@@ -76,7 +76,6 @@ simd_float4x4 toSimd(const Mat4& m) {
     return r;
 }
 simd_float4 v4(Vec3 v, float w) { return simd_make_float4(v.x, v.y, v.z, w); }
-simd_float4 v4(Vec4 v) { return simd_make_float4(v.x, v.y, v.z, v.w); }
 
 // Authored colors ("#rrggbb") are sRGB; lighting math must happen in linear space.
 float toLinear(float c) { return c <= 0.04045f ? c / 12.92f : std::pow((c + 0.055f) / 1.055f, 2.4f); }

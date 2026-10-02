@@ -9,6 +9,7 @@
 
 #include <cstdint>
 #include <map>
+#include <memory>
 #include <set>
 #include <string>
 #include <unordered_map>
@@ -71,7 +72,9 @@ private:
         EntityId target = kNoEntity;  // kNoEntity = broadcast
     };
     struct Instance {
-        const Program* program = nullptr;  // state is reset when the script's program changes
+        // State resets when the script's program changes. Holding the shared_ptr keeps the old
+        // program alive, so a newly compiled program can never reuse its address (ABA).
+        std::shared_ptr<const Program> program;
         bool started = false;
         std::unordered_map<int, double> timers;
         std::set<int> fired;

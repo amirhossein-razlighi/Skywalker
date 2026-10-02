@@ -180,7 +180,7 @@ TEST_CASE("engine: posted jobs run on pump (cross-thread request path)") {
 TEST_CASE("engine: a throwing edit rolls back and leaves no dangling transaction (regression)") {
     auto e = makeEngine();
     size_t before = e->scene().size();
-    CHECK_THROWS(e->edit("a", "boom", [&]() -> Status {
+    CHECK_THROWS((void)e->edit("a", "boom", [&]() -> Status {
         e->scene().create("Temp");
         throw std::runtime_error("boom");
     }));

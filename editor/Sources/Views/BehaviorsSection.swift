@@ -164,8 +164,7 @@ struct DiagnosticRow: View {
             Image(systemName: isError ? "xmark.octagon.fill" : "exclamationmark.triangle.fill")
                 .foregroundStyle(isError ? Theme.error : Theme.warning).font(.system(size: 10))
             VStack(alignment: .leading, spacing: 1) {
-                Text("Ln \(diagnostic["line"].int ?? 0), Col \(diagnostic["column"].int ?? 0)  ").foregroundStyle(Theme.textFaint)
-                    + Text(diagnostic["message"].string ?? "")
+                Text("\(Text("Ln \(diagnostic["line"].int ?? 0), Col \(diagnostic["column"].int ?? 0)").foregroundStyle(Theme.textFaint))  \(diagnostic["message"].string ?? "")")
                 if let hint = diagnostic["hint"].string { Text(hint).foregroundStyle(Theme.textDim) }
             }
         }
