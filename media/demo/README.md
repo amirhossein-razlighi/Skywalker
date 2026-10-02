@@ -22,6 +22,12 @@ python3 media/demo/render_footage.py VILLAGE_PROJECT DASH_PROJECT WORK/footage
 python compose.py WORK out/skywalker-demo.mp4
 ```
 
+Then normalize loudness for social platforms, **forcing 48 kHz**. `loudnorm` silently upsamples to 96–192 kHz, which QuickTime and most apps play as silence:
+
+```bash
+ffmpeg -i raw.mp4 -c:v copy -af "loudnorm=I=-14:TP=-1.5:LRA=11" -ar 48000 -c:a aac -b:a 192k -movflags +faststart skywalker-demo.mp4
+```
+
 `WORK` must contain `footage/`, `rec_village/` (frames, `events*.jsonl`, `history.json`), `assets/` (avatars, editor screenshots, `behaviors.json`) and `vo/` (one WAV per narration id). Use `--preview` to write stills instead of a video.
 
 Kokoro needs `pip install kokoro soundfile` in a venv on a **short path**: espeak-ng truncates long data paths.
