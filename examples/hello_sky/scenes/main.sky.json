@@ -7,15 +7,15 @@
     "skyTop": "#5b8fe8",
     "skyHorizon": "#dbe8ff",
     "ground": "#6f7a68",
-    "ambient": 0.45,
+    "ambient": 0.35,
     "sunAzimuth": 40,
     "sunElevation": 42,
     "sunColor": "#fff1dc",
-    "sunIntensity": 2.6,
+    "sunIntensity": 2.1,
     "fogColor": "#dbe8ff",
-    "fogDensity": 0.01,
+    "fogDensity": 0.004,
     "exposure": 1,
-    "showGrid": false
+    "showGrid": true
   },
   "entities": [
     {

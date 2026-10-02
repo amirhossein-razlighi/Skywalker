@@ -42,7 +42,7 @@ void OrbitCamera::zoom(float factor) { distance = std::clamp(distance * factor, 
 void OrbitCamera::frame(const Aabb& box) {
     target = box.center();
     float radius = std::max(length(box.extents()), 0.25f);
-    distance = std::clamp(radius / std::sin(radians(fovDeg * 0.5f)) * 1.15f, 0.5f, 5000.f);
+    distance = std::clamp(radius / std::sin(radians(fovDeg * 0.5f)) * 0.9f, 0.5f, 5000.f);
 }
 
 void OrbitCamera::lookAt(Vec3 eye, Vec3 newTarget) {

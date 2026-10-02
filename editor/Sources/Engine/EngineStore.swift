@@ -16,7 +16,37 @@ struct EntitySummary: Identifiable, Hashable, Sendable {
     let id: UInt64
     var name: String
     var parent: UInt64
+    var enabled: Bool
     var components: [String]
+}
+
+enum GizmoMode: Int, CaseIterable, Identifiable, Sendable {
+    case select = 0, move = 1, rotate = 2, scale = 3
+    var id: Int { rawValue }
+    var symbol: String {
+        switch self {
+        case .select: "cursorarrow"
+        case .move: "arrow.up.and.down.and.arrow.left.and.right"
+        case .rotate: "arrow.trianglehead.2.clockwise.rotate.90"
+        case .scale: "arrow.up.left.and.arrow.down.right"
+        }
+    }
+    var title: String {
+        switch self {
+        case .select: "Select (Q)"
+        case .move: "Move (W)"
+        case .rotate: "Rotate (E)"
+        case .scale: "Scale (R)"
+        }
+    }
+}
+
+struct FrameStats: Sendable {
+    var cpuMs = 0.0
+    var draws = 0
+    var entities = 0
+    var renderer = ""
+    var fps = 0.0
 }
 
 /// An entry of the activity feed: who did what.
@@ -42,6 +72,17 @@ final class EngineStore {
     private(set) var logs: [String] = []
     private(set) var revision: UInt64 = 0
     private(set) var agentServerRunning = false
+    private(set) var stats = FrameStats()
+    private(set) var environment: JSON = .null
+    private(set) var cameraYaw: Float = 0
+    private(set) var cameraPitch: Float = 0
+    var gizmoMode: GizmoMode = .move { didSet { applyGizmo() } }
+    var gizmoLocal = false { didSet { applyGizmo() } }
+    var snapping = false
+    var snapStep: Float = 0.5 { didSet { applyGizmo() } }
+    var viewSceneCamera = false { didSet { sky_set_view_scene_camera(handle, viewSceneCamera ? 1 : 0) } }
+    @ObservationIgnored private var frameCount = 0
+    @ObservationIgnored private var fpsWindowStart = Date()
     var selection: Set<UInt64> = [] {
         didSet {
             guard selection != oldValue, !syncingSelection else { return }
@@ -66,6 +107,7 @@ final class EngineStore {
         }
         _ = call("camera_set", ["frame": "all"])
         refresh(force: true)
+        applyGizmo()
         // External agents (Claude Code, Codex, ...) can attach immediately. The socket is
         // user-only (0600); the toggle lives in Settings → External Agents.
         if UserDefaults.standard.object(forKey: Self.autoStartKey) as? Bool ?? true {
@@ -124,7 +166,42 @@ final class EngineStore {
         lastTick = now
         pollEvents()
         refresh(force: false)
+        updateStats(now: now)
     }
+
+    private func updateStats(now: Date) {
+        guard let handle else { return }
+        frameCount += 1
+        var yaw: Float = 0, pitch: Float = 0
+        sky_camera_angles(handle, &yaw, &pitch)
+        if abs(yaw - cameraYaw) > 0.01 || abs(pitch - cameraPitch) > 0.01 {
+            cameraYaw = yaw
+            cameraPitch = pitch
+        }
+        let elapsed = now.timeIntervalSince(fpsWindowStart)
+        guard elapsed >= 0.5, let raw = sky_frame_stats(handle) else { return }  // update UI twice a second
+        defer { sky_string_free(raw) }
+        let j = JSON.parse(String(cString: raw)) ?? .null
+        stats = FrameStats(cpuMs: j["cpuMs"].number ?? 0, draws: j["draws"].int ?? 0, entities: j["entities"].int ?? 0,
+                           renderer: j["renderer"].string ?? "", fps: Double(frameCount) / elapsed)
+        frameCount = 0
+        fpsWindowStart = now
+    }
+
+    private func applyGizmo() {
+        sky_gizmo_set_mode(handle, Int32(gizmoMode.rawValue), gizmoLocal ? 1 : 0)
+        sky_gizmo_set_snap(handle, snapStep, 15)
+    }
+
+    // Gizmo interaction (pixel coordinates)
+    func gizmoHover(x: Float, y: Float, width: Int, height: Int) { _ = sky_gizmo_hover(handle, x, y, Int32(width), Int32(height)) }
+    func gizmoBegin(x: Float, y: Float, width: Int, height: Int) -> Bool {
+        sky_gizmo_begin(handle, x, y, Int32(width), Int32(height)) != 0
+    }
+    func gizmoDrag(x: Float, y: Float, width: Int, height: Int, snap: Bool) {
+        sky_gizmo_drag(handle, x, y, Int32(width), Int32(height), snap || snapping ? 1 : 0)
+    }
+    func gizmoEnd() { sky_gizmo_end(handle) }
 
     func render(layer: UnsafeMutableRawPointer, width: Int, height: Int) {
         guard let handle, width > 0, height > 0 else { return }
@@ -145,9 +222,11 @@ final class EngineStore {
         if revision != rev { revision = rev }
         let overview = call_noRefresh("scene_overview", ["max_entities": 5000])
         sceneName = overview.structured["name"].string ?? sceneName
+        environment = call_noRefresh("environment_get", [:]).structured
         entities = overview.structured["entities"].array.map {
             EntitySummary(id: UInt64($0["id"].number ?? 0), name: $0["name"].string ?? "",
                           parent: UInt64($0["parent"].number ?? 0),
+                          enabled: $0["enabled"].bool ?? true,
                           components: $0["components"].array.compactMap(\.string))
         }
         syncSelectionFromEngine()
@@ -204,6 +283,8 @@ final class EngineStore {
             }
         }
     }
+
+    func clearLogs() { logs.removeAll() }
 
     private func append(_ item: ActivityItem) {
         activity.append(item)

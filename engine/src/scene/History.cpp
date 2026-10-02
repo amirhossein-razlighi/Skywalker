@@ -25,6 +25,7 @@ void History::begin(std::string actor, std::string label) {
     pending_ = HistoryEntry{};
     pending_.actor = std::move(actor);
     pending_.label = std::move(label);
+    pending_.sceneOrderBefore = scene_.entities();
     active_ = true;
 }
 
@@ -58,6 +59,7 @@ bool History::commit() {
         before.push_back(entry.before[i]);
         after.emplace_back(id, std::move(now));
     }
+    entry.sceneOrderAfter = scene_.entities();
     entry.order = std::move(order);
     entry.before = std::move(before);
     entry.after = std::move(after);
@@ -65,7 +67,7 @@ bool History::commit() {
         entry.environmentAfter = reflect::toJson(&scene_.environment(), Environment::type());
         entry.environmentChanged = entry.environmentAfter != entry.environmentBefore;
     }
-    if (entry.order.empty() && !entry.environmentChanged) return false;
+    if (entry.order.empty() && !entry.environmentChanged && entry.sceneOrderBefore == entry.sceneOrderAfter) return false;
 
     entries_.erase(entries_.begin() + static_cast<std::ptrdiff_t>(cursor_), entries_.end());  // drop redo tail
     entry.serial = ++serial_;
@@ -78,13 +80,12 @@ bool History::commit() {
 void History::rollback() {
     if (!active_) return;
     active_ = false;
-    restore(pending_.order, pending_.before, pending_.environmentChanged, pending_.environmentBefore, true);
+    restore(pending_.sceneOrderBefore, pending_.before, pending_.environmentChanged, pending_.environmentBefore, true);
     pending_ = HistoryEntry{};
 }
 
-void History::restore(const std::vector<EntityId>& order, const std::vector<std::pair<EntityId, Json>>& states,
+void History::restore(const std::vector<EntityId>& sceneOrder, const std::vector<std::pair<EntityId, Json>>& states,
                       bool environment, const Json& env, bool reverse) {
-    (void)order;
     ChangeObserver* saved = scene_.observer();
     scene_.setObserver(nullptr);
     // Restoring "before" states walks the touch list backwards so that later changes
@@ -108,6 +109,7 @@ void History::restore(const std::vector<EntityId>& order, const std::vector<std:
         }
     }
     if (environment) (void)reflect::applyJson(&scene_.environment(), Environment::type(), env);
+    scene_.setOrder(sceneOrder);
     scene_.markDirty();
     scene_.setObserver(saved);
 }
@@ -115,14 +117,14 @@ void History::restore(const std::vector<EntityId>& order, const std::vector<std:
 const HistoryEntry* History::undo() {
     if (active_ || !canUndo()) return nullptr;
     const HistoryEntry& e = entries_[--cursor_];
-    restore(e.order, e.before, e.environmentChanged, e.environmentBefore, true);
+    restore(e.sceneOrderBefore, e.before, e.environmentChanged, e.environmentBefore, true);
     return &e;
 }
 
 const HistoryEntry* History::redo() {
     if (active_ || !canRedo()) return nullptr;
     const HistoryEntry& e = entries_[cursor_++];
-    restore(e.order, e.after, e.environmentChanged, e.environmentAfter, false);
+    restore(e.sceneOrderAfter, e.after, e.environmentChanged, e.environmentAfter, false);
     return &e;
 }
 

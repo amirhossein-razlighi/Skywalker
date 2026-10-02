@@ -47,6 +47,7 @@ struct FrameUniforms {
     simd_float4 ground;
     simd_float4 fog;
     simd_float4 params;
+    simd_float4 viewport;
 };
 
 struct DrawUniforms {
@@ -238,7 +239,8 @@ private:
         }
         auto fn = [&](const char* name) { return [lib newFunctionWithName:[NSString stringWithUTF8String:name]]; };
         for (const char* required : {"fullscreenVertex", "skyFragment", "meshVertex", "meshFragment", "shadowVertex",
-                                     "gridVertex", "gridFragment", "presentFragment"}) {
+                                     "gridVertex", "gridFragment", "presentFragment", "outlineVertex",
+                                     "outlineFragment", "overlayFragment"}) {
             if (!fn(required)) {
                 return Error::make("shader_missing_function", std::string("shader source must define ") + required);
             }
@@ -272,7 +274,9 @@ private:
         id<MTLRenderPipelineState> grid = meshBlend ? make("gridVertex", "gridFragment", kColorFormat, kSamples, true, true, &e) : nil;
         id<MTLRenderPipelineState> shadow = grid ? make("shadowVertex", nullptr, MTLPixelFormatInvalid, 1, false, true, &e) : nil;
         id<MTLRenderPipelineState> present = shadow ? make("fullscreenVertex", "presentFragment", kColorFormat, 1, false, false, &e) : nil;
-        if (!present) {
+        id<MTLRenderPipelineState> outline = present ? make("outlineVertex", "outlineFragment", kColorFormat, kSamples, false, true, &e) : nil;
+        id<MTLRenderPipelineState> overlay = outline ? make("meshVertex", "overlayFragment", kColorFormat, kSamples, true, true, &e) : nil;
+        if (!overlay) {
             return Error::make("pipeline_error", e ? std::string(e.localizedDescription.UTF8String) : "pipeline creation failed");
         }
         skyPipeline_ = sky;
@@ -281,6 +285,8 @@ private:
         gridPipeline_ = grid;
         shadowPipeline_ = shadow;
         presentPipeline_ = present;
+        outlinePipeline_ = outline;
+        overlayPipeline_ = overlay;
         return {};
     }
 
@@ -385,6 +391,8 @@ private:
         bool shadows = env.sunElevation > 0.f && env.sunIntensity > 0.f;
         fu.params = simd_make_float4(env.exposure, static_cast<float>(std::min(frame.lights.size(), FrameData::kMaxLights)),
                                      shadows ? 1.f : 0.f, 1.f / static_cast<float>(kShadowSize));
+        float w = static_cast<float>(std::max(frame.width, 1)), h = static_cast<float>(std::max(frame.height, 1));
+        fu.viewport = simd_make_float4(w, h, 1.f / w, 1.f / h);
         return fu;
     }
 
@@ -511,6 +519,28 @@ private:
             for (const DrawItem* d : blended) drawMesh(enc, *d);
         }
 
+        // Selection outline (inverted hull behind the selected meshes)
+        bool anySelected = false;
+        for (const DrawItem& d : frame.draws) anySelected = anySelected || d.selected;
+        if (anySelected) {
+            [enc setRenderPipelineState:outlinePipeline_];
+            [enc setDepthStencilState:depthRead_];
+            [enc setCullMode:MTLCullModeFront];
+            for (const DrawItem& d : frame.draws) {
+                if (!d.selected) continue;
+                const GpuMesh* m = mesh(d.mesh);
+                if (!m) continue;
+                DrawUniforms du = drawUniforms(d, false);
+                [enc setVertexBuffer:m->vertices offset:0 atIndex:0];
+                [enc setVertexBytes:&du length:sizeof(du) atIndex:1];
+                [enc drawIndexedPrimitives:MTLPrimitiveTypeTriangle
+                                indexCount:m->indexCount
+                                 indexType:MTLIndexTypeUInt32
+                               indexBuffer:m->indices
+                         indexBufferOffset:0];
+            }
+        }
+
         // Grid
         if (frame.drawGrid) {
             [enc setRenderPipelineState:gridPipeline_];
@@ -520,6 +550,31 @@ private:
             [enc setFragmentBytes:&fu length:sizeof(fu) atIndex:0];
             [enc drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:6];
         }
+
+        // Overlays (gizmos) on top of everything
+        if (!frame.overlays.empty()) {
+            [enc setRenderPipelineState:overlayPipeline_];
+            [enc setDepthStencilState:depthNone_];
+            [enc setCullMode:MTLCullModeBack];
+            [enc setVertexBytes:&fu length:sizeof(fu) atIndex:2];
+            [enc setFragmentBytes:&fu length:sizeof(fu) atIndex:1];
+            for (const OverlayItem& o : frame.overlays) {
+                const GpuMesh* m = mesh(o.mesh);
+                if (!m) continue;
+                DrawUniforms du{};
+                du.model = toSimd(o.model);
+                du.normalMatrix = toSimd(o.model.inverse().transposed());
+                du.color = lin(o.color);
+                [enc setVertexBuffer:m->vertices offset:0 atIndex:0];
+                [enc setVertexBytes:&du length:sizeof(du) atIndex:1];
+                [enc setFragmentBytes:&du length:sizeof(du) atIndex:0];
+                [enc drawIndexedPrimitives:MTLPrimitiveTypeTriangle
+                                indexCount:m->indexCount
+                                 indexType:MTLIndexTypeUInt32
+                               indexBuffer:m->indices
+                         indexBufferOffset:0];
+            }
+        }
         [enc endEncoding];
     }
 
@@ -527,7 +582,7 @@ private:
     id<MTLCommandQueue> queue_;
     MTKTextureLoader* textureLoader_;
     id<MTLRenderPipelineState> skyPipeline_, meshPipeline_, meshBlendPipeline_, gridPipeline_, shadowPipeline_,
-        presentPipeline_;
+        presentPipeline_, outlinePipeline_, overlayPipeline_;
     id<MTLDepthStencilState> depthWrite_, depthRead_, depthNone_;
     id<MTLTexture> resolve_, msaaColor_, msaaDepth_, shadowMap_, white_;
     id<MTLCommandBuffer> lastCommand_;

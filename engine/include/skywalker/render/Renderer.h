@@ -78,6 +78,13 @@ struct LightItem {
     float cosCone = 0.8f;
 };
 
+/// Unlit geometry drawn on top of the scene (gizmos, editor helpers).
+struct OverlayItem {
+    std::string mesh;  // primitive name (incl. internal "gizmo_ring")
+    Mat4 model;
+    Vec4 color;
+};
+
 struct FrameData {
     int width = 0;
     int height = 0;
@@ -87,6 +94,7 @@ struct FrameData {
     Environment environment;
     std::vector<DrawItem> draws;
     std::vector<LightItem> lights;  // up to kMaxLights are used
+    std::vector<OverlayItem> overlays;
     bool drawGrid = true;
     float time = 0;
 

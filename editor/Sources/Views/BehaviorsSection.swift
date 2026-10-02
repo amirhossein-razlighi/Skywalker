@@ -1,8 +1,8 @@
 import SwiftUI
 
-/// The ECPS editor: each behavior is an *intent* (plain language, for people and agents)
-/// woven into *Wander* code (deterministic, for the engine). Edit either side; "Weave"
-/// asks the crew's gameplay programmer to (re)write the code from the intent.
+/// ECPS (Entity-Component-Prompt System) editor: each behavior is an *intent* in plain
+/// language plus its *Wander* code. Edit either side; "Weave" asks the crew's gameplay
+/// programmer to write or update the code from the intent and verify it in simulation.
 struct BehaviorsSection: View {
     @Environment(EngineStore.self) private var engine
     let entityID: UInt64
@@ -10,27 +10,27 @@ struct BehaviorsSection: View {
     let behaviors: [JSON]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Label("Behaviors", systemImage: "wand.and.stars").font(.headline)
-                Spacer()
+        PropertySection(title: "Behaviors", icon: "sparkles") {
+            VStack(alignment: .leading, spacing: 8) {
+                if behaviors.isEmpty {
+                    Text("Describe what this entity should do. Your crew weaves the intent into deterministic Wander code.")
+                        .font(Theme.label).foregroundStyle(Theme.textFaint)
+                }
+                ForEach(behaviors.indices, id: \.self) { i in
+                    BehaviorCard(entityID: entityID, entityName: entityName, behavior: behaviors[i])
+                }
                 Button {
-                    let name = "Behavior \(behaviors.count + 1)"
-                    engine.call("behavior_set", ["entity": .number(Double(entityID)), "name": .string(name),
+                    var n = behaviors.count + 1
+                    let names = Set(behaviors.compactMap { $0["name"].string })
+                    while names.contains("Behavior \(n)") { n += 1 }
+                    engine.call("behavior_set", ["entity": .number(Double(entityID)), "name": .string("Behavior \(n)"),
                                                  "intent": "", "source": ""])
-                } label: { Image(systemName: "plus") }
+                } label: {
+                    Label("Add Behavior", systemImage: "plus").font(Theme.label)
+                }
                 .buttonStyle(.borderless)
-                .help("Add behavior")
-            }
-            if behaviors.isEmpty {
-                Text("Describe what this entity should do — your crew can weave it into Wander.")
-                    .font(.caption).foregroundStyle(.secondary)
-            }
-            ForEach(behaviors.indices, id: \.self) { i in
-                BehaviorCard(entityID: entityID, entityName: entityName, behavior: behaviors[i])
             }
         }
-        .card()
     }
 }
 
@@ -45,33 +45,41 @@ struct BehaviorCard: View {
     @State private var source = ""
     @State private var diagnostics: [JSON] = []
     @State private var weaving = false
-    @State private var showCode = true
 
     private var name: String { behavior["name"].string ?? "Behavior" }
     private var dirty: Bool { intent != (behavior["intent"].string ?? "") || source != (behavior["source"].string ?? "") }
+    private var errorLines: Set<Int> {
+        Set(diagnostics.filter { $0["severity"].string == "error" }.compactMap { $0["line"].int })
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text(name).font(.subheadline.weight(.semibold))
-                Spacer()
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
                 Toggle("", isOn: Binding(get: { behavior["enabled"].bool ?? true }, set: { save(enabled: $0) }))
-                    .toggleStyle(.switch).controlSize(.mini).labelsHidden()
-                Button(role: .destructive) {
-                    engine.call("behavior_remove", ["entity": .number(Double(entityID)), "name": .string(name)])
-                } label: { Image(systemName: "trash") }
-                .buttonStyle(.borderless)
+                    .toggleStyle(.checkbox).labelsHidden()
+                Text(name).font(Theme.sectionTitle)
+                statusBadge
+                Spacer()
+                Menu {
+                    Button("Remove Behavior", role: .destructive) {
+                        engine.call("behavior_remove", ["entity": .number(Double(entityID)), "name": .string(name)])
+                    }
+                } label: { Image(systemName: "ellipsis").font(.system(size: 10)) }
+                .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
             }
 
-            Text("Intent").font(.caption).foregroundStyle(.secondary)
+            Label("Intent", systemImage: "text.bubble").font(Theme.caps).foregroundStyle(Theme.textDim)
             TextEditor(text: $intent)
-                .font(.callout)
-                .frame(minHeight: 44)
+                .font(Theme.body)
                 .scrollContentBackground(.hidden)
-                .padding(6)
-                .background(Theme.sky.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+                .frame(minHeight: 38, maxHeight: 80)
+                .padding(4)
+                .background(Theme.field, in: RoundedRectangle(cornerRadius: 4))
+                .overlay(RoundedRectangle(cornerRadius: 4).stroke(Theme.border))
 
-            HStack {
+            HStack(spacing: 6) {
+                Label("Wander", systemImage: "chevron.left.forwardslash.chevron.right").font(Theme.caps).foregroundStyle(Theme.textDim)
+                Spacer()
                 Button {
                     weaving = true
                     Task {
@@ -80,56 +88,59 @@ struct BehaviorCard: View {
                         weaving = false
                     }
                 } label: {
-                    Label(weaving ? "Weaving…" : "Weave with crew", systemImage: "sparkles")
+                    Label(weaving ? "Weaving…" : "Weave", systemImage: "sparkles").font(Theme.label)
                 }
-                .disabled(weaving || intent.trimmingCharacters(in: .whitespaces).isEmpty)
-                .buttonStyle(.borderedProminent)
-                .tint(Theme.violet)
+                .buttonStyle(.bordered)
+                .tint(Theme.ai)
                 .controlSize(.small)
-                Spacer()
-                Button(showCode ? "Hide Wander" : "Show Wander") { showCode.toggle() }
-                    .buttonStyle(.borderless).controlSize(.small)
+                .disabled(weaving || intent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .help("Ask the crew's gameplay programmer to write this behavior from the intent")
             }
+            CodeEditor(text: $source, errorLines: errorLines)
+                .frame(minHeight: 120, idealHeight: 180, maxHeight: 320)
+                .background(Theme.field, in: RoundedRectangle(cornerRadius: 4))
+                .overlay(RoundedRectangle(cornerRadius: 4).stroke(Theme.border))
 
-            if showCode {
-                TextEditor(text: $source)
-                    .font(Theme.monoSmall)
-                    .frame(minHeight: 120)
-                    .scrollContentBackground(.hidden)
-                    .padding(6)
-                    .background(.black.opacity(0.06), in: RoundedRectangle(cornerRadius: 8))
-                ForEach(diagnostics.indices, id: \.self) { i in
-                    let d = diagnostics[i]
-                    Label {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("\(d["line"].int ?? 0):\(d["column"].int ?? 0)  \(d["message"].string ?? "")")
-                            if let hint = d["hint"].string { Text(hint).foregroundStyle(.secondary) }
-                        }
-                    } icon: {
-                        Image(systemName: d["severity"].string == "error" ? "xmark.octagon.fill" : "exclamationmark.triangle.fill")
-                            .foregroundStyle(d["severity"].string == "error" ? Theme.rose : Theme.dawn)
-                    }
-                    .font(.caption)
-                }
+            ForEach(diagnostics.indices, id: \.self) { i in
+                DiagnosticRow(diagnostic: diagnostics[i])
             }
 
             if dirty {
                 HStack {
+                    Text("Unsaved changes").font(Theme.label).foregroundStyle(Theme.warning)
                     Spacer()
                     Button("Revert") { syncFromEngine() }.controlSize(.small)
-                    Button("Save") { save() }.controlSize(.small).keyboardShortcut(.return, modifiers: .command)
+                    Button("Save") { save() }.controlSize(.small).buttonStyle(.borderedProminent)
+                        .keyboardShortcut(.return, modifiers: .command)
                 }
             }
         }
         .padding(8)
-        .background(.background, in: RoundedRectangle(cornerRadius: 8))
+        .background(Theme.panelRaised, in: RoundedRectangle(cornerRadius: 6))
+        .overlay(RoundedRectangle(cornerRadius: 6).stroke(Theme.border))
         .onAppear(perform: syncFromEngine)
-        .onChange(of: behavior) { _, _ in syncFromEngine() }
+        .onChange(of: behavior) { _, _ in if !dirty { syncFromEngine() } }
         .task(id: source) {
-            try? await Task.sleep(for: .milliseconds(350))  // debounce live checking
+            try? await Task.sleep(for: .milliseconds(300))  // debounce live checking
             guard !Task.isCancelled else { return }
             diagnostics = engine.call("wander_check", ["source": .string(source)], actor: "editor").structured["diagnostics"].array
         }
+    }
+
+    @ViewBuilder private var statusBadge: some View {
+        let errors = diagnostics.filter { $0["severity"].string == "error" }.count
+        if source.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            badge("empty", Theme.textFaint)
+        } else if errors > 0 {
+            badge("\(errors) error\(errors == 1 ? "" : "s")", Theme.error)
+        } else {
+            badge("compiled", Theme.success)
+        }
+    }
+
+    private func badge(_ text: String, _ color: Color) -> some View {
+        Text(text).font(.system(size: 9.5, weight: .medium)).padding(.horizontal, 5).padding(.vertical, 1)
+            .foregroundStyle(color).background(color.opacity(0.14), in: Capsule())
     }
 
     private func syncFromEngine() {
@@ -142,5 +153,23 @@ struct BehaviorCard: View {
                           "intent": .string(intent), "source": .string(source), "allow_errors": true]
         if let enabled { args.set("enabled", .bool(enabled)) }
         engine.call("behavior_set", args)
+    }
+}
+
+struct DiagnosticRow: View {
+    let diagnostic: JSON
+    var body: some View {
+        let isError = diagnostic["severity"].string == "error"
+        HStack(alignment: .top, spacing: 6) {
+            Image(systemName: isError ? "xmark.octagon.fill" : "exclamationmark.triangle.fill")
+                .foregroundStyle(isError ? Theme.error : Theme.warning).font(.system(size: 10))
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Ln \(diagnostic["line"].int ?? 0), Col \(diagnostic["column"].int ?? 0)  ").foregroundStyle(Theme.textFaint)
+                    + Text(diagnostic["message"].string ?? "")
+                if let hint = diagnostic["hint"].string { Text(hint).foregroundStyle(Theme.textDim) }
+            }
+        }
+        .font(Theme.label)
+        .textSelection(.enabled)
     }
 }

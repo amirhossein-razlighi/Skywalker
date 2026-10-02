@@ -135,6 +135,23 @@ std::vector<EntityId> Scene::children(EntityId id) const {
     return out;
 }
 
+void Scene::setOrder(const std::vector<EntityId>& order) {
+    std::vector<EntityId> result;
+    result.reserve(order_.size());
+    std::unordered_map<EntityId, bool> placed;
+    for (EntityId id : order) {
+        if (exists(id) && !placed[id]) {
+            result.push_back(id);
+            placed[id] = true;
+        }
+    }
+    for (EntityId id : order_) {
+        if (!placed[id]) result.push_back(id);
+    }
+    order_ = std::move(result);
+    ++revision_;
+}
+
 EntityId Scene::find(std::string_view nameOrId) const {
     std::string_view s = nameOrId;
     if (!s.empty() && s[0] == '#') s.remove_prefix(1);

@@ -20,6 +20,7 @@ set(SKY_ENGINE_SOURCES
     src/agent/McpServer.cpp
     src/agent/SocketServer.cpp
     src/engine/Engine.cpp
+    src/engine/Gizmo.cpp
 )
 
 add_library(skywalker_engine STATIC ${SKY_ENGINE_SOURCES})

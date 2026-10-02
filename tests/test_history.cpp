@@ -103,3 +103,37 @@ TEST_CASE("history: environment changes are undoable") {
     REQUIRE(h.undo());
     CHECK(s.environment().sunElevation == doctest::Approx(Environment{}.sunElevation));
 }
+
+TEST_CASE("history: undo restores exact entity order (regression)") {
+    Scene s;
+    History h(s);
+    EntityId a = s.create("A");
+    EntityId b = s.create("B");
+    EntityId c = s.create("C");
+    Json before = s.toJson();
+    h.begin("user", "Delete two");
+    s.destroy(a);
+    s.destroy(b);
+    REQUIRE(h.commit());
+    REQUIRE(h.undo());
+    CHECK(s.entities() == std::vector<EntityId>{a, b, c});
+    CHECK(s.toJson() == before);
+
+    // parent deleted with a child that precedes it in order
+    Scene t;
+    History ht(t);
+    EntityId child = t.create("Child");
+    EntityId other = t.create("Other");
+    EntityId parent = t.create("Parent");
+    (void)t.setParent(child, parent);
+    Json beforeT = t.toJson();
+    ht.begin("user", "Delete parent");
+    t.destroy(parent);
+    REQUIRE(ht.commit());
+    REQUIRE(ht.undo());
+    CHECK(t.entities() == std::vector<EntityId>{child, other, parent});
+    CHECK(t.toJson() == beforeT);
+    REQUIRE(ht.redo());
+    REQUIRE(ht.undo());
+    CHECK(t.toJson() == beforeT);
+}

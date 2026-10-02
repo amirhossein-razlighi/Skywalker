@@ -76,6 +76,9 @@ public:
     /// Entities in stable, deterministic order (creation / hierarchy order).
     const std::vector<EntityId>& entities() const { return order_; }
     std::vector<EntityId> children(EntityId id) const;
+    /// Reorders entities to follow `order` (ids that don't exist are skipped; existing ids
+    /// missing from `order` keep their relative order at the end). Used by undo/redo.
+    void setOrder(const std::vector<EntityId>& order);
     size_t size() const { return order_.size(); }
 
     /// Finds by exact id ("#12"/"12"), exact name, then case-insensitive name.

@@ -1,5 +1,6 @@
 #include "skywalker/agent/SocketServer.h"
 
+#include <poll.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/un.h>
@@ -109,6 +110,10 @@ Status SocketServer::start(const std::string& path) {
     }
     ::chmod(path.c_str(), 0600);  // only the current user may drive the editor
     if (::listen(fd.get(), 8) != 0) return Error::make("listen_failed", std::strerror(errno));
+    int pipeFds[2];
+    if (::pipe(pipeFds) != 0) return Error::make("io_error", std::strerror(errno));
+    wakeRead_.reset(pipeFds[0]);
+    wakeWrite_.reset(pipeFds[1]);
     path_ = path;
     listenFd_ = std::move(fd);
     running_ = true;
@@ -119,9 +124,15 @@ Status SocketServer::start(const std::string& path) {
 void SocketServer::stop() {
     if (!running_.exchange(false)) return;
     // Shutting down the listening socket wakes accept(); shutting down clients wakes read().
-    ::shutdown(listenFd_.get(), SHUT_RDWR);
-    listenFd_.reset();
+    // Wake the accept loop through the self-pipe (shutdown() does not interrupt accept()
+    // on macOS), join it, and only then close the descriptors — closing first would race
+    // with the accept thread and could hand it a recycled descriptor.
+    const char byte = 1;
+    (void)!::write(wakeWrite_.get(), &byte, 1);
     if (acceptThread_.joinable()) acceptThread_.join();
+    listenFd_.reset();
+    wakeRead_.reset();
+    wakeWrite_.reset();
     std::vector<std::thread> threads;
     {
         std::lock_guard lock(clientsMutex_);
@@ -136,6 +147,14 @@ void SocketServer::stop() {
 
 void SocketServer::acceptLoop() {
     while (running_) {
+        pollfd fds[2] = {{listenFd_.get(), POLLIN, 0}, {wakeRead_.get(), POLLIN, 0}};
+        int ready = ::poll(fds, 2, -1);
+        if (ready < 0) {
+            if (errno == EINTR) continue;
+            break;
+        }
+        if (fds[1].revents != 0 || !running_) break;  // stop requested
+        if ((fds[0].revents & POLLIN) == 0) continue;
         int c = ::accept(listenFd_.get(), nullptr, nullptr);
         if (c < 0) {
             if (errno == EINTR) continue;

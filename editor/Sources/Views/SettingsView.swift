@@ -53,8 +53,7 @@ private struct CrewSettings: View {
                 Form {
                     HStack {
                         Spacer()
-                        CloudAvatar(color: crew.cloudlings[i].color, face: crew.cloudlings[i].face,
-                                    accessory: crew.cloudlings[i].role.symbol, size: 64)
+                        CloudAvatar(color: crew.cloudlings[i].color, face: crew.cloudlings[i].face, size: 64)
                         Spacer()
                     }
                     TextField("Name", text: $crew.cloudlings[i].name)

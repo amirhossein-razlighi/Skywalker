@@ -1,5 +1,6 @@
 #include "sky_api.h"
 
+#include <algorithm>
 #include <cstdlib>
 #include <cstring>
 #include <memory>
@@ -132,6 +133,67 @@ void sky_drag_update(SkyEngine* h, float x, float y, int w, int hgt) {
 }
 void sky_drag_end(SkyEngine* h) {
     if (Engine* e = E(h)) e->endDrag();
+}
+
+void sky_gizmo_set_mode(SkyEngine* h, int mode, int local) {
+    if (Engine* e = E(h)) {
+        e->gizmo().mode = static_cast<GizmoMode>(std::clamp(mode, 0, 3));
+        e->gizmo().local = local != 0;
+    }
+}
+
+int sky_gizmo_mode(SkyEngine* h) {
+    Engine* e = E(h);
+    return e ? static_cast<int>(e->gizmo().mode) : 0;
+}
+
+void sky_gizmo_set_snap(SkyEngine* h, float translate, float rotateDeg) {
+    if (Engine* e = E(h)) {
+        e->gizmo().snap = translate;
+        e->gizmo().rotateSnapDeg = rotateDeg > 0 ? rotateDeg : 15.f;
+    }
+}
+
+int sky_gizmo_hover(SkyEngine* h, float x, float y, int w, int hgt) {
+    Engine* e = E(h);
+    return e ? e->gizmoHover(x, y, w, hgt) : -1;
+}
+
+int sky_gizmo_begin(SkyEngine* h, float x, float y, int w, int hgt) {
+    Engine* e = E(h);
+    return e && e->gizmoBegin(x, y, w, hgt) ? 1 : 0;
+}
+
+void sky_gizmo_drag(SkyEngine* h, float x, float y, int w, int hgt, int snapping) {
+    if (Engine* e = E(h)) e->gizmoDrag(x, y, w, hgt, snapping != 0);
+}
+
+void sky_gizmo_end(SkyEngine* h) {
+    if (Engine* e = E(h)) e->gizmoEnd();
+}
+
+void sky_set_view_scene_camera(SkyEngine* h, int on) {
+    if (Engine* e = E(h)) e->setViewThroughSceneCamera(on != 0);
+}
+
+void sky_camera_angles(SkyEngine* h, float* yaw, float* pitch) {
+    Engine* e = E(h);
+    if (!e) return;
+    if (yaw) *yaw = e->camera().yaw;
+    if (pitch) *pitch = e->camera().pitch;
+}
+
+char* sky_frame_stats(SkyEngine* h) {
+    Engine* e = E(h);
+    if (!e) return dup("{}");
+    const auto& s = e->stats();
+    RendererInfo ri = e->renderer().info();
+    return dup(Json::object({{"cpuMs", s.cpuMs},
+                             {"draws", s.draws},
+                             {"lights", s.lights},
+                             {"entities", s.entities},
+                             {"renderer", ri.backend + " · " + ri.device}})
+                   .dump());
 }
 
 void sky_input_key(SkyEngine* h, const char* key, int down) {

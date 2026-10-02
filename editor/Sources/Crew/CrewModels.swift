@@ -131,12 +131,3 @@ struct FlightPlan: Codable, Identifiable, Hashable, Sendable {
     var name: String
     var steps: [FlightStep]
 }
-
-extension Color {
-    init(hex: String) {
-        var s = hex.trimmingCharacters(in: .whitespaces)
-        if s.hasPrefix("#") { s.removeFirst() }
-        let v = UInt64(s, radix: 16) ?? 0x5c8fed
-        self.init(red: Double((v >> 16) & 0xff) / 255, green: Double((v >> 8) & 0xff) / 255, blue: Double(v & 0xff) / 255)
-    }
-}

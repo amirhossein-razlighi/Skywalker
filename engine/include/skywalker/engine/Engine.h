@@ -12,11 +12,13 @@
 #include <future>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <vector>
 
 #include "skywalker/agent/ToolRegistry.h"
 #include "skywalker/core/Json.h"
+#include "skywalker/engine/Gizmo.h"
 #include "skywalker/render/Renderer.h"
 #include "skywalker/scene/History.h"
 #include "skywalker/scene/Scene.h"
@@ -113,6 +115,26 @@ public:
     void dragTo(float x, float y, int width, int height);
     void endDrag();
 
+    // --- Transform gizmo (editor) ---------------------------------------------------
+    Gizmo& gizmo() { return gizmo_; }
+    /// Editor viewport looks through the scene's primary camera instead of the orbit camera.
+    void setViewThroughSceneCamera(bool on) { viewSceneCamera_ = on; }
+    bool viewThroughSceneCamera() const { return viewSceneCamera_; }
+    /// Highlights the handle under the cursor. Returns the axis or -1.
+    int gizmoHover(float x, float y, int width, int height);
+    /// Starts dragging a handle if one is under the cursor (opens an undo transaction).
+    bool gizmoBegin(float x, float y, int width, int height);
+    void gizmoDrag(float x, float y, int width, int height, bool snapping);
+    void gizmoEnd();
+
+    struct FrameStats {
+        double cpuMs = 0;
+        size_t draws = 0;
+        size_t lights = 0;
+        size_t entities = 0;
+    };
+    const FrameStats& stats() const { return stats_; }
+
     // --- Scene files & assets -------------------------------------------------------
     Status newScene(const std::string& name, bool withDefaults);
     Status loadScene(const std::string& path);
@@ -160,6 +182,16 @@ private:
     std::vector<AssetRequest> assetRequests_;
     uint64_t nextAssetRequest_ = 1;
 
+    bool gizmoTarget(EntityId& id, GizmoFrame& frame, int width, int height);
+    void commitEditTransaction();
+
+    Gizmo gizmo_;
+    bool viewSceneCamera_ = false;
+    int gizmoHot_ = -1;
+    std::optional<Gizmo::DragStart> gizmoDrag_;
+    EntityId gizmoEntity_ = kNoEntity;
+    FrameStats stats_;
+
     struct Drag {
         EntityId entity = kNoEntity;
         float planeY = 0;
@@ -168,7 +200,10 @@ private:
 
     std::deque<Json> events_;
     std::mutex jobsMutex_;
-    bool shuttingDown_ = false;  // guarded by jobsMutex_
+    bool shuttingDown_ = false;   // guarded by jobsMutex_
+    bool acceptingJobs_ = true;   // guarded by jobsMutex_
+    void failQueuedJobsLocked(const std::string& why);
+    int editDepth_ = 0;
     std::deque<std::pair<std::function<Json()>, std::promise<Json>>> jobs_;
     std::unique_ptr<SocketServer> server_;
 };

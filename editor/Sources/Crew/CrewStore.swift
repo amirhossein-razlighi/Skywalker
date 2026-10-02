@@ -34,7 +34,10 @@ final class CrewStore {
     private(set) var runningPlan = false
 
     @ObservationIgnored private let engine: EngineStore
-    @ObservationIgnored private var sessions: [UUID: LLMSession] = [:]
+    @ObservationIgnored private var sessions: [String: LLMSession] = [:]
+    /// Tool results not yet delivered to the model (run was stopped / hit the step limit).
+    /// They are sent with the next message so the provider history stays valid.
+    @ObservationIgnored private var undelivered: [UUID: [ToolOutcome]] = [:]
     @ObservationIgnored private var cancelled: Set<UUID> = []
     @ObservationIgnored private let storeURL: URL
 
@@ -84,6 +87,11 @@ final class CrewStore {
 
     func transcript(for c: Cloudling) -> [ChatEntry] { transcripts[c.id] ?? [] }
     func isWorking(_ c: Cloudling) -> Bool { working.contains(c.id) }
+    var workingCount: Int { working.count }
+    func modelLabel(for c: Cloudling) -> String {
+        let provider = providers.first { $0.id == c.providerID } ?? providers.first
+        return c.model.isEmpty ? (provider?.defaultModel ?? "no provider") : c.model
+    }
     func cloudling(named name: String) -> Cloudling? {
         cloudlings.first { $0.name.caseInsensitiveCompare(name) == .orderedSame }
     }
@@ -93,11 +101,17 @@ final class CrewStore {
     }
 
     func resetConversation(_ c: Cloudling) {
-        sessions[c.id] = nil
+        stop(c)
+        sessions = sessions.filter { !$0.key.hasPrefix(c.id.uuidString) }
+        undelivered[c.id] = nil
         transcripts[c.id] = []
     }
 
-    func stop(_ c: Cloudling) { cancelled.insert(c.id) }
+    func stop(_ c: Cloudling) {
+        cancelled.insert(c.id)
+        // Release any loop suspended on an approval prompt.
+        for approval in pendingApprovals where approval.cloudling.id == c.id { resolve(approval, approved: false) }
+    }
 
     private func log(_ c: Cloudling, _ entry: ChatEntry) {
         transcripts[c.id, default: []].append(entry)
@@ -109,24 +123,33 @@ final class CrewStore {
     /// Returns the agent's final text (used for delegation and pipelines).
     @discardableResult
     func send(_ text: String, to c: Cloudling, depth: Int = 0) async -> String {
+        // One loop per agent at a time: a second loop would interleave messages in the
+        // same provider history (weave / pipelines / delegation can all target a busy agent).
+        guard !working.contains(c.id) else {
+            log(c, ChatEntry(role: .system, text: "Busy — skipped a request while already working."))
+            return "\(c.name) is busy with another task; try again later."
+        }
         log(c, ChatEntry(role: .user, text: text))
         working.insert(c.id)
         cancelled.remove(c.id)
         defer { working.remove(c.id) }
 
+        let allowDelegation = depth == 0
+        let key = "\(c.id.uuidString)|\(allowDelegation)"
         let session: LLMSession
         do {
-            session = try sessionFor(c, allowDelegation: depth == 0)
+            session = try sessionFor(c, key: key, allowDelegation: allowDelegation)
         } catch {
             log(c, ChatEntry(role: .error, text: error.localizedDescription, isError: true))
             return "error: \(error.localizedDescription)"
         }
 
-        var outcomes: [ToolOutcome] = []
+        var outcomes: [ToolOutcome] = undelivered.removeValue(forKey: c.id) ?? []
         var userText: String? = text
         var finalText = ""
         for _ in 0..<Self.maxRounds {
             if cancelled.contains(c.id) {
+                undelivered[c.id] = outcomes
                 log(c, ChatEntry(role: .system, text: "Stopped."))
                 return finalText.isEmpty ? "stopped" : finalText
             }
@@ -135,7 +158,7 @@ final class CrewStore {
                 turn = try await session.send(userText: userText, toolOutcomes: outcomes)
             } catch {
                 log(c, ChatEntry(role: .error, text: error.localizedDescription, isError: true))
-                sessions[c.id] = nil  // history may be inconsistent after a failed request
+                sessions[key] = nil  // history may be inconsistent after a failed request
                 return "error: \(error.localizedDescription)"
             }
             userText = nil
@@ -155,22 +178,28 @@ final class CrewStore {
             if turn.toolCalls.isEmpty { return finalText }
             outcomes = []
             for call in turn.toolCalls {
-                outcomes.append(await execute(call, by: c, depth: depth))
+                if cancelled.contains(c.id) {
+                    outcomes.append(ToolOutcome(callID: call.id, name: call.name, text: "Cancelled by the user.",
+                                                imagesBase64: [], isError: true))
+                } else {
+                    outcomes.append(await execute(call, by: c, depth: depth))
+                }
             }
         }
-        log(c, ChatEntry(role: .system, text: "Reached the step limit (\(Self.maxRounds) rounds)."))
+        undelivered[c.id] = outcomes  // delivered with the next message
+        log(c, ChatEntry(role: .system, text: "Reached the step limit (\(Self.maxRounds) rounds). Send a message to continue."))
         return finalText
     }
 
-    private func sessionFor(_ c: Cloudling, allowDelegation: Bool) throws -> LLMSession {
-        if let s = sessions[c.id] { return s }
+    private func sessionFor(_ c: Cloudling, key: String, allowDelegation: Bool) throws -> LLMSession {
+        if let s = sessions[key] { return s }
         guard let provider = providers.first(where: { $0.id == c.providerID }) ?? providers.first else {
             throw ProviderError.badResponse("no provider configured")
         }
         let model = c.model.isEmpty ? provider.defaultModel : c.model
         let s = try Providers.makeSession(config: provider, model: model, system: systemPrompt(for: c),
                                           tools: tools(for: c, allowDelegation: allowDelegation))
-        sessions[c.id] = s
+        sessions[key] = s
         return s
     }
 
@@ -245,8 +274,10 @@ final class CrewStore {
     }
 
     func resolve(_ approval: PendingApproval, approved: Bool) {
-        pendingApprovals.removeAll { $0.id == approval.id }
-        approval.resume.resume(returning: approved)
+        // Resume exactly once, even if the button is clicked twice before the UI updates.
+        guard let index = pendingApprovals.firstIndex(where: { $0.id == approval.id }) else { return }
+        let pending = pendingApprovals.remove(at: index)
+        pending.resume.resume(returning: approved)
     }
 
     // MARK: Pipelines ("flight plans")

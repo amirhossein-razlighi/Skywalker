@@ -81,16 +81,16 @@ struct Behavior {
 /// Scene-wide look & feel. Reflected like a component so agents can tweak lighting
 /// with the same generic machinery ("environment": {"sunElevation": 20}).
 struct Environment {
-    Vec4 skyTop{0.36f, 0.58f, 0.92f, 1.f};
-    Vec4 skyHorizon{0.86f, 0.92f, 1.0f, 1.f};
-    Vec4 ground{0.42f, 0.44f, 0.48f, 1.f};
-    float ambient = 0.35f;
+    Vec4 skyTop{0.30f, 0.48f, 0.78f, 1.f};
+    Vec4 skyHorizon{0.74f, 0.80f, 0.88f, 1.f};
+    Vec4 ground{0.30f, 0.31f, 0.33f, 1.f};
+    float ambient = 0.3f;
     float sunAzimuth = 35.f;    // degrees, 0 = +Z, clockwise when seen from above
     float sunElevation = 50.f;  // degrees above horizon
     Vec4 sunColor{1.f, 0.95f, 0.86f, 1.f};
-    float sunIntensity = 2.2f;
-    Vec4 fogColor{0.86f, 0.92f, 1.0f, 1.f};
-    float fogDensity = 0.008f;
+    float sunIntensity = 1.9f;
+    Vec4 fogColor{0.74f, 0.80f, 0.88f, 1.f};
+    float fogDensity = 0.004f;
     float exposure = 1.f;
     bool showGrid = true;
 

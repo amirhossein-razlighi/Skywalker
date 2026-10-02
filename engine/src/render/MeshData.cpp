@@ -185,9 +185,9 @@ MeshData capsule(int segments, int rings) {
     return finish(std::move(m));
 }
 
-MeshData torus(int segments, int sides) {
+MeshData torus(int segments, int sides, float major, float minor) {
     MeshData m;
-    const float R = 0.35f, r = 0.15f;
+    const float R = major, r = minor;
     for (int i = 0; i <= segments; ++i) {
         float u = 2.f * kPi * static_cast<float>(i) / static_cast<float>(segments);
         Vec3 center{std::cos(u) * R, 0, std::sin(u) * R};
@@ -210,6 +210,7 @@ Result<MeshData> primitive(const std::string& name) {
     if (name == "cone") return cone();
     if (name == "capsule") return capsule();
     if (name == "torus") return torus();
+    if (name == "gizmo_ring") return torus(96, 8, 0.5f, 0.012f);  // internal: rotate-gizmo ring
     return Error::make("unknown_mesh", "unknown primitive '" + name + "'");
 }
 

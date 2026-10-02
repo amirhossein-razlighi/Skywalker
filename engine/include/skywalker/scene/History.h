@@ -26,6 +26,8 @@ struct HistoryEntry {
     std::string actor;  // "user", "agent:Nimbus", "mcp:claude-code", ...
     std::string label;  // "Move Crate", "Batch (5 ops)"
     std::vector<EntityId> order;              // touch order
+    std::vector<EntityId> sceneOrderBefore;   // full entity order before / after, so undo
+    std::vector<EntityId> sceneOrderAfter;    // and redo reproduce ordering exactly
     std::vector<std::pair<EntityId, Json>> before;
     std::vector<std::pair<EntityId, Json>> after;
     bool environmentChanged = false;
@@ -62,7 +64,7 @@ public:
     void beforeEnvironmentChange() override;
 
 private:
-    void restore(const std::vector<EntityId>& order, const std::vector<std::pair<EntityId, Json>>& states,
+    void restore(const std::vector<EntityId>& sceneOrder, const std::vector<std::pair<EntityId, Json>>& states,
                  bool environment, const Json& env, bool reverse);
 
     Scene& scene_;

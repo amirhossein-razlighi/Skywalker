@@ -83,7 +83,7 @@ Json briefJson(const Scene& s, EntityId e) {
         if (k.has(s, e)) comps.push(k.name);
     }
     if (s.get<Behavior>(e)) comps.push("behaviors");
-    Json j = Json::object({{"id", e}, {"name", r->name}, {"parent", r->parent}, {"components", comps}});
+    Json j = Json::object({{"id", e}, {"name", r->name}, {"parent", r->parent}, {"enabled", r->enabled}, {"components", comps}});
     if (const auto* t = s.get<Transform>(e)) j["position"] = reflect::vec3ToJson(t->position);
     return j;
 }
@@ -479,6 +479,12 @@ void addSceneTools(Engine& engine, ToolRegistry& reg) {
                  }
                  if (out.size() == 0) return ToolResult::error(Error::make("not_found", "unknown component"));
                  return ToolResult::json(out);
+             }});
+
+    reg.add({"environment_get", "Get lighting & environment",
+             "Current sun, sky, ambient, fog, exposure and grid settings.", "render", object({}), false, false,
+             [&engine](const Json&, ToolContext&) {
+                 return ToolResult::json(reflect::toJson(&engine.scene().environment(), Environment::type()));
              }});
 
     reg.add({"environment_update", "Lighting & environment",

@@ -1,5 +1,7 @@
 #include "skywalker/engine/Engine.h"
 
+#include <atomic>
+#include <chrono>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -51,10 +53,7 @@ Engine::~Engine() {
         // server threads; otherwise a connection thread could wait on a job never pumped.
         std::lock_guard lock(jobsMutex_);
         shuttingDown_ = true;
-        for (auto& [job, promise] : jobs_) {
-            promise.set_value(ToolResult::error(Error::make("engine_shutdown", "the engine is shutting down")).toMcp());
-        }
-        jobs_.clear();
+        failQueuedJobsLocked("the engine is shutting down");
     }
     stopAgentServer();
 }
@@ -78,22 +77,46 @@ ToolResult Engine::callTool(std::string_view name, const Json& args, const std::
 }
 
 Status Engine::edit(const std::string& actor, const std::string& label, const std::function<Status()>& fn) {
+    // Nested edit() calls (tools inside `batch`) join the outermost one. Only edit() itself
+    // counts as nesting: an interactive drag transaction is a different thing and is never
+    // joined (jobs are not pumped while one is open, see update()).
+    if (editDepth_ > 0) return fn();
+
+    struct DepthGuard {
+        int& depth;
+        explicit DepthGuard(int& d) : depth(d) { ++depth; }
+        ~DepthGuard() { --depth; }
+    } depthGuard(editDepth_);
+
     if (playState_ != PlayState::Editing) {
-        // Live edits during play affect the running simulation only; they revert on stop.
-        return fn();
-    }
-    if (history_->inTransaction()) return fn();  // joins the enclosing batch
-    history_->begin(actor, label);
-    Status s = fn();
-    if (!s) {
-        history_->rollback();
+        // Live edits during play affect the running simulation only (they revert on stop),
+        // but must still be atomic: restore the snapshot if anything fails.
+        Json snapshot = scene_->toJson();
+        Status s;
+        try {
+            s = fn();
+        } catch (...) {
+            (void)scene_->loadJson(snapshot);
+            throw;
+        }
+        if (!s) (void)scene_->loadJson(snapshot);
         return s;
     }
-    if (history_->commit()) {
-        Json ev = history_->lastCommitted()->summary();
-        ev["type"] = "edit";
-        emitEvent(std::move(ev));
-    }
+
+    if (history_->inTransaction()) commitEditTransaction();  // never absorb a stray open transaction
+    history_->begin(actor, label);
+    // Roll back if fn() throws, so a failure can never leave a dangling transaction.
+    struct RollbackGuard {
+        History& history;
+        bool armed = true;
+        ~RollbackGuard() {
+            if (armed) history.rollback();
+        }
+    } rollbackGuard{*history_};
+    Status s = fn();
+    if (!s) return s;  // guard rolls back
+    rollbackGuard.armed = false;
+    commitEditTransaction();
     return s;
 }
 
@@ -151,7 +174,9 @@ void Engine::step(int ticks) {
 }
 
 void Engine::update(double seconds) {
-    pump();
+    // While the user drags an object or a gizmo handle, an undo transaction is open;
+    // agent jobs wait until it is committed so their edits are never attributed to it.
+    if (!drag_.entity && !gizmoDrag_) pump();
     if (playState_ != PlayState::Playing) return;
     accumulator_ += std::min(seconds, 0.25);  // avoid spiral of death after stalls
     int ticks = 0;
@@ -201,7 +226,7 @@ FrameData Engine::frame(const CaptureOptions& opts) {
     } else if (opts.useSceneCamera || opts.cameraEntity) {
         ViewCamera sc;
         if (sceneCamera(*scene_, sc, opts.cameraEntity)) view = sc;
-    } else if (playState_ != PlayState::Editing) {
+    } else if (playState_ != PlayState::Editing || viewSceneCamera_) {
         ViewCamera sc;
         if (sceneCamera(*scene_, sc)) view = sc;
     }
@@ -215,6 +240,10 @@ FrameData Engine::frame(const CaptureOptions& opts) {
     FrameData f = buildFrame(*scene_, view, opts.width, opts.height, bo);
     for (auto& d : f.draws) {
         if (!d.texture.empty()) d.texture = resolvePath(d.texture);
+    }
+    if (bo.editorOverlays && selection_.size() == 1 && scene_->exists(selection_[0]) && !opts.annotate) {
+        GizmoFrame gf = Gizmo::frameFor(scene_->worldMatrix(selection_[0]), view, gizmo_.local);
+        f.overlays = gizmo_.overlays(gf, gizmoHot_, gizmoDrag_ ? gizmoDrag_->axis : -1);
     }
     return f;
 }
@@ -232,12 +261,80 @@ Result<Capture> Engine::capture(const CaptureOptions& opts) {
 }
 
 Status Engine::renderToSurface(void* surface, int width, int height) {
+    auto start = std::chrono::steady_clock::now();
     CaptureOptions opts;
     opts.width = width;
     opts.height = height;
     FrameData f = frame(opts);
-    if (Status s = renderer_->render(f); !s) return s;
-    return renderer_->present(surface);
+    Status s = renderer_->render(f);
+    if (s) s = renderer_->present(surface);
+    double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
+    stats_.cpuMs = stats_.cpuMs * 0.9 + ms * 0.1;  // smoothed
+    stats_.draws = f.draws.size();
+    stats_.lights = f.lights.size();
+    stats_.entities = scene_->size();
+    return s;
+}
+
+// ---------------------------------------------------------------------------
+// Gizmo
+// ---------------------------------------------------------------------------
+
+bool Engine::gizmoTarget(EntityId& id, GizmoFrame& gf, int width, int height) {
+    (void)width;
+    (void)height;
+    if (playState_ != PlayState::Editing || selection_.size() != 1 || !scene_->exists(selection_[0])) return false;
+    id = selection_[0];
+    gf = Gizmo::frameFor(scene_->worldMatrix(id), camera_.toView(), gizmo_.local);
+    return true;
+}
+
+int Engine::gizmoHover(float x, float y, int width, int height) {
+    EntityId id;
+    GizmoFrame gf;
+    gizmoHot_ = gizmoTarget(id, gf, width, height) ? gizmo_.hitTest(gf, camera_.toView().rayAt(x, y, width, height)) : -1;
+    return gizmoHot_;
+}
+
+bool Engine::gizmoBegin(float x, float y, int width, int height) {
+    EntityId id;
+    GizmoFrame gf;
+    if (!gizmoTarget(id, gf, width, height)) return false;
+    const Transform* t = scene_->get<Transform>(id);
+    auto start = gizmo_.begin(gf, camera_.toView().rayAt(x, y, width, height), gf.center, t->rotation, t->scale);
+    if (!start) return false;
+    endDrag();
+    gizmoDrag_ = start;
+    gizmoEntity_ = id;
+    const char* verb = gizmo_.mode == GizmoMode::Rotate ? "Rotate " : gizmo_.mode == GizmoMode::Scale ? "Scale " : "Move ";
+    history_->begin("user", verb + scene_->record(id)->name);
+    return true;
+}
+
+void Engine::gizmoDrag(float x, float y, int width, int height, bool snapping) {
+    if (!gizmoDrag_ || !scene_->exists(gizmoEntity_)) return;
+    auto r = gizmo_.drag(*gizmoDrag_, camera_.toView().rayAt(x, y, width, height), snapping);
+    const EntityRecord* rec = scene_->record(gizmoEntity_);
+    Vec3 local = rec->parent ? scene_->worldMatrix(rec->parent).inverse().transformPoint(r.worldPosition) : r.worldPosition;
+    (void)scene_->patchComponent(gizmoEntity_, "transform",
+                                 Json::object({{"position", reflect::vec3ToJson(local)},
+                                               {"rotation", reflect::vec3ToJson(r.rotation)},
+                                               {"scale", reflect::vec3ToJson(r.scale)}}));
+}
+
+void Engine::gizmoEnd() {
+    if (!gizmoDrag_) return;
+    gizmoDrag_.reset();
+    gizmoEntity_ = kNoEntity;
+    commitEditTransaction();
+}
+
+void Engine::commitEditTransaction() {
+    if (history_->inTransaction() && history_->commit()) {
+        Json ev = history_->lastCommitted()->summary();
+        ev["type"] = "edit";
+        emitEvent(std::move(ev));
+    }
 }
 
 EntityId Engine::pickAt(float x, float y, int width, int height) {
@@ -274,11 +371,7 @@ void Engine::dragTo(float x, float y, int width, int height) {
 void Engine::endDrag() {
     if (!drag_.entity) return;
     drag_ = {};
-    if (history_->inTransaction() && history_->commit()) {
-        Json ev = history_->lastCommitted()->summary();
-        ev["type"] = "edit";
-        emitEvent(std::move(ev));
-    }
+    commitEditTransaction();
 }
 
 // ---------------------------------------------------------------------------
@@ -391,8 +484,8 @@ std::future<Json> Engine::post(std::function<Json()> job) {
     std::promise<Json> promise;
     std::future<Json> future = promise.get_future();
     std::lock_guard lock(jobsMutex_);
-    if (shuttingDown_) {
-        promise.set_value(ToolResult::error(Error::make("engine_shutdown", "the engine is shutting down")).toMcp());
+    if (shuttingDown_ || !acceptingJobs_) {
+        promise.set_value(ToolResult::error(Error::make("unavailable", "the engine is not accepting requests")).toMcp());
         return future;
     }
     jobs_.emplace_back(std::move(job), std::move(promise));
@@ -423,9 +516,15 @@ Status Engine::startAgentServer(const std::string& socketPath) {
     fs::create_directories(fs::path(socketPath).parent_path(), ec);
     auto server = std::make_unique<SocketServer>(
         tools_, [this](const std::string& tool, const Json& args, const std::string& actor) {
-            // Called on a connection thread: hop to the main thread and wait.
-            std::future<Json> f = post([this, tool, args, actor] { return callTool(tool, args, actor).toMcp(); });
+            // Called on a connection thread: hop to the main thread and wait. If we give up
+            // waiting, the job is marked abandoned so it can never apply changes later.
+            auto abandoned = std::make_shared<std::atomic<bool>>(false);
+            std::future<Json> f = post([this, tool, args, actor, abandoned] {
+                if (abandoned->load()) return ToolResult::error(Error::make("timeout", "request abandoned")).toMcp();
+                return callTool(tool, args, actor).toMcp();
+            });
             if (f.wait_for(std::chrono::seconds(120)) != std::future_status::ready) {
+                abandoned->store(true);
                 return ToolResult::error(Error::make("timeout", "the editor did not respond in time")).toMcp();
             }
             return f.get();
@@ -437,10 +536,25 @@ Status Engine::startAgentServer(const std::string& socketPath) {
 }
 
 void Engine::stopAgentServer() {
-    if (server_) {
-        server_->stop();
-        server_.reset();
+    if (!server_) return;
+    // Connection threads may be blocked waiting for jobs that only this (main) thread
+    // would run: refuse new jobs and fail queued ones before joining them.
+    {
+        std::lock_guard lock(jobsMutex_);
+        acceptingJobs_ = false;
+        failQueuedJobsLocked("the agent server is stopping");
     }
+    server_->stop();
+    server_.reset();
+    std::lock_guard lock(jobsMutex_);
+    acceptingJobs_ = true;
+}
+
+void Engine::failQueuedJobsLocked(const std::string& why) {
+    for (auto& [job, promise] : jobs_) {
+        promise.set_value(ToolResult::error(Error::make("cancelled", why)).toMcp());
+    }
+    jobs_.clear();
 }
 
 bool Engine::agentServerRunning() const { return server_ != nullptr; }

@@ -75,6 +75,7 @@ private:
     McpSession::Executor executor_;
     std::string path_;
     UniqueFd listenFd_;
+    UniqueFd wakeRead_, wakeWrite_;  // self-pipe: stop() wakes the accept loop portably
     std::atomic<bool> running_{false};
     std::atomic<size_t> connections_{0};
     std::thread acceptThread_;

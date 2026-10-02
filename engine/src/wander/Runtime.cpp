@@ -757,6 +757,10 @@ void Runtime::tick(float dt, const InputState& input) {
             if (!script.enabled || !script.program) continue;
             std::shared_ptr<const Program> program = script.program;  // keep alive during execution
             Instance& inst = instances_[{id, si}];
+            if (inst.program != program.get()) {  // behavior replaced (e.g. live edit): start fresh
+                inst = Instance{};
+                inst.program = program.get();
+            }
             Exec exec(*this, id, script, inst, dt, input);
             auto runAll = [&](Trigger trig, const std::string& arg) {
                 for (const auto& beh : program->behaviors) {

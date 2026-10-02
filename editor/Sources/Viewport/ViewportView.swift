@@ -13,17 +13,20 @@ struct ViewportView: NSViewRepresentable {
 /// An NSView backed by a CAMetalLayer. The engine renders the frame offscreen (exactly
 /// what agents capture) and presents it into this layer every display refresh.
 ///
-/// Controls (editing):  click = select · drag object = move on its ground plane ·
-/// drag empty space / right-drag / two-finger scroll = orbit · ⇧ + scroll or middle-drag = pan ·
-/// pinch or mouse wheel = zoom · F = frame selection · ⌫ = delete selection.
-/// While playing, keys and clicks go to the game (Wander `on key` / `on click`).
+/// Editing controls (familiar from DCC tools):
+///   Q/W/E/R select · move · rotate · scale tool   F frame selection   ⌫ delete   ⌘D duplicate
+///   LMB: select / drag gizmo handle / drag object on its ground plane (move tool)
+///   RMB or ⌥LMB drag: orbit   MMB or ⇧+two-finger scroll: pan   wheel / pinch: zoom
+///   two-finger scroll: orbit   hold ⌃ while dragging a handle: snap
+/// While playing, keys and clicks are delivered to the game (Wander `on key` / `on click`).
 final class ViewportNSView: NSView {
     private let engine: EngineStore
     private var displayLink: CADisplayLink?
     private var metalLayer: CAMetalLayer { layer as! CAMetalLayer }  // swiftlint:disable:this force_cast
-    private enum DragMode { case none, orbit, pan, moveEntity }
+    private enum DragMode { case none, orbit, pan, moveEntity, gizmo }
     private var dragMode: DragMode = .none
     private var lastPoint = CGPoint.zero
+    private var tracking: NSTrackingArea?
 
     init(engine: EngineStore) {
         self.engine = engine
@@ -48,13 +51,21 @@ final class ViewportNSView: NSView {
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
-        displayLink?.invalidate()
+        displayLink?.invalidate()  // also breaks the link's retain on self
         displayLink = nil
         guard window != nil else { return }
         updateDrawableSize()
         let link = displayLink(target: self, selector: #selector(step(_:)))
         link.add(to: .main, forMode: .common)
         displayLink = link
+    }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let tracking { removeTrackingArea(tracking) }
+        let area = NSTrackingArea(rect: bounds, options: [.mouseMoved, .activeInKeyWindow, .inVisibleRect], owner: self)
+        addTrackingArea(area)
+        tracking = area
     }
 
     override func setFrameSize(_ newSize: NSSize) {
@@ -88,19 +99,36 @@ final class ViewportNSView: NSView {
         return CGPoint(x: p.x * scale, y: p.y * scale)
     }
 
+    private var editing: Bool { engine.playState == "editing" }
+
+    override func mouseMoved(with event: NSEvent) {
+        guard editing else { return }
+        let p = pixel(event)
+        let (w, h) = pixelSize
+        engine.gizmoHover(x: Float(p.x), y: Float(p.y), width: w, height: h)
+    }
+
     override func mouseDown(with event: NSEvent) {
         window?.makeFirstResponder(self)
         let p = pixel(event)
         lastPoint = p
         let (w, h) = pixelSize
+        if event.modifierFlags.contains(.option) {
+            dragMode = .orbit
+            return
+        }
+        if editing, engine.gizmoBegin(x: Float(p.x), y: Float(p.y), width: w, height: h) {
+            dragMode = .gizmo
+            return
+        }
         let hit = engine.pick(x: Float(p.x), y: Float(p.y), width: w, height: h)
-        if engine.playState != "editing" {
+        if !editing {
             if hit != 0 { engine.click(entity: hit) }
             dragMode = .orbit
             return
         }
-        if event.modifierFlags.contains(.option) || hit == 0 {
-            if hit == 0 && !event.modifierFlags.contains(.shift) { engine.selection = [] }
+        if hit == 0 {
+            if !event.modifierFlags.contains(.shift) && !event.modifierFlags.contains(.command) { engine.selection = [] }
             dragMode = .orbit
             return
         }
@@ -109,8 +137,12 @@ final class ViewportNSView: NSView {
             dragMode = .none
         } else {
             engine.selection = [hit]
-            engine.dragBegin(entity: hit, x: Float(p.x), y: Float(p.y), width: w, height: h)
-            dragMode = .moveEntity
+            if engine.gizmoMode == .move {
+                engine.dragBegin(entity: hit, x: Float(p.x), y: Float(p.y), width: w, height: h)
+                dragMode = .moveEntity
+            } else {
+                dragMode = .none
+            }
         }
     }
 
@@ -120,14 +152,20 @@ final class ViewportNSView: NSView {
         let (w, h) = pixelSize
         switch dragMode {
         case .orbit: engine.orbit(dx: Float(-(p.x - lastPoint.x) * 0.25), dy: Float((p.y - lastPoint.y) * 0.25))
-        case .pan: engine.pan(dx: Float((p.x - lastPoint.x) / CGFloat(h)), dy: Float((p.y - lastPoint.y) / CGFloat(h)))
+        case .pan: engine.pan(dx: Float((p.x - lastPoint.x) / CGFloat(max(h, 1))), dy: Float((p.y - lastPoint.y) / CGFloat(max(h, 1))))
         case .moveEntity: engine.dragUpdate(x: Float(p.x), y: Float(p.y), width: w, height: h)
+        case .gizmo:
+            engine.gizmoDrag(x: Float(p.x), y: Float(p.y), width: w, height: h, snap: event.modifierFlags.contains(.control))
         case .none: break
         }
     }
 
     override func mouseUp(with event: NSEvent) {
-        if dragMode == .moveEntity { engine.dragEnd() }
+        switch dragMode {
+        case .moveEntity: engine.dragEnd()
+        case .gizmo: engine.gizmoEnd()
+        default: break
+        }
         dragMode = .none
     }
 
@@ -181,25 +219,43 @@ final class ViewportNSView: NSView {
 
     override func keyDown(with event: NSEvent) {
         guard let name = keyName(event) else { return }
-        if engine.playState != "editing" {
+        if !editing {
             if !event.isARepeat { engine.key(name, down: true) }
             return
         }
+        if event.modifierFlags.contains(.command) {
+            if name == "d" { duplicateSelection() } else { super.keyDown(with: event) }
+            return
+        }
         switch name {
+        case "q": engine.gizmoMode = .select
+        case "w": engine.gizmoMode = .move
+        case "e": engine.gizmoMode = .rotate
+        case "r": engine.gizmoMode = .scale
         case "f":
             if let first = engine.selection.first { engine.call("camera_set", ["frame": .number(Double(first))]) }
             else { engine.call("camera_set", ["frame": "all"]) }
+        case "escape": engine.selection = []
         case "backspace":
-            if !engine.selection.isEmpty {
-                let ops: [JSON] = engine.selection.map { ["tool": "entity_delete", "args": ["entity": .number(Double($0))]] }
-                engine.call("batch", ["operations": .array(ops), "label": "Delete selection"])
-            }
+            guard !engine.selection.isEmpty else { return }
+            let ops: [JSON] = engine.selection.map { ["tool": "entity_delete", "args": ["entity": .number(Double($0))]] }
+            engine.call("batch", ["operations": .array(ops), "label": "Delete selection"])
         default: super.keyDown(with: event)
         }
     }
 
+    private func duplicateSelection() {
+        guard !engine.selection.isEmpty else { return }
+        let ops: [JSON] = engine.selection.map {
+            ["tool": "entity_duplicate", "args": ["entity": .number(Double($0)), "offset": .vec3(1, 0, 0)]]
+        }
+        let r = engine.call("batch", ["operations": .array(ops), "label": "Duplicate selection"])
+        let created = r.structured["results"].array.flatMap { $0["created"].array.compactMap(\.number) }
+        if !created.isEmpty { engine.selection = Set(created.map { UInt64($0) }) }
+    }
+
     override func keyUp(with event: NSEvent) {
-        guard let name = keyName(event), engine.playState != "editing" else { return }
+        guard let name = keyName(event), !editing else { return }
         engine.key(name, down: false)
     }
 }

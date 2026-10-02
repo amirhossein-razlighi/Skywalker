@@ -15,19 +15,37 @@ struct SkywalkerApp: App {
 
     var body: some Scene {
         Window("Skywalker", id: "main") {
-            ContentView()
+            EditorView()
                 .environment(engine)
                 .environment(crew)
-                .frame(minWidth: 1000, minHeight: 640)
+                .frame(minWidth: 1100, minHeight: 680)
+                .preferredColorScheme(.dark)
                 .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
                     crew.save()
                     engine.shutdown()
                 }
         }
+        .windowToolbarStyle(.unified(showsTitle: true))
+        .defaultSize(width: 1440, height: 880)
         .commands {
             CommandGroup(replacing: .undoRedo) {
-                Button("Undo") { engine.call("history", ["action": "undo"]) }.keyboardShortcut("z")
-                Button("Redo") { engine.call("history", ["action": "redo"]) }.keyboardShortcut("z", modifiers: [.command, .shift])
+                // Text fields keep their own undo; everywhere else ⌘Z undoes scene edits.
+                Button("Undo") {
+                    if let text = NSApp.keyWindow?.firstResponder as? NSTextView, let um = text.undoManager, um.canUndo {
+                        um.undo()
+                    } else {
+                        engine.call("history", ["action": "undo"])
+                    }
+                }
+                .keyboardShortcut("z")
+                Button("Redo") {
+                    if let text = NSApp.keyWindow?.firstResponder as? NSTextView, let um = text.undoManager, um.canRedo {
+                        um.redo()
+                    } else {
+                        engine.call("history", ["action": "redo"])
+                    }
+                }
+                .keyboardShortcut("z", modifiers: [.command, .shift])
             }
             CommandGroup(replacing: .saveItem) {
                 Button("Save Scene") { engine.call("scene_save", ["path": "scenes/main.sky.json"]) }.keyboardShortcut("s")
@@ -45,6 +63,7 @@ struct SkywalkerApp: App {
             SettingsView()
                 .environment(engine)
                 .environment(crew)
+                .preferredColorScheme(.dark)
         }
     }
 

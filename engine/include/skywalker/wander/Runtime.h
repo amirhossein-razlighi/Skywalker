@@ -71,6 +71,7 @@ private:
         EntityId target = kNoEntity;  // kNoEntity = broadcast
     };
     struct Instance {
+        const Program* program = nullptr;  // state is reset when the script's program changes
         bool started = false;
         std::unordered_map<int, double> timers;
         std::set<int> fired;

@@ -19,6 +19,7 @@ struct FrameUniforms {
     float4 ground;      // rgb, w = ambient strength
     float4 fog;         // rgb, w = density
     float4 params;      // x = exposure, y = light count, z = shadows on, w = shadow texel size
+    float4 viewport;    // x = width, y = height (pixels), z = 1/width, w = 1/height
 };
 
 struct DrawUniforms {
@@ -218,13 +219,41 @@ fragment float4 meshFragment(MeshOut in [[stage_in]],
     float fogAmt = 1.0 - exp(-dist * f.fog.w);
     color = mix(color, f.fog.rgb, saturate(fogAmt));
 
-    // Selection rim
-    if (d.material.z > 0.5) {
-        float rim = pow(1.0 - max(dot(N, V), 0.0), 2.0);
-        color = mix(color, float3(0.35, 0.75, 1.0) * 1.6, rim * 0.85 + 0.08);
-    }
-
     return float4(acesTonemap(color * f.params.x), alpha);
+}
+
+// ---------------------------------------------------------------------------
+// Selection outline: inverted hull extruded in clip space (constant pixel width)
+// ---------------------------------------------------------------------------
+
+vertex float4 outlineVertex(uint vid [[vertex_id]],
+                            const device Vertex* verts [[buffer(0)]],
+                            constant DrawUniforms& d [[buffer(1)]],
+                            constant FrameUniforms& f [[buffer(2)]]) {
+    Vertex v = verts[vid];
+    float4 clip = f.viewProj * (d.model * float4(float3(v.position), 1.0));
+    float3 worldN = normalize((d.normalMatrix * float4(float3(v.normal), 0.0)).xyz);
+    float4 clipN = f.viewProj * float4(worldN, 0.0);
+    float2 dir = length(clipN.xy) > 1e-5 ? normalize(clipN.xy) : float2(0.0);
+    const float widthPx = 2.5;
+    clip.xy += dir * widthPx * 2.0 * f.viewport.zw * clip.w;
+    return clip;
+}
+
+fragment float4 outlineFragment() {
+    return float4(1.0, 0.32, 0.0, 1.0);  // selection orange (linear; sRGB target encodes it)
+}
+
+// ---------------------------------------------------------------------------
+// Overlays (gizmos): lightly shaded, drawn on top of everything
+// ---------------------------------------------------------------------------
+
+fragment float4 overlayFragment(MeshOut in [[stage_in]], constant DrawUniforms& d [[buffer(0)]],
+                                constant FrameUniforms& f [[buffer(1)]]) {
+    float3 N = normalize(in.normal);
+    float3 V = normalize(f.cameraPos.xyz - in.worldPos);
+    float shade = 0.72 + 0.28 * abs(dot(N, V));
+    return float4(d.color.rgb * shade, d.color.a);
 }
 
 // ---------------------------------------------------------------------------
@@ -252,7 +281,7 @@ vertex GridOut gridVertex(uint vid [[vertex_id]], constant FrameUniforms& f [[bu
     float extent = 400.0;
     float2 c = corners[vid] * extent + floor(f.cameraPos.xz);
     GridOut o;
-    o.worldPos = float3(c.x, 0.0, c.y);
+    o.worldPos = float3(c.x, 0.002, c.y);  // lifted slightly to avoid z-fighting with ground planes
     o.position = f.viewProj * float4(o.worldPos, 1.0);
     return o;
 }

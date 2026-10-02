@@ -176,3 +176,58 @@ TEST_CASE("engine: posted jobs run on pump (cross-thread request path)") {
     e->pump();
     CHECK(f.get().asInt() == 42);
 }
+
+TEST_CASE("engine: a throwing edit rolls back and leaves no dangling transaction (regression)") {
+    auto e = makeEngine();
+    size_t before = e->scene().size();
+    CHECK_THROWS(e->edit("a", "boom", [&]() -> Status {
+        e->scene().create("Temp");
+        throw std::runtime_error("boom");
+    }));
+    CHECK(e->scene().size() == before);
+    CHECK_FALSE(e->history().inTransaction());
+}
+
+TEST_CASE("engine: batch during play is atomic (regression)") {
+    auto e = makeEngine();
+    call(*e, "sim_control", R"({"action":"play"})");
+    size_t before = e->scene().size();
+    call(*e, "batch", R"({"operations":[
+        {"tool":"entity_create","args":{"name":"A"}},
+        {"tool":"entity_update","args":{"entity":"Nope","name":"x"}}]})", false);
+    CHECK(e->scene().size() == before);
+    call(*e, "sim_control", R"({"action":"stop"})");
+}
+
+TEST_CASE("runtime: replacing a behavior during play restarts its instance (regression)") {
+    auto e = makeEngine();
+    call(*e, "behavior_set", R"({"entity":"Cube","name":"B","source":"on start\n self.v = 1\nend"})");
+    call(*e, "sim_control", R"({"action":"step","ticks":1})");
+    call(*e, "behavior_set", R"({"entity":"Cube","name":"B","source":"on start\n self.v = 2\nend"})");
+    call(*e, "sim_control", R"({"action":"step","ticks":1})");
+    CHECK(e->scene().record(e->scene().find("Cube"))->vars.get("v").asInt() == 2);
+    call(*e, "sim_control", R"({"action":"stop"})");
+}
+
+TEST_CASE("gizmo: translate drag along X follows the cursor ray; hit testing picks axes") {
+    Gizmo g;
+    ViewCamera cam;
+    cam.eye = {0, 5, 10};
+    cam.target = {0, 0, 0};
+    GizmoFrame f = Gizmo::frameFor(Mat4{}, cam, false);
+    // A ray aimed at the middle of the X handle hits axis 0.
+    Vec3 onX = f.center + f.axes[0] * (f.size * 0.6f);
+    Ray r{cam.eye, normalize(onX - cam.eye)};
+    CHECK(g.hitTest(f, r) == 0);
+    auto start = g.begin(f, r, {0, 0, 0}, {0, 0, 0}, {1, 1, 1});
+    REQUIRE(start.has_value());
+    Vec3 target = f.center + f.axes[0] * (f.size * 0.6f + 2.f);
+    auto res = g.drag(*start, Ray{cam.eye, normalize(target - cam.eye)}, false);
+    CHECK(res.worldPosition.x == doctest::Approx(2.f).epsilon(1e-3));
+    CHECK(res.worldPosition.y == doctest::Approx(0.f).epsilon(1e-3));
+    g.snap = 0.5f;
+    auto snapped = g.drag(*start, Ray{cam.eye, normalize(f.center + f.axes[0] * (f.size * 0.6f + 1.3f) - cam.eye)}, true);
+    CHECK(snapped.worldPosition.x == doctest::Approx(1.5f).epsilon(1e-3));
+    // Empty space hits nothing.
+    CHECK(g.hitTest(f, Ray{cam.eye, normalize(Vec3{5, 5, 0} - cam.eye)}) == -1);
+}

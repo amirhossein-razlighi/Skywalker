@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 160" role="img" aria-label="Skywalker">
+  <title>Skywalker</title>
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#5c8fed"/>
+      <stop offset="1" stop-color="#8b73fa"/>
+    </linearGradient>
+    <linearGradient id="trail" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#ffb873" stop-opacity="0"/>
+      <stop offset="1" stop-color="#ffb873"/>
+    </linearGradient>
+  </defs>
+  <!-- trail -->
+  <path d="M8 118 C 40 112, 60 104, 78 96" fill="none" stroke="url(#trail)" stroke-width="7" stroke-linecap="round"/>
+  <!-- cloud mascot -->
+  <g transform="translate(70 24)">
+    <rect x="10" y="50" width="104" height="58" rx="29" fill="url(#sky)"/>
+    <circle cx="28" cy="72" r="26" fill="url(#sky)"/>
+    <circle cx="58" cy="46" r="34" fill="url(#sky)"/>
+    <circle cx="90" cy="60" r="26" fill="url(#sky)"/>
+    <circle cx="104" cy="80" r="22" fill="url(#sky)"/>
+    <!-- face -->
+    <ellipse cx="50" cy="74" rx="5" ry="6.5" fill="#1f2340"/>
+    <ellipse cx="76" cy="74" rx="5" ry="6.5" fill="#1f2340"/>
+    <path d="M55 86 Q 63 94 71 86" fill="none" stroke="#1f2340" stroke-width="4" stroke-linecap="round"/>
+    <circle cx="40" cy="86" r="6" fill="#ed6b7a" opacity="0.4"/>
+    <circle cx="86" cy="86" r="6" fill="#ed6b7a" opacity="0.4"/>
+    <!-- sparkle -->
+    <path d="M118 18 l5 13 13 5 -13 5 -5 13 -5 -13 -13 -5 13 -5z" fill="#ffb873"/>
+  </g>
+  <text x="222" y="104" font-family="ui-rounded, 'SF Pro Rounded', Nunito, system-ui, sans-serif"
+        font-size="64" font-weight="800" fill="#1f2340">Skywalker</text>
+</svg>
