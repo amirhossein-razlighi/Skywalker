@@ -1,0 +1,5817 @@
+{
+  "format": "skywalker.scene",
+  "version": 1,
+  "name": "Sky Dash",
+  "seed": 1,
+  "environment": {
+    "skyTop": "#5aa2ff",
+    "skyHorizon": "#8cc4ff",
+    "ground": "#7d8f6a",
+    "ambient": 0.75,
+    "sunAzimuth": 20,
+    "sunElevation": 40,
+    "sunColor": "#fff4e0",
+    "sunIntensity": 1.600000023841858,
+    "fogColor": "#bdcce0",
+    "fogDensity": 0,
+    "exposure": 1,
+    "showGrid": false
+  },
+  "entities": [
+    {
+      "id": 1,
+      "name": "Mountain 1",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "parallax"
+      ],
+      "vars": {
+        "factor": 0.6
+      },
+      "components": {
+        "transform": {
+          "position": [
+            -12,
+            2.4000000953674316,
+            -14
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            9.600000381469727,
+            6,
+            2
+          ]
+        },
+        "mesh": {
+          "mesh": "cone",
+          "color": "#7d8fc7",
+          "metallic": 0,
+          "roughness": 1,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      },
+      "behaviors": [
+        {
+          "name": "Parallax",
+          "intent": "Slide with the camera at a fraction of its speed for depth.",
+          "source": "\nbehavior Parallax\n  var home = (0, 0, 0)\n  var cam0 = 0\n  on start\n    home = self.position\n    cam0 = find(\"Game Camera\").position.x\n  end\n  on tick\n    let cam = find(\"Game Camera\").position.x\n    self.position.x = home.x + (cam - cam0) * self.factor\n  end\nend\n",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "name": "Mountain 2",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "parallax"
+      ],
+      "vars": {
+        "factor": 0.6
+      },
+      "components": {
+        "transform": {
+          "position": [
+            -3,
+            3.4000000953674316,
+            -14
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            12.800000190734863,
+            8,
+            2
+          ]
+        },
+        "mesh": {
+          "mesh": "cone",
+          "color": "#6f82bd",
+          "metallic": 0,
+          "roughness": 1,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      },
+      "behaviors": [
+        {
+          "name": "Parallax",
+          "intent": "Slide with the camera at a fraction of its speed for depth.",
+          "source": "\nbehavior Parallax\n  var home = (0, 0, 0)\n  var cam0 = 0\n  on start\n    home = self.position\n    cam0 = find(\"Game Camera\").position.x\n  end\n  on tick\n    let cam = find(\"Game Camera\").position.x\n    self.position.x = home.x + (cam - cam0) * self.factor\n  end\nend\n",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "name": "Mountain 3",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "parallax"
+      ],
+      "vars": {
+        "factor": 0.6
+      },
+      "components": {
+        "transform": {
+          "position": [
+            7,
+            2.1500000953674316,
+            -14
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            8.800000190734863,
+            5.5,
+            2
+          ]
+        },
+        "mesh": {
+          "mesh": "cone",
+          "color": "#7d8fc7",
+          "metallic": 0,
+          "roughness": 1,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      },
+      "behaviors": [
+        {
+          "name": "Parallax",
+          "intent": "Slide with the camera at a fraction of its speed for depth.",
+          "source": "\nbehavior Parallax\n  var home = (0, 0, 0)\n  var cam0 = 0\n  on start\n    home = self.position\n    cam0 = find(\"Game Camera\").position.x\n  end\n  on tick\n    let cam = find(\"Game Camera\").position.x\n    self.position.x = home.x + (cam - cam0) * self.factor\n  end\nend\n",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "name": "Mountain 4",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "parallax"
+      ],
+      "vars": {
+        "factor": 0.6
+      },
+      "components": {
+        "transform": {
+          "position": [
+            17,
+            3.1500000953674316,
+            -14
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            12,
+            7.5,
+            2
+          ]
+        },
+        "mesh": {
+          "mesh": "cone",
+          "color": "#6879b8",
+          "metallic": 0,
+          "roughness": 1,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      },
+      "behaviors": [
+        {
+          "name": "Parallax",
+          "intent": "Slide with the camera at a fraction of its speed for depth.",
+          "source": "\nbehavior Parallax\n  var home = (0, 0, 0)\n  var cam0 = 0\n  on start\n    home = self.position\n    cam0 = find(\"Game Camera\").position.x\n  end\n  on tick\n    let cam = find(\"Game Camera\").position.x\n    self.position.x = home.x + (cam - cam0) * self.factor\n  end\nend\n",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "name": "Mountain 5",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "parallax"
+      ],
+      "vars": {
+        "factor": 0.6
+      },
+      "components": {
+        "transform": {
+          "position": [
+            28,
+            2.4000000953674316,
+            -14
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            9.600000381469727,
+            6,
+            2
+          ]
+        },
+        "mesh": {
+          "mesh": "cone",
+          "color": "#7d8fc7",
+          "metallic": 0,
+          "roughness": 1,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      },
+      "behaviors": [
+        {
+          "name": "Parallax",
+          "intent": "Slide with the camera at a fraction of its speed for depth.",
+          "source": "\nbehavior Parallax\n  var home = (0, 0, 0)\n  var cam0 = 0\n  on start\n    home = self.position\n    cam0 = find(\"Game Camera\").position.x\n  end\n  on tick\n    let cam = find(\"Game Camera\").position.x\n    self.position.x = home.x + (cam - cam0) * self.factor\n  end\nend\n",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "name": "Mountain 6",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "parallax"
+      ],
+      "vars": {
+        "factor": 0.6
+      },
+      "components": {
+        "transform": {
+          "position": [
+            39,
+            3.6500000953674316,
+            -14
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            13.600000381469727,
+            8.5,
+            2
+          ]
+        },
+        "mesh": {
+          "mesh": "cone",
+          "color": "#6f82bd",
+          "metallic": 0,
+          "roughness": 1,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      },
+      "behaviors": [
+        {
+          "name": "Parallax",
+          "intent": "Slide with the camera at a fraction of its speed for depth.",
+          "source": "\nbehavior Parallax\n  var home = (0, 0, 0)\n  var cam0 = 0\n  on start\n    home = self.position\n    cam0 = find(\"Game Camera\").position.x\n  end\n  on tick\n    let cam = find(\"Game Camera\").position.x\n    self.position.x = home.x + (cam - cam0) * self.factor\n  end\nend\n",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "name": "Mountain 7",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "parallax"
+      ],
+      "vars": {
+        "factor": 0.6
+      },
+      "components": {
+        "transform": {
+          "position": [
+            51,
+            2.4000000953674316,
+            -14
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            9.600000381469727,
+            6,
+            2
+          ]
+        },
+        "mesh": {
+          "mesh": "cone",
+          "color": "#7d8fc7",
+          "metallic": 0,
+          "roughness": 1,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      },
+      "behaviors": [
+        {
+          "name": "Parallax",
+          "intent": "Slide with the camera at a fraction of its speed for depth.",
+          "source": "\nbehavior Parallax\n  var home = (0, 0, 0)\n  var cam0 = 0\n  on start\n    home = self.position\n    cam0 = find(\"Game Camera\").position.x\n  end\n  on tick\n    let cam = find(\"Game Camera\").position.x\n    self.position.x = home.x + (cam - cam0) * self.factor\n  end\nend\n",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "name": "Mountain 8",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "parallax"
+      ],
+      "vars": {
+        "factor": 0.6
+      },
+      "components": {
+        "transform": {
+          "position": [
+            63,
+            3.1500000953674316,
+            -14
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            12,
+            7.5,
+            2
+          ]
+        },
+        "mesh": {
+          "mesh": "cone",
+          "color": "#6879b8",
+          "metallic": 0,
+          "roughness": 1,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      },
+      "behaviors": [
+        {
+          "name": "Parallax",
+          "intent": "Slide with the camera at a fraction of its speed for depth.",
+          "source": "\nbehavior Parallax\n  var home = (0, 0, 0)\n  var cam0 = 0\n  on start\n    home = self.position\n    cam0 = find(\"Game Camera\").position.x\n  end\n  on tick\n    let cam = find(\"Game Camera\").position.x\n    self.position.x = home.x + (cam - cam0) * self.factor\n  end\nend\n",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "name": "Hill 1",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "parallax"
+      ],
+      "vars": {
+        "factor": 0.3
+      },
+      "components": {
+        "transform": {
+          "position": [
+            -10,
+            -1.2000000476837158,
+            -6
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            9,
+            5,
+            1
+          ]
+        },
+        "mesh": {
+          "mesh": "sphere",
+          "color": "#5aab72",
+          "metallic": 0,
+          "roughness": 1,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      },
+      "behaviors": [
+        {
+          "name": "Parallax",
+          "intent": "Slide with the camera at a fraction of its speed for depth.",
+          "source": "\nbehavior Parallax\n  var home = (0, 0, 0)\n  var cam0 = 0\n  on start\n    home = self.position\n    cam0 = find(\"Game Camera\").position.x\n  end\n  on tick\n    let cam = find(\"Game Camera\").position.x\n    self.position.x = home.x + (cam - cam0) * self.factor\n  end\nend\n",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "name": "Hill 2",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "parallax"
+      ],
+      "vars": {
+        "factor": 0.3
+      },
+      "components": {
+        "transform": {
+          "position": [
+            -3,
+            -1.2000000476837158,
+            -6
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            9,
+            5,
+            1
+          ]
+        },
+        "mesh": {
+          "mesh": "sphere",
+          "color": "#4f9e6a",
+          "metallic": 0,
+          "roughness": 1,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      },
+      "behaviors": [
+        {
+          "name": "Parallax",
+          "intent": "Slide with the camera at a fraction of its speed for depth.",
+          "source": "\nbehavior Parallax\n  var home = (0, 0, 0)\n  var cam0 = 0\n  on start\n    home = self.position\n    cam0 = find(\"Game Camera\").position.x\n  end\n  on tick\n    let cam = find(\"Game Camera\").position.x\n    self.position.x = home.x + (cam - cam0) * self.factor\n  end\nend\n",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "name": "Hill 3",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "parallax"
+      ],
+      "vars": {
+        "factor": 0.3
+      },
+      "components": {
+        "transform": {
+          "position": [
+            4,
+            -1.2000000476837158,
+            -6
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            9,
+            5,
+            1
+          ]
+        },
+        "mesh": {
+          "mesh": "sphere",
+          "color": "#5aab72",
+          "metallic": 0,
+          "roughness": 1,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      },
+      "behaviors": [
+        {
+          "name": "Parallax",
+          "intent": "Slide with the camera at a fraction of its speed for depth.",
+          "source": "\nbehavior Parallax\n  var home = (0, 0, 0)\n  var cam0 = 0\n  on start\n    home = self.position\n    cam0 = find(\"Game Camera\").position.x\n  end\n  on tick\n    let cam = find(\"Game Camera\").position.x\n    self.position.x = home.x + (cam - cam0) * self.factor\n  end\nend\n",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "name": "Hill 4",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "parallax"
+      ],
+      "vars": {
+        "factor": 0.3
+      },
+      "components": {
+        "transform": {
+          "position": [
+            11,
+            -1.2000000476837158,
+            -6
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            9,
+            5,
+            1
+          ]
+        },
+        "mesh": {
+          "mesh": "sphere",
+          "color": "#4f9e6a",
+          "metallic": 0,
+          "roughness": 1,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      },
+      "behaviors": [
+        {
+          "name": "Parallax",
+          "intent": "Slide with the camera at a fraction of its speed for depth.",
+          "source": "\nbehavior Parallax\n  var home = (0, 0, 0)\n  var cam0 = 0\n  on start\n    home = self.position\n    cam0 = find(\"Game Camera\").position.x\n  end\n  on tick\n    let cam = find(\"Game Camera\").position.x\n    self.position.x = home.x + (cam - cam0) * self.factor\n  end\nend\n",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "name": "Hill 5",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "parallax"
+      ],
+      "vars": {
+        "factor": 0.3
+      },
+      "components": {
+        "transform": {
+          "position": [
+            18,
+            -1.2000000476837158,
+            -6
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            9,
+            5,
+            1
+          ]
+        },
+        "mesh": {
+          "mesh": "sphere",
+          "color": "#5aab72",
+          "metallic": 0,
+          "roughness": 1,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      },
+      "behaviors": [
+        {
+          "name": "Parallax",
+          "intent": "Slide with the camera at a fraction of its speed for depth.",
+          "source": "\nbehavior Parallax\n  var home = (0, 0, 0)\n  var cam0 = 0\n  on start\n    home = self.position\n    cam0 = find(\"Game Camera\").position.x\n  end\n  on tick\n    let cam = find(\"Game Camera\").position.x\n    self.position.x = home.x + (cam - cam0) * self.factor\n  end\nend\n",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "name": "Hill 6",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "parallax"
+      ],
+      "vars": {
+        "factor": 0.3
+      },
+      "components": {
+        "transform": {
+          "position": [
+            25,
+            -1.2000000476837158,
+            -6
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            9,
+            5,
+            1
+          ]
+        },
+        "mesh": {
+          "mesh": "sphere",
+          "color": "#4f9e6a",
+          "metallic": 0,
+          "roughness": 1,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      },
+      "behaviors": [
+        {
+          "name": "Parallax",
+          "intent": "Slide with the camera at a fraction of its speed for depth.",
+          "source": "\nbehavior Parallax\n  var home = (0, 0, 0)\n  var cam0 = 0\n  on start\n    home = self.position\n    cam0 = find(\"Game Camera\").position.x\n  end\n  on tick\n    let cam = find(\"Game Camera\").position.x\n    self.position.x = home.x + (cam - cam0) * self.factor\n  end\nend\n",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 15,
+      "name": "Hill 7",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "parallax"
+      ],
+      "vars": {
+        "factor": 0.3
+      },
+      "components": {
+        "transform": {
+          "position": [
+            32,
+            -1.2000000476837158,
+            -6
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            9,
+            5,
+            1
+          ]
+        },
+        "mesh": {
+          "mesh": "sphere",
+          "color": "#5aab72",
+          "metallic": 0,
+          "roughness": 1,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      },
+      "behaviors": [
+        {
+          "name": "Parallax",
+          "intent": "Slide with the camera at a fraction of its speed for depth.",
+          "source": "\nbehavior Parallax\n  var home = (0, 0, 0)\n  var cam0 = 0\n  on start\n    home = self.position\n    cam0 = find(\"Game Camera\").position.x\n  end\n  on tick\n    let cam = find(\"Game Camera\").position.x\n    self.position.x = home.x + (cam - cam0) * self.factor\n  end\nend\n",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 16,
+      "name": "Hill 8",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "parallax"
+      ],
+      "vars": {
+        "factor": 0.3
+      },
+      "components": {
+        "transform": {
+          "position": [
+            39,
+            -1.2000000476837158,
+            -6
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            9,
+            5,
+            1
+          ]
+        },
+        "mesh": {
+          "mesh": "sphere",
+          "color": "#4f9e6a",
+          "metallic": 0,
+          "roughness": 1,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      },
+      "behaviors": [
+        {
+          "name": "Parallax",
+          "intent": "Slide with the camera at a fraction of its speed for depth.",
+          "source": "\nbehavior Parallax\n  var home = (0, 0, 0)\n  var cam0 = 0\n  on start\n    home = self.position\n    cam0 = find(\"Game Camera\").position.x\n  end\n  on tick\n    let cam = find(\"Game Camera\").position.x\n    self.position.x = home.x + (cam - cam0) * self.factor\n  end\nend\n",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 17,
+      "name": "Hill 9",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "parallax"
+      ],
+      "vars": {
+        "factor": 0.3
+      },
+      "components": {
+        "transform": {
+          "position": [
+            46,
+            -1.2000000476837158,
+            -6
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            9,
+            5,
+            1
+          ]
+        },
+        "mesh": {
+          "mesh": "sphere",
+          "color": "#5aab72",
+          "metallic": 0,
+          "roughness": 1,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      },
+      "behaviors": [
+        {
+          "name": "Parallax",
+          "intent": "Slide with the camera at a fraction of its speed for depth.",
+          "source": "\nbehavior Parallax\n  var home = (0, 0, 0)\n  var cam0 = 0\n  on start\n    home = self.position\n    cam0 = find(\"Game Camera\").position.x\n  end\n  on tick\n    let cam = find(\"Game Camera\").position.x\n    self.position.x = home.x + (cam - cam0) * self.factor\n  end\nend\n",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 18,
+      "name": "Hill 10",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "parallax"
+      ],
+      "vars": {
+        "factor": 0.3
+      },
+      "components": {
+        "transform": {
+          "position": [
+            53,
+            -1.2000000476837158,
+            -6
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            9,
+            5,
+            1
+          ]
+        },
+        "mesh": {
+          "mesh": "sphere",
+          "color": "#4f9e6a",
+          "metallic": 0,
+          "roughness": 1,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      },
+      "behaviors": [
+        {
+          "name": "Parallax",
+          "intent": "Slide with the camera at a fraction of its speed for depth.",
+          "source": "\nbehavior Parallax\n  var home = (0, 0, 0)\n  var cam0 = 0\n  on start\n    home = self.position\n    cam0 = find(\"Game Camera\").position.x\n  end\n  on tick\n    let cam = find(\"Game Camera\").position.x\n    self.position.x = home.x + (cam - cam0) * self.factor\n  end\nend\n",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 19,
+      "name": "Hill 11",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "parallax"
+      ],
+      "vars": {
+        "factor": 0.3
+      },
+      "components": {
+        "transform": {
+          "position": [
+            60,
+            -1.2000000476837158,
+            -6
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            9,
+            5,
+            1
+          ]
+        },
+        "mesh": {
+          "mesh": "sphere",
+          "color": "#5aab72",
+          "metallic": 0,
+          "roughness": 1,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      },
+      "behaviors": [
+        {
+          "name": "Parallax",
+          "intent": "Slide with the camera at a fraction of its speed for depth.",
+          "source": "\nbehavior Parallax\n  var home = (0, 0, 0)\n  var cam0 = 0\n  on start\n    home = self.position\n    cam0 = find(\"Game Camera\").position.x\n  end\n  on tick\n    let cam = find(\"Game Camera\").position.x\n    self.position.x = home.x + (cam - cam0) * self.factor\n  end\nend\n",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 20,
+      "name": "Hill 12",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "parallax"
+      ],
+      "vars": {
+        "factor": 0.3
+      },
+      "components": {
+        "transform": {
+          "position": [
+            67,
+            -1.2000000476837158,
+            -6
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            9,
+            5,
+            1
+          ]
+        },
+        "mesh": {
+          "mesh": "sphere",
+          "color": "#4f9e6a",
+          "metallic": 0,
+          "roughness": 1,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      },
+      "behaviors": [
+        {
+          "name": "Parallax",
+          "intent": "Slide with the camera at a fraction of its speed for depth.",
+          "source": "\nbehavior Parallax\n  var home = (0, 0, 0)\n  var cam0 = 0\n  on start\n    home = self.position\n    cam0 = find(\"Game Camera\").position.x\n  end\n  on tick\n    let cam = find(\"Game Camera\").position.x\n    self.position.x = home.x + (cam - cam0) * self.factor\n  end\nend\n",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 21,
+      "name": "Hill 13",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "parallax"
+      ],
+      "vars": {
+        "factor": 0.3
+      },
+      "components": {
+        "transform": {
+          "position": [
+            74,
+            -1.2000000476837158,
+            -6
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            9,
+            5,
+            1
+          ]
+        },
+        "mesh": {
+          "mesh": "sphere",
+          "color": "#5aab72",
+          "metallic": 0,
+          "roughness": 1,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      },
+      "behaviors": [
+        {
+          "name": "Parallax",
+          "intent": "Slide with the camera at a fraction of its speed for depth.",
+          "source": "\nbehavior Parallax\n  var home = (0, 0, 0)\n  var cam0 = 0\n  on start\n    home = self.position\n    cam0 = find(\"Game Camera\").position.x\n  end\n  on tick\n    let cam = find(\"Game Camera\").position.x\n    self.position.x = home.x + (cam - cam0) * self.factor\n  end\nend\n",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 22,
+      "name": "Cloud 1",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "cloud"
+      ],
+      "vars": {
+        "speed": 0.3
+      },
+      "components": {
+        "transform": {
+          "position": [
+            -4,
+            8,
+            -8
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      },
+      "behaviors": [
+        {
+          "name": "Drift",
+          "intent": "Drift slowly to the right, forever.",
+          "source": "\non tick\n  move self by (self.speed * dt, 0, 0)\nend\n",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 23,
+      "name": "Cloud 2",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "cloud"
+      ],
+      "vars": {
+        "speed": 0.4
+      },
+      "components": {
+        "transform": {
+          "position": [
+            8,
+            9.5,
+            -8
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      },
+      "behaviors": [
+        {
+          "name": "Drift",
+          "intent": "Drift slowly to the right, forever.",
+          "source": "\non tick\n  move self by (self.speed * dt, 0, 0)\nend\n",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 24,
+      "name": "Cloud 3",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "cloud"
+      ],
+      "vars": {
+        "speed": 0.5
+      },
+      "components": {
+        "transform": {
+          "position": [
+            19,
+            7.800000190734863,
+            -8
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      },
+      "behaviors": [
+        {
+          "name": "Drift",
+          "intent": "Drift slowly to the right, forever.",
+          "source": "\non tick\n  move self by (self.speed * dt, 0, 0)\nend\n",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 25,
+      "name": "Cloud 4",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "cloud"
+      ],
+      "vars": {
+        "speed": 0.3
+      },
+      "components": {
+        "transform": {
+          "position": [
+            31,
+            9,
+            -8
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      },
+      "behaviors": [
+        {
+          "name": "Drift",
+          "intent": "Drift slowly to the right, forever.",
+          "source": "\non tick\n  move self by (self.speed * dt, 0, 0)\nend\n",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 26,
+      "name": "Cloud 5",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "cloud"
+      ],
+      "vars": {
+        "speed": 0.4
+      },
+      "components": {
+        "transform": {
+          "position": [
+            44,
+            8.399999618530273,
+            -8
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      },
+      "behaviors": [
+        {
+          "name": "Drift",
+          "intent": "Drift slowly to the right, forever.",
+          "source": "\non tick\n  move self by (self.speed * dt, 0, 0)\nend\n",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 27,
+      "name": "Cloud 6",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "cloud"
+      ],
+      "vars": {
+        "speed": 0.5
+      },
+      "components": {
+        "transform": {
+          "position": [
+            57,
+            9.600000381469727,
+            -8
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      },
+      "behaviors": [
+        {
+          "name": "Drift",
+          "intent": "Drift slowly to the right, forever.",
+          "source": "\non tick\n  move self by (self.speed * dt, 0, 0)\nend\n",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 28,
+      "name": "Cloud 7",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "cloud"
+      ],
+      "vars": {
+        "speed": 0.3
+      },
+      "components": {
+        "transform": {
+          "position": [
+            70,
+            8.199999809265137,
+            -8
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      },
+      "behaviors": [
+        {
+          "name": "Drift",
+          "intent": "Drift slowly to the right, forever.",
+          "source": "\non tick\n  move self by (self.speed * dt, 0, 0)\nend\n",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 29,
+      "name": "Cloud 1 Puff 1",
+      "parent": 22,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            2.240000009536743,
+            1.600000023841858,
+            0.5
+          ]
+        },
+        "mesh": {
+          "mesh": "sphere",
+          "color": "#ffffff",
+          "metallic": 0,
+          "roughness": 1,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 30,
+      "name": "Cloud 1 Puff 2",
+      "parent": 22,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            1.100000023841858,
+            0.30000001192092896,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1.6799999475479126,
+            1.2000000476837158,
+            0.5
+          ]
+        },
+        "mesh": {
+          "mesh": "sphere",
+          "color": "#ffffff",
+          "metallic": 0,
+          "roughness": 1,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 31,
+      "name": "Cloud 1 Puff 3",
+      "parent": 22,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -1,
+            0.10000000149011612,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1.5399999618530273,
+            1.100000023841858,
+            0.5
+          ]
+        },
+        "mesh": {
+          "mesh": "sphere",
+          "color": "#ffffff",
+          "metallic": 0,
+          "roughness": 1,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 32,
+      "name": "Cloud 1 Puff 4",
+      "parent": 22,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0.4000000059604645,
+            0.6000000238418579,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1.399999976158142,
+            1,
+            0.5
+          ]
+        },
+        "mesh": {
+          "mesh": "sphere",
+          "color": "#ffffff",
+          "metallic": 0,
+          "roughness": 1,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 33,
+      "name": "Cloud 2 Puff 1",
+      "parent": 23,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            2.240000009536743,
+            1.600000023841858,
+            0.5
+          ]
+        },
+        "mesh": {
+          "mesh": "sphere",
+          "color": "#ffffff",
+          "metallic": 0,
+          "roughness": 1,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 34,
+      "name": "Cloud 2 Puff 2",
+      "parent": 23,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            1.100000023841858,
+            0.30000001192092896,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1.6799999475479126,
+            1.2000000476837158,
+            0.5
+          ]
+        },
+        "mesh": {
+          "mesh": "sphere",
+          "color": "#ffffff",
+          "metallic": 0,
+          "roughness": 1,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 35,
+      "name": "Cloud 2 Puff 3",
+      "parent": 23,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -1,
+            0.10000000149011612,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1.5399999618530273,
+            1.100000023841858,
+            0.5
+          ]
+        },
+        "mesh": {
+          "mesh": "sphere",
+          "color": "#ffffff",
+          "metallic": 0,
+          "roughness": 1,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 36,
+      "name": "Cloud 2 Puff 4",
+      "parent": 23,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0.4000000059604645,
+            0.6000000238418579,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1.399999976158142,
+            1,
+            0.5
+          ]
+        },
+        "mesh": {
+          "mesh": "sphere",
+          "color": "#ffffff",
+          "metallic": 0,
+          "roughness": 1,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 37,
+      "name": "Cloud 3 Puff 1",
+      "parent": 24,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            2.240000009536743,
+            1.600000023841858,
+            0.5
+          ]
+        },
+        "mesh": {
+          "mesh": "sphere",
+          "color": "#ffffff",
+          "metallic": 0,
+          "roughness": 1,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 38,
+      "name": "Cloud 3 Puff 2",
+      "parent": 24,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            1.100000023841858,
+            0.30000001192092896,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1.6799999475479126,
+            1.2000000476837158,
+            0.5
+          ]
+        },
+        "mesh": {
+          "mesh": "sphere",
+          "color": "#ffffff",
+          "metallic": 0,
+          "roughness": 1,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 39,
+      "name": "Cloud 3 Puff 3",
+      "parent": 24,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -1,
+            0.10000000149011612,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1.5399999618530273,
+            1.100000023841858,
+            0.5
+          ]
+        },
+        "mesh": {
+          "mesh": "sphere",
+          "color": "#ffffff",
+          "metallic": 0,
+          "roughness": 1,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 40,
+      "name": "Cloud 3 Puff 4",
+      "parent": 24,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0.4000000059604645,
+            0.6000000238418579,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1.399999976158142,
+            1,
+            0.5
+          ]
+        },
+        "mesh": {
+          "mesh": "sphere",
+          "color": "#ffffff",
+          "metallic": 0,
+          "roughness": 1,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 41,
+      "name": "Cloud 4 Puff 1",
+      "parent": 25,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            2.240000009536743,
+            1.600000023841858,
+            0.5
+          ]
+        },
+        "mesh": {
+          "mesh": "sphere",
+          "color": "#ffffff",
+          "metallic": 0,
+          "roughness": 1,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 42,
+      "name": "Cloud 4 Puff 2",
+      "parent": 25,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            1.100000023841858,
+            0.30000001192092896,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1.6799999475479126,
+            1.2000000476837158,
+            0.5
+          ]
+        },
+        "mesh": {
+          "mesh": "sphere",
+          "color": "#ffffff",
+          "metallic": 0,
+          "roughness": 1,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 43,
+      "name": "Cloud 4 Puff 3",
+      "parent": 25,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -1,
+            0.10000000149011612,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1.5399999618530273,
+            1.100000023841858,
+            0.5
+          ]
+        },
+        "mesh": {
+          "mesh": "sphere",
+          "color": "#ffffff",
+          "metallic": 0,
+          "roughness": 1,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 44,
+      "name": "Cloud 4 Puff 4",
+      "parent": 25,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0.4000000059604645,
+            0.6000000238418579,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1.399999976158142,
+            1,
+            0.5
+          ]
+        },
+        "mesh": {
+          "mesh": "sphere",
+          "color": "#ffffff",
+          "metallic": 0,
+          "roughness": 1,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 45,
+      "name": "Cloud 5 Puff 1",
+      "parent": 26,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            2.240000009536743,
+            1.600000023841858,
+            0.5
+          ]
+        },
+        "mesh": {
+          "mesh": "sphere",
+          "color": "#ffffff",
+          "metallic": 0,
+          "roughness": 1,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 46,
+      "name": "Cloud 5 Puff 2",
+      "parent": 26,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            1.100000023841858,
+            0.30000001192092896,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1.6799999475479126,
+            1.2000000476837158,
+            0.5
+          ]
+        },
+        "mesh": {
+          "mesh": "sphere",
+          "color": "#ffffff",
+          "metallic": 0,
+          "roughness": 1,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 47,
+      "name": "Cloud 5 Puff 3",
+      "parent": 26,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -1,
+            0.10000000149011612,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1.5399999618530273,
+            1.100000023841858,
+            0.5
+          ]
+        },
+        "mesh": {
+          "mesh": "sphere",
+          "color": "#ffffff",
+          "metallic": 0,
+          "roughness": 1,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 48,
+      "name": "Cloud 5 Puff 4",
+      "parent": 26,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0.4000000059604645,
+            0.6000000238418579,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1.399999976158142,
+            1,
+            0.5
+          ]
+        },
+        "mesh": {
+          "mesh": "sphere",
+          "color": "#ffffff",
+          "metallic": 0,
+          "roughness": 1,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 49,
+      "name": "Cloud 6 Puff 1",
+      "parent": 27,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            2.240000009536743,
+            1.600000023841858,
+            0.5
+          ]
+        },
+        "mesh": {
+          "mesh": "sphere",
+          "color": "#ffffff",
+          "metallic": 0,
+          "roughness": 1,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 50,
+      "name": "Cloud 6 Puff 2",
+      "parent": 27,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            1.100000023841858,
+            0.30000001192092896,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1.6799999475479126,
+            1.2000000476837158,
+            0.5
+          ]
+        },
+        "mesh": {
+          "mesh": "sphere",
+          "color": "#ffffff",
+          "metallic": 0,
+          "roughness": 1,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 51,
+      "name": "Cloud 6 Puff 3",
+      "parent": 27,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -1,
+            0.10000000149011612,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1.5399999618530273,
+            1.100000023841858,
+            0.5
+          ]
+        },
+        "mesh": {
+          "mesh": "sphere",
+          "color": "#ffffff",
+          "metallic": 0,
+          "roughness": 1,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 52,
+      "name": "Cloud 6 Puff 4",
+      "parent": 27,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0.4000000059604645,
+            0.6000000238418579,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1.399999976158142,
+            1,
+            0.5
+          ]
+        },
+        "mesh": {
+          "mesh": "sphere",
+          "color": "#ffffff",
+          "metallic": 0,
+          "roughness": 1,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 53,
+      "name": "Cloud 7 Puff 1",
+      "parent": 28,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            2.240000009536743,
+            1.600000023841858,
+            0.5
+          ]
+        },
+        "mesh": {
+          "mesh": "sphere",
+          "color": "#ffffff",
+          "metallic": 0,
+          "roughness": 1,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 54,
+      "name": "Cloud 7 Puff 2",
+      "parent": 28,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            1.100000023841858,
+            0.30000001192092896,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1.6799999475479126,
+            1.2000000476837158,
+            0.5
+          ]
+        },
+        "mesh": {
+          "mesh": "sphere",
+          "color": "#ffffff",
+          "metallic": 0,
+          "roughness": 1,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 55,
+      "name": "Cloud 7 Puff 3",
+      "parent": 28,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -1,
+            0.10000000149011612,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1.5399999618530273,
+            1.100000023841858,
+            0.5
+          ]
+        },
+        "mesh": {
+          "mesh": "sphere",
+          "color": "#ffffff",
+          "metallic": 0,
+          "roughness": 1,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 56,
+      "name": "Cloud 7 Puff 4",
+      "parent": 28,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0.4000000059604645,
+            0.6000000238418579,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1.399999976158142,
+            1,
+            0.5
+          ]
+        },
+        "mesh": {
+          "mesh": "sphere",
+          "color": "#ffffff",
+          "metallic": 0,
+          "roughness": 1,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 57,
+      "name": "Ground",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            35,
+            -1.2999999523162842,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            100,
+            2.5999999046325684,
+            3
+          ]
+        },
+        "mesh": {
+          "mesh": "cube",
+          "color": "#9b6b43",
+          "metallic": 0,
+          "roughness": 1,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 58,
+      "name": "Grass",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            35,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            100,
+            0.4000000059604645,
+            3.200000047683716
+          ]
+        },
+        "mesh": {
+          "mesh": "cube",
+          "color": "#4cb35a",
+          "metallic": 0,
+          "roughness": 0.8999999761581421,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 59,
+      "name": "Bush 1",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -8,
+            0.3499999940395355,
+            -0.8999999761581421
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1.600000023841858,
+            1,
+            0.6000000238418579
+          ]
+        },
+        "mesh": {
+          "mesh": "sphere",
+          "color": "#48a857",
+          "metallic": 0,
+          "roughness": 1,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 60,
+      "name": "Bush 2",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -2,
+            0.3499999940395355,
+            -0.8999999761581421
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            2,
+            1.2999999523162842,
+            0.6000000238418579
+          ]
+        },
+        "mesh": {
+          "mesh": "sphere",
+          "color": "#3f9a4e",
+          "metallic": 0,
+          "roughness": 1,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 61,
+      "name": "Bush 3",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            4,
+            0.3499999940395355,
+            -0.8999999761581421
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            2.4000000953674316,
+            1,
+            0.6000000238418579
+          ]
+        },
+        "mesh": {
+          "mesh": "sphere",
+          "color": "#48a857",
+          "metallic": 0,
+          "roughness": 1,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 62,
+      "name": "Bush 4",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            7,
+            0.3499999940395355,
+            -0.8999999761581421
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1.600000023841858,
+            1.2999999523162842,
+            0.6000000238418579
+          ]
+        },
+        "mesh": {
+          "mesh": "sphere",
+          "color": "#3f9a4e",
+          "metallic": 0,
+          "roughness": 1,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 63,
+      "name": "Bush 5",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            13,
+            0.3499999940395355,
+            -0.8999999761581421
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            2,
+            1,
+            0.6000000238418579
+          ]
+        },
+        "mesh": {
+          "mesh": "sphere",
+          "color": "#48a857",
+          "metallic": 0,
+          "roughness": 1,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 64,
+      "name": "Bush 6",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            19,
+            0.3499999940395355,
+            -0.8999999761581421
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            2.4000000953674316,
+            1.2999999523162842,
+            0.6000000238418579
+          ]
+        },
+        "mesh": {
+          "mesh": "sphere",
+          "color": "#3f9a4e",
+          "metallic": 0,
+          "roughness": 1,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 65,
+      "name": "Bush 7",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            22,
+            0.3499999940395355,
+            -0.8999999761581421
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1.600000023841858,
+            1,
+            0.6000000238418579
+          ]
+        },
+        "mesh": {
+          "mesh": "sphere",
+          "color": "#48a857",
+          "metallic": 0,
+          "roughness": 1,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 66,
+      "name": "Bush 8",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            28,
+            0.3499999940395355,
+            -0.8999999761581421
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            2,
+            1.2999999523162842,
+            0.6000000238418579
+          ]
+        },
+        "mesh": {
+          "mesh": "sphere",
+          "color": "#3f9a4e",
+          "metallic": 0,
+          "roughness": 1,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 67,
+      "name": "Bush 9",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            34,
+            0.3499999940395355,
+            -0.8999999761581421
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            2.4000000953674316,
+            1,
+            0.6000000238418579
+          ]
+        },
+        "mesh": {
+          "mesh": "sphere",
+          "color": "#48a857",
+          "metallic": 0,
+          "roughness": 1,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 68,
+      "name": "Bush 10",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            37,
+            0.3499999940395355,
+            -0.8999999761581421
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1.600000023841858,
+            1.2999999523162842,
+            0.6000000238418579
+          ]
+        },
+        "mesh": {
+          "mesh": "sphere",
+          "color": "#3f9a4e",
+          "metallic": 0,
+          "roughness": 1,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 69,
+      "name": "Bush 11",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            43,
+            0.3499999940395355,
+            -0.8999999761581421
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            2,
+            1,
+            0.6000000238418579
+          ]
+        },
+        "mesh": {
+          "mesh": "sphere",
+          "color": "#48a857",
+          "metallic": 0,
+          "roughness": 1,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 70,
+      "name": "Bush 12",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            49,
+            0.3499999940395355,
+            -0.8999999761581421
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            2.4000000953674316,
+            1.2999999523162842,
+            0.6000000238418579
+          ]
+        },
+        "mesh": {
+          "mesh": "sphere",
+          "color": "#3f9a4e",
+          "metallic": 0,
+          "roughness": 1,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 71,
+      "name": "Bush 13",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            52,
+            0.3499999940395355,
+            -0.8999999761581421
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1.600000023841858,
+            1,
+            0.6000000238418579
+          ]
+        },
+        "mesh": {
+          "mesh": "sphere",
+          "color": "#48a857",
+          "metallic": 0,
+          "roughness": 1,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 72,
+      "name": "Bush 14",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            58,
+            0.3499999940395355,
+            -0.8999999761581421
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            2,
+            1.2999999523162842,
+            0.6000000238418579
+          ]
+        },
+        "mesh": {
+          "mesh": "sphere",
+          "color": "#3f9a4e",
+          "metallic": 0,
+          "roughness": 1,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 73,
+      "name": "Bush 15",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            64,
+            0.3499999940395355,
+            -0.8999999761581421
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            2.4000000953674316,
+            1,
+            0.6000000238418579
+          ]
+        },
+        "mesh": {
+          "mesh": "sphere",
+          "color": "#48a857",
+          "metallic": 0,
+          "roughness": 1,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 74,
+      "name": "Bush 16",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            67,
+            0.3499999940395355,
+            -0.8999999761581421
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1.600000023841858,
+            1.2999999523162842,
+            0.6000000238418579
+          ]
+        },
+        "mesh": {
+          "mesh": "sphere",
+          "color": "#3f9a4e",
+          "metallic": 0,
+          "roughness": 1,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 75,
+      "name": "Bush 17",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            73,
+            0.3499999940395355,
+            -0.8999999761581421
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            2,
+            1,
+            0.6000000238418579
+          ]
+        },
+        "mesh": {
+          "mesh": "sphere",
+          "color": "#48a857",
+          "metallic": 0,
+          "roughness": 1,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 76,
+      "name": "Bush 18",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            79,
+            0.3499999940395355,
+            -0.8999999761581421
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            2.4000000953674316,
+            1.2999999523162842,
+            0.6000000238418579
+          ]
+        },
+        "mesh": {
+          "mesh": "sphere",
+          "color": "#3f9a4e",
+          "metallic": 0,
+          "roughness": 1,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 77,
+      "name": "Tree 1 Trunk",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -4,
+            1,
+            -3
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            0.4000000059604645,
+            2.200000047683716,
+            0.4000000059604645
+          ]
+        },
+        "mesh": {
+          "mesh": "cylinder",
+          "color": "#7a5235",
+          "metallic": 0,
+          "roughness": 0.550000011920929,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 78,
+      "name": "Tree 1 Crown",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -4,
+            2.799999952316284,
+            -3
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            2.4000000953674316,
+            2.4000000953674316,
+            1
+          ]
+        },
+        "mesh": {
+          "mesh": "sphere",
+          "color": "#3a9a52",
+          "metallic": 0,
+          "roughness": 0.550000011920929,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 79,
+      "name": "Tree 2 Trunk",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            5,
+            1,
+            -3
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            0.4000000059604645,
+            2.200000047683716,
+            0.4000000059604645
+          ]
+        },
+        "mesh": {
+          "mesh": "cylinder",
+          "color": "#7a5235",
+          "metallic": 0,
+          "roughness": 0.550000011920929,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 80,
+      "name": "Tree 2 Crown",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            5,
+            2.799999952316284,
+            -3
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            2.4000000953674316,
+            2.4000000953674316,
+            1
+          ]
+        },
+        "mesh": {
+          "mesh": "sphere",
+          "color": "#2f8a4a",
+          "metallic": 0,
+          "roughness": 0.550000011920929,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 81,
+      "name": "Tree 3 Trunk",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            14,
+            1,
+            -3
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            0.4000000059604645,
+            2.200000047683716,
+            0.4000000059604645
+          ]
+        },
+        "mesh": {
+          "mesh": "cylinder",
+          "color": "#7a5235",
+          "metallic": 0,
+          "roughness": 0.550000011920929,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 82,
+      "name": "Tree 3 Crown",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            14,
+            2.799999952316284,
+            -3
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            2.4000000953674316,
+            2.4000000953674316,
+            1
+          ]
+        },
+        "mesh": {
+          "mesh": "sphere",
+          "color": "#3a9a52",
+          "metallic": 0,
+          "roughness": 0.550000011920929,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 83,
+      "name": "Tree 4 Trunk",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            23,
+            1,
+            -3
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            0.4000000059604645,
+            2.200000047683716,
+            0.4000000059604645
+          ]
+        },
+        "mesh": {
+          "mesh": "cylinder",
+          "color": "#7a5235",
+          "metallic": 0,
+          "roughness": 0.550000011920929,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 84,
+      "name": "Tree 4 Crown",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            23,
+            2.799999952316284,
+            -3
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            2.4000000953674316,
+            2.4000000953674316,
+            1
+          ]
+        },
+        "mesh": {
+          "mesh": "sphere",
+          "color": "#2f8a4a",
+          "metallic": 0,
+          "roughness": 0.550000011920929,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 85,
+      "name": "Tree 5 Trunk",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            32,
+            1,
+            -3
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            0.4000000059604645,
+            2.200000047683716,
+            0.4000000059604645
+          ]
+        },
+        "mesh": {
+          "mesh": "cylinder",
+          "color": "#7a5235",
+          "metallic": 0,
+          "roughness": 0.550000011920929,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 86,
+      "name": "Tree 5 Crown",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            32,
+            2.799999952316284,
+            -3
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            2.4000000953674316,
+            2.4000000953674316,
+            1
+          ]
+        },
+        "mesh": {
+          "mesh": "sphere",
+          "color": "#3a9a52",
+          "metallic": 0,
+          "roughness": 0.550000011920929,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 87,
+      "name": "Tree 6 Trunk",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            41,
+            1,
+            -3
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            0.4000000059604645,
+            2.200000047683716,
+            0.4000000059604645
+          ]
+        },
+        "mesh": {
+          "mesh": "cylinder",
+          "color": "#7a5235",
+          "metallic": 0,
+          "roughness": 0.550000011920929,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 88,
+      "name": "Tree 6 Crown",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            41,
+            2.799999952316284,
+            -3
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            2.4000000953674316,
+            2.4000000953674316,
+            1
+          ]
+        },
+        "mesh": {
+          "mesh": "sphere",
+          "color": "#2f8a4a",
+          "metallic": 0,
+          "roughness": 0.550000011920929,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 89,
+      "name": "Tree 7 Trunk",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            50,
+            1,
+            -3
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            0.4000000059604645,
+            2.200000047683716,
+            0.4000000059604645
+          ]
+        },
+        "mesh": {
+          "mesh": "cylinder",
+          "color": "#7a5235",
+          "metallic": 0,
+          "roughness": 0.550000011920929,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 90,
+      "name": "Tree 7 Crown",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            50,
+            2.799999952316284,
+            -3
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            2.4000000953674316,
+            2.4000000953674316,
+            1
+          ]
+        },
+        "mesh": {
+          "mesh": "sphere",
+          "color": "#3a9a52",
+          "metallic": 0,
+          "roughness": 0.550000011920929,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 91,
+      "name": "Tree 8 Trunk",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            59,
+            1,
+            -3
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            0.4000000059604645,
+            2.200000047683716,
+            0.4000000059604645
+          ]
+        },
+        "mesh": {
+          "mesh": "cylinder",
+          "color": "#7a5235",
+          "metallic": 0,
+          "roughness": 0.550000011920929,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 92,
+      "name": "Tree 8 Crown",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            59,
+            2.799999952316284,
+            -3
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            2.4000000953674316,
+            2.4000000953674316,
+            1
+          ]
+        },
+        "mesh": {
+          "mesh": "sphere",
+          "color": "#2f8a4a",
+          "metallic": 0,
+          "roughness": 0.550000011920929,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 93,
+      "name": "Tree 9 Trunk",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            68,
+            1,
+            -3
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            0.4000000059604645,
+            2.200000047683716,
+            0.4000000059604645
+          ]
+        },
+        "mesh": {
+          "mesh": "cylinder",
+          "color": "#7a5235",
+          "metallic": 0,
+          "roughness": 0.550000011920929,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 94,
+      "name": "Tree 9 Crown",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            68,
+            2.799999952316284,
+            -3
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            2.4000000953674316,
+            2.4000000953674316,
+            1
+          ]
+        },
+        "mesh": {
+          "mesh": "sphere",
+          "color": "#3a9a52",
+          "metallic": 0,
+          "roughness": 0.550000011920929,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 95,
+      "name": "Tree 10 Trunk",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            77,
+            1,
+            -3
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            0.4000000059604645,
+            2.200000047683716,
+            0.4000000059604645
+          ]
+        },
+        "mesh": {
+          "mesh": "cylinder",
+          "color": "#7a5235",
+          "metallic": 0,
+          "roughness": 0.550000011920929,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 96,
+      "name": "Tree 10 Crown",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            77,
+            2.799999952316284,
+            -3
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            2.4000000953674316,
+            2.4000000953674316,
+            1
+          ]
+        },
+        "mesh": {
+          "mesh": "sphere",
+          "color": "#2f8a4a",
+          "metallic": 0,
+          "roughness": 0.550000011920929,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 97,
+      "name": "Slime 1",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "enemy"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            3.0455000400543213,
+            0.550000011920929,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            0.800000011920929,
+            0.800000011920929
+          ]
+        },
+        "mesh": {
+          "mesh": "sphere",
+          "color": "#e05d6f",
+          "metallic": 0,
+          "roughness": 0.3499999940395355,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      },
+      "behaviors": [
+        {
+          "name": "Squish",
+          "intent": "Bounce in place with a jelly squish so it looks alive.",
+          "source": "\nbehavior Squish\n  var base = 0\n  on start\n    base = self.position.y\n  end\n  on tick\n    let t = sin(time * 6 + self.id)\n    self.scale = (1.0 + t * 0.12, 0.8 - t * 0.12, 0.8)\n    self.position.y = base - t * 0.06\n  end\nend\n",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 98,
+      "name": "Coin 1.1",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "coin"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            2.227299928665161,
+            2.7464001178741455,
+            0
+          ],
+          "rotation": [
+            90,
+            0,
+            0
+          ],
+          "scale": [
+            0.699999988079071,
+            0.699999988079071,
+            0.699999988079071
+          ]
+        },
+        "mesh": {
+          "mesh": "torus",
+          "color": "#f4c430",
+          "metallic": 1,
+          "roughness": 0.25,
+          "emissive": "#ffb30033",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      },
+      "behaviors": [
+        {
+          "name": "Collectible",
+          "intent": "Spin in place; when the player touches it, pop and count a coin.",
+          "source": "\non tick\n  rotate self by (0, 240 * dt, 0)\n  let p = find(\"Player\")\n  if exists(p) and distance(self, p) < 0.9 then\n    emit \"coin\" to p\n    destroy self\n  end\nend\n",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 99,
+      "name": "Coin 1.2",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "coin"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            3.0455000400543213,
+            3.0408999919891357,
+            0
+          ],
+          "rotation": [
+            90,
+            0,
+            0
+          ],
+          "scale": [
+            0.699999988079071,
+            0.699999988079071,
+            0.699999988079071
+          ]
+        },
+        "mesh": {
+          "mesh": "torus",
+          "color": "#f4c430",
+          "metallic": 1,
+          "roughness": 0.25,
+          "emissive": "#ffb30033",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      },
+      "behaviors": [
+        {
+          "name": "Collectible",
+          "intent": "Spin in place; when the player touches it, pop and count a coin.",
+          "source": "\non tick\n  rotate self by (0, 240 * dt, 0)\n  let p = find(\"Player\")\n  if exists(p) and distance(self, p) < 0.9 then\n    emit \"coin\" to p\n    destroy self\n  end\nend\n",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 100,
+      "name": "Coin 1.3",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "coin"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            3.863600015640259,
+            2.7464001178741455,
+            0
+          ],
+          "rotation": [
+            90,
+            0,
+            0
+          ],
+          "scale": [
+            0.699999988079071,
+            0.699999988079071,
+            0.699999988079071
+          ]
+        },
+        "mesh": {
+          "mesh": "torus",
+          "color": "#f4c430",
+          "metallic": 1,
+          "roughness": 0.25,
+          "emissive": "#ffb30033",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      },
+      "behaviors": [
+        {
+          "name": "Collectible",
+          "intent": "Spin in place; when the player touches it, pop and count a coin.",
+          "source": "\non tick\n  rotate self by (0, 240 * dt, 0)\n  let p = find(\"Player\")\n  if exists(p) and distance(self, p) < 0.9 then\n    emit \"coin\" to p\n    destroy self\n  end\nend\n",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 101,
+      "name": "Spikes 2",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "hazard"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            10.045499801635742,
+            0.6000000238418579,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            0.8999999761581421,
+            0.8999999761581421,
+            0.8999999761581421
+          ]
+        },
+        "mesh": {
+          "mesh": "cone",
+          "color": "#7c7f8c",
+          "metallic": 0.6000000238418579,
+          "roughness": 0.3499999940395355,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 102,
+      "name": "Coin 2.1",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "coin"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            9.227299690246582,
+            2.7464001178741455,
+            0
+          ],
+          "rotation": [
+            90,
+            0,
+            0
+          ],
+          "scale": [
+            0.699999988079071,
+            0.699999988079071,
+            0.699999988079071
+          ]
+        },
+        "mesh": {
+          "mesh": "torus",
+          "color": "#f4c430",
+          "metallic": 1,
+          "roughness": 0.25,
+          "emissive": "#ffb30033",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      },
+      "behaviors": [
+        {
+          "name": "Collectible",
+          "intent": "Spin in place; when the player touches it, pop and count a coin.",
+          "source": "\non tick\n  rotate self by (0, 240 * dt, 0)\n  let p = find(\"Player\")\n  if exists(p) and distance(self, p) < 0.9 then\n    emit \"coin\" to p\n    destroy self\n  end\nend\n",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 103,
+      "name": "Coin 2.2",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "coin"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            10.045499801635742,
+            3.0408999919891357,
+            0
+          ],
+          "rotation": [
+            90,
+            0,
+            0
+          ],
+          "scale": [
+            0.699999988079071,
+            0.699999988079071,
+            0.699999988079071
+          ]
+        },
+        "mesh": {
+          "mesh": "torus",
+          "color": "#f4c430",
+          "metallic": 1,
+          "roughness": 0.25,
+          "emissive": "#ffb30033",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      },
+      "behaviors": [
+        {
+          "name": "Collectible",
+          "intent": "Spin in place; when the player touches it, pop and count a coin.",
+          "source": "\non tick\n  rotate self by (0, 240 * dt, 0)\n  let p = find(\"Player\")\n  if exists(p) and distance(self, p) < 0.9 then\n    emit \"coin\" to p\n    destroy self\n  end\nend\n",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 104,
+      "name": "Coin 2.3",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "coin"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            10.86359977722168,
+            2.7464001178741455,
+            0
+          ],
+          "rotation": [
+            90,
+            0,
+            0
+          ],
+          "scale": [
+            0.699999988079071,
+            0.699999988079071,
+            0.699999988079071
+          ]
+        },
+        "mesh": {
+          "mesh": "torus",
+          "color": "#f4c430",
+          "metallic": 1,
+          "roughness": 0.25,
+          "emissive": "#ffb30033",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      },
+      "behaviors": [
+        {
+          "name": "Collectible",
+          "intent": "Spin in place; when the player touches it, pop and count a coin.",
+          "source": "\non tick\n  rotate self by (0, 240 * dt, 0)\n  let p = find(\"Player\")\n  if exists(p) and distance(self, p) < 0.9 then\n    emit \"coin\" to p\n    destroy self\n  end\nend\n",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 105,
+      "name": "Slime 3",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "enemy"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            17.045499801635742,
+            0.550000011920929,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            0.800000011920929,
+            0.800000011920929
+          ]
+        },
+        "mesh": {
+          "mesh": "sphere",
+          "color": "#e05d6f",
+          "metallic": 0,
+          "roughness": 0.3499999940395355,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      },
+      "behaviors": [
+        {
+          "name": "Squish",
+          "intent": "Bounce in place with a jelly squish so it looks alive.",
+          "source": "\nbehavior Squish\n  var base = 0\n  on start\n    base = self.position.y\n  end\n  on tick\n    let t = sin(time * 6 + self.id)\n    self.scale = (1.0 + t * 0.12, 0.8 - t * 0.12, 0.8)\n    self.position.y = base - t * 0.06\n  end\nend\n",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 106,
+      "name": "Coin 3.1",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "coin"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            16.2273006439209,
+            2.7464001178741455,
+            0
+          ],
+          "rotation": [
+            90,
+            0,
+            0
+          ],
+          "scale": [
+            0.699999988079071,
+            0.699999988079071,
+            0.699999988079071
+          ]
+        },
+        "mesh": {
+          "mesh": "torus",
+          "color": "#f4c430",
+          "metallic": 1,
+          "roughness": 0.25,
+          "emissive": "#ffb30033",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      },
+      "behaviors": [
+        {
+          "name": "Collectible",
+          "intent": "Spin in place; when the player touches it, pop and count a coin.",
+          "source": "\non tick\n  rotate self by (0, 240 * dt, 0)\n  let p = find(\"Player\")\n  if exists(p) and distance(self, p) < 0.9 then\n    emit \"coin\" to p\n    destroy self\n  end\nend\n",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 107,
+      "name": "Coin 3.2",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "coin"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            17.045499801635742,
+            3.0408999919891357,
+            0
+          ],
+          "rotation": [
+            90,
+            0,
+            0
+          ],
+          "scale": [
+            0.699999988079071,
+            0.699999988079071,
+            0.699999988079071
+          ]
+        },
+        "mesh": {
+          "mesh": "torus",
+          "color": "#f4c430",
+          "metallic": 1,
+          "roughness": 0.25,
+          "emissive": "#ffb30033",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      },
+      "behaviors": [
+        {
+          "name": "Collectible",
+          "intent": "Spin in place; when the player touches it, pop and count a coin.",
+          "source": "\non tick\n  rotate self by (0, 240 * dt, 0)\n  let p = find(\"Player\")\n  if exists(p) and distance(self, p) < 0.9 then\n    emit \"coin\" to p\n    destroy self\n  end\nend\n",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 108,
+      "name": "Coin 3.3",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "coin"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            17.86359977722168,
+            2.7464001178741455,
+            0
+          ],
+          "rotation": [
+            90,
+            0,
+            0
+          ],
+          "scale": [
+            0.699999988079071,
+            0.699999988079071,
+            0.699999988079071
+          ]
+        },
+        "mesh": {
+          "mesh": "torus",
+          "color": "#f4c430",
+          "metallic": 1,
+          "roughness": 0.25,
+          "emissive": "#ffb30033",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      },
+      "behaviors": [
+        {
+          "name": "Collectible",
+          "intent": "Spin in place; when the player touches it, pop and count a coin.",
+          "source": "\non tick\n  rotate self by (0, 240 * dt, 0)\n  let p = find(\"Player\")\n  if exists(p) and distance(self, p) < 0.9 then\n    emit \"coin\" to p\n    destroy self\n  end\nend\n",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 109,
+      "name": "Spikes 4",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "hazard"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            24.045499801635742,
+            0.6000000238418579,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            0.8999999761581421,
+            0.8999999761581421,
+            0.8999999761581421
+          ]
+        },
+        "mesh": {
+          "mesh": "cone",
+          "color": "#7c7f8c",
+          "metallic": 0.6000000238418579,
+          "roughness": 0.3499999940395355,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 110,
+      "name": "Coin 4.1",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "coin"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            23.2273006439209,
+            2.7464001178741455,
+            0
+          ],
+          "rotation": [
+            90,
+            0,
+            0
+          ],
+          "scale": [
+            0.699999988079071,
+            0.699999988079071,
+            0.699999988079071
+          ]
+        },
+        "mesh": {
+          "mesh": "torus",
+          "color": "#f4c430",
+          "metallic": 1,
+          "roughness": 0.25,
+          "emissive": "#ffb30033",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      },
+      "behaviors": [
+        {
+          "name": "Collectible",
+          "intent": "Spin in place; when the player touches it, pop and count a coin.",
+          "source": "\non tick\n  rotate self by (0, 240 * dt, 0)\n  let p = find(\"Player\")\n  if exists(p) and distance(self, p) < 0.9 then\n    emit \"coin\" to p\n    destroy self\n  end\nend\n",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 111,
+      "name": "Coin 4.2",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "coin"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            24.045499801635742,
+            3.0408999919891357,
+            0
+          ],
+          "rotation": [
+            90,
+            0,
+            0
+          ],
+          "scale": [
+            0.699999988079071,
+            0.699999988079071,
+            0.699999988079071
+          ]
+        },
+        "mesh": {
+          "mesh": "torus",
+          "color": "#f4c430",
+          "metallic": 1,
+          "roughness": 0.25,
+          "emissive": "#ffb30033",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      },
+      "behaviors": [
+        {
+          "name": "Collectible",
+          "intent": "Spin in place; when the player touches it, pop and count a coin.",
+          "source": "\non tick\n  rotate self by (0, 240 * dt, 0)\n  let p = find(\"Player\")\n  if exists(p) and distance(self, p) < 0.9 then\n    emit \"coin\" to p\n    destroy self\n  end\nend\n",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 112,
+      "name": "Coin 4.3",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "coin"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            24.86359977722168,
+            2.7464001178741455,
+            0
+          ],
+          "rotation": [
+            90,
+            0,
+            0
+          ],
+          "scale": [
+            0.699999988079071,
+            0.699999988079071,
+            0.699999988079071
+          ]
+        },
+        "mesh": {
+          "mesh": "torus",
+          "color": "#f4c430",
+          "metallic": 1,
+          "roughness": 0.25,
+          "emissive": "#ffb30033",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      },
+      "behaviors": [
+        {
+          "name": "Collectible",
+          "intent": "Spin in place; when the player touches it, pop and count a coin.",
+          "source": "\non tick\n  rotate self by (0, 240 * dt, 0)\n  let p = find(\"Player\")\n  if exists(p) and distance(self, p) < 0.9 then\n    emit \"coin\" to p\n    destroy self\n  end\nend\n",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 113,
+      "name": "Slime 5",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "enemy"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            31.045499801635742,
+            0.550000011920929,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            0.800000011920929,
+            0.800000011920929
+          ]
+        },
+        "mesh": {
+          "mesh": "sphere",
+          "color": "#e05d6f",
+          "metallic": 0,
+          "roughness": 0.3499999940395355,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      },
+      "behaviors": [
+        {
+          "name": "Squish",
+          "intent": "Bounce in place with a jelly squish so it looks alive.",
+          "source": "\nbehavior Squish\n  var base = 0\n  on start\n    base = self.position.y\n  end\n  on tick\n    let t = sin(time * 6 + self.id)\n    self.scale = (1.0 + t * 0.12, 0.8 - t * 0.12, 0.8)\n    self.position.y = base - t * 0.06\n  end\nend\n",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 114,
+      "name": "Coin 5.1",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "coin"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            30.2273006439209,
+            2.7464001178741455,
+            0
+          ],
+          "rotation": [
+            90,
+            0,
+            0
+          ],
+          "scale": [
+            0.699999988079071,
+            0.699999988079071,
+            0.699999988079071
+          ]
+        },
+        "mesh": {
+          "mesh": "torus",
+          "color": "#f4c430",
+          "metallic": 1,
+          "roughness": 0.25,
+          "emissive": "#ffb30033",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      },
+      "behaviors": [
+        {
+          "name": "Collectible",
+          "intent": "Spin in place; when the player touches it, pop and count a coin.",
+          "source": "\non tick\n  rotate self by (0, 240 * dt, 0)\n  let p = find(\"Player\")\n  if exists(p) and distance(self, p) < 0.9 then\n    emit \"coin\" to p\n    destroy self\n  end\nend\n",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 115,
+      "name": "Coin 5.2",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "coin"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            31.045499801635742,
+            3.0408999919891357,
+            0
+          ],
+          "rotation": [
+            90,
+            0,
+            0
+          ],
+          "scale": [
+            0.699999988079071,
+            0.699999988079071,
+            0.699999988079071
+          ]
+        },
+        "mesh": {
+          "mesh": "torus",
+          "color": "#f4c430",
+          "metallic": 1,
+          "roughness": 0.25,
+          "emissive": "#ffb30033",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      },
+      "behaviors": [
+        {
+          "name": "Collectible",
+          "intent": "Spin in place; when the player touches it, pop and count a coin.",
+          "source": "\non tick\n  rotate self by (0, 240 * dt, 0)\n  let p = find(\"Player\")\n  if exists(p) and distance(self, p) < 0.9 then\n    emit \"coin\" to p\n    destroy self\n  end\nend\n",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 116,
+      "name": "Coin 5.3",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "coin"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            31.86359977722168,
+            2.7464001178741455,
+            0
+          ],
+          "rotation": [
+            90,
+            0,
+            0
+          ],
+          "scale": [
+            0.699999988079071,
+            0.699999988079071,
+            0.699999988079071
+          ]
+        },
+        "mesh": {
+          "mesh": "torus",
+          "color": "#f4c430",
+          "metallic": 1,
+          "roughness": 0.25,
+          "emissive": "#ffb30033",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      },
+      "behaviors": [
+        {
+          "name": "Collectible",
+          "intent": "Spin in place; when the player touches it, pop and count a coin.",
+          "source": "\non tick\n  rotate self by (0, 240 * dt, 0)\n  let p = find(\"Player\")\n  if exists(p) and distance(self, p) < 0.9 then\n    emit \"coin\" to p\n    destroy self\n  end\nend\n",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 117,
+      "name": "Spikes 6",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "hazard"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            38.045501708984375,
+            0.6000000238418579,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            0.8999999761581421,
+            0.8999999761581421,
+            0.8999999761581421
+          ]
+        },
+        "mesh": {
+          "mesh": "cone",
+          "color": "#7c7f8c",
+          "metallic": 0.6000000238418579,
+          "roughness": 0.3499999940395355,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 118,
+      "name": "Coin 6.1",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "coin"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            37.227298736572266,
+            2.7464001178741455,
+            0
+          ],
+          "rotation": [
+            90,
+            0,
+            0
+          ],
+          "scale": [
+            0.699999988079071,
+            0.699999988079071,
+            0.699999988079071
+          ]
+        },
+        "mesh": {
+          "mesh": "torus",
+          "color": "#f4c430",
+          "metallic": 1,
+          "roughness": 0.25,
+          "emissive": "#ffb30033",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      },
+      "behaviors": [
+        {
+          "name": "Collectible",
+          "intent": "Spin in place; when the player touches it, pop and count a coin.",
+          "source": "\non tick\n  rotate self by (0, 240 * dt, 0)\n  let p = find(\"Player\")\n  if exists(p) and distance(self, p) < 0.9 then\n    emit \"coin\" to p\n    destroy self\n  end\nend\n",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 119,
+      "name": "Coin 6.2",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "coin"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            38.045501708984375,
+            3.0408999919891357,
+            0
+          ],
+          "rotation": [
+            90,
+            0,
+            0
+          ],
+          "scale": [
+            0.699999988079071,
+            0.699999988079071,
+            0.699999988079071
+          ]
+        },
+        "mesh": {
+          "mesh": "torus",
+          "color": "#f4c430",
+          "metallic": 1,
+          "roughness": 0.25,
+          "emissive": "#ffb30033",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      },
+      "behaviors": [
+        {
+          "name": "Collectible",
+          "intent": "Spin in place; when the player touches it, pop and count a coin.",
+          "source": "\non tick\n  rotate self by (0, 240 * dt, 0)\n  let p = find(\"Player\")\n  if exists(p) and distance(self, p) < 0.9 then\n    emit \"coin\" to p\n    destroy self\n  end\nend\n",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 120,
+      "name": "Coin 6.3",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "coin"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            38.86360168457031,
+            2.7464001178741455,
+            0
+          ],
+          "rotation": [
+            90,
+            0,
+            0
+          ],
+          "scale": [
+            0.699999988079071,
+            0.699999988079071,
+            0.699999988079071
+          ]
+        },
+        "mesh": {
+          "mesh": "torus",
+          "color": "#f4c430",
+          "metallic": 1,
+          "roughness": 0.25,
+          "emissive": "#ffb30033",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      },
+      "behaviors": [
+        {
+          "name": "Collectible",
+          "intent": "Spin in place; when the player touches it, pop and count a coin.",
+          "source": "\non tick\n  rotate self by (0, 240 * dt, 0)\n  let p = find(\"Player\")\n  if exists(p) and distance(self, p) < 0.9 then\n    emit \"coin\" to p\n    destroy self\n  end\nend\n",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 121,
+      "name": "Slime 7",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "enemy"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            45.045501708984375,
+            0.550000011920929,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            0.800000011920929,
+            0.800000011920929
+          ]
+        },
+        "mesh": {
+          "mesh": "sphere",
+          "color": "#e05d6f",
+          "metallic": 0,
+          "roughness": 0.3499999940395355,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      },
+      "behaviors": [
+        {
+          "name": "Squish",
+          "intent": "Bounce in place with a jelly squish so it looks alive.",
+          "source": "\nbehavior Squish\n  var base = 0\n  on start\n    base = self.position.y\n  end\n  on tick\n    let t = sin(time * 6 + self.id)\n    self.scale = (1.0 + t * 0.12, 0.8 - t * 0.12, 0.8)\n    self.position.y = base - t * 0.06\n  end\nend\n",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 122,
+      "name": "Coin 7.1",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "coin"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            44.227298736572266,
+            2.7464001178741455,
+            0
+          ],
+          "rotation": [
+            90,
+            0,
+            0
+          ],
+          "scale": [
+            0.699999988079071,
+            0.699999988079071,
+            0.699999988079071
+          ]
+        },
+        "mesh": {
+          "mesh": "torus",
+          "color": "#f4c430",
+          "metallic": 1,
+          "roughness": 0.25,
+          "emissive": "#ffb30033",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      },
+      "behaviors": [
+        {
+          "name": "Collectible",
+          "intent": "Spin in place; when the player touches it, pop and count a coin.",
+          "source": "\non tick\n  rotate self by (0, 240 * dt, 0)\n  let p = find(\"Player\")\n  if exists(p) and distance(self, p) < 0.9 then\n    emit \"coin\" to p\n    destroy self\n  end\nend\n",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 123,
+      "name": "Coin 7.2",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "coin"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            45.045501708984375,
+            3.0408999919891357,
+            0
+          ],
+          "rotation": [
+            90,
+            0,
+            0
+          ],
+          "scale": [
+            0.699999988079071,
+            0.699999988079071,
+            0.699999988079071
+          ]
+        },
+        "mesh": {
+          "mesh": "torus",
+          "color": "#f4c430",
+          "metallic": 1,
+          "roughness": 0.25,
+          "emissive": "#ffb30033",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      },
+      "behaviors": [
+        {
+          "name": "Collectible",
+          "intent": "Spin in place; when the player touches it, pop and count a coin.",
+          "source": "\non tick\n  rotate self by (0, 240 * dt, 0)\n  let p = find(\"Player\")\n  if exists(p) and distance(self, p) < 0.9 then\n    emit \"coin\" to p\n    destroy self\n  end\nend\n",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 124,
+      "name": "Coin 7.3",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "coin"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            45.86360168457031,
+            2.7464001178741455,
+            0
+          ],
+          "rotation": [
+            90,
+            0,
+            0
+          ],
+          "scale": [
+            0.699999988079071,
+            0.699999988079071,
+            0.699999988079071
+          ]
+        },
+        "mesh": {
+          "mesh": "torus",
+          "color": "#f4c430",
+          "metallic": 1,
+          "roughness": 0.25,
+          "emissive": "#ffb30033",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      },
+      "behaviors": [
+        {
+          "name": "Collectible",
+          "intent": "Spin in place; when the player touches it, pop and count a coin.",
+          "source": "\non tick\n  rotate self by (0, 240 * dt, 0)\n  let p = find(\"Player\")\n  if exists(p) and distance(self, p) < 0.9 then\n    emit \"coin\" to p\n    destroy self\n  end\nend\n",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 125,
+      "name": "Spikes 8",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "hazard"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            52.045501708984375,
+            0.6000000238418579,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            0.8999999761581421,
+            0.8999999761581421,
+            0.8999999761581421
+          ]
+        },
+        "mesh": {
+          "mesh": "cone",
+          "color": "#7c7f8c",
+          "metallic": 0.6000000238418579,
+          "roughness": 0.3499999940395355,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 126,
+      "name": "Coin 8.1",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "coin"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            51.227298736572266,
+            2.7464001178741455,
+            0
+          ],
+          "rotation": [
+            90,
+            0,
+            0
+          ],
+          "scale": [
+            0.699999988079071,
+            0.699999988079071,
+            0.699999988079071
+          ]
+        },
+        "mesh": {
+          "mesh": "torus",
+          "color": "#f4c430",
+          "metallic": 1,
+          "roughness": 0.25,
+          "emissive": "#ffb30033",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      },
+      "behaviors": [
+        {
+          "name": "Collectible",
+          "intent": "Spin in place; when the player touches it, pop and count a coin.",
+          "source": "\non tick\n  rotate self by (0, 240 * dt, 0)\n  let p = find(\"Player\")\n  if exists(p) and distance(self, p) < 0.9 then\n    emit \"coin\" to p\n    destroy self\n  end\nend\n",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 127,
+      "name": "Coin 8.2",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "coin"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            52.045501708984375,
+            3.0408999919891357,
+            0
+          ],
+          "rotation": [
+            90,
+            0,
+            0
+          ],
+          "scale": [
+            0.699999988079071,
+            0.699999988079071,
+            0.699999988079071
+          ]
+        },
+        "mesh": {
+          "mesh": "torus",
+          "color": "#f4c430",
+          "metallic": 1,
+          "roughness": 0.25,
+          "emissive": "#ffb30033",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      },
+      "behaviors": [
+        {
+          "name": "Collectible",
+          "intent": "Spin in place; when the player touches it, pop and count a coin.",
+          "source": "\non tick\n  rotate self by (0, 240 * dt, 0)\n  let p = find(\"Player\")\n  if exists(p) and distance(self, p) < 0.9 then\n    emit \"coin\" to p\n    destroy self\n  end\nend\n",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 128,
+      "name": "Coin 8.3",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "coin"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            52.86360168457031,
+            2.7464001178741455,
+            0
+          ],
+          "rotation": [
+            90,
+            0,
+            0
+          ],
+          "scale": [
+            0.699999988079071,
+            0.699999988079071,
+            0.699999988079071
+          ]
+        },
+        "mesh": {
+          "mesh": "torus",
+          "color": "#f4c430",
+          "metallic": 1,
+          "roughness": 0.25,
+          "emissive": "#ffb30033",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      },
+      "behaviors": [
+        {
+          "name": "Collectible",
+          "intent": "Spin in place; when the player touches it, pop and count a coin.",
+          "source": "\non tick\n  rotate self by (0, 240 * dt, 0)\n  let p = find(\"Player\")\n  if exists(p) and distance(self, p) < 0.9 then\n    emit \"coin\" to p\n    destroy self\n  end\nend\n",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 129,
+      "name": "Platform 1",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            2.5,
+            3.5999999046325684,
+            -1.5
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            3,
+            0.5,
+            1
+          ]
+        },
+        "mesh": {
+          "mesh": "cube",
+          "color": "#8d6e52",
+          "metallic": 0,
+          "roughness": 1,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 130,
+      "name": "Platform 1 Top",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            2.5,
+            3.9000000953674316,
+            -1.5
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            3.0999999046325684,
+            0.15000000596046448,
+            1.0499999523162842
+          ]
+        },
+        "mesh": {
+          "mesh": "cube",
+          "color": "#5fbf63",
+          "metallic": 0,
+          "roughness": 0.550000011920929,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 131,
+      "name": "Platform 2",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            16,
+            3.5999999046325684,
+            -1.5
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            3,
+            0.5,
+            1
+          ]
+        },
+        "mesh": {
+          "mesh": "cube",
+          "color": "#8d6e52",
+          "metallic": 0,
+          "roughness": 1,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 132,
+      "name": "Platform 2 Top",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            16,
+            3.9000000953674316,
+            -1.5
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            3.0999999046325684,
+            0.15000000596046448,
+            1.0499999523162842
+          ]
+        },
+        "mesh": {
+          "mesh": "cube",
+          "color": "#5fbf63",
+          "metallic": 0,
+          "roughness": 0.550000011920929,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 133,
+      "name": "Platform 3",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            30,
+            3.5999999046325684,
+            -1.5
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            3,
+            0.5,
+            1
+          ]
+        },
+        "mesh": {
+          "mesh": "cube",
+          "color": "#8d6e52",
+          "metallic": 0,
+          "roughness": 1,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 134,
+      "name": "Platform 3 Top",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            30,
+            3.9000000953674316,
+            -1.5
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            3.0999999046325684,
+            0.15000000596046448,
+            1.0499999523162842
+          ]
+        },
+        "mesh": {
+          "mesh": "cube",
+          "color": "#5fbf63",
+          "metallic": 0,
+          "roughness": 0.550000011920929,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 135,
+      "name": "Platform 4",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            44,
+            3.5999999046325684,
+            -1.5
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            3,
+            0.5,
+            1
+          ]
+        },
+        "mesh": {
+          "mesh": "cube",
+          "color": "#8d6e52",
+          "metallic": 0,
+          "roughness": 1,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 136,
+      "name": "Platform 4 Top",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            44,
+            3.9000000953674316,
+            -1.5
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            3.0999999046325684,
+            0.15000000596046448,
+            1.0499999523162842
+          ]
+        },
+        "mesh": {
+          "mesh": "cube",
+          "color": "#5fbf63",
+          "metallic": 0,
+          "roughness": 0.550000011920929,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 137,
+      "name": "Goal Pole",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            59,
+            2.5,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            0.15000000596046448,
+            5,
+            0.15000000596046448
+          ]
+        },
+        "mesh": {
+          "mesh": "cylinder",
+          "color": "#e8e8ee",
+          "metallic": 0,
+          "roughness": 0.550000011920929,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 138,
+      "name": "Goal Flag",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            59.75,
+            4.400000095367432,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1.399999976158142,
+            0.8999999761581421,
+            1
+          ]
+        },
+        "mesh": {
+          "mesh": "quad",
+          "color": "#ff6b6b",
+          "metallic": 0,
+          "roughness": 0.800000011920929,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      },
+      "behaviors": [
+        {
+          "name": "Wave",
+          "intent": "Flutter gently like a flag in the wind.",
+          "source": "\non tick\n  rotate self by (0, sin(time * 4) * 30 * dt, 0)\nend\n",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 139,
+      "name": "Player",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "player"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -6,
+            0.699999988079071,
+            0.5
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1.100000023841858,
+            1.100000023841858,
+            1.100000023841858
+          ]
+        },
+        "mesh": {
+          "mesh": "capsule",
+          "color": "#2ec4b6",
+          "metallic": 0,
+          "roughness": 0.3499999940395355,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      },
+      "behaviors": [
+        {
+          "name": "Runner",
+          "intent": "Run right at a steady pace and hop on a rhythm, landing back on the grass.",
+          "source": "\nbehavior Runner\n  var vy = 0\n  var coins = 0\n  on tick\n    move self by (5.0 * dt, 0, 0)\n    vy = vy - 22.0 * dt\n    self.position.y = max(0.7, self.position.y + vy * dt)\n    every 1.4 seconds\n      vy = 9.0\n    end\n    -- squash & stretch while airborne\n    let s = 1.1 + clamp(vy * 0.02, -0.12, 0.12)\n    self.scale = (1.1 - (s - 1.1), s, 1.1)\n  end\n  on event \"coin\"\n    coins = coins + 1\n  end\nend\n",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 140,
+      "name": "Player Eye",
+      "parent": 139,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0.11999999731779099,
+            0.2199999988079071,
+            0.20000000298023224
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            0.18000000715255737,
+            0.18000000715255737,
+            0.10000000149011612
+          ]
+        },
+        "mesh": {
+          "mesh": "sphere",
+          "color": "#ffffff",
+          "metallic": 0,
+          "roughness": 0.550000011920929,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false
+        }
+      }
+    },
+    {
+      "id": 141,
+      "name": "Game Camera",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -2,
+            3.4000000953674316,
+            20
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "camera": {
+          "fov": 50,
+          "nearPlane": 0.10000000149011612,
+          "farPlane": 500,
+          "orthographic": true,
+          "orthoSize": 5.400000095367432,
+          "primary": true
+        }
+      },
+      "behaviors": [
+        {
+          "name": "Follow",
+          "intent": "Follow the player smoothly, keeping them a little left of center.",
+          "source": "\non tick\n  let p = find(\"Player\")\n  if exists(p) then\n    self.position.x = lerp(self.position.x, p.position.x + 4, 0.08)\n  end\nend\n",
+          "enabled": true
+        }
+      ]
+    }
+  ]
+}

@@ -55,7 +55,7 @@ Args parseArgs(int argc, char** argv) {
         const std::string& r = a.raw[i];
         if (r.rfind("-", 0) == 0) {
             bool takesValue = r == "--project" || r == "--scene" || r == "-o" || r == "--width" || r == "--height" ||
-                              r == "--ticks";
+                              r == "--ticks" || r == "--as" || r == "--socket";
             if (takesValue) ++i;
             continue;
         }
@@ -82,6 +82,7 @@ int usage() {
                  "  skywalker run SCENE [--ticks N] [-o out.png]\n"
                  "  skywalker check FILE.wander\n"
                  "  skywalker call TOOL [JSON] [--scene FILE] [--project DIR]\n"
+                 "  skywalker call TOOL [JSON] --attach [--as NAME] [--socket PATH]   (on the running editor)\n"
                  "  skywalker tools [--markdown]\n"
                  "  skywalker version\n",
                  SKY_VERSION_STRING);
@@ -207,8 +208,54 @@ int runCheck(const Args& args) {
     return r.ok() ? 0 : 1;
 }
 
+/// `call --attach`: one tool call against the running editor over its MCP socket, as a
+/// named client (shows up as `mcp:<name>` in history and the activity feed).
+int runCallAttached(const Args& args, const std::string& tool, const Json& toolArgs) {
+    auto fd = connectUnixSocket(args.get("--socket", Engine::defaultSocketPath()));
+    if (!fd) {
+        std::fprintf(stderr, "error: %s\n", fd.error().message.c_str());
+        return 1;
+    }
+    std::string who = args.get("--as", "cli");
+    Json init = Json::object({{"jsonrpc", "2.0"}, {"id", 1}, {"method", "initialize"},
+                              {"params", Json::object({{"protocolVersion", McpSession::latestProtocolVersion()},
+                                                       {"clientInfo", Json::object({{"name", who}, {"version", "1"}})}})}});
+    Json call = Json::object({{"jsonrpc", "2.0"}, {"id", 2}, {"method", "tools/call"},
+                              {"params", Json::object({{"name", tool}, {"arguments", toolArgs}})}});
+    if (!writeAll(fd->get(), init.dump() + "\n" + call.dump() + "\n")) return 1;
+    LineReader reader(fd->get());
+    std::string line;
+    while (reader.next(line)) {
+        auto msg = Json::parse(line);
+        if (!msg || msg->get("id").asInt() != 2) continue;
+        if (msg->contains("error")) {
+            std::printf("%s\n", msg->get("error").get("message").asString().c_str());
+            return 1;
+        }
+        const Json& result = msg->get("result");
+        for (const auto& c : result.get("content").elements()) {
+            if (c.get("type").asString() == "text") std::printf("%s\n", c.get("text").asString().c_str());
+            else std::printf("[image %zu base64 bytes]\n", c.get("data").asString().size());
+        }
+        return result.get("isError").asBool() ? 1 : 0;
+    }
+    return 1;
+}
+
 int runCall(const Args& args) {
     if (args.positional.size() < 2) return usage();
+    if (args.has("--attach")) {
+        Json a = Json::object();
+        if (args.positional.size() > 2) {
+            auto parsed = Json::parse(args.positional[2]);
+            if (!parsed) {
+                std::fprintf(stderr, "error: %s\n", parsed.error().message.c_str());
+                return 1;
+            }
+            a = parsed.value();
+        }
+        return runCallAttached(args, args.positional[1], a);
+    }
     auto engine = makeEngine(args);
     Json a = Json::object();
     if (args.positional.size() > 2) {

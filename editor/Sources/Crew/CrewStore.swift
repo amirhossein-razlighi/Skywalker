@@ -95,9 +95,13 @@ final class CrewStore {
     func cloudling(named name: String) -> Cloudling? {
         cloudlings.first { $0.name.caseInsensitiveCompare(name) == .orderedSame }
     }
+    /// The crew member behind an actor id: in-editor agents ("agent:Name") or external MCP
+    /// agents that connect under a crew member's name ("mcp:Name").
     func cloudling(actor: String) -> Cloudling? {
-        guard actor.hasPrefix("agent:") else { return nil }
-        return cloudling(named: String(actor.dropFirst(6)))
+        for prefix in ["agent:", "mcp:"] where actor.hasPrefix(prefix) {
+            return cloudling(named: String(actor.dropFirst(prefix.count)))
+        }
+        return nil
     }
 
     func resetConversation(_ c: Cloudling) {

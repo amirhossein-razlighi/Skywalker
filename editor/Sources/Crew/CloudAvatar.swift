@@ -11,7 +11,7 @@ struct CloudShape: Shape {
         p.addEllipse(in: CGRect(x: rect.minX + w * 0.20, y: rect.minY + h * 0.05, width: w * 0.46, height: h * 0.76))
         p.addEllipse(in: CGRect(x: rect.minX + w * 0.48, y: rect.minY + h * 0.22, width: w * 0.40, height: h * 0.62))
         p.addEllipse(in: CGRect(x: rect.minX + w * 0.66, y: rect.minY + h * 0.42, width: w * 0.34, height: h * 0.56))
-        return p
+        return p.normalized(eoFill: false)
     }
 }
 

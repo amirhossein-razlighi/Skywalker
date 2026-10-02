@@ -262,7 +262,7 @@ final class EngineStore {
             switch e["type"].string {
             case "edit":
                 append(ActivityItem(actor: actor, kind: "edit", text: e["label"].string ?? "edit", ok: true))
-            case "tool" where actor != "editor" && actor != "user":
+            case "tool" where actor != "editor" && actor != "user" && (e["mutates"].bool ?? false):
                 append(ActivityItem(actor: actor, kind: "tool", text: e["tool"].string ?? "",
                                     ok: e["ok"].bool ?? true))
             case "undo", "redo":

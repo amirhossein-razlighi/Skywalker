@@ -1,0 +1,13 @@
+[
+  {"id": "01_intro", "text": "This is Skywalker. A game engine built, from the ground up, for AI agents."},
+  {"id": "02_crew", "text": "Here, you don't build alone. Meet your crew: a director, a level designer, a lighting artist, and a gameplay programmer. Each one is an AI agent."},
+  {"id": "03_brief", "text": "The director took one idea, a cozy village floating in the sky, and split it into tasks."},
+  {"id": "04_timelapse", "text": "Then the crew got to work. Together, at the same time, inside the live editor. Every change is real, attributed, and undoable."},
+  {"id": "05_vision", "text": "Agents see the scene the way you do. Every object is labeled, so they know exactly what they are looking at."},
+  {"id": "06_wander", "text": "Behaviors start as plain language. The crew weaves them into Wander, a safe, deterministic language, so the windmill turns, airships cruise, and fireflies drift."},
+  {"id": "07_light", "text": "Golden hour, or night. Lighting is one request away."},
+  {"id": "08_2d", "text": "Two D? Same engine. Same agents. Sky Dash was built entirely through engine tools."},
+  {"id": "09_editor", "text": "And when you want control, it's a real editor. Gizmos, properties, history, and a console. Humans and agents use the exact same tools."},
+  {"id": "10_connect", "text": "Bring Claude, GPT, DeepSeek, or a model running on your own machine. Through MCP, any agent can drive the engine."},
+  {"id": "11_outro", "text": "One person. A whole game. Skywalker."}
+]
