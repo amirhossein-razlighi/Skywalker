@@ -1,0 +1,123 @@
+{
+  "format": "skywalker.scene",
+  "version": 1,
+  "name": "Hello Sky",
+  "seed": 7,
+  "environment": {
+    "skyTop": "#5b8fe8",
+    "skyHorizon": "#dbe8ff",
+    "ground": "#6f7a68",
+    "ambient": 0.45,
+    "sunAzimuth": 40,
+    "sunElevation": 42,
+    "sunColor": "#fff1dc",
+    "sunIntensity": 2.6,
+    "fogColor": "#dbe8ff",
+    "fogDensity": 0.01,
+    "exposure": 1,
+    "showGrid": false
+  },
+  "entities": [
+    {
+      "id": 1, "name": "Island", "parent": 0, "enabled": true, "tags": ["static"], "vars": {},
+      "components": {
+        "transform": {"position": [0, -0.5, 0], "rotation": [0, 0, 0], "scale": [14, 1, 14]},
+        "mesh": {"mesh": "cylinder", "color": "#7fb069", "metallic": 0, "roughness": 0.9}
+      }
+    },
+    {
+      "id": 2, "name": "Island Rock", "parent": 0, "enabled": true, "tags": ["static"], "vars": {},
+      "components": {
+        "transform": {"position": [0, -2.4, 0], "rotation": [180, 0, 0], "scale": [13, 3, 13]},
+        "mesh": {"mesh": "cone", "color": "#8a7360", "roughness": 0.95}
+      }
+    },
+    {
+      "id": 3, "name": "Tower", "parent": 0, "enabled": true, "tags": ["building"], "vars": {},
+      "components": {
+        "transform": {"position": [-3, 1.5, -2], "scale": [1.6, 3, 1.6]},
+        "mesh": {"mesh": "cylinder", "color": "#e9e2d0", "roughness": 0.7}
+      }
+    },
+    {
+      "id": 4, "name": "Tower Roof", "parent": 3, "enabled": true, "tags": [], "vars": {},
+      "components": {
+        "transform": {"position": [0, 0.75, 0], "scale": [1.35, 0.5, 1.35]},
+        "mesh": {"mesh": "cone", "color": "#d1495b", "roughness": 0.5}
+      }
+    },
+    {
+      "id": 5, "name": "Crystal", "parent": 0, "enabled": true, "tags": ["magic"], "vars": {},
+      "components": {
+        "transform": {"position": [2.5, 1.6, 0.5], "rotation": [20, 0, 0], "scale": [1.4, 1.4, 1.4]},
+        "mesh": {"mesh": "torus", "color": "#7b61ff", "metallic": 0.6, "roughness": 0.25, "emissive": "#4a2bff33"}
+      },
+      "behaviors": [
+        {
+          "name": "Hover",
+          "intent": "Float gently up and down and slowly spin, like it is alive.",
+          "source": "behavior Hover\n  intent \"Float gently up and down and slowly spin, like it is alive.\"\n  var base = 1.6\n  on tick\n    rotate self by (0, 40 * dt, 0)\n    self.position.y = base + sin(time * 2) * 0.25\n  end\nend\n",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 6, "name": "Hero", "parent": 0, "enabled": true, "tags": ["player"], "vars": {},
+      "components": {
+        "transform": {"position": [0, 0.5, 3]},
+        "mesh": {"mesh": "capsule", "color": "#2ec4b6", "roughness": 0.4}
+      },
+      "behaviors": [
+        {
+          "name": "Controls",
+          "intent": "WASD moves the hero on the ground at 4 m/s. Space makes it jump.",
+          "source": "behavior Controls\n  intent \"WASD moves the hero on the ground at 4 m/s. Space makes it jump.\"\n  var speed = 4\n  var vy = 0\n  on tick\n    let dir = (0, 0, 0)\n    if key(\"w\") then dir = dir + (0, 0, -1) end\n    if key(\"s\") then dir = dir + (0, 0, 1) end\n    if key(\"a\") then dir = dir + (-1, 0, 0) end\n    if key(\"d\") then dir = dir + (1, 0, 0) end\n    move self by normalize(dir) * speed * dt\n    vy = vy - 20 * dt\n    self.position.y = max(0.5, self.position.y + vy * dt)\n  end\n  on key \"space\"\n    if self.position.y <= 0.51 then\n      vy = 7\n    end\n  end\nend\n",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 7, "name": "Coin", "parent": 0, "enabled": true, "tags": ["coin"], "vars": {},
+      "components": {
+        "transform": {"position": [1.5, 0.7, -3], "rotation": [90, 0, 0], "scale": [0.6, 0.6, 0.6]},
+        "mesh": {"mesh": "torus", "color": "#f4c430", "metallic": 1, "roughness": 0.3}
+      },
+      "behaviors": [
+        {
+          "name": "Collectible",
+          "intent": "Spin. When the player gets within 1 meter, announce it and disappear.",
+          "source": "behavior Collectible\n  intent \"Spin. When the player gets within 1 meter, announce it and disappear.\"\n  on tick\n    rotate self by (0, 0, 180 * dt)\n    let p = nearest(\"player\")\n    if exists(p) and distance(self, p) < 1 then\n      emit \"coin_collected\"\n      log \"coin collected!\"\n      destroy self\n    end\n  end\nend\n",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 8, "name": "Cloud A", "parent": 0, "enabled": true, "tags": ["cloud"], "vars": {},
+      "components": {
+        "transform": {"position": [-5, 5.5, -6], "scale": [2.6, 1.4, 1.8]},
+        "mesh": {"mesh": "sphere", "color": "#ffffff", "roughness": 1}
+      }
+    },
+    {
+      "id": 9, "name": "Cloud A Puff", "parent": 8, "enabled": true, "tags": ["cloud"], "vars": {},
+      "components": {
+        "transform": {"position": [0.45, 0.15, 0], "scale": [0.8, 0.9, 0.9]},
+        "mesh": {"mesh": "sphere", "color": "#ffffff", "roughness": 1}
+      }
+    },
+    {
+      "id": 10, "name": "Lantern", "parent": 0, "enabled": true, "tags": [], "vars": {},
+      "components": {
+        "transform": {"position": [-1, 1.2, 1]},
+        "light": {"kind": "point", "color": "#ffb347", "intensity": 6, "range": 6}
+      }
+    },
+    {
+      "id": 11, "name": "Main Camera", "parent": 0, "enabled": true, "tags": [], "vars": {},
+      "components": {
+        "transform": {"position": [0, 6, 12], "rotation": [-24, 0, 0]},
+        "camera": {"fov": 50}
+      }
+    }
+  ]
+}

@@ -1,0 +1,1008 @@
+// The engine's tool catalogue. Descriptions are written for language models: they say
+// when to use a tool, what it returns, and how it composes with others.
+
+#include <algorithm>
+#include <cstdio>
+#include <sstream>
+
+#include "skywalker/core/Strings.h"
+#include "skywalker/engine/Engine.h"
+#include "skywalker/wander/Compiler.h"
+
+namespace sky {
+
+namespace {
+
+using namespace schema;
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+Result<EntityId> resolve(Engine& engine, const Json& ref) {
+    Scene& s = engine.scene();
+    EntityId id = kNoEntity;
+    if (ref.isNumber()) {
+        id = static_cast<EntityId>(ref.asInt());
+        if (!s.exists(id)) id = kNoEntity;
+    } else if (ref.isString()) {
+        id = s.find(ref.asString());
+    }
+    if (id) return id;
+    std::vector<std::string> names;
+    for (EntityId e : s.entities()) names.push_back(s.record(e)->name);
+    std::string guess = ref.isString() ? str::closest(ref.asString(), names, 3) : "";
+    return Error::make("not_found", "no entity " + ref.dump(),
+                       guess.empty() ? "call scene_overview or scene_query to list entities"
+                                     : "did you mean \"" + guess + "\"?");
+}
+
+std::string fmtVec(Vec3 v) {
+    char buf[96];
+    std::snprintf(buf, sizeof(buf), "[%g, %g, %g]", std::round(v.x * 100) / 100, std::round(v.y * 100) / 100,
+                  std::round(v.z * 100) / 100);
+    return buf;
+}
+
+/// One-line, token-efficient entity description.
+std::string describe(const Scene& s, EntityId e) {
+    const EntityRecord* r = s.record(e);
+    std::ostringstream os;
+    os << "#" << e << " " << r->name;
+    std::vector<std::string> bits;
+    if (const auto* m = s.get<MeshRenderer>(e)) bits.push_back(m->mesh + " " + reflect::toHexColor(m->color));
+    if (const auto* l = s.get<Light>(e)) bits.push_back(l->kind + " light");
+    if (s.get<Camera>(e)) bits.push_back("camera");
+    if (const auto* b = s.get<Behavior>(e)) {
+        std::string names;
+        for (const auto& sc : b->scripts) names += (names.empty() ? "" : ",") + sc.name;
+        bits.push_back("behaviors:" + names);
+    }
+    if (!bits.empty()) {
+        os << " (";
+        for (size_t i = 0; i < bits.size(); ++i) os << (i ? "; " : "") << bits[i];
+        os << ")";
+    }
+    if (const auto* t = s.get<Transform>(e)) {
+        os << " pos " << fmtVec(t->position);
+        if (t->rotation != Vec3{0, 0, 0}) os << " rot " << fmtVec(t->rotation);
+        if (t->scale != Vec3{1, 1, 1}) os << " scale " << fmtVec(t->scale);
+    }
+    if (!r->tags.empty()) {
+        os << " tags:";
+        for (const auto& t : r->tags) os << " " << t;
+    }
+    if (!r->enabled) os << " [disabled]";
+    return os.str();
+}
+
+Json briefJson(const Scene& s, EntityId e) {
+    const EntityRecord* r = s.record(e);
+    Json comps = Json::array();
+    for (const auto& k : s.componentKinds()) {
+        if (k.has(s, e)) comps.push(k.name);
+    }
+    if (s.get<Behavior>(e)) comps.push("behaviors");
+    Json j = Json::object({{"id", e}, {"name", r->name}, {"parent", r->parent}, {"components", comps}});
+    if (const auto* t = s.get<Transform>(e)) j["position"] = reflect::vec3ToJson(t->position);
+    return j;
+}
+
+ToolResult fail(const Status& s) { return ToolResult::error(s.error()); }
+
+Json vecArg(const Json& args, const char* key, bool& present, Vec3& out) {
+    present = args.contains(key) && reflect::jsonToVec3(args.get(key), out);
+    return args.get(key);
+}
+
+ToolResult entityResult(Engine& engine, EntityId id, const std::string& verb) {
+    Json doc = engine.scene().entityToJson(id);
+    return ToolResult::json(doc, verb + " " + describe(engine.scene(), id));
+}
+
+Json compileFor(Engine& engine, const std::string& source) {
+    return wander::compile(source, engine.scene().componentNames()).toJson();
+}
+
+Json presetPatch(const std::string& name) {
+    if (name == "noon") {
+        return Json::parse(R"({"sunElevation":70,"sunAzimuth":30,"sunColor":"#fff6e8","sunIntensity":2.6,
+            "skyTop":"#3f7fe0","skyHorizon":"#cfe3ff","ambient":0.4,"fogColor":"#cfe3ff","fogDensity":0.006,"exposure":1})").value();
+    }
+    if (name == "sunset") {
+        return Json::parse(R"({"sunElevation":8,"sunAzimuth":250,"sunColor":"#ffb070","sunIntensity":2.4,
+            "skyTop":"#3b4a8a","skyHorizon":"#ff9e6b","ground":"#5a4040","ambient":0.3,"fogColor":"#e8a07a","fogDensity":0.012,"exposure":1.1})").value();
+    }
+    if (name == "night") {
+        return Json::parse(R"({"sunElevation":35,"sunAzimuth":140,"sunColor":"#9fb4ff","sunIntensity":0.35,
+            "skyTop":"#050a1a","skyHorizon":"#1a2440","ground":"#101418","ambient":0.12,"fogColor":"#141c30","fogDensity":0.02,"exposure":1.3})").value();
+    }
+    if (name == "overcast") {
+        return Json::parse(R"({"sunElevation":60,"sunAzimuth":0,"sunColor":"#e6ebf0","sunIntensity":0.6,
+            "skyTop":"#9aa5b1","skyHorizon":"#c9d0d6","ground":"#6b6f72","ambient":0.85,"fogColor":"#c0c7cd","fogDensity":0.015,"exposure":1})").value();
+    }
+    if (name == "studio") {
+        return Json::parse(R"({"sunElevation":45,"sunAzimuth":45,"sunColor":"#ffffff","sunIntensity":2,
+            "skyTop":"#2b2d33","skyHorizon":"#4a4d55","ground":"#30323a","ambient":0.55,"fogDensity":0,"exposure":1})").value();
+    }
+    return {};
+}
+
+void duplicateTree(Scene& s, EntityId src, EntityId newParent, const std::string& name, Vec3 offset, bool root,
+                   std::vector<EntityId>& created) {
+    Json doc = s.entityToJson(src);
+    doc.erase("id");
+    doc.erase("parent");
+    EntityId copy = s.create(name.empty() ? doc.get("name").asString() : name, newParent);
+    doc.erase("name");
+    (void)s.applyEntityJson(copy, doc);
+    if (root) {
+        if (auto* t = s.get<Transform>(copy)) t->position += offset;
+    }
+    created.push_back(copy);
+    for (EntityId c : s.children(src)) duplicateTree(s, c, copy, "", {}, false, created);
+}
+
+// ---------------------------------------------------------------------------
+// Registration
+// ---------------------------------------------------------------------------
+
+void addSceneTools(Engine& engine, ToolRegistry& reg) {
+    reg.add({"engine_info", "Engine info",
+             "Version, renderer, play state, component types and tool categories. Call once at the start of a session.",
+             "scene", object({}), false, false, [&engine](const Json&, ToolContext&) {
+                 RendererInfo ri = engine.renderer().info();
+                 Json cats = Json::object();
+                 for (const auto& t : engine.tools().all()) cats[t.category].push(t.name);
+                 Json j = Json::object({{"engine", "Skywalker"},
+                                        {"version", SKY_VERSION_STRING},
+                                        {"renderer", ri.backend + " (" + ri.device + ")"},
+                                        {"playState", toString(engine.playState())},
+                                        {"components", Json::array()},
+                                        {"primitives", Json::array()},
+                                        {"tools", cats},
+                                        {"conventions", "meters, +Y up, entities face -Z, rotations in Euler degrees "
+                                                        "[pitch, yaw, roll], colors as \"#rrggbb\""}});
+                 for (const auto& n : engine.scene().componentNames()) j["components"].push(n);
+                 for (const auto& p : MeshRenderer::primitives()) j["primitives"].push(p);
+                 return ToolResult::json(j);
+             }});
+
+    reg.add({"scene_overview", "Scene overview",
+             "Compact outline of the whole scene: every entity as one line (id, name, mesh/color, position, tags) in "
+             "hierarchy order, plus environment and selection. Start here before editing.",
+             "scene", object({{"max_entities", integer("Limit lines (default 300)")}}), false, false,
+             [&engine](const Json& a, ToolContext&) {
+                 Scene& s = engine.scene();
+                 const Environment& env = s.environment();
+                 size_t limit = static_cast<size_t>(a.get("max_entities").asInt(300));
+                 std::ostringstream os;
+                 os << "Scene \"" << s.name << "\": " << s.size() << " entities, state " << toString(engine.playState());
+                 if (!engine.selection().empty()) {
+                     os << ", selected:";
+                     for (EntityId id : engine.selection()) os << " #" << id;
+                 }
+                 os << "\nEnvironment: sun elev " << env.sunElevation << " az " << env.sunAzimuth << " intensity "
+                    << env.sunIntensity << ", ambient " << env.ambient << ", fog " << env.fogDensity << ", exposure "
+                    << env.exposure << "\n";
+                 size_t lines = 0;
+                 std::function<void(EntityId, int)> walk = [&](EntityId e, int depth) {
+                     if (lines++ >= limit) return;
+                     os << std::string(static_cast<size_t>(depth) * 2, ' ') << describe(s, e) << "\n";
+                     for (EntityId c : s.children(e)) walk(c, depth + 1);
+                 };
+                 Json list = Json::array();
+                 for (EntityId e : s.entities()) {
+                     if (s.record(e)->parent == kNoEntity) walk(e, 0);
+                     if (list.size() < limit) list.push(briefJson(s, e));
+                 }
+                 if (lines > limit) os << "... (" << s.size() - limit << " more; use scene_query)\n";
+                 Json sel = Json::array();
+                 for (EntityId id : engine.selection()) sel.push(id);
+                 ToolResult r = ToolResult::text(os.str());
+                 r.structured = Json::object({{"name", s.name}, {"count", s.size()}, {"selection", sel}, {"entities", list}});
+                 return r;
+             }});
+
+    reg.add({"scene_query", "Find entities",
+             "Find entities by name glob (e.g. \"tree*\"), tag, component, or proximity. Returns one line per match.",
+             "scene",
+             object({{"name", string("Name glob, case-insensitive (* and ?)")},
+                     {"tag", string("Required tag")},
+                     {"component", string("Required component (transform, mesh, light, camera, behaviors)")},
+                     {"near", vec3("Only entities within `radius` of this point")},
+                     {"radius", number("Radius for `near` (default 5)")},
+                     {"limit", integer("Max results (default 50)")}}),
+             false, false, [&engine](const Json& a, ToolContext&) {
+                 Scene& s = engine.scene();
+                 Vec3 nearP;
+                 bool hasNear = reflect::jsonToVec3(a.get("near"), nearP);
+                 float radius = a.get("radius").asFloat(5.f);
+                 size_t limit = static_cast<size_t>(a.get("limit").asInt(50));
+                 std::string out;
+                 Json list = Json::array();
+                 for (EntityId e : s.entities()) {
+                     const EntityRecord* r = s.record(e);
+                     if (a.contains("name") && !str::globMatch(a.get("name").asString(), r->name)) continue;
+                     if (a.contains("tag") &&
+                         std::find(r->tags.begin(), r->tags.end(), a.get("tag").asString()) == r->tags.end()) continue;
+                     if (a.contains("component")) {
+                         const std::string& c = a.get("component").asString();
+                         if (c == "behaviors" ? !s.get<Behavior>(e)
+                                              : (!s.componentKind(c) || !s.componentKind(c)->has(s, e))) continue;
+                     }
+                     if (hasNear && distance(s.worldMatrix(e).translation(), nearP) > radius) continue;
+                     if (list.size() >= limit) break;
+                     out += describe(s, e) + "\n";
+                     list.push(briefJson(s, e));
+                 }
+                 ToolResult r = ToolResult::text(out.empty() ? "no matches" : out);
+                 r.structured = Json::object({{"matches", list}});
+                 return r;
+             }});
+
+    reg.add({"entity_get", "Get entity",
+             "Full data of one entity: components (all fields), tags, vars, behaviors (intent + Wander source).",
+             "entity", object({{"entity", schema::entity()}}, {"entity"}), false, false,
+             [&engine](const Json& a, ToolContext&) {
+                 auto id = resolve(engine, a.get("entity"));
+                 if (!id) return ToolResult::error(id.error());
+                 return ToolResult::json(engine.scene().entityToJson(*id));
+             }});
+
+    reg.add({"entity_create", "Create entity",
+             "Create an entity. Shorthands: mesh (primitive name), color, position, rotation (degrees), scale. "
+             "`components` takes full component objects, e.g. {\"light\": {\"kind\": \"point\", \"intensity\": 3}}. "
+             "Returns the new id.",
+             "entity",
+             object({{"name", string("Display name")},
+                     {"parent", schema::entity("Parent entity (id or name)")},
+                     {"mesh", string("Primitive: cube, sphere, plane, cylinder, cone, quad, capsule, torus")},
+                     {"color", string("Base color \"#rrggbb\"")},
+                     {"position", vec3("Position [x, y, z] in meters")},
+                     {"rotation", vec3("Rotation [pitch, yaw, roll] in degrees")},
+                     {"scale", vec3("Scale [x, y, z]")},
+                     {"tags", array(Json::object({{"type", "string"}}), "Tags")},
+                     {"vars", Json::object({{"type", "object"}, {"description", "Free-form entity variables"}})},
+                     {"components", Json::object({{"type", "object"}, {"description", "Component name -> fields"}})}},
+                    {"name"}),
+             true, false, [&engine](const Json& a, ToolContext& ctx) {
+                 EntityId created = kNoEntity;
+                 Status st = engine.edit(ctx.actor, "Create " + a.get("name").asString(), [&]() -> Status {
+                     Scene& s = engine.scene();
+                     EntityId parent = kNoEntity;
+                     if (a.contains("parent")) {
+                         auto p = resolve(engine, a.get("parent"));
+                         if (!p) return p.error();
+                         parent = *p;
+                     }
+                     created = s.create(a.get("name").asString(), parent);
+                     Json doc = Json::object();
+                     Json comps = a.get("components").isObject() ? a.get("components") : Json::object();
+                     Json t = comps.get("transform").isObject() ? comps.get("transform") : Json::object();
+                     for (const char* k : {"position", "rotation", "scale"}) {
+                         if (a.contains(k)) t[k] = a.get(k);
+                     }
+                     if (t.size()) comps["transform"] = t;
+                     if (a.contains("mesh") || a.contains("color")) {
+                         Json m = comps.get("mesh").isObject() ? comps.get("mesh") : Json::object();
+                         if (a.contains("mesh")) m["mesh"] = a.get("mesh");
+                         if (a.contains("color")) m["color"] = a.get("color");
+                         comps["mesh"] = m;
+                     }
+                     doc["components"] = comps;
+                     if (a.contains("tags")) doc["tags"] = a.get("tags");
+                     if (a.contains("vars")) doc["vars"] = a.get("vars");
+                     return s.applyEntityJson(created, doc);
+                 });
+                 if (!st) return fail(st);
+                 return entityResult(engine, created, "created");
+             }});
+
+    reg.add({"entity_update", "Update entity",
+             "Change an entity. Only given keys change; component objects are merged field-by-field. Set a "
+             "component to null to remove it. Example: {\"entity\": \"Lamp\", \"components\": {\"light\": "
+             "{\"intensity\": 5}}}.",
+             "entity",
+             object({{"entity", schema::entity()},
+                     {"name", string("New name")},
+                     {"parent", schema::entity("New parent (0 for root)")},
+                     {"enabled", boolean("Enable/disable")},
+                     {"tags", array(Json::object({{"type", "string"}}), "Replace tags")},
+                     {"vars", Json::object({{"type", "object"}, {"description", "Merge into vars (null deletes)"}})},
+                     {"components", Json::object({{"type", "object"}, {"description", "Component name -> partial fields"}})}},
+                    {"entity"}),
+             true, false, [&engine](const Json& a, ToolContext& ctx) {
+                 auto id = resolve(engine, a.get("entity"));
+                 if (!id) return ToolResult::error(id.error());
+                 Json doc = a;
+                 doc.erase("entity");
+                 Status st = engine.edit(ctx.actor, "Edit " + engine.scene().record(*id)->name,
+                                         [&] { return engine.scene().applyEntityJson(*id, doc); });
+                 if (!st) return fail(st);
+                 return entityResult(engine, *id, "updated");
+             }});
+
+    reg.add({"transform", "Transform entity",
+             "Move/rotate/scale an entity. Absolute: position, rotation (degrees), scale. Relative: translate, rotate. "
+             "space=world interprets position in world space even if the entity has a parent.",
+             "entity",
+             object({{"entity", schema::entity()},
+                     {"position", vec3("Absolute position")},
+                     {"rotation", vec3("Absolute rotation, degrees")},
+                     {"scale", vec3("Absolute scale")},
+                     {"translate", vec3("Relative offset")},
+                     {"rotate", vec3("Relative rotation, degrees")},
+                     {"space", enumeration({"local", "world"}, "Space for `position` (default local)")}},
+                    {"entity"}),
+             true, false, [&engine](const Json& a, ToolContext& ctx) {
+                 auto id = resolve(engine, a.get("entity"));
+                 if (!id) return ToolResult::error(id.error());
+                 Scene& s = engine.scene();
+                 Status st = engine.edit(ctx.actor, "Transform " + s.record(*id)->name, [&]() -> Status {
+                     Transform t = *s.get<Transform>(*id);
+                     Vec3 v;
+                     bool has = false;
+                     vecArg(a, "position", has, v);
+                     if (has) {
+                         const EntityRecord* r = s.record(*id);
+                         if (a.get("space").asString() == "world" && r->parent) {
+                             v = s.worldMatrix(r->parent).inverse().transformPoint(v);
+                         }
+                         t.position = v;
+                     }
+                     vecArg(a, "rotation", has, v);
+                     if (has) t.rotation = v;
+                     vecArg(a, "scale", has, v);
+                     if (has) t.scale = v;
+                     vecArg(a, "translate", has, v);
+                     if (has) t.position += v;
+                     vecArg(a, "rotate", has, v);
+                     if (has) t.rotation += v;
+                     return s.patchComponent(*id, "transform", reflect::toJson(&t, Transform::type()));
+                 });
+                 if (!st) return fail(st);
+                 return ToolResult::text("ok: " + describe(s, *id));
+             }});
+
+    reg.add({"entity_delete", "Delete entity", "Delete an entity and all its children (undoable).", "entity",
+             object({{"entity", schema::entity()}}, {"entity"}), true, true, [&engine](const Json& a, ToolContext& ctx) {
+                 auto id = resolve(engine, a.get("entity"));
+                 if (!id) return ToolResult::error(id.error());
+                 std::string name = engine.scene().record(*id)->name;
+                 size_t n = 0;
+                 Status st = engine.edit(ctx.actor, "Delete " + name, [&]() -> Status {
+                     n = engine.scene().destroy(*id);
+                     return {};
+                 });
+                 if (!st) return fail(st);
+                 return ToolResult::text("deleted " + name + " (" + std::to_string(n) + " entities)");
+             }});
+
+    reg.add({"entity_duplicate", "Duplicate entity",
+             "Copy an entity (with children, components and behaviors). Optional new name and position offset.",
+             "entity",
+             object({{"entity", schema::entity()},
+                     {"name", string("Name of the copy")},
+                     {"offset", vec3("Offset added to the copy's position")},
+                     {"count", integer("Number of copies (default 1, max 100); offsets accumulate")}},
+                    {"entity"}),
+             true, false, [&engine](const Json& a, ToolContext& ctx) {
+                 auto id = resolve(engine, a.get("entity"));
+                 if (!id) return ToolResult::error(id.error());
+                 Scene& s = engine.scene();
+                 Vec3 offset{0, 0, 0};
+                 reflect::jsonToVec3(a.get("offset"), offset);
+                 int count = static_cast<int>(std::clamp<int64_t>(a.get("count").asInt(1), 1, 100));
+                 std::vector<EntityId> roots;
+                 Status st = engine.edit(ctx.actor, "Duplicate " + s.record(*id)->name, [&]() -> Status {
+                     for (int i = 0; i < count; ++i) {
+                         std::vector<EntityId> created;
+                         std::string name = a.get("name").asString(s.record(*id)->name + " copy");
+                         if (count > 1) name += " " + std::to_string(i + 1);
+                         duplicateTree(s, *id, s.record(*id)->parent, name, offset * static_cast<float>(i + 1), true, created);
+                         roots.push_back(created.front());
+                     }
+                     return {};
+                 });
+                 if (!st) return fail(st);
+                 std::string out;
+                 Json ids = Json::array();
+                 for (EntityId r : roots) {
+                     out += describe(s, r) + "\n";
+                     ids.push(r);
+                 }
+                 ToolResult r = ToolResult::text(out);
+                 r.structured = Json::object({{"created", ids}});
+                 return r;
+             }});
+
+    reg.add({"batch", "Batch operations",
+             "Run many tool calls atomically as ONE undo step. If any operation fails, everything is rolled back "
+             "and the failing index is reported. Use for building scenes efficiently.",
+             "scene",
+             object({{"operations", array(object({{"tool", string("Tool name")},
+                                                  {"args", Json::object({{"type", "object"}, {"description", "Tool arguments"}})}},
+                                                 {"tool"}),
+                                          "Operations in order")},
+                     {"label", string("History label, e.g. \"Build village\"")}},
+                    {"operations"}),
+             true, false, [&engine](const Json& a, ToolContext& ctx) {
+                 Json results = Json::array();
+                 size_t failedAt = SIZE_MAX;
+                 ToolResult failure;
+                 std::string label = a.get("label").asString("Batch (" + std::to_string(a.get("operations").size()) + " ops)");
+                 Status st = engine.edit(ctx.actor, label, [&]() -> Status {
+                     for (size_t i = 0; i < a.get("operations").size(); ++i) {
+                         const Json& op = a.get("operations")[i];
+                         const std::string& tool = op.get("tool").asString();
+                         if (tool == "batch" || tool == "scene_load" || tool == "scene_new" || tool == "sim_control" ||
+                             tool == "history") {
+                             failedAt = i;
+                             failure = ToolResult::error(Error::make("invalid_arguments", tool + " cannot run inside a batch"));
+                             return Error::make("batch_failed", "operation failed");
+                         }
+                         ToolResult r = engine.tools().call(tool, op.get("args"), ctx);
+                         if (r.isError) {
+                             failedAt = i;
+                             failure = r;
+                             return Error::make("batch_failed", "operation failed");
+                         }
+                         results.push(r.structured.isNull() ? Json(r.content.empty() ? "" : r.content.front().text)
+                                                            : r.structured);
+                     }
+                     return {};
+                 });
+                 if (!st) {
+                     std::string why = failure.content.empty() ? st.error().message : failure.content.front().text;
+                     return ToolResult::error(Error::make("batch_failed",
+                                                          "operation " + std::to_string(failedAt) + " failed; nothing was "
+                                                          "applied. " + why));
+                 }
+                 return ToolResult::json(Json::object({{"ok", true}, {"results", results}}),
+                                         "applied " + std::to_string(results.size()) + " operations as one undo step");
+             }});
+
+    reg.add({"component_schema", "Component schema",
+             "JSON schema of components (transform, mesh, light, camera) and the environment, with field docs, "
+             "ranges and enums.",
+             "entity", object({{"component", string("One component name; omit for all")}}), false, false,
+             [&engine](const Json& a, ToolContext&) {
+                 Json out = Json::object();
+                 for (const auto& k : engine.scene().componentKinds()) {
+                     if (!a.contains("component") || a.get("component").asString() == k.name) {
+                         out[k.name] = reflect::schema(*k.info);
+                     }
+                 }
+                 if (!a.contains("component") || a.get("component").asString() == "environment") {
+                     out["environment"] = reflect::schema(Environment::type());
+                 }
+                 if (out.size() == 0) return ToolResult::error(Error::make("not_found", "unknown component"));
+                 return ToolResult::json(out);
+             }});
+
+    reg.add({"environment_update", "Lighting & environment",
+             "Edit scene lighting/atmosphere: sun (azimuth, elevation, color, intensity), sky colors, ambient, fog, "
+             "exposure, grid. Optional preset: noon, sunset, night, overcast, studio (applied first).",
+             "render",
+             [] {
+                 Json s = reflect::schema(Environment::type());
+                 s["properties"]["preset"] = enumeration({"noon", "sunset", "night", "overcast", "studio"}, "Lighting preset");
+                 s["description"] = Json();
+                 s.erase("description");
+                 return s;
+             }(),
+             true, false, [&engine](const Json& a, ToolContext& ctx) {
+                 Json patch = a;
+                 Status st = engine.edit(ctx.actor, "Lighting", [&]() -> Status {
+                     if (a.contains("preset")) {
+                         if (Status s = engine.scene().patchEnvironment(presetPatch(a.get("preset").asString())); !s) return s;
+                         patch.erase("preset");
+                     }
+                     return patch.size() ? engine.scene().patchEnvironment(patch) : Status{};
+                 });
+                 if (!st) return fail(st);
+                 return ToolResult::json(reflect::toJson(&engine.scene().environment(), Environment::type()), "environment:");
+             }});
+}
+
+void addWanderTools(Engine& engine, ToolRegistry& reg) {
+    reg.add({"wander_reference", "Wander language reference",
+             "The Wander behavior language guide (syntax, triggers, statements, functions). Read once before writing "
+             "behaviors.",
+             "wander", object({}), false, false,
+             [](const Json&, ToolContext&) { return ToolResult::text(wander::referenceText()); }});
+
+    reg.add({"wander_check", "Check Wander code",
+             "Compile Wander source without attaching it. Returns diagnostics with line, column, code and hints.",
+             "wander", object({{"source", string("Wander source code")}}, {"source"}), false, false,
+             [&engine](const Json& a, ToolContext&) {
+                 Json r = compileFor(engine, a.get("source").asString());
+                 return ToolResult::json(r, r.get("ok").asBool() ? "compiles cleanly" : "has errors");
+             }});
+
+    reg.add({"behavior_set", "Set behavior",
+             "Create or replace a named behavior on an entity: the natural-language `intent` (what it should do) and "
+             "its Wander `source` (how). The source is compiled; by default code with errors is rejected and the "
+             "diagnostics are returned so you can fix and retry.",
+             "wander",
+             object({{"entity", schema::entity()},
+                     {"name", string("Behavior name, e.g. \"Patrol\"")},
+                     {"intent", string("What the behavior should do, in plain language")},
+                     {"source", string("Wander source code")},
+                     {"enabled", boolean("Enabled (default true)")},
+                     {"allow_errors", boolean("Save even if the code does not compile (default false)")}},
+                    {"entity", "name"}),
+             true, false, [&engine](const Json& a, ToolContext& ctx) {
+                 auto id = resolve(engine, a.get("entity"));
+                 if (!id) return ToolResult::error(id.error());
+                 Scene& s = engine.scene();
+                 Json list = s.entityToJson(*id).get("behaviors");
+                 if (!list.isArray()) list = Json::array();
+                 const std::string& name = a.get("name").asString();
+                 Json* existing = nullptr;
+                 for (auto& b : list.elements()) {
+                     if (b.get("name").asString() == name) existing = &b;
+                 }
+                 if (!existing) {
+                     list.push(Json::object({{"name", name}, {"intent", ""}, {"source", ""}, {"enabled", true}}));
+                     existing = &list.elements().back();
+                 }
+                 for (const char* k : {"intent", "source", "enabled"}) {
+                     if (a.contains(k)) (*existing)[k] = a.get(k);
+                 }
+                 Json report = compileFor(engine, existing->get("source").asString());
+                 if (!report.get("ok").asBool() && !a.get("allow_errors").asBool()) {
+                     ToolResult r = ToolResult::json(report, "rejected: the Wander source has errors (nothing changed)");
+                     r.isError = true;
+                     return r;
+                 }
+                 Status st = engine.edit(ctx.actor, "Behavior " + name, [&] { return s.setBehaviors(*id, list); });
+                 if (!st) return fail(st);
+                 return ToolResult::json(report, "behavior \"" + name + "\" saved on " + s.record(*id)->name);
+             }});
+
+    reg.add({"behavior_remove", "Remove behavior", "Remove a named behavior from an entity.", "wander",
+             object({{"entity", schema::entity()}, {"name", string("Behavior name")}}, {"entity", "name"}), true, true,
+             [&engine](const Json& a, ToolContext& ctx) {
+                 auto id = resolve(engine, a.get("entity"));
+                 if (!id) return ToolResult::error(id.error());
+                 Json list = engine.scene().entityToJson(*id).get("behaviors");
+                 Json kept = Json::array();
+                 for (const auto& b : list.elements()) {
+                     if (b.get("name").asString() != a.get("name").asString()) kept.push(b);
+                 }
+                 if (kept.size() == list.size()) return ToolResult::error(Error::make("not_found", "no such behavior"));
+                 Status st = engine.edit(ctx.actor, "Remove behavior", [&] { return engine.scene().setBehaviors(*id, kept); });
+                 if (!st) return fail(st);
+                 return ToolResult::text("removed");
+             }});
+}
+
+void addSimTools(Engine& engine, ToolRegistry& reg) {
+    reg.add({"sim_control", "Simulation control",
+             "play / pause / stop the game, or `step` N fixed ticks (1/60 s each) deterministically and get the "
+             "resulting logs and errors. stop restores the scene to its pre-play state. Use step + "
+             "viewport_capture to test behaviors.",
+             "sim",
+             object({{"action", enumeration({"play", "pause", "stop", "step", "status"}, "What to do")},
+                     {"ticks", integer("Ticks for step (default 60 = 1 second, max 36000)")}},
+                    {"action"}),
+             true, false, [&engine](const Json& a, ToolContext&) {
+                 const std::string& action = a.get("action").asString();
+                 size_t before = engine.recentMessages(100000).size();
+                 if (action == "play") engine.play();
+                 else if (action == "pause") engine.pause();
+                 else if (action == "stop") engine.stop();
+                 else if (action == "step") engine.step(static_cast<int>(std::clamp<int64_t>(a.get("ticks").asInt(60), 1, 36000)));
+                 auto all = engine.recentMessages(100000);
+                 Json fresh = Json::array();
+                 for (size_t i = std::min(before, all.size()); i < all.size(); ++i) fresh.push(all[i]);
+                 Json j = Json::object({{"state", toString(engine.playState())},
+                                        {"time", engine.runtime().time()},
+                                        {"frame", engine.runtime().frame()},
+                                        {"messages", fresh}});
+                 return ToolResult::json(j);
+             }});
+
+    reg.add({"sim_input", "Simulate input",
+             "Inject player input for the next ticks: press keys (fires `on key`), hold/release keys (for key()), "
+             "click an entity (fires `on click`), or emit a named event.",
+             "sim",
+             object({{"press", array(Json::object({{"type", "string"}}), "Keys pressed once, e.g. [\"space\"]")},
+                     {"hold", array(Json::object({{"type", "string"}}), "Keys to start holding, e.g. [\"w\"]")},
+                     {"release", array(Json::object({{"type", "string"}}), "Keys to release")},
+                     {"click", schema::entity("Entity to click")},
+                     {"event", string("Event name to emit")},
+                     {"target", schema::entity("Event receiver (default: broadcast)")}}),
+             true, false, [&engine](const Json& a, ToolContext&) {
+                 auto& in = engine.input();
+                 for (const auto& k : a.get("press").elements()) in.pressed.insert(str::lower(k.asString()));
+                 for (const auto& k : a.get("hold").elements()) in.held.insert(str::lower(k.asString()));
+                 for (const auto& k : a.get("release").elements()) in.held.erase(str::lower(k.asString()));
+                 if (a.contains("click")) {
+                     auto id = resolve(engine, a.get("click"));
+                     if (!id) return ToolResult::error(id.error());
+                     in.clicked.push_back(*id);
+                 }
+                 if (a.contains("event")) {
+                     EntityId target = kNoEntity;
+                     if (a.contains("target")) {
+                         auto id = resolve(engine, a.get("target"));
+                         if (!id) return ToolResult::error(id.error());
+                         target = *id;
+                     }
+                     engine.runtime().emit(a.get("event").asString(), target);
+                 }
+                 return ToolResult::text("input queued (applies on the next tick)");
+             }});
+
+    reg.add({"logs", "Runtime logs", "Recent Wander log output and runtime/compile errors.", "sim",
+             object({{"limit", integer("Max messages (default 30)")}}), false, false,
+             [&engine](const Json& a, ToolContext&) {
+                 Json arr = Json::array();
+                 for (auto& m : engine.recentMessages(static_cast<size_t>(a.get("limit").asInt(30)))) arr.push(m);
+                 return ToolResult::json(Json::object({{"messages", arr}}));
+             }});
+}
+
+void addViewTools(Engine& engine, ToolRegistry& reg) {
+    reg.add({"viewport_capture", "Look at the scene",
+             "Render the scene and return a PNG plus every visible entity with its on-screen box [x, y, w, h]. "
+             "annotate=true (default) draws each entity's #id on the image so you can match what you see to ids. "
+             "Choose the view: the editor camera (default), the game camera (view=\"scene\"), or any eye/target.",
+             "view",
+             object({{"width", integer("Image width (default 768, max 2048)")},
+                     {"height", integer("Image height (default 432, max 2048)")},
+                     {"view", enumeration({"editor", "scene"}, "Editor orbit camera or the scene's primary camera")},
+                     {"camera_entity", schema::entity("Render from this camera entity")},
+                     {"eye", vec3("Custom camera position")},
+                     {"target", vec3("Custom look-at point (with eye)")},
+                     {"annotate", boolean("Draw entity id labels (default true)")},
+                     {"overlays", boolean("Editor grid & selection highlight (default true)")},
+                     {"include_image", boolean("Return the image (default true); false = only the entity list")},
+                     {"save_path", string("Also write the PNG to this project-relative path")}}),
+             false, false, [&engine](const Json& a, ToolContext&) {
+                 CaptureOptions o;
+                 o.width = static_cast<int>(std::clamp<int64_t>(a.get("width").asInt(768), 16, 2048));
+                 o.height = static_cast<int>(std::clamp<int64_t>(a.get("height").asInt(432), 16, 2048));
+                 o.useSceneCamera = a.get("view").asString() == "scene";
+                 if (a.contains("camera_entity")) {
+                     auto id = resolve(engine, a.get("camera_entity"));
+                     if (!id) return ToolResult::error(id.error());
+                     o.cameraEntity = *id;
+                 }
+                 Vec3 eye, target;
+                 if (reflect::jsonToVec3(a.get("eye"), eye)) {
+                     o.hasCustomView = true;
+                     o.customView = engine.camera().toView();
+                     o.customView.eye = eye;
+                     if (reflect::jsonToVec3(a.get("target"), target)) o.customView.target = target;
+                 }
+                 o.annotate = a.get("annotate").asBool(true);
+                 o.editorOverlays = a.get("overlays").asBool(true);
+                 auto cap = engine.capture(o);
+                 if (!cap) return ToolResult::error(cap.error());
+                 Json visible = Json::array();
+                 std::ostringstream os;
+                 os << "Rendered " << o.width << "x" << o.height << ". Visible entities (nearest first):\n";
+                 for (const auto& v : cap->visible) {
+                     visible.push(Json::object({{"id", v.id},
+                                                {"name", v.name},
+                                                {"box", Json::array({std::round(v.x), std::round(v.y), std::round(v.w), std::round(v.h)})},
+                                                {"distance", std::round(v.depth * 100) / 100},
+                                                {"coverage", std::round(v.coverage * 1000) / 1000}}));
+                     char line[200];
+                     std::snprintf(line, sizeof(line), "#%llu %s box [%d,%d,%d,%d] dist %.1f\n",
+                                   static_cast<unsigned long long>(v.id), v.name.c_str(), static_cast<int>(v.x),
+                                   static_cast<int>(v.y), static_cast<int>(v.w), static_cast<int>(v.h), v.depth);
+                     os << line;
+                 }
+                 if (a.contains("save_path")) {
+                     if (Status s = writePng(cap->image, engine.resolvePath(a.get("save_path").asString())); !s) {
+                         return fail(s);
+                     }
+                 }
+                 ToolResult r = ToolResult::text(os.str());
+                 r.structured = Json::object({{"width", o.width},
+                                              {"height", o.height},
+                                              {"camera", Json::object({{"eye", reflect::vec3ToJson(cap->frame.camera.eye)},
+                                                                       {"target", reflect::vec3ToJson(cap->frame.camera.target)}})},
+                                              {"visible", visible}});
+                 if (a.get("include_image").asBool(true)) {
+                     std::vector<uint8_t> png = encodePng(cap->image);
+                     r.image(str::base64Encode(png.data(), png.size()));
+                 }
+                 return r;
+             }});
+
+    reg.add({"viewport_pick", "Pick at pixel",
+             "Which entity is at pixel (x, y) of a capture with the given size (editor camera). Use with the "
+             "boxes/annotations from viewport_capture.",
+             "view",
+             object({{"x", number("Pixel x")},
+                     {"y", number("Pixel y")},
+                     {"width", integer("Capture width (default 768)")},
+                     {"height", integer("Capture height (default 432)")}},
+                    {"x", "y"}),
+             false, false, [&engine](const Json& a, ToolContext&) {
+                 EntityId id = engine.pickAt(a.get("x").asFloat(), a.get("y").asFloat(),
+                                             static_cast<int>(a.get("width").asInt(768)),
+                                             static_cast<int>(a.get("height").asInt(432)));
+                 if (!id) return ToolResult::json(Json::object({{"entity", Json()}}), "nothing there (sky/background)");
+                 return ToolResult::json(Json::object({{"entity", id}}), describe(engine.scene(), id));
+             }});
+
+    reg.add({"camera_set", "Move editor camera",
+             "Point the editor camera (what the human sees and the default capture view). Use frame to fit an entity "
+             "(or \"all\"), or set eye/target, or orbit with yaw/pitch/distance.",
+             "view",
+             object({{"frame", schema::entity("Entity to frame, or \"all\"")},
+                     {"eye", vec3("Camera position")},
+                     {"target", vec3("Look-at point")},
+                     {"yaw", number("Orbit yaw degrees")},
+                     {"pitch", number("Orbit pitch degrees")},
+                     {"distance", number("Orbit distance")}}),
+             false, false, [&engine](const Json& a, ToolContext&) {
+                 OrbitCamera& cam = engine.camera();
+                 Scene& s = engine.scene();
+                 if (a.contains("frame")) {
+                     Aabb box{Vec3(1e30f), Vec3(-1e30f)};
+                     bool any = false;
+                     auto include = [&](EntityId e) {
+                         Aabb b = s.localBounds(e).transformed(s.worldMatrix(e));
+                         box.min = vmin(box.min, b.min);
+                         box.max = vmax(box.max, b.max);
+                         any = true;
+                     };
+                     if (a.get("frame").asString() == "all") {
+                         for (EntityId e : s.entities()) {
+                             const auto* m = s.get<MeshRenderer>(e);
+                             const auto* t = s.get<Transform>(e);
+                             // skip huge ground planes so "all" frames the interesting content
+                             if (m && t && !(m->mesh == "plane" && t->scale.x > 10)) include(e);
+                         }
+                     } else {
+                         auto id = resolve(engine, a.get("frame"));
+                         if (!id) return ToolResult::error(id.error());
+                         include(*id);
+                     }
+                     if (any) cam.frame(box);
+                 }
+                 Vec3 eye, target;
+                 bool hasEye = reflect::jsonToVec3(a.get("eye"), eye);
+                 bool hasTarget = reflect::jsonToVec3(a.get("target"), target);
+                 if (hasEye) cam.lookAt(eye, hasTarget ? target : cam.target);
+                 else if (hasTarget) cam.target = target;
+                 if (a.contains("yaw")) cam.yaw = a.get("yaw").asFloat();
+                 if (a.contains("pitch")) cam.pitch = std::clamp(a.get("pitch").asFloat(), -89.f, 89.f);
+                 if (a.contains("distance")) cam.distance = std::max(0.2f, a.get("distance").asFloat());
+                 return ToolResult::json(cam.toJson(), "camera:");
+             }});
+
+    reg.add({"selection_get", "Get selection",
+             "Entities the human currently has selected in the editor (\"this\", \"these\" usually means them).",
+             "view", object({}), false, false, [&engine](const Json&, ToolContext&) {
+                 std::string out;
+                 Json ids = Json::array();
+                 for (EntityId id : engine.selection()) {
+                     out += describe(engine.scene(), id) + "\n";
+                     ids.push(id);
+                 }
+                 ToolResult r = ToolResult::text(out.empty() ? "nothing selected" : out);
+                 r.structured = Json::object({{"selection", ids}});
+                 return r;
+             }});
+
+    reg.add({"selection_set", "Select entities", "Select entities in the editor to show the human what you mean.",
+             "view", object({{"entities", array(schema::entity(), "Entities to select (empty clears)")}}, {"entities"}),
+             false, false, [&engine](const Json& a, ToolContext& ctx) {
+                 std::vector<EntityId> ids;
+                 for (const auto& e : a.get("entities").elements()) {
+                     auto id = resolve(engine, e);
+                     if (!id) return ToolResult::error(id.error());
+                     ids.push_back(*id);
+                 }
+                 engine.setSelection(ids, ctx.actor);
+                 return ToolResult::text("selected " + std::to_string(ids.size()));
+             }});
+}
+
+void addHistoryAndFileTools(Engine& engine, ToolRegistry& reg) {
+    reg.add({"history", "Undo / redo / log",
+             "Undo or redo edits (by anyone), or list recent history entries with who made them.", "history",
+             object({{"action", enumeration({"undo", "redo", "list"}, "What to do")},
+                     {"steps", integer("How many steps for undo/redo (default 1)")},
+                     {"limit", integer("Entries for list (default 20)")}},
+                    {"action"}),
+             true, false, [&engine](const Json& a, ToolContext& ctx) {
+                 History& h = engine.history();
+                 const std::string& action = a.get("action").asString();
+                 if (engine.playState() != PlayState::Editing && action != "list") {
+                     return ToolResult::error(Error::make("invalid_state", "stop the simulation before undo/redo"));
+                 }
+                 if (action == "list") {
+                     Json arr = Json::array();
+                     std::string out;
+                     size_t limit = static_cast<size_t>(a.get("limit").asInt(20));
+                     const auto& es = h.entries();
+                     for (size_t i = es.size() > limit ? es.size() - limit : 0; i < es.size(); ++i) {
+                         Json j = es[i].summary();
+                         j["undone"] = i >= h.cursor();
+                         out += (i >= h.cursor() ? "(undone) " : "") + es[i].actor + ": " + es[i].label + "\n";
+                         arr.push(j);
+                     }
+                     ToolResult r = ToolResult::text(out.empty() ? "history is empty" : out);
+                     r.structured = Json::object({{"entries", arr}});
+                     return r;
+                 }
+                 int steps = static_cast<int>(std::clamp<int64_t>(a.get("steps").asInt(1), 1, 100));
+                 std::string out;
+                 for (int i = 0; i < steps; ++i) {
+                     const HistoryEntry* e = action == "undo" ? h.undo() : h.redo();
+                     if (!e) break;
+                     out += action + ": " + e->label + " (by " + e->actor + ")\n";
+                     engine.emitEvent(Json::object({{"type", action}, {"actor", ctx.actor}, {"label", e->label}}));
+                 }
+                 return ToolResult::text(out.empty() ? "nothing to " + action : out);
+             }});
+
+    reg.add({"scene_save", "Save scene", "Save the scene as JSON (.sky.json). Path is relative to the project.",
+             "scene", object({{"path", string("e.g. scenes/level1.sky.json (default: current file)")}}), true, false,
+             [&engine](const Json& a, ToolContext&) {
+                 Status s = engine.saveScene(a.get("path").asString());
+                 if (!s) return fail(s);
+                 return ToolResult::text("saved " + engine.scenePath());
+             }});
+
+    reg.add({"scene_load", "Load scene", "Load a scene file (replaces the current scene and clears history).",
+             "scene", object({{"path", string("Scene path")}}, {"path"}), true, true,
+             [&engine](const Json& a, ToolContext&) {
+                 Status s = engine.loadScene(a.get("path").asString());
+                 if (!s) return fail(s);
+                 return ToolResult::text("loaded \"" + engine.scene().name + "\" (" + std::to_string(engine.scene().size()) +
+                                         " entities)");
+             }});
+
+    reg.add({"scene_new", "New scene",
+             "Start a new scene. By default it contains a ground plane, a cube and a camera; empty=true for nothing.",
+             "scene", object({{"name", string("Scene name")}, {"empty", boolean("Start completely empty")}}), true, true,
+             [&engine](const Json& a, ToolContext&) {
+                 Status s = engine.newScene(a.get("name").asString("Untitled"), !a.get("empty").asBool(false));
+                 if (!s) return fail(s);
+                 return ToolResult::text("new scene \"" + engine.scene().name + "\"");
+             }});
+}
+
+void addAssetAndRenderTools(Engine& engine, ToolRegistry& reg) {
+    reg.add({"asset_import_mesh", "Import mesh",
+             "Import a Wavefront OBJ (e.g. output of a 3D-generation model) and optionally assign it to an entity "
+             "(its mesh becomes \"asset:<path>\"). Meshes are normalized to fit a 1m cube.",
+             "asset",
+             object({{"path", string("Project-relative .obj path")},
+                     {"entity", schema::entity("Entity to assign the mesh to")}},
+                    {"path"}),
+             true, false, [&engine](const Json& a, ToolContext& ctx) {
+                 auto key = engine.importMesh(a.get("path").asString());
+                 if (!key) return ToolResult::error(key.error());
+                 if (a.contains("entity")) {
+                     auto id = resolve(engine, a.get("entity"));
+                     if (!id) return ToolResult::error(id.error());
+                     Status st = engine.edit(ctx.actor, "Assign mesh", [&] {
+                         return engine.scene().patchComponent(*id, "mesh", Json::object({{"mesh", *key}}));
+                     });
+                     if (!st) return fail(st);
+                 }
+                 return ToolResult::json(Json::object({{"mesh", *key}}), "imported");
+             }});
+
+    reg.add({"asset_request", "Request generated asset",
+             "Queue a request for generated content — kind: mesh (3D model), texture, sprite (2D), audio (sfx), music, "
+             "video — with a prompt. A connected generator (image/3D/audio model) or an agent fulfills it with "
+             "asset_complete; results are applied to `target` automatically.",
+             "asset",
+             object({{"kind", enumeration({"mesh", "texture", "sprite", "audio", "music", "video"}, "Asset kind")},
+                     {"prompt", string("What to generate, in detail")},
+                     {"style", string("Optional style guide, e.g. \"low-poly pastel\"")},
+                     {"target", schema::entity("Entity that should receive the result")}},
+                    {"kind", "prompt"}),
+             true, false, [&engine](const Json& a, ToolContext& ctx) {
+                 AssetRequest req;
+                 req.kind = a.get("kind").asString();
+                 req.prompt = a.get("prompt").asString();
+                 req.style = a.get("style").asString();
+                 req.requestedBy = ctx.actor;
+                 if (a.contains("target")) {
+                     auto id = resolve(engine, a.get("target"));
+                     if (!id) return ToolResult::error(id.error());
+                     req.target = *id;
+                 }
+                 AssetRequest& r = engine.addAssetRequest(std::move(req));
+                 return ToolResult::json(r.toJson(), "queued asset request #" + std::to_string(r.id));
+             }});
+
+    reg.add({"asset_requests", "List asset requests", "List generated-asset requests and their status.", "asset",
+             object({{"status", enumeration({"pending", "done", "failed"}, "Filter by status")}}), false, false,
+             [&engine](const Json& a, ToolContext&) {
+                 Json arr = Json::array();
+                 for (const auto& r : engine.assetRequests()) {
+                     if (!a.contains("status") || r.status == a.get("status").asString()) arr.push(r.toJson());
+                 }
+                 return ToolResult::json(Json::object({{"requests", arr}}));
+             }});
+
+    reg.add({"asset_complete", "Complete asset request",
+             "Mark a request done with the generated file (project-relative). mesh -> imported and assigned to the "
+             "target; texture -> set as the target's texture; sprite -> target becomes a camera-facing textured quad.",
+             "asset",
+             object({{"id", integer("Request id")},
+                     {"path", string("Generated file path")},
+                     {"failed", boolean("Mark as failed instead")}},
+                    {"id"}),
+             true, false, [&engine](const Json& a, ToolContext& ctx) {
+                 AssetRequest* req = nullptr;
+                 for (auto& r : engine.assetRequests()) {
+                     if (r.id == static_cast<uint64_t>(a.get("id").asInt())) req = &r;
+                 }
+                 if (!req) return ToolResult::error(Error::make("not_found", "no such asset request"));
+                 if (a.get("failed").asBool()) {
+                     req->status = "failed";
+                     return ToolResult::json(req->toJson(), "marked failed");
+                 }
+                 req->path = a.get("path").asString();
+                 if (req->path.empty()) return ToolResult::error(Error::make("invalid_arguments", "path is required"));
+                 if (req->target && engine.scene().exists(req->target)) {
+                     Json patch;
+                     if (req->kind == "mesh") {
+                         auto key = engine.importMesh(req->path);
+                         if (!key) return ToolResult::error(key.error());
+                         patch = Json::object({{"mesh", *key}});
+                     } else if (req->kind == "texture") {
+                         patch = Json::object({{"texture", req->path}});
+                     } else if (req->kind == "sprite") {
+                         patch = Json::object({{"mesh", "quad"}, {"texture", req->path}, {"billboard", true}, {"color", "#ffffff"}});
+                     }
+                     if (patch.isObject()) {
+                         EntityId target = req->target;
+                         Status st = engine.edit(ctx.actor, "Apply generated " + req->kind,
+                                                 [&] { return engine.scene().patchComponent(target, "mesh", patch); });
+                         if (!st) return fail(st);
+                     }
+                 }
+                 req->status = "done";
+                 engine.emitEvent(Json::object({{"type", "asset_done"}, {"request", req->toJson()}}));
+                 return ToolResult::json(req->toJson(), "completed");
+             }});
+
+    reg.add({"shader_get", "Get shader source",
+             "The renderer's current shader source (Metal Shading Language). Edit it with shader_set.", "render",
+             object({}), false, false, [&engine](const Json&, ToolContext&) {
+                 std::string src = engine.renderer().shaderSource();
+                 if (src.empty()) return ToolResult::error(Error::make("unsupported", "this renderer has no shader source"));
+                 return ToolResult::text(src);
+             }});
+
+    reg.add({"shader_set", "Hot-reload shaders",
+             "Replace the renderer's shader source at runtime. On a compile error nothing changes and the compiler "
+             "diagnostics are returned. Function names and struct layouts must be kept.",
+             "render", object({{"source", string("Complete shader source")}}, {"source"}), true, false,
+             [&engine](const Json& a, ToolContext&) {
+                 Status s = engine.renderer().reloadShaders(a.get("source").asString());
+                 if (!s) return fail(s);
+                 return ToolResult::text("shaders reloaded");
+             }});
+}
+
+}  // namespace
+
+void registerEngineTools(Engine& engine) {
+    ToolRegistry& reg = engine.tools();
+    addSceneTools(engine, reg);
+    addWanderTools(engine, reg);
+    addSimTools(engine, reg);
+    addViewTools(engine, reg);
+    addHistoryAndFileTools(engine, reg);
+    addAssetAndRenderTools(engine, reg);
+}
+
+}  // namespace sky

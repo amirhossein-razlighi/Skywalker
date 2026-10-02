@@ -1,0 +1,264 @@
+// `skywalker` — headless command-line front end.
+//
+//   skywalker mcp [--project DIR] [--scene FILE]     MCP server on stdio (headless engine)
+//   skywalker mcp --attach [SOCKET]                  MCP stdio bridge to a running editor
+//   skywalker render SCENE -o out.png [--width W --height H --annotate --scene-camera]
+//   skywalker run SCENE [--ticks N] [-o out.png]     simulate deterministically, print logs
+//   skywalker check FILE.wander                      compile Wander, print diagnostics
+//   skywalker call TOOL [JSON] [--scene FILE]        call one tool, print the result
+//   skywalker tools [--markdown]                     list tools
+//   skywalker version
+
+#include <sys/socket.h>
+#include <unistd.h>
+
+#include <cstdio>
+#include <fstream>
+#include <iostream>
+#include <sstream>
+#include <string>
+#include <thread>
+#include <vector>
+
+#include "skywalker/agent/McpServer.h"
+#include "skywalker/agent/SocketServer.h"
+#include "skywalker/core/Log.h"
+#include "skywalker/engine/Engine.h"
+#include "skywalker/wander/Compiler.h"
+
+using namespace sky;
+
+namespace {
+
+struct Args {
+    std::vector<std::string> positional;
+    std::string get(const std::string& flag, const std::string& fallback = "") const {
+        for (size_t i = 0; i + 1 < raw.size(); ++i) {
+            if (raw[i] == flag) return raw[i + 1];
+        }
+        return fallback;
+    }
+    bool has(const std::string& flag) const {
+        for (const auto& r : raw) {
+            if (r == flag) return true;
+        }
+        return false;
+    }
+    std::vector<std::string> raw;
+};
+
+Args parseArgs(int argc, char** argv) {
+    Args a;
+    for (int i = 1; i < argc; ++i) a.raw.emplace_back(argv[i]);
+    for (size_t i = 0; i < a.raw.size(); ++i) {
+        const std::string& r = a.raw[i];
+        if (r.rfind("-", 0) == 0) {
+            bool takesValue = r == "--project" || r == "--scene" || r == "-o" || r == "--width" || r == "--height" ||
+                              r == "--ticks";
+            if (takesValue) ++i;
+            continue;
+        }
+        a.positional.push_back(r);
+    }
+    return a;
+}
+
+std::string readFile(const std::string& path, bool& ok) {
+    std::ifstream f(path);
+    ok = static_cast<bool>(f);
+    std::stringstream ss;
+    ss << f.rdbuf();
+    return ss.str();
+}
+
+int usage() {
+    std::fprintf(stderr,
+                 "skywalker %s — a game engine built for AI agents\n\n"
+                 "usage:\n"
+                 "  skywalker mcp [--project DIR] [--scene FILE]   MCP server on stdio\n"
+                 "  skywalker mcp --attach [SOCKET]                bridge to a running editor\n"
+                 "  skywalker render SCENE -o out.png [--width W] [--height H] [--annotate] [--scene-camera]\n"
+                 "  skywalker run SCENE [--ticks N] [-o out.png]\n"
+                 "  skywalker check FILE.wander\n"
+                 "  skywalker call TOOL [JSON] [--scene FILE] [--project DIR]\n"
+                 "  skywalker tools [--markdown]\n"
+                 "  skywalker version\n",
+                 SKY_VERSION_STRING);
+    return 2;
+}
+
+std::unique_ptr<Engine> makeEngine(const Args& args) {
+    EngineConfig cfg;
+    cfg.projectDir = args.get("--project", ".");
+    auto engine = std::make_unique<Engine>(cfg);
+    std::string scene = args.get("--scene");
+    if (!scene.empty()) {
+        if (Status s = engine->loadScene(scene); !s) log::error("cli", s.error().message);
+    } else {
+        (void)engine->newScene("Untitled", true);
+    }
+    return engine;
+}
+
+int runMcp(const Args& args) {
+    log::setMinLevel(LogLevel::Warn);  // stdout is the protocol channel; logs go to stderr only
+    if (args.has("--attach")) {
+        std::string path = Engine::defaultSocketPath();
+        for (size_t i = 0; i + 1 < args.raw.size(); ++i) {
+            if (args.raw[i] == "--attach" && args.raw[i + 1].rfind("-", 0) != 0) path = args.raw[i + 1];
+        }
+        auto fd = connectUnixSocket(path);
+        if (!fd) {
+            std::fprintf(stderr, "skywalker: %s\n  hint: %s\n", fd.error().message.c_str(), fd.error().hint.c_str());
+            return 1;
+        }
+        int sock = fd->get();
+        std::thread downstream([sock] {
+            LineReader reader(sock);
+            std::string line;
+            while (reader.next(line)) {
+                std::fwrite(line.data(), 1, line.size(), stdout);
+                std::fputc('\n', stdout);
+                std::fflush(stdout);
+            }
+        });
+        LineReader in(STDIN_FILENO);
+        std::string line;
+        while (in.next(line)) {
+            if (!writeAll(sock, line + "\n")) break;
+        }
+        ::shutdown(sock, SHUT_RDWR);
+        downstream.join();
+        return 0;
+    }
+
+    auto engine = makeEngine(args);
+    McpSession session(engine->tools(), [&](const std::string& tool, const Json& a, const std::string& actor) {
+        return engine->callTool(tool, a, actor).toMcp();
+    });
+    LineReader in(STDIN_FILENO);
+    std::string line;
+    while (in.next(line)) {
+        if (line.empty()) continue;
+        engine->pump();
+        if (auto response = session.handle(line)) {
+            std::fwrite(response->data(), 1, response->size(), stdout);
+            std::fputc('\n', stdout);
+            std::fflush(stdout);
+        }
+        (void)engine->drainEvents();  // no UI to consume them in headless mode
+    }
+    return 0;
+}
+
+int runRender(const Args& args, bool simulate) {
+    if (args.positional.size() < 2) return usage();
+    EngineConfig cfg;
+    cfg.projectDir = args.get("--project", ".");
+    Engine engine(cfg);
+    if (Status s = engine.loadScene(args.positional[1]); !s) {
+        std::fprintf(stderr, "error: %s\n", s.error().message.c_str());
+        return 1;
+    }
+    if (simulate) {
+        int ticks = std::stoi(args.get("--ticks", "60"));
+        engine.step(ticks);
+        for (const auto& m : engine.recentMessages(1000)) std::printf("%s\n", m.dump().c_str());
+        std::printf("simulated %d ticks (%.2fs)\n", ticks, engine.runtime().time());
+    }
+    std::string out = args.get("-o");
+    if (out.empty()) return 0;
+    CaptureOptions o;
+    o.width = std::stoi(args.get("--width", "1280"));
+    o.height = std::stoi(args.get("--height", "720"));
+    o.annotate = args.has("--annotate");
+    o.useSceneCamera = args.has("--scene-camera");
+    if (!o.useSceneCamera) engine.callTool("camera_set", Json::object({{"frame", "all"}}), "cli");
+    auto cap = engine.capture(o);
+    if (!cap) {
+        std::fprintf(stderr, "error: %s\n", cap.error().message.c_str());
+        return 1;
+    }
+    if (Status s = writePng(cap->image, out); !s) {
+        std::fprintf(stderr, "error: %s\n", s.error().message.c_str());
+        return 1;
+    }
+    std::printf("wrote %s (%dx%d, %zu visible entities, renderer %s)\n", out.c_str(), o.width, o.height,
+                cap->visible.size(), engine.renderer().info().backend.c_str());
+    return 0;
+}
+
+int runCheck(const Args& args) {
+    if (args.positional.size() < 2) return usage();
+    bool ok = false;
+    std::string src = readFile(args.positional[1], ok);
+    if (!ok) {
+        std::fprintf(stderr, "error: cannot read %s\n", args.positional[1].c_str());
+        return 1;
+    }
+    auto r = wander::compile(src, {"transform", "mesh", "light", "camera"});
+    for (const auto& d : r.diagnostics) {
+        std::printf("%s:%d:%d: %s: %s [%s]%s%s\n", args.positional[1].c_str(), d.loc.line, d.loc.column,
+                    d.severity == wander::Severity::Error ? "error" : "warning", d.message.c_str(), d.code.c_str(),
+                    d.hint.empty() ? "" : "\n  hint: ", d.hint.c_str());
+    }
+    if (r.ok()) std::printf("ok: %zu behavior(s)\n", r.program->behaviors.size());
+    return r.ok() ? 0 : 1;
+}
+
+int runCall(const Args& args) {
+    if (args.positional.size() < 2) return usage();
+    auto engine = makeEngine(args);
+    Json a = Json::object();
+    if (args.positional.size() > 2) {
+        auto parsed = Json::parse(args.positional[2]);
+        if (!parsed) {
+            std::fprintf(stderr, "error: %s\n", parsed.error().message.c_str());
+            return 1;
+        }
+        a = parsed.value();
+    }
+    ToolResult r = engine->callTool(args.positional[1], a, "cli");
+    for (const auto& c : r.content) {
+        if (c.type == ContentBlock::Type::Text) std::printf("%s\n", c.text.c_str());
+        else std::printf("[image %s, %zu base64 bytes]\n", c.mimeType.c_str(), c.data.size());
+    }
+    return r.isError ? 1 : 0;
+}
+
+int runTools(const Args& args) {
+    Engine engine;
+    if (args.has("--markdown")) {
+        std::string category;
+        for (const auto& t : engine.tools().all()) {
+            if (t.category != category) {
+                category = t.category;
+                std::printf("\n### %s\n\n| Tool | Description |\n|---|---|\n", category.c_str());
+            }
+            std::printf("| `%s`%s | %s |\n", t.name.c_str(), t.mutates ? " ✎" : "", t.description.c_str());
+        }
+        return 0;
+    }
+    for (const auto& t : engine.tools().all()) std::printf("%-20s %s\n", t.name.c_str(), t.title.c_str());
+    return 0;
+}
+
+}  // namespace
+
+int main(int argc, char** argv) {
+    Args args = parseArgs(argc, argv);
+    if (args.positional.empty()) return usage();
+    const std::string& cmd = args.positional[0];
+    if (cmd != "mcp") log::setMinLevel(LogLevel::Warn);
+    if (cmd == "mcp") return runMcp(args);
+    if (cmd == "render") return runRender(args, false);
+    if (cmd == "run") return runRender(args, true);
+    if (cmd == "check") return runCheck(args);
+    if (cmd == "call") return runCall(args);
+    if (cmd == "tools") return runTools(args);
+    if (cmd == "version" || cmd == "--version") {
+        std::printf("skywalker %s\n", SKY_VERSION_STRING);
+        return 0;
+    }
+    return usage();
+}
