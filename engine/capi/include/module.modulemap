@@ -1,0 +1,4 @@
+module CSkywalker {
+    header "sky_api.h"
+    export *
+}

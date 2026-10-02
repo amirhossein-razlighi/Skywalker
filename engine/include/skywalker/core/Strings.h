@@ -23,4 +23,8 @@ std::string closest(std::string_view word, const std::vector<std::string>& candi
 
 std::string base64Encode(const void* data, size_t size);
 
+/// Locale-independent double parsing of the whole input (std::from_chars for floating point
+/// needs macOS 26, so we parse in the "C" locale explicitly). Returns false on failure.
+bool parseDouble(std::string_view text, double& out);
+
 }  // namespace sky::str

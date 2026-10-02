@@ -1,5 +1,7 @@
 #include "skywalker/core/Json.h"
 
+#include "skywalker/core/Strings.h"
+
 #include <charconv>
 #include <cmath>
 #include <cstdio>
@@ -344,8 +346,7 @@ private:
             if (!digits()) { error_ = "invalid number exponent"; return false; }
         }
         double v = 0;
-        auto res = std::from_chars(text_.data() + start, text_.data() + pos_, v);
-        if (res.ec != std::errc() && res.ec != std::errc::result_out_of_range) {
+        if (!str::parseDouble(text_.substr(start, pos_ - start), v)) {
             error_ = "invalid number";
             return false;
         }

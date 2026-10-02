@@ -3,6 +3,11 @@
 #include <algorithm>
 #include <cctype>
 #include <cstdint>
+#include <cstdlib>
+#include <locale.h>
+#if defined(__APPLE__)
+#include <xlocale.h>
+#endif
 
 namespace sky::str {
 
@@ -109,6 +114,16 @@ std::string base64Encode(const void* data, size_t size) {
         out.push_back('=');
     }
     return out;
+}
+
+bool parseDouble(std::string_view text, double& out) {
+    if (text.empty() || text.size() > 512) return false;
+    std::string buf(text);  // NUL-terminated copy for strtod
+    char* end = nullptr;
+    // A dedicated "C" locale keeps parsing independent of the host app's LC_NUMERIC.
+    static locale_t cLocale = newlocale(LC_NUMERIC_MASK, "C", nullptr);
+    out = strtod_l(buf.c_str(), &end, cLocale);
+    return end == buf.c_str() + buf.size();
 }
 
 }  // namespace sky::str

@@ -31,8 +31,9 @@ find_package(Threads REQUIRED)
 target_include_directories(skywalker_engine PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
 target_link_libraries(skywalker_engine PUBLIC sky::options PRIVATE ZLIB::ZLIB Threads::Threads)
+# Definitions are C-family only (Swift consumers of the C API must not see them).
 target_compile_definitions(skywalker_engine PUBLIC
-    SKY_VERSION_STRING="${PROJECT_VERSION}")
+    $<$<COMPILE_LANGUAGE:C,CXX,OBJCXX>:SKY_VERSION_STRING="${PROJECT_VERSION}">)
 
 if(SKY_HAS_METAL)
     # Shaders are compiled at runtime from embedded source (enables live shader editing
@@ -48,11 +49,11 @@ if(SKY_HAS_METAL)
 
     target_sources(skywalker_engine PRIVATE platform/metal/MetalRenderer.mm ${_shader_inc})
     target_include_directories(skywalker_engine PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/generated)
-    target_compile_definitions(skywalker_engine PUBLIC SKY_HAS_METAL=1)
+    target_compile_definitions(skywalker_engine PUBLIC $<$<COMPILE_LANGUAGE:C,CXX,OBJCXX>:SKY_HAS_METAL=1>)
     target_link_libraries(skywalker_engine PUBLIC
         "-framework Foundation" "-framework Metal" "-framework MetalKit" "-framework QuartzCore")
 else()
-    target_compile_definitions(skywalker_engine PUBLIC SKY_HAS_METAL=0)
+    target_compile_definitions(skywalker_engine PUBLIC $<$<COMPILE_LANGUAGE:C,CXX,OBJCXX>:SKY_HAS_METAL=0>)
 endif()
 
 # Stable C API (used by the Swift editor and future language bindings).

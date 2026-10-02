@@ -1,5 +1,13 @@
 cmake_minimum_required(VERSION 3.26)
 
+# Swift compilation mode is a target property (wholemodule for the editor) — CMake >= 3.29.
+if(POLICY CMP0157)
+    cmake_policy(SET CMP0157 NEW)
+endif()
+
+# Must be set before project() to take effect.
+set(CMAKE_OSX_DEPLOYMENT_TARGET "15.0" CACHE STRING "Minimum macOS version")
+
 project(Skywalker
     VERSION 0.0.1
     DESCRIPTION "A game engine built from the ground up for AI agents"
@@ -20,7 +28,6 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 if(APPLE)
-    set(CMAKE_OSX_DEPLOYMENT_TARGET "14.0" CACHE STRING "Minimum macOS version")
     enable_language(OBJCXX)
     set(SKY_HAS_METAL ON)
 else()

@@ -125,8 +125,7 @@ private:
         size_t start = pos_;
         while (pos_ < src_.size() && (std::isdigit(static_cast<unsigned char>(src_[pos_])) || src_[pos_] == '.')) advance();
         double v = 0;
-        auto res = std::from_chars(src_.data() + start, src_.data() + pos_, v);
-        if (res.ec != std::errc() || res.ptr != src_.data() + pos_) {
+        if (!str::parseDouble(src_.substr(start, pos_ - start), v)) {
             error(loc, "invalid_number", "invalid number '" + std::string(src_.substr(start, pos_ - start)) + "'");
         }
         return {Tok::Number, std::string(src_.substr(start, pos_ - start)), v, {}, loc};
