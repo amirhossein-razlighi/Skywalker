@@ -67,3 +67,21 @@ showcase game uses:
 - only assets that are original, procedural, or permissively licensed with credits.
 
 The strategy sample uses a fictional continent, not real-world maps of a specific era.
+
+## High-end rendering track (engine capability; samples opt in)
+
+Not every sample has to be this heavy, but the engine must be capable of shipping-AAA
+looks when a game asks for them.
+
+| Feature | Approach |
+|---|---|
+| Temporal core | Sub-pixel jitter, TAA with reprojection and variance clipping, and N-sample accumulation for stills and cinematics |
+| Global illumination | Screen-space GI (bounce and emissive light) with temporal and spatial denoising, falling back to the sky probe |
+| Reflections | Screen-space reflections on every glossy surface (GGX-importance-sampled), falling back to probes |
+| Hair and fur | Strand-based grooms (guide curves, interpolated children, clumping, noise), GPU-expanded strand ribbons, Marschner-style R/TT/TRT shading, deep-opacity self-shadowing, and wind/physics sway; a card-based LOD |
+| GPU particles | Compute-simulated particles in the millions: curl-noise and vector fields, depth-buffer collisions, ribbons/trails, mesh particles, flipbook sheets, lit and shadowed, sorted, and emitting light |
+| Skin | Separable screen-space subsurface scattering; eye and teeth shading |
+| Terrain and coastlines | Large erosion-sculpted terrains, splat materials with height blending, parallax occlusion, wet sand where waves reach, foam lines, shoreline wave breaking, detail meshes (shells, pebbles, seaweed) |
+| Vegetation | GPU-instanced foliage and grass in the 100k+ range, wind animation, translucency, LOD and impostors |
+| Atmosphere | Volumetric clouds, aerial perspective, volumetric fog with local lights |
+| Cinematic post | Auto exposure, bokeh depth of field, motion blur, LUT grading, film grain, lens effects |
