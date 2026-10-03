@@ -344,7 +344,7 @@ Json schema(const TypeInfo& type) {
             case FieldType::Vec4:
                 p["type"] = "array";
                 p["items"] = Json::object({{"type", "number"}});
-                p["minItems"] = 4;
+                p["minItems"] = 1;  // CSS shorthand: [all], [v, h], [t, h, b], [t, r, b, l]
                 p["maxItems"] = 4;
                 break;
             case FieldType::Json:

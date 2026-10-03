@@ -1051,6 +1051,9 @@ void registerEngineTools(Engine& engine) {
     tools::addWorldTools(engine, reg);
     tools::addNetworkTools(engine, reg);
     tools::addFxTools(engine, reg);
+    tools::addTools2D(engine, reg);
+    tools::addUiTools(engine, reg);
+    tools::addDialogueTools(engine, reg);
 }
 
 }  // namespace sky

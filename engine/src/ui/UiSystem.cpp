@@ -485,6 +485,15 @@ void UiSystem::tick(Scene& scene, const UiInput& in, float dt, const ViewCamera*
         focused_ = kNoEntity;
         fn = nullptr;
     }
+    // Typed text first, then editing keys (so "abc" + backspace leaves "ab").
+    if (fn && fn->el.widget == "input" && !in.text.empty()) {
+        if (UIElement* el = scene.get<UIElement>(focused_)) {
+            for (char ch : in.text) {
+                if (static_cast<unsigned char>(ch) >= 0x20 && ch != 0x7F) el->text += ch;
+            }
+            scene.markDirty();
+        }
+    }
     for (const std::string& key : in.keys) {
         if (key == "tab") {
             moveFocus(1);
@@ -514,14 +523,6 @@ void UiSystem::tick(Scene& scene, const UiInput& in, float dt, const ViewCamera*
             }
         }
         fn = focused_ ? lay.find(focused_) : nullptr;
-    }
-    if (fn && fn->el.widget == "input" && !in.text.empty()) {
-        if (UIElement* el = scene.get<UIElement>(focused_)) {
-            for (char ch : in.text) {
-                if (static_cast<unsigned char>(ch) >= 0x20 && ch != 0x7F) el->text += ch;
-            }
-            scene.markDirty();
-        }
     }
 
     // Hover/press transitions.

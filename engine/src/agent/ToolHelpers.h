@@ -33,5 +33,8 @@ void addAssetTools(Engine& engine, ToolRegistry& reg);
 void addWorldTools(Engine& engine, ToolRegistry& reg);
 void addNetworkTools(Engine& engine, ToolRegistry& reg);
 void addFxTools(Engine& engine, ToolRegistry& reg);
+void addTools2D(Engine& engine, ToolRegistry& reg);        // sprites, atlases, tilemaps
+void addUiTools(Engine& engine, ToolRegistry& reg);        // ui_create, ui_style, ui_inspect, ui_interact
+void addDialogueTools(Engine& engine, ToolRegistry& reg);  // dialogue_check, dialogue_preview, dialogue_control
 
 }  // namespace sky::tools
