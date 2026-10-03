@@ -285,4 +285,26 @@ TEST_CASE("anim look-at: the head turns toward a target, within the angle limit"
     p.patch(hero, "animator", R"({"lookAtWeight": 0})");
     head = as.boneWorld(hero, "Head").value();
     CHECK(dot(facing(head), Vec3{0, 0, -1}) > 0.999f);
+
+    // Playing: the turn eases in, and eases out when lookAt is cleared (no snapping).
+    p.patch(hero, "animator", R"({"lookAtWeight": 1, "lookAtLimit": 120, "clip": "Bend", "speed": 0})");
+    p.engine->play();
+    auto turned = [&]() {
+        float d = std::clamp(dot(facing(as.boneWorld(hero, "Head").value()), Vec3{0, 0, -1}), -1.f, 1.f);
+        return degrees(std::acos(d));
+    };
+    p.engine->step(2);
+    float early = turned();
+    p.engine->step(90);
+    float full = turned();
+    CHECK(early < full * 0.5f);
+    CHECK(full > 75.f);
+    p.scene().get<Animator>(hero)->lookAt.clear();  // a gameplay change while playing
+    p.engine->step(2);
+    float fading = turned();
+    CHECK(fading > full * 0.5f);
+    CHECK(fading < full);
+    p.engine->step(120);
+    CHECK(turned() < 1.f);
+    p.engine->stop();
 }

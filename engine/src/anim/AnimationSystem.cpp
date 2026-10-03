@@ -121,7 +121,9 @@ struct AnimationSystem::Instance {
     std::unordered_map<std::string, SkinEntry> skins;
 
     std::vector<int> lookChain;
+    std::vector<Mat4> restGlobals;     // skeleton rest pose (look-at reference)
     float lookBlend = 0.f;
+    std::optional<Vec3> lookTarget;    // last aim point (world): lets the turn fade out when lookAt clears
     Vec3 lastRootMotion{0, 0, 0};
     std::vector<std::string> recentEvents;
     std::optional<std::pair<std::string, float>> preview;     // tool preview: (state or clip, seconds)
@@ -303,10 +305,9 @@ void AnimationSystem::bindMesh(Instance& inst, EntityId e) {
     inst.meshKey.clear();
     inst.libraryFromMesh.clear();
     inst.transform = Mat4{};
-    std::vector<EntityId> stack{e};
-    while (!stack.empty()) {
-        EntityId id = stack.front();
-        stack.erase(stack.begin());
+    std::vector<EntityId> queue{e};  // breadth first: the mesh closest to the animator wins
+    for (size_t qi = 0; qi < queue.size(); ++qi) {
+        EntityId id = queue[qi];
         if (const MeshData* md = skinnedMesh(id)) {
             inst.meshEntity = id;
             inst.meshKey = scene_.get<MeshRenderer>(id)->mesh;
@@ -316,7 +317,7 @@ void AnimationSystem::bindMesh(Instance& inst, EntityId e) {
             if (inst.libraryFromMesh.empty()) inst.libraryFromMesh = file;
             return;
         }
-        for (EntityId c : scene_.children(id)) stack.push_back(c);
+        for (EntityId c : scene_.children(id)) queue.push_back(c);
     }
 }
 
@@ -353,6 +354,8 @@ void AnimationSystem::initRuntime(Instance& inst, const Animator& a) {
     inst.editKey.clear();
     inst.skins.clear();
     inst.lookChain.clear();
+    inst.restGlobals.clear();
+    inst.lookTarget.reset();
     inst.rootMotion = false;
     ++inst.version;
 
@@ -396,6 +399,7 @@ void AnimationSystem::initRuntime(Instance& inst, const Animator& a) {
         return;
     }
     inst.lookChain = lookChain(inst.lib->skeleton);
+    computeGlobals(inst.lib->skeleton, restPose(inst.lib->skeleton), inst.restGlobals);
 }
 
 Mat4 AnimationSystem::modelToWorld(const Instance& inst, EntityId e) const {
@@ -421,16 +425,14 @@ void AnimationSystem::applyLookAt(Instance& inst, EntityId e, const Animator& a)
             }
         }
     }
-    float goal = targetWorld ? std::clamp(a.lookAtWeight, 0.f, 1.f) : 0.f;
-    float blend = inst.lookBlend;
-    if (blend <= 1e-4f && goal <= 0.f) return;
+    if (targetWorld) inst.lookTarget = targetWorld;
+    const float blend = inst.lookBlend;
+    if (blend <= 1e-4f || !inst.lookTarget || inst.lookChain.empty()) return;  // off, or faded out
     const Skeleton& sk = inst.lib->skeleton;
     computeGlobals(sk, inst.pose, inst.globals);
-    if (!targetWorld) return;  // fading out: nothing to aim at, keep the animated pose
     Mat4 toModel = modelToWorld(inst, e).inverse();
-    Vec3 target = toModel.transformPoint(*targetWorld);
-    std::vector<Mat4> rest;
-    computeGlobals(sk, restPose(sk), rest);
+    Vec3 target = toModel.transformPoint(*inst.lookTarget);  // the last target while fading out
+    const std::vector<Mat4>& rest = inst.restGlobals;
     const int head = inst.lookChain.back();
     const Vec3 fwd{0, 0, 1};  // glTF characters face +Z in their own space
     auto facing = [&](int bone) {
@@ -570,7 +572,10 @@ void AnimationSystem::poseEditing(Instance& inst, EntityId e, const Animator& a)
     } else if (a.preview != "play") {
         seekSeconds("", a.time);
     }
-    inst.lookBlend = std::clamp(a.lookAtWeight, 0.f, 1.f);  // previews snap (no smoothing)
+    // Previews snap (no smoothing) and never keep aiming at an old target.
+    const bool looking = !a.lookAt.empty() && scene_.find(a.lookAt) != kNoEntity;
+    inst.lookBlend = looking ? std::clamp(a.lookAtWeight, 0.f, 1.f) : 0.f;
+    if (!looking) inst.lookTarget.reset();
     finishPose(inst, e, a);
 }
 
@@ -653,7 +658,8 @@ void AnimationSystem::tick(float dt) {
                     }
                 }
             }
-            float goal = a->lookAt.empty() ? 0.f : std::clamp(a->lookAtWeight, 0.f, 1.f);
+            const bool looking = !a->lookAt.empty() && scene_.find(a->lookAt) != kNoEntity;
+            float goal = looking ? std::clamp(a->lookAtWeight, 0.f, 1.f) : 0.f;  // turns fade in and out
             inst->lookBlend += (goal - inst->lookBlend) * std::min(1.f, dt * kLookRate);
             finishPose(*inst, e, *a);
         }
