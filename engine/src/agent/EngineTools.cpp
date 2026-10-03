@@ -774,7 +774,7 @@ void addViewTools(Engine& engine, ToolRegistry& reg) {
 
     reg.add({"viewport_quality", "Viewport quality",
              "How the live editor viewport renders while editing: fast (default; lower internal resolution, no "
-             "screen-space GI/reflections, flat clouds, near foliage shadows, coarser LODs) keeps heavy worlds "
+             "screen-space GI/reflections or light shafts, near foliage shadows, coarser LODs) keeps heavy worlds "
              "responsive; balanced; full (what the game and captures show). Play mode always renders full.",
              "view", object({{"quality", enumeration({"fast", "balanced", "full"}, "Editing quality (omit to read)")}}),
              false, false, [&engine](const Json& a, ToolContext&) {

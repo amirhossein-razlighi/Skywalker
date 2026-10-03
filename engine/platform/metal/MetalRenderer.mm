@@ -494,7 +494,11 @@ public:
             const bool accumulateFrame = std::clamp(frame.samples, 1, 256) > 1;
             const float renderScale = accumulateFrame ? 1.f : std::clamp(frame.environment.renderScale, 0.33f, 1.f);
             ensureTargets(frame.width, frame.height, renderScale);
-            const bool upscale = !accumulateFrame && renderScale < 0.999f && temporalScaler() != nil;
+            // Upscaling: interactive editor tiers use the GPU-only MetalFX spatial scaler after our
+            // own TAA (cheap, robust under load); full-quality frames use the temporal scaler.
+            const bool scaled = !accumulateFrame && renderScale < 0.999f;
+            const bool spatialUpscale = scaled && frame.quality > 0 && spatialScaler() != nil;
+            const bool upscale = scaled && !spatialUpscale && temporalScaler() != nil;
             ensureHdri(frame.environment);
             const Environment& env = frame.environment;
             Cascades cascades = computeCascades(frame);
@@ -571,7 +575,8 @@ public:
                 if (!accumulate) historyValid_ = true;
             }
             if (accumulate) historyValid_ = true;  // the converged still seeds later TAA frames
-            postSource_ = upscale ? upscaled_ : taa_[taaCurrent_];
+            if (spatialUpscale) encodeSpatialUpscale(cmd);
+            postSource_ = upscale || spatialUpscale ? upscaled_ : taa_[taaCurrent_];
             encodePost(cmd, frame, accumulate, base);
             if (frame.debugView > 0) {
                 PostUniforms pu{};
@@ -962,6 +967,31 @@ private:
         // Engine for the ML scaler), so the old scaler must outlive work already queued with it.
         if (scaler_) retiredScalers_.push_back({scaler_, frameIndex_});
         scaler_ = nil;
+        spatialScaler_ = nil;
+    }
+
+    /// MetalFX spatial upscaler (GPU only) from the anti-aliased internal image to the output.
+    id<MTLFXSpatialScaler> spatialScaler() {
+        if (spatialScaler_) return spatialScaler_;
+        if (![MTLFXSpatialScalerDescriptor supportsDevice:device_]) return nil;
+        MTLFXSpatialScalerDescriptor* d = [MTLFXSpatialScalerDescriptor new];
+        d.colorTextureFormat = kHDRFormat;
+        d.outputTextureFormat = kHDRFormat;
+        d.inputWidth = hdr_.width;
+        d.inputHeight = hdr_.height;
+        d.outputWidth = upscaled_.width;
+        d.outputHeight = upscaled_.height;
+        d.colorProcessingMode = MTLFXSpatialScalerColorProcessingModeHDR;
+        spatialScaler_ = [d newSpatialScalerWithDevice:device_];
+        return spatialScaler_;
+    }
+
+    void encodeSpatialUpscale(id<MTLCommandBuffer> cmd) {
+        id<MTLFXSpatialScaler> sc = spatialScaler();
+        sc.colorTexture = taa_[taaCurrent_];
+        sc.outputTexture = upscaled_;
+        [sc encodeToCommandBuffer:cmd];
+        [cmd addCompletedHandler:^(id<MTLCommandBuffer>) { (void)sc; }];
     }
 
     /// MetalFX temporal upscaler from the internal to the output resolution (nil if unsupported).
@@ -2704,6 +2734,7 @@ private:
         dofBlurPipeline_, dofCombinePipeline_;
     id<MTLTexture> lum_, exposure_[2], postA_, postB_, dofCoc_, dofBlur_, lut_, upscaled_, motion_, postSource_;
     id<MTLFXTemporalScaler> scaler_;
+    id<MTLFXSpatialScaler> spatialScaler_;
     struct RetiredScaler {
         id<MTLFXTemporalScaler> scaler;
         uint64_t frame = 0;

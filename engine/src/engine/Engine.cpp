@@ -516,8 +516,7 @@ void Engine::ensureMeshUploaded(const std::string& meshKey) {
 
 namespace {
 /// Interactive tiers: the expensive, slowly converging parts of the frame (screen-space GI and
-/// reflections, volumetric clouds and light shafts, depth of field, far foliage and its
-/// shadows) are trimmed and the frame renders at a lower internal resolution (MetalFX
+/// reflections, light shafts, depth of field, far foliage and its shadows) are trimmed and the frame renders at a lower internal resolution (MetalFX
 /// upscales it). Full quality is untouched.
 void applyViewportQuality(FrameData& f, int quality) {
     f.quality = quality;
@@ -531,7 +530,6 @@ void applyViewportQuality(FrameData& f, int quality) {
     env.gi = 0.f;
     env.ssr = 0.f;
     env.godRays = 0.f;
-    if (env.cloudMode == "volumetric") env.cloudMode = "flat";
     env.shadowDistance = env.shadowDistance > 0.f ? std::min(env.shadowDistance, 150.f) : 150.f;
     for (auto& b : f.instances) b.cullDistance *= 0.4f;
 }
