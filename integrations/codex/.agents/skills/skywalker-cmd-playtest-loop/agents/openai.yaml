@@ -1,0 +1,4 @@
+interface:
+  display_name: "Skywalker: playtest loop"
+policy:
+  allow_implicit_invocation: false

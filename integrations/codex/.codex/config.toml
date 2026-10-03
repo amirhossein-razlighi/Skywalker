@@ -1,0 +1,7 @@
+# Skywalker MCP server for Codex. Merge into ~/.codex/config.toml (or a trusted project's .codex/config.toml),
+# or run `skywalker setup codex`, which does this for you with the absolute path of the binary.
+[mcp_servers.skywalker]
+command = "skywalker"
+args = ["mcp", "--auto"]
+startup_timeout_sec = 30
+tool_timeout_sec = 600

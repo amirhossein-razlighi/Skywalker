@@ -92,6 +92,8 @@ public:
 
     /// MCP `tools/list` payload.
     Json listJson() const;
+    /// The tool catalogue as markdown, grouped by category (`skywalker tools --markdown`, MCP resource skywalker://tools).
+    std::string catalogueMarkdown() const;
 
 private:
     std::vector<ToolDef> tools_;

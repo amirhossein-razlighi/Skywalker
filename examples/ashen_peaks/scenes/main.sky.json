@@ -1,0 +1,383 @@
+{
+  "format": "skywalker.scene",
+  "version": 1,
+  "name": "Ashen Peaks",
+  "seed": 1,
+  "environment": {
+    "skyTop": "#4d7ac7",
+    "skyHorizon": "#bdcce0",
+    "ground": "#4d4f54",
+    "ambient": 0.35,
+    "sunAzimuth": 245,
+    "sunElevation": 13,
+    "sunColor": "#ffe2bc",
+    "sunIntensity": 3.4,
+    "fogColor": "#b9c6d6",
+    "fogDensity": 9e-04,
+    "exposure": 1,
+    "autoExposure": true,
+    "exposureCompensation": 0.2,
+    "adaptationSpeed": 1.5,
+    "showGrid": false,
+    "bloomIntensity": 0.35,
+    "bloomThreshold": 1,
+    "saturation": 1.05,
+    "contrast": 1.05,
+    "vignette": 0.25,
+    "grain": 0.08,
+    "chromaticAberration": 0,
+    "look": "golden_hour",
+    "lut": "",
+    "lookStrength": 0.6,
+    "skyMode": "atmosphere",
+    "hdri": "",
+    "hdriRotation": 0,
+    "hdriIntensity": 1,
+    "clouds": 0.45,
+    "cloudMode": "volumetric",
+    "cloudHeight": 1800,
+    "cloudThickness": 1600,
+    "cloudDensity": 1,
+    "cloudScale": 1.3,
+    "cloudSpeed": 8,
+    "stars": 0,
+    "sunSize": 1,
+    "fogHeight": 0.01,
+    "reflections": 1,
+    "ao": 0.8,
+    "aoRadius": 0.6,
+    "gi": 1,
+    "giDistance": 4,
+    "ssr": 1,
+    "taa": true,
+    "sharpen": 0.35,
+    "shadowSoftness": 1,
+    "tonemap": "aces",
+    "temperature": 0,
+    "tint": 0,
+    "shadowDistance": 0,
+    "godRays": 0.5,
+    "haze": 0.0015,
+    "windSpeed": 4,
+    "windDirection": 60
+  },
+  "entities": [
+    {
+      "id": 1,
+      "name": "Valley",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "terrain": {
+          "data": "terrain/valley_1.terrain",
+          "size": 1200,
+          "resolution": 1025,
+          "generator": {
+            "shape": "valley",
+            "seed": 11,
+            "minHeight": 0,
+            "maxHeight": 300,
+            "featureSize": 650,
+            "octaves": 7,
+            "roughness": 0.5,
+            "ridges": 0.7,
+            "warp": 0.4,
+            "erosion": 0.8,
+            "thermal": 0.4,
+            "terraces": 0,
+            "beachWidth": 30,
+            "seaLevel": 0
+          },
+          "layers": [
+            {
+              "name": "forest floor",
+              "material": "materials/forest_leaves_04.mat.json",
+              "tiling": 4
+            },
+            {
+              "name": "meadow",
+              "material": "materials/sparse_grass.mat.json",
+              "tiling": 3.5,
+              "heightMin": 8,
+              "heightMax": 150,
+              "slopeMax": 22,
+              "noise": 0.8,
+              "sharpness": 0.3
+            },
+            {
+              "name": "scree",
+              "material": "materials/rock_ground_02.mat.json",
+              "tiling": 5,
+              "slopeMin": 26,
+              "slopeMax": 40,
+              "noise": 0.6,
+              "sharpness": 0.35
+            },
+            {
+              "name": "cliff",
+              "material": "materials/rock_face_03.mat.json",
+              "tiling": 9,
+              "slopeMin": 36,
+              "noise": 0.5,
+              "sharpness": 0.55,
+              "triplanar": true
+            },
+            {
+              "name": "snow",
+              "material": "materials/snow_02.mat.json",
+              "tiling": 6,
+              "heightMin": 205,
+              "slopeMax": 44,
+              "noise": 0.8,
+              "sharpness": 0.6
+            }
+          ],
+          "waterLevel": -100000,
+          "wetBand": 1.2,
+          "detail": 1,
+          "castShadows": true
+        },
+        "collider": {
+          "shape": "heightfield",
+          "size": [
+            1200,
+            290.2281,
+            1200
+          ],
+          "radius": 0.5,
+          "height": 1,
+          "offset": [
+            0,
+            6.8767,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "isTrigger": false,
+          "friction": -1,
+          "restitution": -1,
+          "heightmap": "terrain/valley_1.r16",
+          "resolution": 1024
+        }
+      }
+    },
+    {
+      "id": 2,
+      "name": "Forest",
+      "parent": 1,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "foliage": {
+          "layers": [
+            {
+              "prefab": "downloads/fir_sapling_medium/fir_sapling_medium_1k.prefab.json",
+              "density": 0.006,
+              "scaleMin": 1.6,
+              "scaleMax": 2.8,
+              "slopeMax": 33,
+              "heightMax": 195,
+              "terrainLayer": 0,
+              "alignToNormal": 0.05,
+              "clumping": 0.8,
+              "cullDistance": 1500,
+              "wind": 0.3,
+              "randomTilt": 2,
+              "subsurface": 0.4
+            },
+            {
+              "prefab": "downloads/fir_sapling/fir_sapling_1k.prefab.json",
+              "density": 0.01,
+              "scaleMin": 1,
+              "scaleMax": 2.2,
+              "slopeMax": 33,
+              "heightMax": 200,
+              "terrainLayer": 0,
+              "clumping": 0.75,
+              "cullDistance": 500,
+              "wind": 0.45,
+              "seed": 3,
+              "subsurface": 0.4
+            },
+            {
+              "prefab": "downloads/jacaranda_tree/jacaranda_tree_1k.prefab.json",
+              "density": 6e-04,
+              "scaleMin": 0.8,
+              "scaleMax": 1.2,
+              "slopeMax": 18,
+              "heightMin": 10,
+              "heightMax": 120,
+              "terrainLayer": 1,
+              "clumping": 0.6,
+              "cullDistance": 1500,
+              "wind": 0.3,
+              "subsurface": 0.5
+            },
+            {
+              "mesh": "asset:downloads/shrub_01/shrub_01_1k.gltf",
+              "material": "downloads/shrub_01/shrub_01_1k.mat.json",
+              "density": 0.01,
+              "scaleMin": 0.7,
+              "scaleMax": 1.4,
+              "slopeMax": 32,
+              "heightMax": 180,
+              "clumping": 0.8,
+              "cullDistance": 180,
+              "wind": 0.6,
+              "seed": 10,
+              "subsurface": 0.5
+            },
+            {
+              "mesh": "asset:downloads/shrub_02/shrub_02_1k.gltf",
+              "material": "downloads/shrub_02/shrub_02_1k.mat.json",
+              "density": 0.01,
+              "scaleMin": 0.7,
+              "scaleMax": 1.4,
+              "slopeMax": 32,
+              "heightMax": 180,
+              "clumping": 0.8,
+              "cullDistance": 180,
+              "wind": 0.6,
+              "seed": 11,
+              "subsurface": 0.5
+            },
+            {
+              "mesh": "asset:downloads/shrub_04/shrub_04_1k.gltf",
+              "material": "downloads/shrub_04/shrub_04_1k.mat.json",
+              "density": 0.01,
+              "scaleMin": 0.7,
+              "scaleMax": 1.4,
+              "slopeMax": 32,
+              "heightMax": 180,
+              "clumping": 0.8,
+              "cullDistance": 180,
+              "wind": 0.6,
+              "seed": 12,
+              "subsurface": 0.5
+            },
+            {
+              "mesh": "asset:downloads/fern_02/fern_02_2k.gltf",
+              "material": "downloads/fern_02/fern_02_2k.mat.json",
+              "density": 0.15,
+              "scaleMin": 0.6,
+              "scaleMax": 1.3,
+              "slopeMax": 35,
+              "heightMax": 170,
+              "terrainLayer": 0,
+              "clumping": 0.8,
+              "cullDistance": 70,
+              "wind": 0.7,
+              "castShadows": false,
+              "subsurface": 0.5
+            },
+            {
+              "mesh": "asset:downloads/grass_medium_01/grass_medium_01_2k.gltf",
+              "material": "downloads/grass_medium_01/grass_medium_01_2k.mat.json",
+              "density": 1.4,
+              "scaleMin": 0.7,
+              "scaleMax": 1.3,
+              "slopeMax": 24,
+              "terrainLayer": 1,
+              "clumping": 0.5,
+              "cullDistance": 60,
+              "wind": 1,
+              "castShadows": false,
+              "subsurface": 0.6
+            },
+            {
+              "mesh": "asset:downloads/grass_medium_02/grass_medium_02_2k.gltf",
+              "material": "downloads/grass_medium_02/grass_medium_02_2k.mat.json",
+              "density": 1,
+              "scaleMin": 0.7,
+              "scaleMax": 1.3,
+              "slopeMax": 24,
+              "terrainLayer": 1,
+              "clumping": 0.6,
+              "cullDistance": 55,
+              "wind": 1,
+              "castShadows": false,
+              "seed": 21,
+              "subsurface": 0.6
+            },
+            {
+              "mesh": "asset:downloads/rock_moss_set_01/rock_moss_set_01_2k.gltf",
+              "material": "downloads/rock_moss_set_01/rock_moss_set_01_2k.mat.json",
+              "density": 0.002,
+              "scaleMin": 0.8,
+              "scaleMax": 2.2,
+              "slopeMax": 45,
+              "clumping": 0.6,
+              "cullDistance": 400,
+              "alignToNormal": 0.8,
+              "sink": 0.3,
+              "wind": 0
+            },
+            {
+              "mesh": "asset:downloads/boulder_01/boulder_01_1k.gltf",
+              "material": "downloads/boulder_01/boulder_01_1k.mat.json",
+              "density": 4e-04,
+              "scaleMin": 1.5,
+              "scaleMax": 4,
+              "slopeMax": 50,
+              "clumping": 0.5,
+              "cullDistance": 900,
+              "alignToNormal": 0.6,
+              "sink": 0.6,
+              "wind": 0,
+              "seed": 33
+            }
+          ],
+          "seed": 4,
+          "density": 1,
+          "surface": "terrain",
+          "area": [
+            40,
+            20,
+            40
+          ],
+          "visible": true
+        }
+      }
+    }
+  ]
+}

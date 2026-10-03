@@ -5,7 +5,9 @@
 // line, if any. The CLI wires it to stdio (newline-delimited JSON, per the MCP stdio
 // transport); the editor wires it to a Unix domain socket so external agents can attach
 // to a live editor session. Implements: initialize, ping, tools/list, tools/call,
-// resources/list, prompts/list, logging/setLevel. Spec: https://modelcontextprotocol.io
+// resources/list, resources/templates/list, resources/read (docs, skills, the tool catalogue and live
+// studio/scene state), prompts/list, prompts/get (studio roles and workflows), logging/setLevel.
+// Spec: https://modelcontextprotocol.io
 
 #include <functional>
 #include <optional>
@@ -36,6 +38,10 @@ public:
 
 private:
     Json dispatch(const Json& request);
+    Json listResources() const;
+    Json readResource(const Json& id, const std::string& uri);
+    Json listPrompts() const;
+    Json getPrompt(const Json& id, const std::string& name, const Json& arguments);
     Json handleOne(const Json& request, bool& isNotification);
 
     const ToolRegistry& registry_;

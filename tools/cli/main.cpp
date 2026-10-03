@@ -2,11 +2,13 @@
 //
 //   skywalker mcp [--project DIR] [--scene FILE]     MCP server on stdio (headless engine)
 //   skywalker mcp --attach [SOCKET]                  MCP stdio bridge to a running editor
+//   skywalker mcp --auto [--project DIR]             bridge to the editor if it runs, else headless
+//   skywalker setup <claude|codex|gemini|cursor|all> install MCP config, skills, subagents (SetupCommand.cpp)
 //   skywalker render SCENE -o out.png [--width W --height H --annotate --scene-camera]
 //   skywalker run SCENE [--ticks N] [-o out.png]     simulate deterministically, print logs
 //   skywalker check FILE.wander                      compile Wander, print diagnostics
 //   skywalker call TOOL [JSON] [--scene FILE]        call one tool, print the result
-//   skywalker tools [--markdown]                     list tools
+//   skywalker tools [--markdown|--json]              list tools
 //   skywalker studio status|agents|board|feedback|loops|run --project DIR ...   (StudioCommand.cpp)
 //   skywalker version
 
@@ -32,6 +34,7 @@
 using namespace sky;
 
 int runStudio(const std::vector<std::string>& raw);  // StudioCommand.cpp
+int runSetup(const std::vector<std::string>& raw);   // SetupCommand.cpp
 
 namespace {
 
@@ -58,7 +61,7 @@ Args parseArgs(int argc, char** argv) {
     for (size_t i = 0; i < a.raw.size(); ++i) {
         const std::string& r = a.raw[i];
         if (r.rfind("-", 0) == 0) {
-            bool takesValue = r == "--project" || r == "--scene" || r == "-o" || r == "--width" || r == "--height" ||
+            bool takesValue = r == "--project" || r == "--mode" || r == "--scene" || r == "-o" || r == "--width" || r == "--height" ||
                               r == "--ticks" || r == "--as" || r == "--socket";
             if (takesValue) ++i;
             continue;
@@ -82,12 +85,15 @@ int usage() {
                  "usage:\n"
                  "  skywalker mcp [--project DIR] [--scene FILE]   MCP server on stdio\n"
                  "  skywalker mcp --attach [SOCKET]                bridge to a running editor\n"
+                 "  skywalker mcp --auto [--project DIR]           bridge to the editor if it runs, else headless\n"
+                 "  skywalker setup <claude|codex|gemini|cursor|all> [--project DIR] [--global] [--dry-run] [--print] [--no-skills]\n"
+                 "                                                 install the MCP server entry, skills, subagents and commands\n"
                  "  skywalker render SCENE -o out.png [--width W] [--height H] [--annotate] [--scene-camera] [--samples N]\n"
                  "  skywalker run SCENE [--ticks N] [-o out.png]\n"
                  "  skywalker check FILE.wander\n"
                  "  skywalker call TOOL [JSON] [--scene FILE] [--project DIR] [-o image.png]\n"
                  "  skywalker call TOOL [JSON] --attach [--as NAME] [--socket PATH]   (on the running editor)\n"
-                 "  skywalker tools [--markdown]\n"
+                 "  skywalker tools [--markdown|--json]\n"
                  "  skywalker studio status|agents|board|feedback|loops --project DIR\n"
                  "  skywalker studio run --project DIR --loop NAME [--iterations N] [--dry-run] [--yes]\n"
                  "  skywalker version\n",
@@ -108,6 +114,27 @@ std::unique_ptr<Engine> makeEngine(const Args& args) {
     return engine;
 }
 
+/// Pipes the MCP stdio session to a running editor over its Unix socket (until either side closes).
+int bridgeToEditor(int sock) {
+    std::thread downstream([sock] {
+        LineReader reader(sock);
+        std::string line;
+        while (reader.next(line)) {
+            std::fwrite(line.data(), 1, line.size(), stdout);
+            std::fputc('\n', stdout);
+            std::fflush(stdout);
+        }
+    });
+    LineReader in(STDIN_FILENO);
+    std::string line;
+    while (in.next(line)) {
+        if (!writeAll(sock, line + "\n")) break;
+    }
+    ::shutdown(sock, SHUT_RDWR);
+    downstream.join();
+    return 0;
+}
+
 int runMcp(const Args& args) {
     log::setMinLevel(LogLevel::Warn);  // stdout is the protocol channel; logs go to stderr only
     if (args.has("--attach")) {
@@ -120,24 +147,16 @@ int runMcp(const Args& args) {
             std::fprintf(stderr, "skywalker: %s\n  hint: %s\n", fd.error().message.c_str(), fd.error().hint.c_str());
             return 1;
         }
-        int sock = fd->get();
-        std::thread downstream([sock] {
-            LineReader reader(sock);
-            std::string line;
-            while (reader.next(line)) {
-                std::fwrite(line.data(), 1, line.size(), stdout);
-                std::fputc('\n', stdout);
-                std::fflush(stdout);
-            }
-        });
-        LineReader in(STDIN_FILENO);
-        std::string line;
-        while (in.next(line)) {
-            if (!writeAll(sock, line + "\n")) break;
+        return bridgeToEditor(fd->get());
+    }
+    if (args.has("--auto")) {
+        // Best of both: co-edit with the running editor when there is one, otherwise run a headless engine
+        // on --project (default: the current directory) so agent clients never face a dead server.
+        if (auto fd = connectUnixSocket(args.get("--socket", Engine::defaultSocketPath()))) {
+            std::fprintf(stderr, "skywalker: attached to the running editor\n");
+            return bridgeToEditor(fd->get());
         }
-        ::shutdown(sock, SHUT_RDWR);
-        downstream.join();
-        return 0;
+        std::fprintf(stderr, "skywalker: no editor is running, starting a headless engine on '%s'\n", args.get("--project", ".").c_str());
     }
 
     auto engine = makeEngine(args);
@@ -296,22 +315,12 @@ int runCall(const Args& args) {
 
 int runTools(const Args& args) {
     Engine engine;
+    if (args.has("--json")) {
+        std::printf("%s\n", engine.tools().listJson().dump(1).c_str());
+        return 0;
+    }
     if (args.has("--markdown")) {
-        std::vector<std::string> categories;
-        for (const auto& t : engine.tools().all()) {
-            if (std::find(categories.begin(), categories.end(), t.category) == categories.end()) categories.push_back(t.category);
-        }
-        std::printf("# Tool reference\n\nGenerated by `skywalker tools --markdown` (%s). ✎ = modifies the scene "
-                    "(undoable, attributed to the caller).\n",
-                    SKY_VERSION_STRING);
-        for (const auto& category : categories) {
-            std::printf("\n## %s\n\n| Tool | Description |\n|---|---|\n", category.c_str());
-            for (const auto& t : engine.tools().all()) {
-                if (t.category == category) {
-                    std::printf("| `%s`%s | %s |\n", t.name.c_str(), t.mutates ? " ✎" : "", t.description.c_str());
-                }
-            }
-        }
+        std::printf("%s", engine.tools().catalogueMarkdown().c_str());
         return 0;
     }
     for (const auto& t : engine.tools().all()) std::printf("%-20s %s\n", t.name.c_str(), t.title.c_str());
@@ -332,6 +341,7 @@ int main(int argc, char** argv) {
     if (cmd == "call") return runCall(args);
     if (cmd == "tools") return runTools(args);
     if (cmd == "studio") return runStudio(args.raw);
+    if (cmd == "setup") return runSetup(args.raw);
     if (cmd == "version" || cmd == "--version") {
         std::printf("skywalker %s\n", SKY_VERSION_STRING);
         return 0;

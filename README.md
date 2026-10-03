@@ -93,21 +93,19 @@ Run the editor with the example project:
 open build/debug/bin/Skywalker.app --env SKY_PROJECT="$PWD/examples/hello_sky"
 ```
 
-### Connect Claude Code (or any MCP client) to the running editor
+### Use with Claude Code / Codex / Gemini / Cursor
 
-The editor listens on `~/.skywalker/editor.sock` (user-only permissions). Bridge it:
-
-```bash
-claude mcp add skywalker -- "$PWD/build/debug/bin/skywalker" mcp --attach
-```
-
-Or run a headless engine with no editor at all:
+One command wires a tool to Skywalker: the MCP server (attaches to the running editor, otherwise runs headless), twelve `skywalker-*` skills (the agent loop, world
+building, look development, assets, Blender, audio, the multi-agent studio, ...), eight studio-role subagents and five workflow commands.
 
 ```bash
-claude mcp add skywalker-headless -- "$PWD/build/debug/bin/skywalker" mcp --project examples/hello_sky --scene scenes/main.sky.json
+skywalker setup claude          # or codex | gemini | cursor | all   (add --global for your user config, --dry-run to preview diffs)
 ```
 
-More: [docs/AGENTS.md](docs/AGENTS.md).
+Claude Code also ships as a plugin (`claude plugin marketplace add <this repo>` then `claude plugin install skywalker@skywalker`), Gemini CLI as an extension
+(`gemini extensions install integrations/gemini`). The same server exposes the docs, skills, the tool catalogue and the live studio as MCP resources and prompts.
+Setup merges into existing configs and backs up what it changes. Details, role mapping across tools, and SDK examples (OpenAI Agents SDK, Anthropic tool runner):
+[docs/INTEGRATIONS.md](docs/INTEGRATIONS.md). By hand: `claude mcp add skywalker -- "$PWD/build/debug/bin/skywalker" mcp --auto`.
 
 ### Headless CLI
 
@@ -125,6 +123,7 @@ build/debug/bin/skywalker render examples/hello_sky/scenes/main.sky.json -o shot
 | [ARCHITECTURE](docs/ARCHITECTURE.md) | Layers, threading, data flow, design decisions |
 | [WANDER](docs/WANDER.md) | The behavior language and the ECPS model |
 | [AGENTS](docs/AGENTS.md) | MCP, the crew, Agent Designer, providers, generative assets |
+| [INTEGRATIONS](docs/INTEGRATIONS.md) | Skills, subagents and setup for Claude Code, Codex, Gemini CLI and Cursor; MCP resources and prompts |
 | [ASSETS](docs/ASSETS.md) | Asset database, glTF, materials, prefabs, spatial tools |
 | [RENDERING](docs/RENDERING.md) | PBR + toon surfaces, IBL, cascaded shadows, SSAO, sky, post, recipes |
 | [BRAND](docs/BRAND.md) | Logo, app icon, colors, typography |
