@@ -97,3 +97,21 @@ looks when a game asks for them.
 | Shaders and pipelines | Function-constant specialization instead of runtime branching; pipeline/binary-archive caching; runtime compilation kept for agent hot-reload |
 | CPU | A job system (P-core and E-core aware) for frame building, culling, particles, ocean, physics, and animation; data-oriented component storage |
 | Profiling | GPU timestamps per pass, CPU scopes, and memory stats, exposed through `perf_stats` so agents can measure and optimize their own scenes |
+
+## Closing milestone: the launch film
+
+This is an advertisement-grade video for people seeing Skywalker for the first time. It is
+built after the engineering work lands.
+
+- **Style:** Apple-style motion design with refined typography, smooth eased transitions, and
+  sketch-to-fill reveals (wireframe → shaded → final lighting). Kinetic type explains the idea.
+- **Story:** what Skywalker is (an engine built for AI agents), and what makes it different:
+  - one tool surface for humans and agents;
+  - a studio of specialist agents with playtest feedback loops and a director;
+  - the Wander language and natural language turned into code;
+  - integrations with Claude Code, Codex, Gemini CLI and Cursor;
+  - the Blender bridge.
+- **Feature beats:** global illumination, volumetric clouds, FFT ocean, fluid fire, terrain
+  and foliage, hair and GPU particles, animation, physics, 2D/UI, cinematic camera and grading.
+- **Worlds:** many visually stunning, high-variety original sample scenes, every detail
+  polished.
