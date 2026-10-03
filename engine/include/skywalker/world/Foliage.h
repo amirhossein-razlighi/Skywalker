@@ -32,6 +32,7 @@ static_assert(sizeof(FoliageInstance) == 16 * sizeof(float));
 struct FoliageLayer {
     std::string name;
     std::string mesh = "grass";         // primitive ("grass", "grass_tall", "pebbles", "fern", ...) or "asset:..." (incl. #part)
+    std::string prefab;                 // multi-part model (e.g. an imported tree: trunk + alpha-cut leaves)
     std::string material;               // optional material asset; otherwise the fields below
     std::string texture, normalMap, ormMap;  // optional maps (project-relative)
     bool triplanar = false;             // project the maps in world space (rocks)

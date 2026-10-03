@@ -53,6 +53,7 @@ std::vector<FoliageLayer> foliageLayersFromJson(const Json& layers) {
         l.name = src.get("name").asString(src.get("preset").asString("layer" + std::to_string(i)));
         l.mesh = src.get("mesh").asString(l.mesh);
         l.material = src.get("material").asString();
+        l.prefab = src.get("prefab").asString();
         l.texture = src.get("texture").asString();
         l.normalMap = src.get("normalMap").asString();
         l.ormMap = src.get("ormMap").asString();

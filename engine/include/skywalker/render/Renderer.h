@@ -195,6 +195,7 @@ struct InstanceBatch {
     float wind = 1.f;           // bend strength
     float cullDistance = 100.f;
     float meshHeight = 1.f;     // height of the mesh (m) for wind bending
+    Mat4 part;                  // transform of this part inside a multi-part model (identity otherwise)
 };
 
 struct FrameData {

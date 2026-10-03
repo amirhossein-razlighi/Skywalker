@@ -22,6 +22,11 @@ public:
         std::function<const Surface*(const std::string&)> material;                     // material asset -> surface
         std::function<std::optional<Aabb>(const std::string&)> meshBounds;              // mesh key -> local bounds
         std::function<bool(float x, float z, float top, float bottom, float& y, Vec3& n)> sceneSurface;  // ray down
+        struct Part {
+            std::string mesh, material;
+            Mat4 local;
+        };
+        std::function<std::vector<Part>(const std::string&)> prefabParts;  // prefab asset -> mesh parts
     };
     explicit WorldRuntime(Hooks hooks) : hooks_(std::move(hooks)) {}
 

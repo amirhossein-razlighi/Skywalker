@@ -17,6 +17,11 @@ struct MeshData {
     std::vector<uint32_t> indices;
     Aabb bounds;
     bool hasVertexColors = false;
+    /// Coarser levels of detail (indices into the same vertices), from mesh::buildLods. LOD 0
+    /// is `indices`. `lodErrors[i]` is the simplification error of lods[i] relative to the
+    /// mesh's extent (e.g. 0.01 = 1% of its size).
+    std::vector<std::vector<uint32_t>> lods;
+    std::vector<float> lodErrors;
 
     size_t vertexCount() const { return vertices.size() / kFloatsPerVertex; }
     void addVertex(Vec3 p, Vec3 n, Vec2 uv, Vec4 color = {1, 1, 1, 1});
@@ -35,6 +40,10 @@ MeshData cylinder(int segments = 48);
 MeshData cone(int segments = 48);
 MeshData capsule(int segments = 32, int rings = 8);
 MeshData torus(int segments = 64, int sides = 24, float major = 0.35f, float minor = 0.15f);
+/// Builds up to `maxLods` coarser LODs (meshoptimizer, attribute-aware) and optimizes every
+/// level for the vertex cache. No-op for small meshes (< `minTriangles`).
+void buildLods(MeshData& m, int maxLods = 4, size_t minTriangles = 3000);
+
 // Vegetation and ground detail (Vegetation.cpp), standing on y = 0.
 MeshData grass();
 MeshData grassTall();

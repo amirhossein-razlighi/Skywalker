@@ -25,6 +25,7 @@ set(SKY_ENGINE_SOURCES
     src/render/Vegetation.cpp
     src/render/ColorGrading.cpp
     src/render/LightClusters.cpp
+    src/render/MeshLod.cpp
     src/render/MeshFormats.cpp
     src/assets/Fetch.cpp
     src/render/TextureGen.cpp
@@ -127,6 +128,10 @@ set_source_files_properties(src/audio/Miniaudio.cpp PROPERTIES COMPILE_OPTIONS "
 # Physics (Jolt) and navigation (Recast/Detour), see cmake/PhysicsDeps.cmake.
 include(${PROJECT_SOURCE_DIR}/cmake/PhysicsDeps.cmake)
 target_link_libraries(skywalker_engine PRIVATE Jolt Recast Detour DetourCrowd)
+
+# meshoptimizer: automatic LODs, see cmake/MeshDeps.cmake.
+include(${PROJECT_SOURCE_DIR}/cmake/MeshDeps.cmake)
+target_link_libraries(skywalker_engine PRIVATE meshoptimizer)
 # Definitions are C-family only (Swift consumers of the C API must not see them).
 target_compile_definitions(skywalker_engine PUBLIC
     $<$<COMPILE_LANGUAGE:C,CXX,OBJCXX>:SKY_VERSION_STRING="${PROJECT_VERSION}">)

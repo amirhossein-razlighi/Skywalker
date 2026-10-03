@@ -158,6 +158,7 @@ struct TerrainNodeGpu {
 
 struct FoliageUniformsGpu {
     simd_float4 wind, params;
+    simd_float4x4 part;
 };
 
 struct LensUniformsGpu {
@@ -281,8 +282,23 @@ Cascades computeCascades(const FrameData& frame) {
 
 struct GpuMesh {
     id<MTLBuffer> vertices;
-    id<MTLBuffer> indices;
+    id<MTLBuffer> indices;  // LOD 0 first, then each coarser level
     uint32_t indexCount = 0;
+    static constexpr int kMaxLods = 6;
+    int lodCount = 1;
+    uint32_t lodOffset[kMaxLods] = {};  // in indices
+    uint32_t lodCount_[kMaxLods] = {};
+    float lodError[kMaxLods] = {};      // relative to the mesh extent
+    float radius = 1.f;                 // bounding-sphere radius (local units)
+
+    /// The coarsest level whose simplification error stays under ~1 pixel at `pixelsPerUnit`.
+    int lodFor(float pixelsPerUnit) const {
+        int best = 0;
+        for (int i = 1; i < lodCount; ++i) {
+            if (lodError[i] * radius * 2.f * pixelsPerUnit < 0.8f) best = i;
+        }
+        return best;
+    }
 };
 
 class MetalRenderer final : public Renderer {
@@ -477,6 +493,7 @@ public:
             clusterIndexBuf_ = transient(grid.indices.data(), grid.indices.size() * sizeof(uint32_t));
             ensureCloudNoise(cmd);
             encodeEnvironment(cmd, frame, base);
+            lodFrame_ = &frame;
             encodeShadows(cmd, frame, base, cascades);
             for (int i = 0; i < samples; ++i) {
                 // Sub-pixel jitter (Halton 2,3): TAA spreads it over frames, stills over sub-samples.
@@ -517,6 +534,7 @@ public:
             [cmd commit];
             lastCommand_ = cmd;
             evictWorldCaches();
+            lodFrame_ = nullptr;
             prevViewProj_ = vp;
             motionPrevVP_ = vp;
             motionValid_ = true;
@@ -627,7 +645,8 @@ private:
                                      "fluidCurl", "fluidForces", "fluidDivergence", "fluidJacobi", "fluidProject", "volumetricFragment",
                                      "ssgiFragment", "ssrFragment", "ssTemporalFragment", "lightingResolveFragment",
                                      "temporalFragment", "debugViewFragment", "terrainVertex", "terrainFragment",
-                                     "terrainShadowVertex", "foliageVertex", "foliageShadowVertex", "cloudsFragment",
+                                     "terrainShadowVertex", "foliageVertex", "foliageShadowVertex", "foliageShadowAlphaVertex",
+                                     "cloudsFragment",
                                      "cloudTemporalFragment", "cloudShapeKernel", "cloudDetailKernel", "lumaFragment",
                                      "exposureFragment", "motionBlurFragment", "dofCocFragment", "dofBlurFragment",
                                      "dofCombineFragment"}) {
@@ -720,7 +739,9 @@ private:
         id<MTLRenderPipelineState> foliage = terrainShadow ? make("foliageVertex", "meshFragment", kHDRFormat, kSamples, Blend::None, true, &e, true) : nil;
         id<MTLRenderPipelineState> foliageCutout = foliage ? make("foliageVertex", "meshFragment", kHDRFormat, kSamples, Blend::None, true, &e, true, true) : nil;
         id<MTLRenderPipelineState> foliageShadow = foliageCutout ? make("foliageShadowVertex", nullptr, MTLPixelFormatInvalid, 1, Blend::None, true, &e) : nil;
-        id<MTLRenderPipelineState> clouds = foliageShadow ? make("fullscreenVertex", "cloudsFragment", kHDRFormat, 1, Blend::None, false, &e) : nil;
+        id<MTLRenderPipelineState> foliageShadowAlpha =
+            foliageShadow ? make("foliageShadowAlphaVertex", "shadowAlphaFragment", MTLPixelFormatInvalid, 1, Blend::None, true, &e) : nil;
+        id<MTLRenderPipelineState> clouds = foliageShadowAlpha ? make("fullscreenVertex", "cloudsFragment", kHDRFormat, 1, Blend::None, false, &e) : nil;
         id<MTLRenderPipelineState> cloudTemporal = clouds ? make("fullscreenVertex", "cloudTemporalFragment", kHDRFormat, 1, Blend::None, false, &e) : nil;
         id<MTLComputePipelineState> cloudShapeK = cloudTemporal ? [device_ newComputePipelineStateWithFunction:fn("cloudShapeKernel") error:&e] : nil;
         id<MTLComputePipelineState> cloudDetailK = cloudShapeK ? [device_ newComputePipelineStateWithFunction:fn("cloudDetailKernel") error:&e] : nil;
@@ -780,6 +801,7 @@ private:
         foliagePipeline_ = foliage;
         foliageCutoutPipeline_ = foliageCutout;
         foliageShadowPipeline_ = foliageShadow;
+        foliageShadowAlphaPipeline_ = foliageShadowAlpha;
         cloudsPipeline_ = clouds;
         cloudTemporalPipeline_ = cloudTemporal;
         cloudShapeKernel_ = cloudShapeK;
@@ -880,11 +902,54 @@ private:
         g.vertices = [device_ newBufferWithBytes:m.vertices.data()
                                           length:m.vertices.size() * sizeof(float)
                                          options:MTLResourceStorageModeShared];
-        g.indices = [device_ newBufferWithBytes:m.indices.data()
-                                         length:m.indices.size() * sizeof(uint32_t)
-                                        options:MTLResourceStorageModeShared];
+        std::vector<uint32_t> all(m.indices);
+        g.lodOffset[0] = 0;
+        g.lodCount_[0] = static_cast<uint32_t>(m.indices.size());
+        for (size_t i = 0; i < m.lods.size() && g.lodCount < GpuMesh::kMaxLods; ++i) {
+            g.lodOffset[g.lodCount] = static_cast<uint32_t>(all.size());
+            g.lodCount_[g.lodCount] = static_cast<uint32_t>(m.lods[i].size());
+            g.lodError[g.lodCount] = i < m.lodErrors.size() ? m.lodErrors[i] : 0.f;
+            all.insert(all.end(), m.lods[i].begin(), m.lods[i].end());
+            ++g.lodCount;
+        }
+        g.indices = [device_ newBufferWithBytes:all.data() length:all.size() * sizeof(uint32_t) options:MTLResourceStorageModeShared];
         g.indexCount = static_cast<uint32_t>(m.indices.size());
+        Vec3 ext = m.bounds.max - m.bounds.min;
+        g.radius = std::max(length(ext) * 0.5f, 1e-3f);
         return g;
+    }
+
+    /// Pixels per world unit at `distance` for the current view (perspective).
+    float pixelsPerUnit(const FrameData& frame, float distance) const {
+        float h = static_cast<float>(std::max(frame.height, 1));
+        if (frame.camera.orthographic) return h / (2.f * std::max(frame.camera.orthoSize, 1e-3f));
+        return h / (2.f * std::tan(radians(frame.camera.fovDeg) * 0.5f) * std::max(distance, 0.05f));
+    }
+
+    /// LOD for a draw item from its on-screen size (`bias` > 0 picks coarser levels, e.g. shadows).
+    int lodForDraw(const GpuMesh& m, const DrawItem& d, int bias = 0) const {
+        if (m.lodCount <= 1 || !lodFrame_) return 0;
+        float scale = std::max({length(d.model.transformDir({1, 0, 0})), length(d.model.transformDir({0, 1, 0})),
+                                length(d.model.transformDir({0, 0, 1}))});
+        float dist = distance(lodFrame_->camera.eye, d.worldBounds.center());
+        return std::min(m.lodFor(pixelsPerUnit(*lodFrame_, dist) * scale) + bias, m.lodCount - 1);
+    }
+    int lodForChunk(const GpuMesh& m, const InstanceBatch& b, int bias = 0) const {
+        if (m.lodCount <= 1 || !lodFrame_) return 0;
+        const Vec3 e = lodFrame_->camera.eye;
+        Vec3 c{std::clamp(e.x, b.bounds.min.x, b.bounds.max.x), std::clamp(e.y, b.bounds.min.y, b.bounds.max.y),
+               std::clamp(e.z, b.bounds.min.z, b.bounds.max.z)};
+        return std::min(m.lodFor(pixelsPerUnit(*lodFrame_, distance(e, c)) * 1.3f) + bias, m.lodCount - 1);
+    }
+
+    void drawLod(id<MTLRenderCommandEncoder> enc, const GpuMesh& m, int lod, NSUInteger instances = 1) {
+        lod = std::clamp(lod, 0, m.lodCount - 1);
+        [enc drawIndexedPrimitives:MTLPrimitiveTypeTriangle
+                        indexCount:m.lodCount_[lod]
+                         indexType:MTLIndexTypeUInt32
+                       indexBuffer:m.indices
+                 indexBufferOffset:m.lodOffset[lod] * sizeof(uint32_t)
+                     instanceCount:instances];
     }
 
     const GpuMesh* mesh(const std::string& name) {
@@ -1142,11 +1207,7 @@ private:
                     }
                     [enc setVertexBuffer:m->vertices offset:0 atIndex:0];
                     [enc setVertexBytes:&du length:sizeof(du) atIndex:1];
-                    [enc drawIndexedPrimitives:MTLPrimitiveTypeTriangle
-                                    indexCount:m->indexCount
-                                     indexType:MTLIndexTypeUInt32
-                                   indexBuffer:m->indices
-                             indexBufferOffset:0];
+                    drawLod(enc, *m, lodForDraw(*m, d, 1));
                 }
                 drawTerrainShadows(enc, frame, fr, lvp);
                 drawFoliageShadows(enc, frame, fr, lvp);
@@ -1427,6 +1488,7 @@ private:
         FoliageUniformsGpu u{};
         u.wind = simd_make_float4(std::sin(a), std::cos(a), env.windSpeed, b.wind);
         u.params = simd_make_float4(b.cullDistance, b.meshHeight, 0, frame.time);
+        u.part = toSimd(b.part);
         return u;
     }
 
@@ -1465,12 +1527,7 @@ private:
             [enc setFragmentTexture:(normal ?: white_) atIndex:2];
             [enc setFragmentTexture:(orm ?: white_) atIndex:3];
             [enc setFragmentTexture:(emissive ?: white_) atIndex:4];
-            [enc drawIndexedPrimitives:MTLPrimitiveTypeTriangle
-                            indexCount:m->indexCount
-                             indexType:MTLIndexTypeUInt32
-                           indexBuffer:m->indices
-                     indexBufferOffset:0
-                         instanceCount:b.instances->size()];
+            drawLod(enc, *m, lodForChunk(*m, b), b.instances->size());
             instancesDrawn_ += b.instances->size();
         }
     }
@@ -1485,21 +1542,25 @@ private:
             const GpuMesh* m = mesh(b.mesh);
             if (!m) continue;
             if (!bound) {
-                [enc setRenderPipelineState:foliageShadowPipeline_];
                 [enc setCullMode:MTLCullModeNone];
                 bound = true;
+            }
+            id<MTLTexture> cutTex = b.surface.alphaCutoff > 0.f ? texture(b.surface.texture, true) : nil;
+            [enc setRenderPipelineState:cutTex ? foliageShadowAlphaPipeline_ : foliageShadowPipeline_];
+            if (cutTex) {
+                DrawItem d;
+                d.surface = b.surface;
+                DrawUniforms du = drawUniforms(d);
+                [enc setVertexBytes:&du length:sizeof(du) atIndex:1];
+                [enc setFragmentBytes:&du length:sizeof(du) atIndex:0];
+                [enc setFragmentTexture:cutTex atIndex:0];
             }
             FoliageUniformsGpu fu = foliageUniforms(frame, b);
             [enc setVertexBuffer:m->vertices offset:0 atIndex:0];
             [enc setVertexBytes:&lvp length:sizeof(lvp) atIndex:2];
             [enc setVertexBuffer:instanceBuffer(b) offset:0 atIndex:3];
             [enc setVertexBytes:&fu length:sizeof(fu) atIndex:4];
-            [enc drawIndexedPrimitives:MTLPrimitiveTypeTriangle
-                            indexCount:m->indexCount
-                             indexType:MTLIndexTypeUInt32
-                           indexBuffer:m->indices
-                     indexBufferOffset:0
-                         instanceCount:b.instances->size()];
+            drawLod(enc, *m, lodForChunk(*m, b, 1), b.instances->size());
         }
     }
 
@@ -1529,11 +1590,7 @@ private:
         [enc setFragmentTexture:(normal ?: white_) atIndex:2];
         [enc setFragmentTexture:(orm ?: white_) atIndex:3];
         [enc setFragmentTexture:(emissive ?: white_) atIndex:4];
-        [enc drawIndexedPrimitives:MTLPrimitiveTypeTriangle
-                        indexCount:m->indexCount
-                         indexType:MTLIndexTypeUInt32
-                       indexBuffer:m->indices
-                 indexBufferOffset:0];
+        drawLod(enc, *m, lodForDraw(*m, d));
     }
 
     void drawOutline(id<MTLRenderCommandEncoder> enc, const DrawItem& d, float width, simd_float4 color) {
@@ -2441,6 +2498,7 @@ private:
         aoBlurPipeline_, meshCutoutPipeline_, shadowAlphaPipeline_, waterPipeline_, particlePipeline_, volumePipeline_, volumetricPipeline_,
         ssgiPipeline_, ssrPipeline_, ssTemporalPipeline_, resolvePipeline_, temporalPipeline_, debugViewPipeline_,
         terrainPipeline_, terrainShadowPipeline_, foliagePipeline_, foliageCutoutPipeline_, foliageShadowPipeline_,
+        foliageShadowAlphaPipeline_,
         cloudsPipeline_, cloudTemporalPipeline_, lumaPipeline_, exposurePipeline_, motionBlurPipeline_, dofCocPipeline_,
         dofBlurPipeline_, dofCombinePipeline_;
     id<MTLTexture> lum_, exposure_[2], postA_, postB_, dofCoc_, dofBlur_, lut_;
@@ -2496,6 +2554,7 @@ private:
     std::string source_;
     size_t culled_ = 0;
     size_t terrainNodesDrawn_ = 0, instancesDrawn_ = 0;
+    const FrameData* lodFrame_ = nullptr;  // frame being encoded (LOD selection)
     std::shared_ptr<std::atomic<double>> gpuMs_ = std::make_shared<std::atomic<double>>(0.0);
     uint64_t frameIndex_ = 0;
     bool aoActive_ = false;

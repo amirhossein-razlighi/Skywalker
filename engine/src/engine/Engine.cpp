@@ -81,6 +81,27 @@ Engine::Engine(EngineConfig config)
         n = hit->normal;
         return true;
     };
+    hooks.prefabParts = [this](const std::string& path) {
+        std::vector<world::WorldRuntime::Hooks::Part> parts;
+        auto prefab = loadPrefabAsset(path);
+        if (!prefab) return parts;
+        // Walk the prefab tree, accumulating local transforms.
+        std::function<void(const Json&, const Mat4&)> walk = [&](const Json& node, const Mat4& parent) {
+            const Json& t = node.get("components").get("transform");
+            Vec3 pos{0, 0, 0}, rot{0, 0, 0}, scl{1, 1, 1};
+            reflect::jsonToVec3(t.get("position"), pos);
+            reflect::jsonToVec3(t.get("rotation"), rot);
+            reflect::jsonToVec3(t.get("scale"), scl);
+            Mat4 m = parent * Mat4::trs(pos, rot, scl);
+            const Json& mesh = node.get("components").get("mesh");
+            if (mesh.isObject() && !mesh.get("mesh").asString().empty()) {
+                parts.push_back({mesh.get("mesh").asString(), mesh.get("material").asString(), m});
+            }
+            for (const auto& c : node.get("children").elements()) walk(c, m);
+        };
+        walk(prefab->get("root"), Mat4{});
+        return parts;
+    };
     world_ = std::make_unique<world::WorldRuntime>(std::move(hooks));
     // audio & input builtins and project settings
     audio_ = std::make_unique<audio::AudioSystem>(audio::AudioSystem::Config{
@@ -352,6 +373,11 @@ void Engine::ensureMeshUploaded(const std::string& meshKey) {
     if (!mesh) {
         scene_->assetBounds[meshKey] = {Vec3(-0.5f), Vec3(0.5f)};  // don't retry every frame
         return;
+    }
+    // Heavy meshes (photoscans, high-poly imports) get an automatic LOD chain once.
+    if (mesh->lods.empty() && mesh->indices.size() / 3 >= 3000) {
+        auto it = cpuMeshes_.find(meshKey);
+        if (it != cpuMeshes_.end() && it->second) mesh::buildLods(*it->second);
     }
     (void)renderer_->uploadMesh(meshKey, *mesh);
     scene_->assetBounds[meshKey] = mesh->bounds;

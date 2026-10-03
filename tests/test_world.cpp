@@ -234,3 +234,22 @@ TEST_CASE("world: terrains are solid for physics") {
     CHECK(y > ground - 0.5f);  // landed on the hills, not through them
     CHECK(y < ground + 3.f);
 }
+
+TEST_CASE("mesh: automatic LODs shrink heavy meshes with bounded error") {
+    MeshData m = mesh::sphere(256, 128);  // ~65k triangles
+    size_t tris = m.indices.size() / 3;
+    mesh::buildLods(m);
+    REQUIRE(m.lods.size() >= 2);
+    CHECK(m.lods.size() == m.lodErrors.size());
+    size_t prev = tris;
+    for (size_t i = 0; i < m.lods.size(); ++i) {
+        size_t t = m.lods[i].size() / 3;
+        CHECK(t < prev);
+        prev = t;
+        for (uint32_t idx : m.lods[i]) REQUIRE(idx < m.vertexCount());
+    }
+    CHECK(m.lodErrors.back() < 0.2f);
+    MeshData small = mesh::cube();
+    mesh::buildLods(small);
+    CHECK(small.lods.empty());
+}

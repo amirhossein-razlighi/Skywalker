@@ -245,6 +245,7 @@ struct FoliageInstanceGpu {
 struct FoliageUniforms {
     float4 wind;    // xy = direction (xz), z = speed (m/s), w = layer bend strength
     float4 params;  // x = cull distance, y = mesh height (m), z = unused, w = time (s)
+    float4x4 part;  // the part's transform inside a multi-part model (trunk, leaves...)
 };
 
 static float3 foliageWorld(float3 p, FoliageInstanceGpu inst, constant FoliageUniforms& fu, thread float& h01) {
@@ -289,8 +290,10 @@ vertex MeshOut foliageVertex(uint vid [[vertex_id]], uint iid [[instance_id]],
         return o;
     }
     float h01;
-    float3 world = foliageWorld(float3(v.position) * float3(1.0, shrink, 1.0), inst, fu, h01);
-    float3 n = float3(dot(inst.row0.xyz, float3(v.normal)), dot(inst.row1.xyz, float3(v.normal)), dot(inst.row2.xyz, float3(v.normal)));
+    float3 local = (fu.part * float4(float3(v.position), 1.0)).xyz;
+    float3 world = foliageWorld(local * float3(1.0, shrink, 1.0), inst, fu, h01);
+    float3 ln = (fu.part * float4(float3(v.normal), 0.0)).xyz;
+    float3 n = float3(dot(inst.row0.xyz, ln), dot(inst.row1.xyz, ln), dot(inst.row2.xyz, ln));
     o.position = f.viewProj * float4(world, 1.0);
     o.worldPos = world;
     o.normal = normalize(n);
@@ -308,6 +311,21 @@ vertex float4 foliageShadowVertex(uint vid [[vertex_id]], uint iid [[instance_id
                                   const device FoliageInstanceGpu* instances [[buffer(3)]],
                                   constant FoliageUniforms& fu [[buffer(4)]]) {
     float h01;
-    float3 world = foliageWorld(float3(verts[vid].position), instances[iid], fu, h01);
+    float3 world = foliageWorld((fu.part * float4(float3(verts[vid].position), 1.0)).xyz, instances[iid], fu, h01);
     return lightViewProj * float4(world, 1.0);
+}
+
+// Alpha-tested foliage (leaf cards, grass cards) casts shadows only where it is solid.
+vertex ShadowAlphaOut foliageShadowAlphaVertex(uint vid [[vertex_id]], uint iid [[instance_id]],
+                                               const device Vertex* verts [[buffer(0)]],
+                                               constant DrawUniforms& d [[buffer(1)]],
+                                               constant float4x4& lightViewProj [[buffer(2)]],
+                                               const device FoliageInstanceGpu* instances [[buffer(3)]],
+                                               constant FoliageUniforms& fu [[buffer(4)]]) {
+    float h01;
+    float3 world = foliageWorld((fu.part * float4(float3(verts[vid].position), 1.0)).xyz, instances[iid], fu, h01);
+    ShadowAlphaOut o;
+    o.position = lightViewProj * float4(world, 1.0);
+    o.uv = float2(verts[vid].uv) * d.material2.xy;
+    return o;
 }
