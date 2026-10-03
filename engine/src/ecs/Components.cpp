@@ -12,6 +12,8 @@ static_assert(std::is_standard_layout_v<Environment>);
 static_assert(std::is_standard_layout_v<ParticleEmitter>);
 static_assert(std::is_standard_layout_v<Water>);
 static_assert(std::is_standard_layout_v<FluidVolume>);
+static_assert(std::is_standard_layout_v<Terrain>);
+static_assert(std::is_standard_layout_v<Foliage>);
 
 const TypeInfo& Transform::type() {
     static const TypeInfo info{
@@ -26,7 +28,8 @@ const TypeInfo& Transform::type() {
 }
 
 const std::vector<std::string>& MeshRenderer::primitives() {
-    static const std::vector<std::string> names{"cube", "sphere", "plane", "cylinder", "cone", "quad", "capsule", "torus"};
+    static const std::vector<std::string> names{"cube",  "sphere", "plane",  "cylinder", "cone",   "quad",   "capsule", "torus",
+                                                "grass", "grass_tall", "fern", "flowers", "pebbles", "shell", "rock"};
     return names;
 }
 
@@ -211,6 +214,50 @@ const TypeInfo& Water::type() {
             SKY_FIELD_RANGE(Water, refraction, Float, "Refraction distortion", 0.f, 4.f),
             SKY_FIELD_RANGE(Water, roughness, Float, "Micro roughness (sun glint size)", 0.005f, 0.5f),
             SKY_FIELD(Water, seed, Int, "Random seed of the wave field"),
+        }};
+    return info;
+}
+
+const TypeInfo& Terrain::type() {
+    static const TypeInfo info{
+        "terrain",
+        "Large heightfield terrain (islands, beaches, mountains, canyons, dunes) with erosion, up to 8 blended "
+        "material layers and wet shorelines. Rendered with continuous LOD. Use terrain_create, terrain_sculpt, "
+        "terrain_paint and terrain_layers; heights are relative to the entity.",
+        {
+            SKY_FIELD(Terrain, data, String, "Project-relative .terrain file with heights and layer weights"),
+            SKY_FIELD_RANGE(Terrain, size, Float, "Square extent in meters", 8.f, 32768.f),
+            SKY_FIELD_RANGE(Terrain, resolution, Int, "Height samples per side (2^n+1: 257, 513, 1025, 2049)", 17, 4097),
+            SKY_FIELD_JSON(Terrain, generator, "Generation parameters (shape, seed, minHeight, maxHeight, featureSize, ridges, "
+                                               "warp, erosion, thermal, terraces, beachWidth, seaLevel)",
+                           R"({"type":"object"})"),
+            SKY_FIELD_JSON(Terrain, layers,
+                           "Material layers, base first. Each: {name, texture, normalMap, ormMap, color, roughness, tiling (m), "
+                           "heightMin, heightMax, slopeMin, slopeMax, noise, sharpness}. Rules auto-paint the weights.",
+                           R"({"type":"array","items":{"type":"object"}})"),
+            SKY_FIELD(Terrain, waterLevel, Float, "World height of the water line (wet sand/soil just above it)"),
+            SKY_FIELD_RANGE(Terrain, wetBand, Float, "Meters above the water line that stay damp", 0.f, 20.f),
+            SKY_FIELD_RANGE(Terrain, detail, Float, "Level-of-detail quality multiplier", 0.25f, 4.f),
+            SKY_FIELD(Terrain, castShadows, Bool, "Cast sun shadows"),
+        }};
+    return info;
+}
+
+const TypeInfo& Foliage::type() {
+    static const TypeInfo info{
+        "foliage",
+        "GPU-instanced scattering of grass, flowers, ferns, pebbles, shells, rocks and trees over a terrain (this entity or "
+        "its parent) or over scene meshes inside `area`. Wind-animated, deterministic. Use foliage_add with presets.",
+        {
+            SKY_FIELD_JSON(Foliage, layers,
+                           "Layers: [{preset, mesh, color, density (/m²), scaleMin, scaleMax, slopeMin, slopeMax, heightMin, "
+                           "heightMax, terrainLayer, wind, cullDistance, castShadows, clumping, alignToNormal}]",
+                           R"({"type":"array","items":{"type":"object"}})"),
+            SKY_FIELD(Foliage, seed, Int, "Random seed of the placement"),
+            SKY_FIELD_RANGE(Foliage, density, Float, "Density multiplier for every layer", 0.f, 4.f),
+            SKY_FIELD_ENUM(Foliage, surface, "What to grow on", "terrain", "scene"),
+            SKY_FIELD(Foliage, area, Vec3, "Scene mode: extent in meters around the entity"),
+            SKY_FIELD(Foliage, visible, Bool, "Draw the foliage"),
         }};
     return info;
 }

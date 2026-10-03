@@ -57,6 +57,8 @@ void Scene::registerKinds() {
     kinds_.push_back(makeReflectedKind<Camera>());
     kinds_.push_back(makeReflectedKind<ParticleEmitter>());
     kinds_.push_back(makeReflectedKind<Water>());
+    kinds_.push_back(makeReflectedKind<Terrain>());
+    kinds_.push_back(makeReflectedKind<Foliage>());
     kinds_.push_back(makeReflectedKind<FluidVolume>());
 }
 

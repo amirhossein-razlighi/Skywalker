@@ -30,6 +30,7 @@
 #include "skywalker/scene/History.h"
 #include "skywalker/scene/Scene.h"
 #include "skywalker/wander/Runtime.h"
+#include "skywalker/world/WorldRuntime.h"
 
 namespace sky {
 
@@ -198,6 +199,9 @@ public:
     /// Height of the water surface at world (x, z), waves included. False if no water covers it.
     bool waterHeight(float x, float z, float& height, Vec3* normal = nullptr);
 
+    // --- World building: terrain and foliage ----------------------------------------
+    world::WorldRuntime& world() { return *world_; }
+
     // --- Events (activity feed) -----------------------------------------------------
     void emitEvent(Json event);
     std::vector<Json> drainEvents();
@@ -243,6 +247,7 @@ private:
     Json playSnapshot_;
     double accumulator_ = 0;
     fx::ParticleSystem particles_;
+    std::unique_ptr<world::WorldRuntime> world_;
     std::unordered_map<EntityId, fx::Ocean> oceans_;
     double previewTime_ = 0;
     fx::Ocean& oceanFor(EntityId e, const Water& w);

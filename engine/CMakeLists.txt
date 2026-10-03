@@ -19,6 +19,10 @@ set(SKY_ENGINE_SOURCES
     src/render/Hdr.cpp
     src/fx/Particles.cpp
     src/fx/Ocean.cpp
+    src/world/Terrain.cpp
+    src/world/Foliage.cpp
+    src/world/WorldRuntime.cpp
+    src/render/Vegetation.cpp
     src/render/MeshFormats.cpp
     src/assets/Fetch.cpp
     src/render/TextureGen.cpp
@@ -31,6 +35,7 @@ set(SKY_ENGINE_SOURCES
     src/agent/WorldTools.cpp
     src/agent/NetworkTools.cpp
     src/agent/FxTools.cpp
+    src/agent/WorldBuildTools.cpp
     src/agent/McpServer.cpp
     src/agent/SocketServer.cpp
     src/engine/Engine.cpp
@@ -56,7 +61,7 @@ if(SKY_HAS_METAL)
     # by agents and does not require the offline Metal toolchain).
     # The standard shader library is several modules concatenated in dependency order.
     set(_shader_dir ${CMAKE_CURRENT_SOURCE_DIR}/platform/metal/shaders)
-    set(_shader_modules Common.metal Sky.metal Surface.metal Lighting.metal Effects.metal Post.metal)
+    set(_shader_modules Common.metal Sky.metal Surface.metal Terrain.metal Lighting.metal Effects.metal Post.metal)
     list(TRANSFORM _shader_modules PREPEND ${_shader_dir}/ OUTPUT_VARIABLE _shader_src)
     string(REPLACE ";" "," _shader_list "${_shader_modules}")
     set(_shader_inc ${CMAKE_CURRENT_BINARY_DIR}/generated/ShaderSource.inc)

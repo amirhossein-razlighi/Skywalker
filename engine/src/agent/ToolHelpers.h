@@ -33,5 +33,6 @@ void addAssetTools(Engine& engine, ToolRegistry& reg);
 void addWorldTools(Engine& engine, ToolRegistry& reg);
 void addNetworkTools(Engine& engine, ToolRegistry& reg);
 void addFxTools(Engine& engine, ToolRegistry& reg);
+void addWorldBuildTools(Engine& engine, ToolRegistry& reg);
 
 }  // namespace sky::tools

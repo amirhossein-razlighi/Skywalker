@@ -35,6 +35,14 @@ MeshData cylinder(int segments = 48);
 MeshData cone(int segments = 48);
 MeshData capsule(int segments = 32, int rings = 8);
 MeshData torus(int segments = 64, int sides = 24, float major = 0.35f, float minor = 0.15f);
+// Vegetation and ground detail (Vegetation.cpp), standing on y = 0.
+MeshData grass();
+MeshData grassTall();
+MeshData fern();
+MeshData flowers();
+MeshData pebbles();
+MeshData shell();
+MeshData rock();
 
 /// Parses Wavefront OBJ (v/vt/vn/f, polygons triangulated, negative indices supported).
 /// If `normalize` is true the mesh is recentred and scaled to fit a unit cube.

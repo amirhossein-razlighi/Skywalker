@@ -30,8 +30,11 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <functional>
 #include <unordered_map>
 #include <unordered_set>
+
+#include <dispatch/dispatch.h>
 
 #include "skywalker/core/Log.h"
 #include "skywalker/render/Hdr.h"
@@ -133,6 +136,20 @@ struct ResolveUniforms {
 
 struct TemporalUniforms {
     simd_float4 params, texel;
+};
+
+struct TerrainUniformsGpu {
+    simd_float4 origin, grid, water;
+    simd_float4 layerParams[8];
+    simd_float4 layerColor[8];
+};
+
+struct TerrainNodeGpu {
+    simd_float4 node, morph;
+};
+
+struct FoliageUniformsGpu {
+    simd_float4 wind, params;
 };
 
 struct GPULight {
@@ -269,6 +286,19 @@ class MetalRenderer final : public Renderer {
         double lastTime = -1;
         double age = 0;  // seconds simulated
     };
+    struct TerrainGpu {
+        id<MTLTexture> height, normal, weights0, weights1;
+        uint64_t version = 0;
+        const world::TerrainData* source = nullptr;
+        int levels = 0;                                    // quadtree levels above the finest node
+        std::vector<std::vector<simd_float2>> minMax;      // per level, per node: min/max height
+        int nodesPerSide0 = 0;                             // finest level
+        uint64_t lastUse = 0;
+    };
+    struct InstanceGpu {
+        id<MTLBuffer> buffer;
+        uint64_t lastUse = 0;
+    };
 
 public:
     bool init() {
@@ -326,6 +356,8 @@ public:
         bd.storageMode = MTLStorageModePrivate;
         brdfLut_ = [device_ newTextureWithDescriptor:bd];
         bakeBrdf();
+        for (auto& r : ring_) r = [device_ newBufferWithLength:kRingSize options:MTLResourceStorageModeShared | MTLResourceCPUCacheModeWriteCombined];
+        buildTerrainPatch();
         return true;
     }
 
@@ -374,8 +406,14 @@ public:
             const bool jittered = accumulate || env.taa;
             const float w = static_cast<float>(std::max(frame.width, 1)), h = static_cast<float>(std::max(frame.height, 1));
 
+            // Bound the frames in flight so the transient ring is never overwritten in use.
+            dispatch_semaphore_wait(inFlight_, DISPATCH_TIME_FOREVER);
+            ringIndex_ = (ringIndex_ + 1) % kFramesInFlight;
+            ringOffset_ = 0;
             id<MTLCommandBuffer> cmd = [queue_ commandBuffer];
             cmd.label = @"Skywalker Frame";
+            dispatch_semaphore_t sem = inFlight_;
+            [cmd addCompletedHandler:^(id<MTLCommandBuffer>) { dispatch_semaphore_signal(sem); }];
             encodeEnvironment(cmd, frame, base);
             encodeShadows(cmd, frame, base, cascades);
             for (int i = 0; i < samples; ++i) {
@@ -415,6 +453,7 @@ public:
             encodeOverlays(cmd, frame, base);
             [cmd commit];
             lastCommand_ = cmd;
+            evictWorldCaches();
             prevViewProj_ = vp;
             prevEye_ = frame.camera.eye;
             prevTarget_ = frame.camera.target;
@@ -522,7 +561,8 @@ private:
                                      "volumeVertex", "volumeFragment", "fluidAdvect", "fluidCorrect", "fluidCombust",
                                      "fluidCurl", "fluidForces", "fluidDivergence", "fluidJacobi", "fluidProject", "volumetricFragment",
                                      "ssgiFragment", "ssrFragment", "ssTemporalFragment", "lightingResolveFragment",
-                                     "temporalFragment", "debugViewFragment"}) {
+                                     "temporalFragment", "debugViewFragment", "terrainVertex", "terrainFragment",
+                                     "terrainShadowVertex", "foliageVertex", "foliageShadowVertex"}) {
             if (!fn(required)) {
                 return Error::make("shader_missing_function", std::string("shader source must define ") + required);
             }
@@ -607,7 +647,12 @@ private:
         id<MTLRenderPipelineState> lightResolve = ssTemporal ? make("fullscreenVertex", "lightingResolveFragment", kHDRFormat, 1, Blend::None, false, &e) : nil;
         id<MTLRenderPipelineState> temporal = lightResolve ? make("fullscreenVertex", "temporalFragment", kHDRFormat, 1, Blend::None, false, &e) : nil;
         id<MTLRenderPipelineState> debugView = temporal ? make("fullscreenVertex", "debugViewFragment", kColorFormat, 1, Blend::None, false, &e) : nil;
-        if (!debugView) volume = nil;
+        id<MTLRenderPipelineState> terrain = debugView ? make("terrainVertex", "terrainFragment", kHDRFormat, kSamples, Blend::None, true, &e, true) : nil;
+        id<MTLRenderPipelineState> terrainShadow = terrain ? make("terrainShadowVertex", nullptr, MTLPixelFormatInvalid, 1, Blend::None, true, &e) : nil;
+        id<MTLRenderPipelineState> foliage = terrainShadow ? make("foliageVertex", "meshFragment", kHDRFormat, kSamples, Blend::None, true, &e, true) : nil;
+        id<MTLRenderPipelineState> foliageCutout = foliage ? make("foliageVertex", "meshFragment", kHDRFormat, kSamples, Blend::None, true, &e, true, true) : nil;
+        id<MTLRenderPipelineState> foliageShadow = foliageCutout ? make("foliageShadowVertex", nullptr, MTLPixelFormatInvalid, 1, Blend::None, true, &e) : nil;
+        if (!foliageShadow) volume = nil;
         if (volume) {
             for (const char* k : {"fluidAdvect", "fluidCorrect", "fluidCombust", "fluidCurl", "fluidForces", "fluidDivergence",
                                   "fluidJacobi", "fluidProject"}) {
@@ -652,6 +697,11 @@ private:
         resolvePipeline_ = lightResolve;
         temporalPipeline_ = temporal;
         debugViewPipeline_ = debugView;
+        terrainPipeline_ = terrain;
+        terrainShadowPipeline_ = terrainShadow;
+        foliagePipeline_ = foliage;
+        foliageCutoutPipeline_ = foliageCutout;
+        foliageShadowPipeline_ = foliageShadow;
         return {};
     }
 
@@ -986,9 +1036,363 @@ private:
                                    indexBuffer:m->indices
                              indexBufferOffset:0];
                 }
+                drawTerrainShadows(enc, frame, fr, lvp);
+                drawFoliageShadows(enc, frame, fr, lvp);
+                [enc setRenderPipelineState:shadowPipeline_];
+                [enc setCullMode:MTLCullModeNone];
             }
         }
         [enc endEncoding];
+    }
+
+    // --- Transient per-frame data ----------------------------------------------------------
+    struct Alloc {
+        id<MTLBuffer> buffer;
+        NSUInteger offset;
+    };
+    Alloc transient(const void* data, NSUInteger size) {
+        const NSUInteger aligned = (size + 255) & ~static_cast<NSUInteger>(255);
+        if (ringOffset_ + aligned > kRingSize) {  // rare overflow: a dedicated buffer
+            return {[device_ newBufferWithBytes:data length:size options:MTLResourceStorageModeShared], 0};
+        }
+        Alloc a{ring_[ringIndex_], ringOffset_};
+        std::memcpy(static_cast<uint8_t*>(ring_[ringIndex_].contents) + ringOffset_, data, size);
+        ringOffset_ += aligned;
+        return a;
+    }
+
+    // --- Terrain (CDLOD) ---------------------------------------------------------------------
+    static constexpr int kPatchCells = 32;
+
+    void buildTerrainPatch() {
+        std::vector<simd_float2> v;
+        std::vector<uint16_t> idx;
+        const int n = kPatchCells;
+        for (int z = 0; z <= n; ++z) {
+            for (int x = 0; x <= n; ++x) v.push_back(simd_make_float2(static_cast<float>(x) / n, static_cast<float>(z) / n));
+        }
+        for (int z = 0; z < n; ++z) {
+            for (int x = 0; x < n; ++x) {
+                uint16_t a = static_cast<uint16_t>(z * (n + 1) + x), b = static_cast<uint16_t>(a + 1);
+                uint16_t c = static_cast<uint16_t>(a + n + 1), d = static_cast<uint16_t>(c + 1);
+                // Alternate the diagonal for a more isotropic mesh.
+                if ((x + z) % 2 == 0) {
+                    idx.insert(idx.end(), {a, c, b, b, c, d});
+                } else {
+                    idx.insert(idx.end(), {a, c, d, a, d, b});
+                }
+            }
+        }
+        patchVertices_ = [device_ newBufferWithBytes:v.data() length:v.size() * sizeof(simd_float2) options:MTLResourceStorageModeShared];
+        patchIndices_ = [device_ newBufferWithBytes:idx.data() length:idx.size() * sizeof(uint16_t) options:MTLResourceStorageModeShared];
+        patchIndexCount_ = static_cast<uint32_t>(idx.size());
+    }
+
+    id<MTLTexture> sharedTexture(MTLPixelFormat format, int w, int h, const void* bytes, NSUInteger bytesPerRow) {
+        MTLTextureDescriptor* d = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:format
+                                                                                     width:static_cast<NSUInteger>(w)
+                                                                                    height:static_cast<NSUInteger>(h)
+                                                                                 mipmapped:NO];
+        d.usage = MTLTextureUsageShaderRead;
+        d.storageMode = MTLStorageModeShared;  // unified memory: no staging copy
+        id<MTLTexture> t = [device_ newTextureWithDescriptor:d];
+        [t replaceRegion:MTLRegionMake2D(0, 0, static_cast<NSUInteger>(w), static_cast<NSUInteger>(h))
+             mipmapLevel:0
+               withBytes:bytes
+             bytesPerRow:bytesPerRow];
+        return t;
+    }
+
+    TerrainGpu& terrainGpu(const TerrainItem& item) {
+        TerrainGpu& g = terrainsGpu_[item.entity];
+        g.lastUse = frameIndex_;
+        const world::TerrainData& t = *item.data;
+        if (g.source == item.data.get() && g.version == t.version() && g.height) return g;
+        g.source = item.data.get();
+        g.version = t.version();
+        const int n = t.resolution();
+        g.height = sharedTexture(MTLPixelFormatR32Float, n, n, t.heights().data(), static_cast<NSUInteger>(n) * 4);
+        // Normals (xz, encoded 0..1) for smooth shading independent of the LOD mesh.
+        std::vector<__fp16> nrm(static_cast<size_t>(n) * n * 2);
+        const float cell = t.cell();
+        for (int z = 0; z < n; ++z) {
+            for (int x = 0; x < n; ++x) {
+                float hl = t.h(std::max(x - 1, 0), z), hr = t.h(std::min(x + 1, n - 1), z);
+                float hd = t.h(x, std::max(z - 1, 0)), hu = t.h(x, std::min(z + 1, n - 1));
+                Vec3 nv = normalize(Vec3{hl - hr, 2.f * cell, hd - hu});
+                size_t i = (static_cast<size_t>(z) * n + x) * 2;
+                nrm[i] = static_cast<__fp16>(nv.x * 0.5f + 0.5f);
+                nrm[i + 1] = static_cast<__fp16>(nv.z * 0.5f + 0.5f);
+            }
+        }
+        g.normal = sharedTexture(MTLPixelFormatRG16Float, n, n, nrm.data(), static_cast<NSUInteger>(n) * 4);
+        std::vector<uint8_t> w0(static_cast<size_t>(n) * n * 4), w1(static_cast<size_t>(n) * n * 4);
+        const auto& ws = t.weights();
+        for (size_t i = 0, cnt = static_cast<size_t>(n) * n; i < cnt; ++i) {
+            std::memcpy(&w0[i * 4], &ws[i * 8], 4);
+            std::memcpy(&w1[i * 4], &ws[i * 8 + 4], 4);
+        }
+        g.weights0 = sharedTexture(MTLPixelFormatRGBA8Unorm, n, n, w0.data(), static_cast<NSUInteger>(n) * 4);
+        g.weights1 = sharedTexture(MTLPixelFormatRGBA8Unorm, n, n, w1.data(), static_cast<NSUInteger>(n) * 4);
+        // Min/max height pyramid over kPatchCells-sized blocks (node culling).
+        const int cells = n - 1;
+        const int n0 = std::max(1, (cells + kPatchCells - 1) / kPatchCells);
+        g.nodesPerSide0 = n0;
+        g.minMax.clear();
+        std::vector<simd_float2> lvl(static_cast<size_t>(n0) * n0);
+        for (int bz = 0; bz < n0; ++bz) {
+            for (int bx = 0; bx < n0; ++bx) {
+                float mn = 1e30f, mx = -1e30f;
+                for (int z = bz * kPatchCells; z <= std::min((bz + 1) * kPatchCells, n - 1); ++z) {
+                    for (int x = bx * kPatchCells; x <= std::min((bx + 1) * kPatchCells, n - 1); ++x) {
+                        mn = std::min(mn, t.h(x, z));
+                        mx = std::max(mx, t.h(x, z));
+                    }
+                }
+                lvl[static_cast<size_t>(bz) * n0 + bx] = simd_make_float2(mn, mx);
+            }
+        }
+        g.minMax.push_back(lvl);
+        int side = n0;
+        while (side > 1) {
+            int ns = (side + 1) / 2;
+            std::vector<simd_float2> up(static_cast<size_t>(ns) * ns, simd_make_float2(1e30f, -1e30f));
+            for (int z = 0; z < side; ++z) {
+                for (int x = 0; x < side; ++x) {
+                    simd_float2 c = g.minMax.back()[static_cast<size_t>(z) * side + x];
+                    simd_float2& u = up[static_cast<size_t>(z / 2) * ns + x / 2];
+                    u = simd_make_float2(std::min(u.x, c.x), std::max(u.y, c.y));
+                }
+            }
+            g.minMax.push_back(std::move(up));
+            side = ns;
+        }
+        g.levels = static_cast<int>(g.minMax.size()) - 1;
+        return g;
+    }
+
+    /// Quadtree LOD selection (CDLOD): nodes subdivide while the eye is within their range.
+    void selectTerrainNodes(const TerrainItem& item, const TerrainGpu& g, Vec3 eye, const Frustum& fr, float detail,
+                            std::vector<TerrainNodeGpu>& out) const {
+        const world::TerrainData& t = *item.data;
+        const float finest = kPatchCells * t.cell();
+        const float base = std::max(3.2f, 3.5f * detail) * finest;
+        const float half = t.size() * 0.5f;
+        auto range = [&](int L) { return base * std::exp2(static_cast<float>(L)); };
+        std::function<void(int, int, int)> visit = [&](int L, int ix, int iz) {
+            const int sideL = static_cast<int>(g.minMax[static_cast<size_t>(L)].size() > 0
+                                                   ? std::lround(std::sqrt(static_cast<double>(g.minMax[static_cast<size_t>(L)].size())))
+                                                   : 1);
+            if (ix >= sideL || iz >= sideL) return;
+            const float ns = finest * std::exp2(static_cast<float>(L));
+            const float x0 = -half + ix * ns, z0 = -half + iz * ns;
+            if (x0 >= half || z0 >= half) return;
+            simd_float2 mm = g.minMax[static_cast<size_t>(L)][static_cast<size_t>(iz) * sideL + ix];
+            Aabb b;
+            b.min = {item.origin.x + x0, item.origin.y + mm.x, item.origin.z + z0};
+            b.max = {item.origin.x + std::min(x0 + ns, half), item.origin.y + mm.y, item.origin.z + std::min(z0 + ns, half)};
+            if (!fr.intersects(b)) return;
+            Vec3 c{std::clamp(eye.x, b.min.x, b.max.x), std::clamp(eye.y, b.min.y, b.max.y), std::clamp(eye.z, b.min.z, b.max.z)};
+            float d = distance(eye, c);
+            if (L == 0 || d > range(L - 1)) {
+                float lo = L == 0 ? 0.f : range(L - 1);
+                float hi = range(L);
+                float morphStart = L >= g.levels ? 1e30f : lo + (hi - lo) * 0.66f;
+                float morphEnd = L >= g.levels ? 1e30f : hi * 0.98f;
+                TerrainNodeGpu node;
+                node.node = simd_make_float4(x0, z0, ns, static_cast<float>(L));
+                node.morph = simd_make_float4(morphStart, morphEnd, static_cast<float>(kPatchCells), 0);
+                out.push_back(node);
+                return;
+            }
+            for (int dz = 0; dz < 2; ++dz) {
+                for (int dx = 0; dx < 2; ++dx) visit(L - 1, ix * 2 + dx, iz * 2 + dz);
+            }
+        };
+        visit(g.levels, 0, 0);
+    }
+
+    TerrainUniformsGpu terrainUniforms(const TerrainItem& item) {
+        const world::TerrainData& t = *item.data;
+        TerrainUniformsGpu u{};
+        u.origin = v4(item.origin, t.size());
+        u.grid = simd_make_float4(static_cast<float>(t.resolution()), 1.f / t.resolution(), t.cell(),
+                                  static_cast<float>(std::min<size_t>(item.layers.size(), 8)));
+        u.water = simd_make_float4(item.waterLevel, item.wetBand, item.selected ? 1.f : 0.f, 0);
+        for (size_t i = 0; i < std::min<size_t>(item.layers.size(), 8); ++i) {
+            const auto& l = item.layers[i];
+            const Surface& s = l.surface;
+            int flags = (texture(s.texture, true) ? 1 : 0) | (texture(s.normalMap, false) ? 2 : 0) | (texture(s.ormMap, false) ? 4 : 0) |
+                        (l.triplanar ? 8 : 0);
+            u.layerParams[i] = simd_make_float4(l.tiling, s.normalStrength, s.roughness, static_cast<float>(flags));
+            u.layerColor[i] = lin(s.color.xyz(), s.metallic);
+        }
+        return u;
+    }
+
+    void drawTerrains(id<MTLRenderCommandEncoder> enc, const FrameData& frame, const Frustum& fr) {
+        if (frame.terrains.empty()) return;
+        [enc setRenderPipelineState:terrainPipeline_];
+        [enc setCullMode:MTLCullModeNone];
+        for (const TerrainItem& item : frame.terrains) {
+            if (!item.data) continue;
+            TerrainGpu& g = terrainGpu(item);
+            std::vector<TerrainNodeGpu> nodes;
+            selectTerrainNodes(item, g, frame.camera.eye, fr, item.detail, nodes);
+            if (nodes.empty()) continue;
+            TerrainUniformsGpu u = terrainUniforms(item);
+            Alloc nb = transient(nodes.data(), nodes.size() * sizeof(TerrainNodeGpu));
+            [enc setVertexBuffer:patchVertices_ offset:0 atIndex:0];
+            [enc setVertexBytes:&u length:sizeof(u) atIndex:1];
+            [enc setVertexBuffer:nb.buffer offset:nb.offset atIndex:3];
+            [enc setVertexTexture:g.height atIndex:0];
+            [enc setFragmentBytes:&u length:sizeof(u) atIndex:0];
+            [enc setFragmentTexture:g.normal atIndex:0];
+            [enc setFragmentTexture:g.weights0 atIndex:2];
+            [enc setFragmentTexture:g.weights1 atIndex:3];
+            for (size_t i = 0; i < 8; ++i) {
+                const Surface* s = i < item.layers.size() ? &item.layers[i].surface : nullptr;
+                id<MTLTexture> a = s ? texture(s->texture, true) : nil, n = s ? texture(s->normalMap, false) : nil,
+                               o = s ? texture(s->ormMap, false) : nil;
+                [enc setFragmentTexture:(a ?: white_) atIndex:7 + i * 3];
+                [enc setFragmentTexture:(n ?: white_) atIndex:8 + i * 3];
+                [enc setFragmentTexture:(o ?: white_) atIndex:9 + i * 3];
+            }
+            [enc drawIndexedPrimitives:MTLPrimitiveTypeTriangle
+                            indexCount:patchIndexCount_
+                             indexType:MTLIndexTypeUInt16
+                           indexBuffer:patchIndices_
+                     indexBufferOffset:0
+                         instanceCount:nodes.size()];
+            terrainNodesDrawn_ += nodes.size();
+        }
+    }
+
+    void drawTerrainShadows(id<MTLRenderCommandEncoder> enc, const FrameData& frame, const Frustum& fr, const simd_float4x4& lvp) {
+        bool bound = false;
+        for (const TerrainItem& item : frame.terrains) {
+            if (!item.data || !item.castShadows) continue;
+            TerrainGpu& g = terrainGpu(item);
+            std::vector<TerrainNodeGpu> nodes;
+            selectTerrainNodes(item, g, frame.camera.eye, fr, item.detail * 0.5f, nodes);
+            if (nodes.empty()) continue;
+            if (!bound) {
+                [enc setRenderPipelineState:terrainShadowPipeline_];
+                bound = true;
+            }
+            TerrainUniformsGpu u = terrainUniforms(item);
+            Alloc nb = transient(nodes.data(), nodes.size() * sizeof(TerrainNodeGpu));
+            [enc setVertexBuffer:patchVertices_ offset:0 atIndex:0];
+            [enc setVertexBytes:&u length:sizeof(u) atIndex:1];
+            [enc setVertexBytes:&lvp length:sizeof(lvp) atIndex:2];
+            [enc setVertexBuffer:nb.buffer offset:nb.offset atIndex:3];
+            [enc setVertexTexture:g.height atIndex:0];
+            [enc drawIndexedPrimitives:MTLPrimitiveTypeTriangle
+                            indexCount:patchIndexCount_
+                             indexType:MTLIndexTypeUInt16
+                           indexBuffer:patchIndices_
+                     indexBufferOffset:0
+                         instanceCount:nodes.size()];
+        }
+    }
+
+    // --- Instanced foliage ----------------------------------------------------------------------
+    id<MTLBuffer> instanceBuffer(const InstanceBatch& b) {
+        InstanceGpu& g = instanceBuffers_[b.id];
+        g.lastUse = frameIndex_;
+        if (!g.buffer) {
+            g.buffer = [device_ newBufferWithBytes:b.instances->data()
+                                            length:b.instances->size() * sizeof(world::FoliageInstance)
+                                           options:MTLResourceStorageModeShared];
+        }
+        return g.buffer;
+    }
+
+    FoliageUniformsGpu foliageUniforms(const FrameData& frame, const InstanceBatch& b) const {
+        const Environment& env = frame.environment;
+        float a = radians(env.windDirection);
+        FoliageUniformsGpu u{};
+        u.wind = simd_make_float4(std::sin(a), std::cos(a), env.windSpeed, b.wind);
+        u.params = simd_make_float4(b.cullDistance, b.meshHeight, 0, frame.time);
+        return u;
+    }
+
+    void drawFoliage(id<MTLRenderCommandEncoder> enc, const FrameData& frame, const Frustum& fr) {
+        if (frame.instances.empty()) return;
+        bool cutBound = false, first = true;
+        for (const InstanceBatch& b : frame.instances) {
+            if (!b.instances || b.instances->empty() || !fr.intersects(b.bounds)) continue;
+            Vec3 c{std::clamp(frame.camera.eye.x, b.bounds.min.x, b.bounds.max.x), std::clamp(frame.camera.eye.y, b.bounds.min.y, b.bounds.max.y),
+                   std::clamp(frame.camera.eye.z, b.bounds.min.z, b.bounds.max.z)};
+            if (distance(c, frame.camera.eye) > b.cullDistance) continue;
+            const GpuMesh* m = mesh(b.mesh);
+            if (!m) continue;
+            bool cut = b.surface.alphaCutoff > 0.f;
+            if (first || cut != cutBound) {
+                [enc setRenderPipelineState:cut ? foliageCutoutPipeline_ : foliagePipeline_];
+                cutBound = cut;
+                first = false;
+            }
+            DrawItem d;
+            d.mesh = b.mesh;
+            d.surface = b.surface;
+            const Surface& s = b.surface;
+            id<MTLTexture> albedo = texture(s.texture, true), normal = texture(s.normalMap, false), orm = texture(s.ormMap, false),
+                           emissive = texture(s.emissiveMap, true);
+            DrawUniforms du = drawUniforms(d, simd_make_float4(albedo ? 1 : 0, normal ? 1 : 0, orm ? 1.f + s.occlusionStrength : 0.f,
+                                                               emissive ? 1 : 0));
+            FoliageUniformsGpu fu = foliageUniforms(frame, b);
+            [enc setCullMode:s.doubleSided ? MTLCullModeNone : MTLCullModeBack];
+            [enc setVertexBuffer:m->vertices offset:0 atIndex:0];
+            [enc setVertexBytes:&du length:sizeof(du) atIndex:1];
+            [enc setVertexBuffer:instanceBuffer(b) offset:0 atIndex:3];
+            [enc setVertexBytes:&fu length:sizeof(fu) atIndex:4];
+            [enc setFragmentBytes:&du length:sizeof(du) atIndex:0];
+            [enc setFragmentTexture:(albedo ?: white_) atIndex:0];
+            [enc setFragmentTexture:(normal ?: white_) atIndex:2];
+            [enc setFragmentTexture:(orm ?: white_) atIndex:3];
+            [enc setFragmentTexture:(emissive ?: white_) atIndex:4];
+            [enc drawIndexedPrimitives:MTLPrimitiveTypeTriangle
+                            indexCount:m->indexCount
+                             indexType:MTLIndexTypeUInt32
+                           indexBuffer:m->indices
+                     indexBufferOffset:0
+                         instanceCount:b.instances->size()];
+            instancesDrawn_ += b.instances->size();
+        }
+    }
+
+    void drawFoliageShadows(id<MTLRenderCommandEncoder> enc, const FrameData& frame, const Frustum& fr, const simd_float4x4& lvp) {
+        bool bound = false;
+        for (const InstanceBatch& b : frame.instances) {
+            if (!b.castShadows || !b.instances || b.instances->empty() || !fr.intersects(b.bounds)) continue;
+            Vec3 c{std::clamp(frame.camera.eye.x, b.bounds.min.x, b.bounds.max.x), std::clamp(frame.camera.eye.y, b.bounds.min.y, b.bounds.max.y),
+                   std::clamp(frame.camera.eye.z, b.bounds.min.z, b.bounds.max.z)};
+            if (distance(c, frame.camera.eye) > b.cullDistance) continue;
+            const GpuMesh* m = mesh(b.mesh);
+            if (!m) continue;
+            if (!bound) {
+                [enc setRenderPipelineState:foliageShadowPipeline_];
+                [enc setCullMode:MTLCullModeNone];
+                bound = true;
+            }
+            FoliageUniformsGpu fu = foliageUniforms(frame, b);
+            [enc setVertexBuffer:m->vertices offset:0 atIndex:0];
+            [enc setVertexBytes:&lvp length:sizeof(lvp) atIndex:2];
+            [enc setVertexBuffer:instanceBuffer(b) offset:0 atIndex:3];
+            [enc setVertexBytes:&fu length:sizeof(fu) atIndex:4];
+            [enc drawIndexedPrimitives:MTLPrimitiveTypeTriangle
+                            indexCount:m->indexCount
+                             indexType:MTLIndexTypeUInt32
+                           indexBuffer:m->indices
+                     indexBufferOffset:0
+                         instanceCount:b.instances->size()];
+        }
+    }
+
+    void evictWorldCaches() {
+        std::erase_if(instanceBuffers_, [&](const auto& kv) { return frameIndex_ - kv.second.lastUse > 180; });
+        std::erase_if(terrainsGpu_, [&](const auto& kv) { return frameIndex_ - kv.second.lastUse > 180; });
     }
 
     // --- Scene ------------------------------------------------------------------------------
@@ -1101,6 +1505,14 @@ private:
             }
             drawMesh(enc, d);
         }
+
+        // Terrain and instanced foliage (opaque)
+        terrainNodesDrawn_ = 0;
+        instancesDrawn_ = 0;
+        drawTerrains(enc, frame, frustum);
+        drawFoliage(enc, frame, frustum);
+        [enc setRenderPipelineState:meshPipeline_];
+        [enc setDepthStencilState:depthWrite_];
 
         // Toon outlines (inverted hulls; depth-tested so they only show at silhouettes)
         if (!outlined.empty()) {
@@ -1785,7 +2197,20 @@ private:
         presentPipeline_, outlinePipeline_, overlayPipeline_, bloomPrefilterPipeline_, bloomDownPipeline_,
         bloomUpPipeline_, compositePipeline_, envSkyPipeline_, envPrefilterPipeline_, brdfPipeline_, ssaoPipeline_,
         aoBlurPipeline_, meshCutoutPipeline_, shadowAlphaPipeline_, waterPipeline_, particlePipeline_, volumePipeline_, volumetricPipeline_,
-        ssgiPipeline_, ssrPipeline_, ssTemporalPipeline_, resolvePipeline_, temporalPipeline_, debugViewPipeline_;
+        ssgiPipeline_, ssrPipeline_, ssTemporalPipeline_, resolvePipeline_, temporalPipeline_, debugViewPipeline_,
+        terrainPipeline_, terrainShadowPipeline_, foliagePipeline_, foliageCutoutPipeline_, foliageShadowPipeline_;
+    // Transient per-frame data: a ring of shared buffers, one per frame in flight.
+    static constexpr int kFramesInFlight = 3;
+    static constexpr NSUInteger kRingSize = 8u << 20;
+    id<MTLBuffer> ring_[kFramesInFlight];
+    NSUInteger ringOffset_ = 0;
+    int ringIndex_ = 0;
+    dispatch_semaphore_t inFlight_ = dispatch_semaphore_create(kFramesInFlight);
+    // Terrain and foliage GPU caches
+    std::unordered_map<EntityId, TerrainGpu> terrainsGpu_;
+    id<MTLBuffer> patchVertices_, patchIndices_;
+    uint32_t patchIndexCount_ = 0;
+    std::unordered_map<uint64_t, InstanceGpu> instanceBuffers_;
     // G-buffer, lighting and temporal targets
     id<MTLTexture> lit_, gbufA_, gbufB_, msaaGbufA_, msaaGbufB_, depthPrev_;
     id<MTLTexture> taa_[2], giRaw_, giHist_[2], ssrRaw_, ssrHist_[2];
@@ -1814,6 +2239,7 @@ private:
     std::unordered_set<std::string> warnedMeshes_;
     std::string source_;
     size_t culled_ = 0;
+    size_t terrainNodesDrawn_ = 0, instancesDrawn_ = 0;
     uint64_t frameIndex_ = 0;
     bool aoActive_ = false;
     bool volumetricActive_ = false;

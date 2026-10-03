@@ -63,6 +63,23 @@ Engine::Engine(EngineConfig config)
         float h = 0;
         return waterHeight(x, z, h) ? h : 0.f;
     };
+    world::WorldRuntime::Hooks hooks;
+    hooks.resolvePath = [this](const std::string& p) { return resolvePath(p); };
+    hooks.material = [this](const std::string& p) { return resolveMaterial(p); };
+    hooks.meshBounds = [this](const std::string& key) -> std::optional<Aabb> {
+        ensureMeshUploaded(key);
+        const MeshData* m = cpuMesh(key);
+        if (!m) return std::nullopt;
+        return m->bounds;
+    };
+    hooks.sceneSurface = [this](float x, float z, float top, float bottom, float& y, Vec3& n) {
+        auto hit = raycast(Ray{{x, top, z}, {0, -1, 0}});
+        if (!hit || hit->point.y < bottom) return false;
+        y = hit->point.y;
+        n = hit->normal;
+        return true;
+    };
+    world_ = std::make_unique<world::WorldRuntime>(std::move(hooks));
     registerEngineTools(*this);
     log::info("engine", std::string("Skywalker ") + SKY_VERSION_STRING + " ready (renderer: " + renderer_->info().backend +
                             " " + renderer_->info().device + ")");
@@ -326,6 +343,19 @@ FrameData Engine::frame(const CaptureOptions& opts) {
         f.water.push_back(std::move(wi));
     }
     std::erase_if(oceans_, [&](const auto& kv) { return std::find(waterIds.begin(), waterIds.end(), kv.first) == waterIds.end(); });
+    // Terrain and foliage (resolved texture paths included). Captures generate all foliage
+    // in range; the live viewport streams a few chunks per frame.
+    world_->gather(*scene_, view, f, opts.samples <= 1);
+    {
+        std::vector<std::string> meshes;
+        for (const auto& b : f.instances) {
+            if (std::find(meshes.begin(), meshes.end(), b.mesh) == meshes.end()) meshes.push_back(b.mesh);
+        }
+        for (const auto& m : meshes) ensureMeshUploaded(m);
+        for (auto& t : f.terrains) {
+            t.selected = bo.editorOverlays && std::find(selection_.begin(), selection_.end(), t.entity) != selection_.end();
+        }
+    }
     resolveTexturePaths(f);
     if (bo.editorOverlays && selection_.size() == 1 && scene_->exists(selection_[0]) && !opts.annotate) {
         GizmoFrame gf = Gizmo::frameFor(scene_->worldMatrix(selection_[0]), view, gizmo_.local);
@@ -957,6 +987,11 @@ Result<Image> Engine::assetPreview(const std::string& ref, int size) {
 std::optional<Engine::Hit> Engine::raycast(const Ray& rayIn, const std::vector<EntityId>& exclude) {
     Ray ray{rayIn.origin, normalize(rayIn.dir)};
     std::optional<Hit> best;
+    if (auto th = world_->raycast(*scene_, ray, 1e6f)) {
+        if (std::find(exclude.begin(), exclude.end(), th->entity) == exclude.end()) {
+            best = Hit{th->entity, th->point, th->normal, th->distance};
+        }
+    }
     for (EntityId e : scene_->entities()) {
         if (std::find(exclude.begin(), exclude.end(), e) != exclude.end()) continue;
         const MeshRenderer* m = scene_->get<MeshRenderer>(e);

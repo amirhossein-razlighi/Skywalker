@@ -253,3 +253,5 @@ struct Environment {
 };
 
 }  // namespace sky
+
+#include "skywalker/ecs/WorldComponents.h"  // Terrain, Foliage

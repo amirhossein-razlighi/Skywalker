@@ -19,6 +19,8 @@
 #include "skywalker/math/Math.h"
 #include "skywalker/render/Image.h"
 #include "skywalker/scene/Scene.h"
+#include "skywalker/world/Foliage.h"
+#include "skywalker/world/Terrain.h"
 
 namespace sky {
 
@@ -160,6 +162,38 @@ struct VolumeItem {
     Vec3 wind{0, 0, 0};   // environment wind in world space (m/s), already scaled by params.wind
 };
 
+/// A heightfield terrain to draw (continuous LOD from its height texture).
+struct TerrainItem {
+    EntityId entity = kNoEntity;
+    Vec3 origin;  // world position of the terrain center
+    std::shared_ptr<const world::TerrainData> data;
+    struct Layer {
+        Surface surface;  // color, roughness, metallic, texture / normalMap / ormMap (absolute paths)
+        float tiling = 0.25f;  // texture repeats per meter
+        bool triplanar = false;
+    };
+    std::vector<Layer> layers;
+    float waterLevel = -100000.f;
+    float wetBand = 1.2f;
+    float detail = 1.f;
+    bool castShadows = true;
+    bool selected = false;
+};
+
+/// A chunk of GPU-instanced foliage (one mesh + surface, many transforms).
+struct InstanceBatch {
+    EntityId entity = kNoEntity;
+    uint64_t id = 0;  // stable while the instance data is unchanged (GPU buffer caching)
+    std::string mesh;
+    Surface surface;
+    std::shared_ptr<const std::vector<world::FoliageInstance>> instances;
+    Aabb bounds;
+    bool castShadows = true;
+    float wind = 1.f;           // bend strength
+    float cullDistance = 100.f;
+    float meshHeight = 1.f;     // height of the mesh (m) for wind bending
+};
+
 struct FrameData {
     int width = 0;
     int height = 0;
@@ -173,6 +207,8 @@ struct FrameData {
     std::vector<ParticleInstance> particles;  // sorted back to front
     std::vector<WaterItem> water;
     std::vector<VolumeItem> volumes;
+    std::vector<TerrainItem> terrains;
+    std::vector<InstanceBatch> instances;
     bool drawGrid = true;
     float time = 0;
     /// Jittered sub-samples accumulated into this frame (stills and cinematics: supersampling,
