@@ -178,10 +178,11 @@ def run_from_env():
         register()
     except Exception:  # noqa: BLE001 - the panel is a convenience; the bridge must still run
         pass
+    from skywalker_dcc import blender as B
+    if headless:
+        B.reset_scene()  # agents start from an empty scene, not Blender's default cube
     opened = os.environ.get("SKY_OPEN", "")
     if opened and os.path.exists(opened):
-        from skywalker_dcc import blender as B
-        B.reset_scene() if headless else None
         B.import_file(opened)
     BRIDGE.start(session_file=os.environ.get("SKY_SESSION_FILE", ""), mode="headless" if headless else "ui")
     if headless:

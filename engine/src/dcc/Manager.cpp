@@ -146,18 +146,18 @@ std::string lastPythonError(const std::string& text) {
 }
 
 // ---------------------------------------------------------------------------
-// Environment & detection
+// Machine & detection
 // ---------------------------------------------------------------------------
 
-Environment Environment::real() {
-    Environment e;
+Machine Machine::real() {
+    Machine e;
     e.host = Host::real();
     std::string override = e.host.getenv("SKY_DCC_STATE");
     e.stateDir = !override.empty() ? override : (fs::path(e.host.home.empty() ? "/tmp" : e.host.home) / ".skywalker" / "dcc").string();
     return e;
 }
 
-Manager::Manager(Environment env) : env_(std::move(env)) {}
+Manager::Manager(Machine env) : machine_(std::move(env)) {}
 
 Manager::~Manager() {
     std::vector<long> pids;
@@ -174,13 +174,13 @@ std::vector<AppInfo> Manager::apps(bool refresh) {
     std::lock_guard lock(mutex_);
     if (detected_ && !refresh) return apps_;
     std::map<AppId, std::string> configured;
-    if (auto cfg = Json::parse(readFile((fs::path(env_.stateDir) / "paths.json").string()))) {
+    if (auto cfg = Json::parse(readFile((fs::path(machine_.stateDir) / "paths.json").string()))) {
         for (AppId id : allApps()) {
             const std::string& p = cfg->get(toString(id)).asString();
             if (!p.empty()) configured[id] = p;
         }
     }
-    apps_ = detectApps(env_.host, configured, [](const AppInfo& app) {
+    apps_ = detectApps(machine_.host, configured, [](const AppInfo& app) {
         const Adapter& ad = adapterFor(app.id);
         std::vector<std::string> va = ad.versionArgs();
         if (va.empty()) return std::string();
@@ -237,9 +237,9 @@ Result<std::string> Manager::ensureRuntime() {
         h = fnv1a(h, f.path);
         h = fnv1a(h, f.content);
     }
-    fs::path dir = fs::path(env_.stateDir) / "runtime" / hex64(h);
+    fs::path dir = fs::path(machine_.stateDir) / "runtime" / hex64(h);
     if (!fs::exists(dir / ".complete")) {
-        fs::path tmp = fs::path(env_.stateDir) / "runtime" / (hex64(h) + ".tmp-" + randomHex(4));
+        fs::path tmp = fs::path(machine_.stateDir) / "runtime" / (hex64(h) + ".tmp-" + randomHex(4));
         std::error_code ec;
         fs::create_directories(tmp, ec);
         for (const auto& f : embeddedFiles()) {
@@ -408,8 +408,8 @@ JobResult Manager::run(const JobSpec& spec, const AppInfo& app, const std::share
 // Sessions
 // ---------------------------------------------------------------------------
 
-std::string Manager::sessionFilePath() const { return (fs::path(env_.stateDir) / "blender.json").string(); }
-std::string Manager::logPath(const std::string& name) const { return (fs::path(env_.stateDir) / name).string(); }
+std::string Manager::sessionFilePath() const { return (fs::path(machine_.stateDir) / "blender.json").string(); }
+std::string Manager::logPath(const std::string& name) const { return (fs::path(machine_.stateDir) / name).string(); }
 
 Result<Manager::SessionInfo> Manager::session() const {
     auto parsed = Json::parse(readFile(sessionFilePath()));

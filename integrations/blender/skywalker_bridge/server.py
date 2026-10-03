@@ -22,6 +22,7 @@ import contextlib
 import hmac
 import io
 import json
+import linecache
 import os
 import queue
 import secrets
@@ -247,7 +248,7 @@ class Bridge:
                 job.response = {"ok": False, "error": {"type": e.type, "message": str(e)}}
             except Exception as e:  # noqa: BLE001 - the engine gets the traceback, Blender keeps running
                 job.response = {"ok": False, "error": {"type": type(e).__name__, "message": str(e),
-                                                       "trace": traceback.format_exc()}}
+                                                       "trace": _user_trace(e)}}
             job.done.set()
         self.last_pump = time.monotonic()
 
@@ -297,6 +298,8 @@ class Bridge:
         if not isinstance(code, str) or not code.strip():
             raise BridgeError("bad_request", "exec needs a non-empty 'code' string")
         scope = self._scope(bool(params.get("reset")))
+        # So tracebacks can show the offending line of the agent's code.
+        linecache.cache["<skywalker>"] = (len(code), None, code.splitlines(True), "<skywalker>")
         out, err = io.StringIO(), io.StringIO()
         value = None
         t0 = time.monotonic()
@@ -419,6 +422,17 @@ class Bridge:
         if self.mode == "ui":
             bpy.app.timers.register(self.stop, first_interval=0.1)
         return {"stopping": True, "mode": self.mode}
+
+
+def _user_trace(exc):
+    """The traceback of an agent's code without the bridge's own frames."""
+    frames = [f for f in traceback.extract_tb(exc.__traceback__) if f.filename != __file__]
+    if not frames:
+        return "".join(traceback.format_exception_only(type(exc), exc))
+    lines = ["Traceback (most recent call last):\n"]
+    lines += traceback.format_list(frames)
+    lines += traceback.format_exception_only(type(exc), exc)
+    return "".join(lines)
 
 
 def _alive(pid):

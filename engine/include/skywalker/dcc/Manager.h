@@ -34,10 +34,10 @@ struct EmbeddedFile {
 };
 const std::vector<EmbeddedFile>& embeddedFiles();
 
-struct Environment {
+struct Machine {
     Host host;
     std::string stateDir;  // ~/.skywalker/dcc : session files, runtime copies, paths.json
-    static Environment real();
+    static Machine real();
 };
 
 struct JobSpec {
@@ -72,12 +72,12 @@ struct JobResult {
 
 class Manager {
 public:
-    explicit Manager(Environment env = Environment::real());
+    explicit Manager(Machine env = Machine::real());
     ~Manager();
     Manager(const Manager&) = delete;
     Manager& operator=(const Manager&) = delete;
 
-    const Environment& environment() const { return env_; }
+    const Machine& machine() const { return machine_; }
 
     // --- Detection --------------------------------------------------------------------------
     /// Detected apps (cached; `refresh` rescans).
@@ -126,7 +126,7 @@ public:
     std::string logPath(const std::string& name) const;
 
 private:
-    Environment env_;
+    Machine machine_;
     mutable std::mutex mutex_;
     std::vector<AppInfo> apps_;
     bool detected_ = false;

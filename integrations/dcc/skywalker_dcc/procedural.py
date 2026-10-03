@@ -160,6 +160,7 @@ def _add_blob(b, center, radius, rng, mat, color, subdivisions=1):
     for v in verts:
         v.co = Vector((v.co.x * rng.uniform(0.8, 1.25), v.co.y * rng.uniform(0.8, 1.25), v.co.z * rng.uniform(0.5, 0.8)))
         v.co += Vector(center) + Vector((0, 0, radius * 0.4))
+        v.co.z = max(v.co.z, 0.0)  # rubble rests on the ground, never under it
     faces = {f for v in verts for f in v.link_faces}
     c = _tint(color, rng, 0.2)
     for f in faces:
@@ -384,7 +385,7 @@ def _masonry_ring(b, rng, mat, color_fn, radius, wall, height, sides, course_h, 
     col_h = []
     for i in range(sides):
         t = _fbm(Vector((math.cos(i * step) * 1.7, math.sin(i * step) * 1.7, 0.3)), seed, 3)
-        col_h.append(height * (1.0 - ruin * (0.45 + 0.55 * (t * 0.5 + 0.5))))
+        col_h.append(max(height * 0.22, height * (1.0 - ruin * (0.2 + 0.95 * (t * 0.5 + 0.5)))))
     door_angle = -math.pi / 2
     slit_cols = {int(sides * f) % sides for f in (0.12, 0.45, 0.78)} if slits else set()
     for c in range(n_courses):
@@ -478,7 +479,7 @@ def wall(name="Wall", length=8.0, height=2.5, thickness=0.6, course_height=0.4, 
             if x1 - x0 < 0.12:
                 continue
             col = (x0 + x1) / 2
-            limit = height * (1.0 - ruin * (0.45 + 0.55 * (_fbm(Vector((col * 0.7, 0.2, 0.1)), seed, 3) * 0.5 + 0.5)))
+            limit = max(height * 0.2, height * (1.0 - ruin * (0.2 + 0.95 * (_fbm(Vector((col * 0.7, 0.2, 0.1)), seed, 3) * 0.5 + 0.5))))
             if ruin > 0 and (z0 > limit or rng.random() < ruin * 0.18 * (z0 / height)):
                 continue
             t = rng.uniform(-0.03, 0.03)

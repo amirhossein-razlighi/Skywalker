@@ -1067,7 +1067,7 @@ std::shared_ptr<dcc::Manager> addDccTools(Engine& engine, ToolRegistry& reg, std
                 auto blender = mgr->pick("blender", "live_session");
                 if (!blender) return ToolResult::error(blender.error());
                 std::string scriptsDir = a.get("scripts_dir").asString();
-                const dcc::Host& host = mgr->environment().host;
+                const dcc::Host& host = mgr->machine().host;
                 if (scriptsDir.empty()) scriptsDir = host.getenv("BLENDER_USER_SCRIPTS");
                 if (scriptsDir.empty()) {
                     std::string mm = blender->version;
@@ -1274,7 +1274,8 @@ std::shared_ptr<dcc::Manager> addDccTools(Engine& engine, ToolRegistry& reg, std
         ToolDef pull{
             "dcc_session_pull_selection", "Bring Blender's selection into the project",
             "Export the objects currently selected in the live Blender session (or the named objects) to glTF under "
-            "dcc/live/<name>.glb, import them as an asset and optionally place them. Calling it again with the same name "
+            "dcc/live/<name>.glb, import them as an asset and place them (a new asset is placed at the origin unless you pass "
+            "`place`; place:false imports only). Calling it again with the same name "
             "UPDATES the asset in place: every scene entity that uses it refreshes live (the loop for iterating on a model in "
             "Blender while seeing it in the engine). Children of selected objects come along; modifiers are applied. Real-world "
             "size is kept. `origin`: keep | bottom_center | center. Example: {\"name\": \"Lantern\", \"origin\": "
@@ -1340,7 +1341,7 @@ std::shared_ptr<dcc::Manager> addDccTools(Engine& engine, ToolRegistry& reg, std
                         std::string summary = "exported " + std::to_string(out.get("objects").size()) + " object(s) from Blender";
                         if (st->import.import) {
                             // Updating an asset refreshes its entities by itself; only a new one is placed by default.
-                            if (st->existed && !placeExplicit) st->import.place.enabled = false;
+                            if (!placeExplicit) st->import.place.enabled = !st->existed;
                             if (st->import.place.enabled && st->import.place.name.empty()) st->import.place.name = st->name;
                             bool failed = false;
                             Json imported = importMeshes(engine, actor, {st->abs}, st->import, warnings, failed);

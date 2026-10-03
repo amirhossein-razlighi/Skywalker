@@ -22,6 +22,8 @@ from mathutils import Matrix, Vector
 
 import skywalker_dcc as sky
 
+_HAS_AUTO_SMOOTH = "use_auto_smooth" in bpy.types.Mesh.bl_rna.properties
+
 # Object types the glTF exporter turns into meshes.
 MESH_LIKE = ("MESH", "CURVE", "SURFACE", "FONT", "META")
 
@@ -463,11 +465,11 @@ def shade_smooth(objects, angle_deg=40.0):
         _make_single_user(o)
         me = o.data
         me.polygons.foreach_set("use_smooth", [True] * len(me.polygons))
-        if hasattr(me, "use_auto_smooth"):  # removed in Blender 4.1 (smooth by angle is a modifier now)
+        if _HAS_AUTO_SMOOTH:  # removed in Blender 4.1 (smooth by angle is an operator now)
             me.use_auto_smooth = True
             me.auto_smooth_angle = math.radians(angle_deg)
         me.update()
-    if not hasattr(bpy.types.Mesh, "use_auto_smooth") and hasattr(bpy.ops.object, "shade_smooth_by_angle"):
+    if not _HAS_AUTO_SMOOTH and has_operator("object.shade_smooth_by_angle"):
         for o in mesh_objects(objects):
             select([o])
             bpy.ops.object.shade_smooth_by_angle(angle=math.radians(angle_deg))
