@@ -54,11 +54,15 @@ target_compile_definitions(skywalker_engine PUBLIC
 if(SKY_HAS_METAL)
     # Shaders are compiled at runtime from embedded source (enables live shader editing
     # by agents and does not require the offline Metal toolchain).
-    set(_shader_src ${CMAKE_CURRENT_SOURCE_DIR}/platform/metal/shaders/Standard.metal)
+    # The standard shader library is several modules concatenated in dependency order.
+    set(_shader_dir ${CMAKE_CURRENT_SOURCE_DIR}/platform/metal/shaders)
+    set(_shader_modules Common.metal Sky.metal Surface.metal Lighting.metal Effects.metal Post.metal)
+    list(TRANSFORM _shader_modules PREPEND ${_shader_dir}/ OUTPUT_VARIABLE _shader_src)
+    string(REPLACE ";" "," _shader_list "${_shader_modules}")
     set(_shader_inc ${CMAKE_CURRENT_BINARY_DIR}/generated/ShaderSource.inc)
     add_custom_command(
         OUTPUT ${_shader_inc}
-        COMMAND ${CMAKE_COMMAND} -DINPUT=${_shader_src} -DOUTPUT=${_shader_inc}
+        COMMAND ${CMAKE_COMMAND} -DDIR=${_shader_dir} -DFILES=${_shader_list} -DOUTPUT=${_shader_inc}
                 -P ${PROJECT_SOURCE_DIR}/cmake/EmbedText.cmake
         DEPENDS ${_shader_src} ${PROJECT_SOURCE_DIR}/cmake/EmbedText.cmake
         COMMENT "Embedding Metal shader source")
