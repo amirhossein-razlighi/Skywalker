@@ -11,12 +11,34 @@
 
 namespace sky {
 
+/// Per-vertex skinning input of a rigged (or node-animated) model. Vertices follow up to
+/// four joints ("slots"); each slot names the skeleton bone it follows, so a mesh can be
+/// posed by any skeleton that has bones with those names (shared rigs, retargeted clips).
+/// The static `MeshData::vertices` hold the rest pose; skinning recomputes position and
+/// normal from `bind`:  p = transform * sum_k w_k * (G[bone_k] * inverseBind_k) * bind.
+struct SkinStream {
+    static constexpr int kInfluences = 4;
+    std::vector<uint16_t> joints;          // kInfluences slots per vertex
+    std::vector<float> weights;            // kInfluences weights per vertex (sum to 1)
+    std::vector<float> bind;               // 6 floats per vertex: position, normal (glTF skin space)
+    std::vector<std::string> jointNames;   // per slot: the bone it follows
+    std::vector<Mat4> inverseBind;         // per slot
+    std::vector<Mat4> restGlobal;          // per slot: bone's rest transform (fallback if a skeleton lacks it)
+    std::vector<Aabb> slotBounds;          // per slot: bind-space bounds of its vertices (min > max = unused)
+    Mat4 transform;                        // glTF space -> mesh space (z-up fix, facing, normalization)
+
+    bool empty() const { return joints.empty(); }
+    size_t slots() const { return jointNames.size(); }
+};
+
 struct MeshData {
     static constexpr int kFloatsPerVertex = 12;  // position(3) normal(3) uv(2) color(4)
     std::vector<float> vertices;
     std::vector<uint32_t> indices;
     Aabb bounds;
     bool hasVertexColors = false;
+    SkinStream skin;  // empty for static meshes
+    bool skinned() const { return !skin.empty(); }
 
     size_t vertexCount() const { return vertices.size() / kFloatsPerVertex; }
     void addVertex(Vec3 p, Vec3 n, Vec2 uv, Vec4 color = {1, 1, 1, 1});
@@ -74,10 +96,14 @@ Result<MeshData> parsePly(const std::vector<uint8_t>& bytes, bool normalize = tr
 Result<MeshData> parseStl(const std::vector<uint8_t>& bytes, bool normalize = true);
 /// Rotates a Z-up mesh (CAD, scans, Blender exports without conversion) to Y-up.
 void zUpToYUp(MeshData& m);
+/// Turns the mesh 180 degrees around Y: glTF characters face +Z, Skywalker entities face -Z.
+void turnAround(MeshData& m);
+Aabb turnAround(const Aabb& b);
 
 struct LoadOptions {
     bool normalize = true;
     bool zUp = false;
+    bool turnAround = false;  // rotate 180 degrees around Y (rigged glTF characters: +Z -> -Z forward)
     int part = -2;  // glTF: one material's triangles (see Gltf.h); -2 = the whole model
 };
 /// "model.gltf#3" -> {"model.gltf", 3}; no fragment -> part -2.
