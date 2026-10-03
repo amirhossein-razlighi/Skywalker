@@ -11,6 +11,7 @@
 #include "skywalker/core/Strings.h"
 #include "skywalker/physics/DebugDraw.h"
 #include "skywalker/physics/PhysicsSystem.h"
+#include "skywalker/render/MeshData.h"
 
 namespace sky::tools {
 
@@ -69,8 +70,24 @@ Result<uint32_t> layerMask(const Json& layers) {
 }
 
 /// World bounds of the meshes under `id` (or a 1 m box around it).
-Aabb boundsOf(const Scene& s, EntityId id) {
-    if (auto b = subtreeBounds(s, id)) return *b;
+/// World bounds of the meshes under `id` (imported meshes measured from their data, so this works
+/// before anything was rendered), or a 1 m box around it.
+Aabb boundsOf(Engine& engine, EntityId id) {
+    const Scene& s = engine.scene();
+    std::vector<EntityId> all;
+    collectSubtree(s, id, all);
+    Aabb box{Vec3(1e30f), Vec3(-1e30f)};
+    bool any = false;
+    for (EntityId e : all) {
+        const MeshRenderer* m = s.get<MeshRenderer>(e);
+        if (!m) continue;
+        const MeshData* md = str::startsWith(m->mesh, "asset:") ? engine.cpuMesh(m->mesh) : nullptr;
+        Aabb b = (md ? md->bounds : s.localBounds(e)).transformed(s.worldMatrix(e));
+        box.min = vmin(box.min, b.min);
+        box.max = vmax(box.max, b.max);
+        any = true;
+    }
+    if (any) return box;
     Vec3 p = s.worldMatrix(id).translation();
     return {p - Vec3(0.5f), p + Vec3(0.5f)};
 }
@@ -110,7 +127,7 @@ Result<Json> applyPreset(Engine& engine, EntityId id, const std::string& preset,
         if (const ComponentKind* k = s.componentKind(comp); k && k->has(s, e)) return s.patchComponent(e, comp, Json());
         return {};
     };
-    Aabb b = boundsOf(s, id);
+    Aabb b = boundsOf(engine, id);
     if (preset == "remove") {
         for (const char* c : {"body", "collider", "character", "joint"}) {
             if (Status st = remove(id, c); !st) return st.error();
@@ -179,7 +196,6 @@ Result<Json> applyPreset(Engine& engine, EntityId id, const std::string& preset,
 }
 
 ToolResult debugCapture(Engine& engine, const Json& a) {
-    Scene& s = engine.scene();
     physics::PhysicsWorld& world = engine.physics().queryWorld();
     CaptureOptions o;
     o.width = static_cast<int>(std::clamp<int64_t>(a.get("width").asInt(768), 64, 2048));
@@ -192,7 +208,7 @@ ToolResult debugCapture(Engine& engine, const Json& a) {
     if (a.contains("focus")) {
         auto id = resolve(engine, a.get("focus"));
         if (!id) return ToolResult::error(id.error());
-        focus = boundsOf(s, *id);
+        focus = boundsOf(engine, *id);
         haveFocus = true;
     }
     std::vector<physics::DebugShape> shapes = world.debugShapes();

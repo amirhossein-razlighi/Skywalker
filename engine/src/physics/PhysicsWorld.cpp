@@ -397,7 +397,9 @@ struct PhysicsWorld::Impl final : public JPH::ContactListener {
             if (s.get<RigidBody>(c) || s.get<CharacterController>(c)) continue;
             Mat4 m = rel * s.get<Transform>(c)->local();
             if (const MeshRenderer* mr = s.get<MeshRenderer>(c)) {
-                Aabb b = s.localBounds(c).transformed(m);
+                // Imported meshes: the loaded data knows its bounds even before anything rendered it.
+                const MeshData* md = meshes && mr->mesh.rfind("asset:", 0) == 0 ? meshes(mr->mesh) : nullptr;
+                Aabb b = (md ? md->bounds : s.localBounds(c)).transformed(m);
                 meshBounds.min = vmin(meshBounds.min, b.min);
                 meshBounds.max = vmax(meshBounds.max, b.max);
                 anyMesh = anyMesh || mr;

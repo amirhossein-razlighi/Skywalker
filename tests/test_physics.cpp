@@ -562,6 +562,42 @@ TEST_CASE("physics: heightfields (16-bit heightmap and sampled mesh), convex hul
     CHECK(pos(*e, cone).y == doctest::Approx(-0.5f).epsilon(0.05));  // cone base on the surface at y = -1
 }
 
+TEST_CASE("physics: imported meshes become convex props and exact static level geometry") {
+    auto e = makePhysicsEngine();
+    ground(*e);
+    // A square pyramid (base 2 x 2 at y = 0, apex at y = 2), imported without normalization.
+    fs::create_directories(e->resolvePath("models"));
+    {
+        FILE* f = std::fopen(e->resolvePath("models/pyramid.obj").c_str(), "w");
+        REQUIRE(f);
+        std::fputs("v -1 0 -1\nv 1 0 -1\nv 1 0 1\nv -1 0 1\nv 0 2 0\n"
+                   "f 1 2 3\nf 1 3 4\nf 1 5 2\nf 2 5 3\nf 3 5 4\nf 4 5 1\n", f);
+        std::fclose(f);
+    }
+    call(*e, "asset_import", R"({"path": "models/pyramid.obj", "create_entity": "Rock", "normalize": false})");
+    call(*e, "asset_import", R"({"path": "models/pyramid.obj", "create_entity": "Hill", "normalize": false})");
+    EntityId rock = e->scene().find("Rock");
+    EntityId hill = e->scene().find("Hill");
+    REQUIRE(rock);
+    REQUIRE(hill);
+    REQUIRE(e->scene().patchComponent(rock, "transform", Json::parse(R"({"position": [0, 3, 0], "rotation": [0, 0, 0]})").value()));
+    REQUIRE(e->scene().patchComponent(hill, "transform", Json::parse(R"({"position": [10, 0, 0]})").value()));
+    Json r = call(*e, "physics_add", R"({"entity": "Rock", "preset": "prop"})");
+    CHECK(e->scene().get<RigidBody>(rock)->mass > 1.f);  // measured from the mesh data (2 x 2 x 2 m)
+    call(*e, "physics_add", R"({"entity": "Hill", "preset": "static_level"})");
+    REQUIRE(e->scene().get<Collider>(hill));
+    CHECK(e->scene().get<Collider>(hill)->shape == "mesh");
+    // The static triangle mesh is exact: a ray 0.5 m off the apex hits the slanted face at y = 1.
+    auto hit = e->physics().queryWorld().raycast({10.5f, 5, 0}, {0, -1, 0}, 10.f);
+    REQUIRE(hit);
+    CHECK(hit->entity == hill);
+    CHECK(hit->point.y == doctest::Approx(1.f).epsilon(0.02));
+    e->play();
+    e->step(240);
+    CHECK(pos(*e, rock).y == doctest::Approx(0.f).epsilon(0.05));  // the convex hull rests on its base
+    CHECK(e->physics().recentWarnings().empty());
+}
+
 TEST_CASE("physics: the Wander examples in docs/PHYSICS.md compile") {
     std::ifstream in(std::string(SKY_SOURCE_DIR) + "/docs/PHYSICS.md");
     REQUIRE(in);
