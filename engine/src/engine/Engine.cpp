@@ -17,6 +17,8 @@
 #include "skywalker/assets/Prefab.h"
 #include "skywalker/render/Gltf.h"
 #include "skywalker/render/MeshData.h"
+#include "skywalker/studio/Playtest.h"
+#include "skywalker/studio/Studio.h"
 
 namespace sky {
 
@@ -144,6 +146,7 @@ ToolResult Engine::finishTool(PendingCall& call) {
 
 void Engine::recordToolEvent(std::string_view name, const ToolResult& result, const std::string& actor) {
     const ToolDef* def = tools_.find(name);
+    if (studio_) studio_->noteToolCall(actor, name, !result.isError);  // per-agent tool usage
     std::string summary = result.content.empty() ? "" : result.content.front().text.substr(0, 160);
     emitEvent(Json::object({{"type", "tool"},
                             {"actor", actor},
@@ -1166,6 +1169,19 @@ std::optional<Engine::Hit> Engine::raycast(const Ray& rayIn, const std::vector<E
         }
     }
     return best;
+}
+
+// ---------------------------------------------------------------------------
+// Studio
+// ---------------------------------------------------------------------------
+
+studio::Studio& Engine::studio() {
+    if (!studio_) {
+        studio_ = std::make_unique<studio::Studio>(config_.projectDir, [this](Json e) { emitEvent(std::move(e)); });
+        studio_->setPlaytestRunner(
+            [this](const Json& args, const std::string& actor) { return studio::runAndRecordPlaytest(*this, args, actor); });
+    }
+    return *studio_;
 }
 
 // ---------------------------------------------------------------------------

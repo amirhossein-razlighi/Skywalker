@@ -12,7 +12,7 @@ struct ChatEntry: Identifiable, Sendable {
     var isError = false
 }
 
-/// A mutating tool call waiting for the human's OK (autonomy = .ask).
+/// A mutating tool call waiting for the human's OK (autonomy = ask).
 struct PendingApproval: Identifiable {
     let id = UUID()
     let cloudling: Cloudling
@@ -20,110 +20,171 @@ struct PendingApproval: Identifiable {
     let resume: CheckedContinuation<Bool, Never>
 }
 
-/// Owns the crew, their conversations and pipelines, and runs the agent loops.
+/// Runs the studio's agents inside the editor: their conversations, provider sessions,
+/// approvals, and studio loops. The roster itself (and the board, feedback, loops, usage)
+/// lives in the engine's studio, shared with the headless runner and external agents; this
+/// store adds what only the editor has — API keys in the Keychain and a human to approve.
 @MainActor
 @Observable
 final class CrewStore {
     var providers: [ProviderConfig] = []
-    var cloudlings: [Cloudling] = []
-    var plans: [FlightPlan] = []
-    private(set) var transcripts: [UUID: [ChatEntry]] = [:]
-    private(set) var working: Set<UUID> = []
+    private(set) var transcripts: [String: [ChatEntry]] = [:]
+    private(set) var working: Set<String> = []
     var pendingApprovals: [PendingApproval] = []
-    var planLog: [String] = []
-    private(set) var runningPlan = false
-    /// Provider-reported token usage per Cloudling (persisted).
-    private(set) var usage: [UUID: TokenUsage] = [:]
+    /// Loop currently driven by the in-editor crew, and its progress log.
+    private(set) var runningLoop: String?
+    private(set) var loopLog: [String] = []
+    private(set) var lastError: String?
 
-    @ObservationIgnored private let engine: EngineStore
+    @ObservationIgnored let engine: EngineStore
+    @ObservationIgnored let studio: StudioStore
     @ObservationIgnored private var sessions: [String: LLMSession] = [:]
     /// Tool results not yet delivered to the model (run was stopped / hit the step limit).
     /// They are sent with the next message so the provider history stays valid.
-    @ObservationIgnored private var undelivered: [UUID: [ToolOutcome]] = [:]
-    @ObservationIgnored private var cancelled: Set<UUID> = []
+    @ObservationIgnored private var undelivered: [String: [ToolOutcome]] = [:]
+    @ObservationIgnored private var cancelled: Set<String> = []
+    @ObservationIgnored private var loopCancelled = false
+    /// Machine-specific provider choice per agent (agent files only carry a provider name).
+    @ObservationIgnored private var providerOverrides: [String: UUID] = [:]
     @ObservationIgnored private let storeURL: URL
 
-    init(engine: EngineStore) {
+    init(engine: EngineStore, studio: StudioStore) {
         self.engine = engine
+        self.studio = studio
         let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appending(path: "Skywalker", directoryHint: .isDirectory)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         storeURL = dir.appending(path: "crew.json")
         load()
+        if studio.agents.isEmpty {
+            engine.call("studio_team_template", ["template": "starter_crew"], actor: "editor")
+            studio.refresh()
+        }
     }
 
-    // MARK: Persistence
+    // MARK: Persistence (providers and local choices only; the roster is in the project)
 
     private struct Saved: Codable {
         var providers: [ProviderConfig]
-        var cloudlings: [Cloudling]
-        var plans: [FlightPlan]
-        var usage: [UUID: TokenUsage]?
+        var providerOverrides: [String: UUID]?
+    }
+
+    private struct LegacySaved: Decodable {
+        var cloudlings: [LegacyCloudling]?
     }
 
     private func load() {
-        if let data = try? Data(contentsOf: storeURL), let saved = try? JSONDecoder().decode(Saved.self, from: data) {
-            providers = saved.providers
-            cloudlings = saved.cloudlings
-            plans = saved.plans
-            usage = saved.usage ?? [:]
+        guard let data = try? Data(contentsOf: storeURL) else {
+            providers = ProviderConfig.presets
             return
         }
-        providers = ProviderConfig.presets
-        cloudlings = Cloudling.starterCrew(provider: providers.first?.id)
-        if cloudlings.count >= 4 {
-            plans = [FlightPlan(name: "Build a level", steps: [
-                FlightStep(cloudlingID: cloudlings[1].id, instruction: "Lay out the level for the goal. Keep it readable from the main camera."),
-                FlightStep(cloudlingID: cloudlings[2].id, instruction: "Add the gameplay behaviors the goal needs and test them with sim_control step."),
-                FlightStep(cloudlingID: cloudlings[3].id, instruction: "Light the scene to match the mood of the goal."),
-            ])]
+        if let saved = try? JSONDecoder().decode(Saved.self, from: data) {
+            providers = saved.providers
+            providerOverrides = saved.providerOverrides ?? [:]
+        } else {
+            providers = ProviderConfig.presets
+        }
+        // Crews from earlier editor versions lived in Application Support: move them into the
+        // project roster once (agents/<id>.agent.json), then forget the old copy.
+        if let legacy = try? JSONDecoder().decode(LegacySaved.self, from: data), let old = legacy.cloudlings, !old.isEmpty {
+            if studio.agents.isEmpty {
+                for c in old { engine.call("studio_agent_define", c.spec, actor: "editor") }
+                studio.refresh()
+            }
+            save()
         }
     }
 
     func save() {
-        let saved = Saved(providers: providers, cloudlings: cloudlings, plans: plans, usage: usage)
+        let saved = Saved(providers: providers, providerOverrides: providerOverrides)
         if let data = try? JSONEncoder().encode(saved) { try? data.write(to: storeURL, options: .atomic) }
     }
 
-    // MARK: Queries
+    // MARK: Roster
 
+    var cloudlings: [Cloudling] { studio.agents }
     func transcript(for c: Cloudling) -> [ChatEntry] { transcripts[c.id] ?? [] }
-    func isWorking(_ c: Cloudling) -> Bool { working.contains(c.id) }
-    var workingCount: Int { working.count }
-    func modelLabel(for c: Cloudling) -> String {
-        let provider = providers.first { $0.id == c.providerID } ?? providers.first
-        return c.model.isEmpty ? (provider?.defaultModel ?? "no provider") : c.model
-    }
+    func isWorking(_ c: Cloudling) -> Bool { working.contains(c.id) || studio.isWorking(c.id) }
+    var workingCount: Int { cloudlings.filter(isWorking).count }
     func cloudling(named name: String) -> Cloudling? {
-        cloudlings.first { $0.name.caseInsensitiveCompare(name) == .orderedSame }
+        let n = name.hasPrefix("@") ? String(name.dropFirst()) : name
+        return cloudlings.first { $0.id == n.lowercased() || $0.name.caseInsensitiveCompare(n) == .orderedSame }
     }
-    /// The crew member behind an actor id: in-editor agents ("agent:Name") or external MCP
-    /// agents that connect under a crew member's name ("mcp:Name").
+    /// The crew member behind an actor id: in-editor agents ("agent:<id>") or external MCP
+    /// agents that connect under a crew member's name ("mcp:<id>", "mcp:<client>/<id>").
     func cloudling(actor: String) -> Cloudling? {
         for prefix in ["agent:", "mcp:"] where actor.hasPrefix(prefix) {
-            return cloudling(named: String(actor.dropFirst(prefix.count)))
+            let rest = String(actor.dropFirst(prefix.count))
+            return cloudling(named: rest.split(separator: "/").last.map(String.init) ?? rest)
         }
         return nil
     }
+    func usage(for c: Cloudling) -> TokenUsage { studio.usage[c.id] ?? TokenUsage() }
+    var totalUsage: TokenUsage { studio.totalUsage }
 
-    func usage(for c: Cloudling) -> TokenUsage { usage[c.id] ?? TokenUsage() }
-    var totalUsage: TokenUsage { usage.values.reduce(TokenUsage(), +) }
-    func resetUsage(_ c: Cloudling) {
-        usage[c.id] = nil
+    func provider(for c: Cloudling) -> ProviderConfig? {
+        if let id = providerOverrides[c.id], let p = providers.first(where: { $0.id == id }) { return p }
+        let want = c.provider.lowercased()
+        if let p = providers.first(where: { $0.name.lowercased() == want }) { return p }
+        if want == "anthropic" || want == "claude" { return providers.first { $0.kind == .anthropic } ?? providers.first }
+        if want == "openai" { return providers.first { $0.kind == .openAICompatible } ?? providers.first }
+        return providers.first
+    }
+
+    /// Remembers which local provider config runs an agent on this machine (the agent file
+    /// itself stores the provider's name).
+    func setProviderOverride(_ config: ProviderConfig, forAgent id: String) {
+        providerOverrides[id] = config.id
         save()
+        sessions = sessions.filter { !$0.key.hasPrefix(id + "|") }
+    }
+
+    func modelLabel(for c: Cloudling) -> String {
+        c.model.isEmpty ? (provider(for: c)?.defaultModel ?? "no provider") : c.model
+    }
+
+    /// Writes an agent definition to the project (studio_agent_define).
+    @discardableResult
+    func define(_ c: Cloudling) -> Bool {
+        let r = engine.call("studio_agent_define", c.spec, actor: "editor")
+        if r.isError { lastError = r.text }
+        applyDefinitionChanges(c)
+        studio.refresh()
+        return !r.isError
+    }
+
+    @discardableResult
+    func add(role: CrewRole) -> String? {
+        let r = engine.call("studio_agent_define", ["name": .string("Puff \(cloudlings.count + 1)"), "role": .string(role.id)],
+                            actor: "editor")
+        studio.refresh()
+        return r.isError ? nil : r.structured["id"].string
+    }
+
+    func remove(_ c: Cloudling) {
+        stop(c)
+        engine.call("studio_agent_remove", ["agent": .string(c.id)], actor: "editor")
+        transcripts[c.id] = nil
+        studio.refresh()
+    }
+
+    func spawnTeam(_ template: String) {
+        let r = engine.call("studio_team_template", ["template": .string(template)], actor: "editor")
+        if r.isError { lastError = r.text }
+        studio.refresh()
     }
 
     /// Drops cached provider sessions so definition changes (instructions, tools, model)
     /// apply to the next message. The visible transcript is kept.
     func applyDefinitionChanges(_ c: Cloudling) {
         guard !working.contains(c.id) else { return }
-        sessions = sessions.filter { !$0.key.hasPrefix(c.id.uuidString) }
+        sessions = sessions.filter { !$0.key.hasPrefix(c.id + "|") }
         undelivered[c.id] = nil
     }
 
     func resetConversation(_ c: Cloudling) {
         stop(c)
-        sessions = sessions.filter { !$0.key.hasPrefix(c.id.uuidString) }
+        sessions = sessions.filter { !$0.key.hasPrefix(c.id + "|") }
         undelivered[c.id] = nil
         transcripts[c.id] = []
     }
@@ -141,11 +202,11 @@ final class CrewStore {
     // MARK: Running agents
 
     /// Sends a message to a Cloudling and runs its tool loop until it is done.
-    /// Returns the agent's final text (used for delegation and pipelines).
+    /// Returns the agent's final text (used for delegation and loops).
     @discardableResult
-    func send(_ text: String, to c: Cloudling, depth: Int = 0) async -> String {
+    func send(_ text: String, to c: Cloudling, depth: Int = 0, loopMember: Bool = false) async -> String {
         // One loop per agent at a time: a second loop would interleave messages in the
-        // same provider history (weave / pipelines / delegation can all target a busy agent).
+        // same provider history (weave / loops / delegation can all target a busy agent).
         guard !working.contains(c.id) else {
             log(c, ChatEntry(role: .system, text: "Busy — skipped a request while already working."))
             return "\(c.name) is busy with another task; try again later."
@@ -155,16 +216,14 @@ final class CrewStore {
         log(c, ChatEntry(role: .user, text: text))
         working.insert(c.id)
         cancelled.remove(c.id)
-        defer {
-            working.remove(c.id)
-            save()  // persist usage and memory
-        }
+        defer { working.remove(c.id) }
 
-        let allowDelegation = depth == 0
-        let key = "\(c.id.uuidString)|\(allowDelegation)"
+        let allowDelegation = depth == 0 && !loopMember
+        let key = "\(c.id)|\(allowDelegation)|\(loopMember)"
         let session: LLMSession
+        let model: String
         do {
-            session = try sessionFor(c, key: key, allowDelegation: allowDelegation)
+            (session, model) = try sessionFor(c, key: key, allowDelegation: allowDelegation, loopMember: loopMember)
         } catch {
             log(c, ChatEntry(role: .error, text: error.localizedDescription, isError: true))
             return "error: \(error.localizedDescription)"
@@ -189,19 +248,20 @@ final class CrewStore {
                 return "error: \(error.localizedDescription)"
             }
             userText = nil
-            usage[c.id] = (usage[c.id] ?? TokenUsage()) + turn.usage
+            reportUsage(turn.usage, model: model, for: c)
+            if case .refusal(let why) = turn.stop {
+                // A declined turn's partial output is discarded and its tools never run.
+                log(c, ChatEntry(role: .error, text: "The model declined: \(why)", isError: true))
+                sessions[key] = nil
+                return finalText.isEmpty ? "(declined)" : finalText
+            }
             if !turn.text.isEmpty {
                 log(c, ChatEntry(role: .agent, text: turn.text))
                 finalText = turn.text
             }
-            switch turn.stop {
-            case .refusal(let why):
-                log(c, ChatEntry(role: .error, text: "The model declined: \(why)", isError: true))
-                return finalText
-            case .maxTokens where turn.toolCalls.isEmpty:
+            if case .maxTokens = turn.stop, turn.toolCalls.isEmpty {
                 log(c, ChatEntry(role: .system, text: "Reply was cut off (max tokens)."))
                 return finalText
-            default: break
             }
             if turn.toolCalls.isEmpty { return finalText }
             outcomes = []
@@ -209,8 +269,12 @@ final class CrewStore {
                 if cancelled.contains(c.id) {
                     outcomes.append(ToolOutcome(callID: call.id, name: call.name, text: "Cancelled by the user.",
                                                 imagesBase64: [], isError: true))
+                } else if case .maxTokens = turn.stop {
+                    outcomes.append(ToolOutcome(callID: call.id, name: call.name,
+                                                text: "Your reply was cut off (max_tokens) before this call was complete, so it was not run. Re-issue it with smaller arguments.",
+                                                imagesBase64: [], isError: true))
                 } else {
-                    outcomes.append(await execute(call, by: c, depth: depth))
+                    outcomes.append(await execute(call, by: c, depth: depth, loopMember: loopMember))
                 }
             }
         }
@@ -219,46 +283,38 @@ final class CrewStore {
         return finalText
     }
 
-    private func sessionFor(_ c: Cloudling, key: String, allowDelegation: Bool) throws -> LLMSession {
-        if let s = sessions[key] { return s }
-        guard let provider = providers.first(where: { $0.id == c.providerID }) ?? providers.first else {
-            throw ProviderError.badResponse("no provider configured")
+    /// The engine's brief for an agent: its system prompt and permitted tools (the same
+    /// ones the headless runner and external agents use).
+    private func brief(_ c: Cloudling, loopMember: Bool) -> (prompt: String, access: [String: String]) {
+        let r = engine.call("studio_agent_brief", ["agent": .string(c.id), "loop_member": .bool(loopMember)], actor: "editor")
+        var access: [String: String] = [:]
+        for t in r.structured["tools"].array {
+            if let n = t["name"].string { access[n] = t["access"].string ?? "allow" }
         }
-        let model = c.model.isEmpty ? provider.defaultModel : c.model
-        let s = try Providers.makeSession(config: provider, model: model, system: systemPrompt(for: c),
-                                          tools: tools(for: c, allowDelegation: allowDelegation))
-        sessions[key] = s
-        return s
+        return (r.structured["system_prompt"].string ?? "", access)
     }
 
-    private func tools(for c: Cloudling, allowDelegation: Bool) -> [AgentTool] {
-        var out: [AgentTool] = engineTools().filter { c.access(category: $0.category, readOnly: $0.readOnly) != .off }
-        out.append(AgentTool(
-            name: "memory_note",
-            description: "Save a short note to your long-term memory (kept across conversations and shown to you at " +
-                "the start of each one): project conventions, decisions, the human's preferences, unfinished work.",
-            inputSchema: ["type": "object", "properties": ["note": ["type": "string", "description": "One concise fact"]],
-                          "required": ["note"], "additionalProperties": false],
-            readOnly: false))
-        out.append(AgentTool(
-            name: "memory_forget",
-            description: "Remove an outdated note from your long-term memory by its number (1-based, as listed in your instructions).",
-            inputSchema: ["type": "object", "properties": ["number": ["type": "integer", "description": "Note number"]],
-                          "required": ["number"], "additionalProperties": false],
-            readOnly: false))
-        if allowDelegation && c.roleID == "director" {
-            out.append(AgentTool(
+    private func sessionFor(_ c: Cloudling, key: String, allowDelegation: Bool, loopMember: Bool) throws -> (LLMSession, String) {
+        guard let provider = provider(for: c) else { throw ProviderError.badResponse("no provider configured") }
+        let model = c.model.isEmpty ? provider.defaultModel : c.model
+        if let s = sessions[key] { return (s, model) }
+        let (prompt, access) = brief(c, loopMember: loopMember)
+        var tools = engineTools().filter { access[$0.name] != nil }
+        if allowDelegation && (c.discipline == "direction" || c.discipline == "production") {
+            tools.append(AgentTool(
                 name: "crew_delegate",
                 description: "Give a task to a crew member and wait for their report. Members: " +
-                    cloudlings.filter { $0.id != c.id }.map { "\($0.name) (\($0.role.title))" }.joined(separator: ", ") +
-                    ". Be specific about what done looks like.",
+                    cloudlings.filter { $0.id != c.id }.map { "@\($0.id) (\($0.role.title))" }.joined(separator: ", ") +
+                    ". Be specific about what done looks like. For tracked work use studio_task_create instead.",
                 inputSchema: ["type": "object",
-                              "properties": ["member": ["type": "string", "description": "Crew member name"],
+                              "properties": ["member": ["type": "string", "description": "Crew member id or name"],
                                              "task": ["type": "string", "description": "The task"]],
                               "required": ["member", "task"], "additionalProperties": false],
                 readOnly: false))
         }
-        return out
+        let s = try Providers.makeSession(config: provider, model: model, system: prompt, tools: tools)
+        sessions[key] = s
+        return (s, model)
     }
 
     /// Engine tools with their categories and read-only flags.
@@ -270,33 +326,14 @@ final class CrewStore {
         }
     }
 
-    private func systemPrompt(for c: Cloudling) -> String {
-        var extra = ""
-        if !c.instructions.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            extra += "\nStanding instructions from the human:\n\(c.instructions)\n"
-        }
-        if !c.memory.isEmpty {
-            extra += "\nYour long-term memory (manage with memory_note / memory_forget):\n" +
-                c.memory.enumerated().map { "\($0.offset + 1). \($0.element)" }.joined(separator: "\n") + "\n"
-        }
-        return """
-        You are \(c.name), the \(c.role.title) on a small game-development crew working inside the Skywalker \
-        game engine. \(c.mission)
-        Personality: \(c.personality.isEmpty ? "friendly and concise" : c.personality)
-        \(extra)
-        You act on the live game through tools. Every change you make is undoable and shown to the human as \
-        done by you. Work loop: understand (scene_overview, selection_get) -> act (use batch for many edits) -> \
-        look (viewport_capture; boxes are labelled with #ids) -> verify -> report.
-        Conventions: meters, +Y up, entities face -Z, rotations are Euler degrees [pitch, yaw, roll], colors \
-        "#rrggbb". Behaviors are written in the Wander language (read wander_reference before writing any).
-        Reuse before you rebuild: search project assets with asset_list, look with asset_preview, save reusable \
-        groups with prefab_create and shared looks with material_create. Use scatter and place_on_surface for \
-        natural placement, viewport_multi to check layouts, and sim_trace to verify behaviors numerically.
-        When you finish, reply with two or three sentences on what you changed and anything the human should check.
-        """
+    private func reportUsage(_ u: TokenUsage, model: String, for c: Cloudling) {
+        guard u.requests > 0 || u.input > 0 || u.output > 0 else { return }
+        engine.call("studio_usage_report", ["agent": .string(c.id), "model": .string(model),
+                                            "input_tokens": .number(Double(u.input)), "output_tokens": .number(Double(u.output)),
+                                            "cache_read_tokens": .number(Double(u.cacheRead))], actor: "editor")
     }
 
-    private func execute(_ call: ToolCall, by c: Cloudling, depth: Int) async -> ToolOutcome {
+    private func execute(_ call: ToolCall, by c: Cloudling, depth: Int, loopMember: Bool) async -> ToolOutcome {
         log(c, ChatEntry(role: .tool, text: call.arguments.serialized(), toolName: call.name))
 
         if call.name == "crew_delegate" {
@@ -310,20 +347,13 @@ final class CrewStore {
                                imagesBase64: [], isError: false)
         }
 
-        if call.name == "memory_note" || call.name == "memory_forget" {
-            return remember(call, by: c)
-        }
-
-        guard let tool = engineTools().first(where: { $0.name == call.name }) else {
-            return ToolOutcome(callID: call.id, name: call.name, text: "Unknown tool \(call.name).", imagesBase64: [], isError: true)
-        }
-        let access = c.access(category: tool.category, readOnly: tool.readOnly)
-        if access == .off {
+        let access = brief(c, loopMember: loopMember).access[call.name]
+        guard let access else {
             return ToolOutcome(callID: call.id, name: call.name,
-                               text: "You are not permitted to use \(tool.category) tools. Ask the human or a crew member.",
+                               text: "The tool \(call.name) is not available to you (permissions or autonomy). Ask the human or a crew member.",
                                imagesBase64: [], isError: true)
         }
-        if access == .ask {
+        if access == "ask" {
             let approved = await withCheckedContinuation { cont in
                 pendingApprovals.append(PendingApproval(cloudling: c, call: call, resume: cont))
             }
@@ -342,75 +372,6 @@ final class CrewStore {
                            isError: result.isError)
     }
 
-    private func remember(_ call: ToolCall, by c: Cloudling) -> ToolOutcome {
-        guard let i = cloudlings.firstIndex(where: { $0.id == c.id }) else {
-            return ToolOutcome(callID: call.id, name: call.name, text: "unknown agent", imagesBase64: [], isError: true)
-        }
-        var text: String
-        var isError = false
-        if call.name == "memory_note" {
-            let note = (call.arguments["note"].string ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-            if note.isEmpty {
-                text = "Empty note."
-                isError = true
-            } else {
-                cloudlings[i].memory.append(String(note.prefix(500)))
-                if cloudlings[i].memory.count > 50 { cloudlings[i].memory.removeFirst() }
-                text = "Remembered (note \(cloudlings[i].memory.count))."
-            }
-        } else {
-            let n = call.arguments["number"].int ?? 0
-            if n >= 1 && n <= cloudlings[i].memory.count {
-                let removed = cloudlings[i].memory.remove(at: n - 1)
-                text = "Forgot: \(removed)"
-            } else {
-                text = "No note number \(n)."
-                isError = true
-            }
-        }
-        log(c, ChatEntry(role: .tool, text: text, toolName: call.name, isError: isError))
-        save()
-        return ToolOutcome(callID: call.id, name: call.name, text: text, imagesBase64: [], isError: isError)
-    }
-
-    // MARK: Project agents (agents/*.agent.json)
-
-    func agentFiles(in project: URL) -> [URL] {
-        let dir = project.appending(path: "agents", directoryHint: .isDirectory)
-        let files = (try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)) ?? []
-        return files.filter { $0.lastPathComponent.hasSuffix(".agent.json") }.sorted { $0.path < $1.path }
-    }
-
-    @discardableResult
-    func exportAgent(_ c: Cloudling, to project: URL) throws -> URL {
-        let def = AgentDefinition(c, providerName: providers.first { $0.id == c.providerID }?.name)
-        let slug = c.name.lowercased().map { $0.isLetter || $0.isNumber ? String($0) : "-" }.joined()
-        let dir = project.appending(path: "agents", directoryHint: .isDirectory)
-        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        let url = dir.appending(path: "\(slug).agent.json")
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        try encoder.encode(def).write(to: url, options: .atomic)
-        return url
-    }
-
-    /// Adds (or updates, by name) a crew member from an agent file.
-    @discardableResult
-    func importAgent(from url: URL) throws -> Cloudling {
-        let def = try JSONDecoder().decode(AgentDefinition.self, from: Data(contentsOf: url))
-        var c = def.cloudling(providers: providers)
-        if let i = cloudlings.firstIndex(where: { $0.name.caseInsensitiveCompare(def.name) == .orderedSame }) {
-            c.id = cloudlings[i].id
-            c.providerID = cloudlings[i].providerID ?? c.providerID
-            cloudlings[i] = c
-            applyDefinitionChanges(c)
-        } else {
-            cloudlings.append(c)
-        }
-        save()
-        return c
-    }
-
     func resolve(_ approval: PendingApproval, approved: Bool) {
         // Resume exactly once, even if the button is clicked twice before the UI updates.
         guard let index = pendingApprovals.firstIndex(where: { $0.id == approval.id }) else { return }
@@ -418,58 +379,92 @@ final class CrewStore {
         pending.resume.resume(returning: approved)
     }
 
-    // MARK: Pipelines ("flight plans")
+    // MARK: Studio loops
 
-    func run(plan: FlightPlan, goal: String) async {
-        runningPlan = true
-        defer { runningPlan = false }
-        planLog = ["Goal: \(goal)"]
-        var notes: [String] = []
-        for (i, stage) in Self.stages(of: plan).enumerated() {
-            let members = stage.compactMap { step in cloudlings.first { $0.id == step.cloudlingID }.map { (step, $0) } }
-            guard !members.isEmpty else { continue }
-            if members.count == 1 {
-                planLog.append("Stage \(i + 1): \(members[0].1.name) — \(members[0].0.instruction)")
-            } else {
-                planLog.append("Stage \(i + 1) (parallel): " + members.map(\.1.name).joined(separator: " + "))
-            }
-            let handoff = notes.isEmpty ? "" : "\n\nNotes from earlier steps:\n" + notes.joined(separator: "\n")
-            // Agents in a stage work at the same time: their loops interleave on the main actor
-            // while each waits for its model, and every edit is still one attributed transaction.
-            var tasks: [Task<String, Never>] = []
-            for (step, member) in members {
-                var prompt = "Goal: \(goal)\n\nYour step: \(step.instruction)\(handoff)"
-                if members.count > 1 {
-                    let others = members.filter { $0.1.id != member.id }.map { "\($0.1.name) (\($0.0.instruction))" }
-                    prompt += "\n\nWorking in parallel with: \(others.joined(separator: "; ")). Stay within your step."
-                }
-                let message = prompt
-                tasks.append(Task { await self.send(message, to: member, depth: 1) })
-            }
-            var reports: [String] = []
-            for task in tasks { reports.append(await task.value) }
-            for (pair, report) in zip(members, reports) {
-                notes.append("- \(pair.1.name): \(report)")
-                planLog.append("  ↳ \(pair.1.name): \(report)")
-            }
-        }
-        planLog.append("Flight plan complete.")
+    /// Runs a studio loop with the in-editor crew: the engine runs playtest stages and the
+    /// loop state machine; agent stages run here (in parallel when the stage allows it).
+    func runLoop(_ name: String, goal: String = "", maxIterations: Int = 0) async {
+        guard runningLoop == nil else { return }
+        var args: JSON = ["loop": .string(name)]
+        if !goal.isEmpty { args.set("goal", .string(goal)) }
+        if maxIterations > 0 { args.set("max_iterations", .number(Double(maxIterations))) }
+        loopLog = []
+        await drive(name, engine.call("studio_loop_start", args, actor: "editor"))
     }
 
-    /// Groups steps into stages: a step marked parallel joins the previous step's stage.
-    static func stages(of plan: FlightPlan) -> [[FlightStep]] {
-        var out: [[FlightStep]] = []
-        for step in plan.steps {
-            if step.parallelWithPrevious, !out.isEmpty { out[out.count - 1].append(step) } else { out.append([step]) }
+    /// Answers a human approval gate and continues the loop.
+    func approveLoop(_ name: String, approved: Bool) async {
+        guard runningLoop == nil else { return }
+        await drive(name, engine.call("studio_loop_advance", ["loop": .string(name), "approve": .bool(approved)], actor: "editor"))
+    }
+
+    func stopLoop(_ name: String) {
+        if runningLoop == name {
+            loopCancelled = true
+            for c in cloudlings where working.contains(c.id) { stop(c) }
+        } else {
+            engine.call("studio_loop_stop", ["loop": .string(name), "reason": "stopped from the editor"], actor: "editor")
         }
-        return out
+    }
+
+    private func drive(_ name: String, _ first: ToolCallResult) async {
+        runningLoop = name
+        loopCancelled = false
+        defer {
+            runningLoop = nil
+            studio.refresh()
+        }
+        var r = first
+        while true {
+            if r.isError {
+                lastError = r.text
+                loopLog.append("✗ \(r.text)")
+                return
+            }
+            let st = r.structured
+            guard st["status"].string == "running" else {
+                loopLog.append("■ \(st["status"].string ?? "")\(st["stop_reason"].string.map { " — \($0)" } ?? "")")
+                return
+            }
+            let assignments = st["assignments"].array
+            let parallel = st["parallel"].bool ?? true
+            loopLog.append("◆ iteration \(st["iteration"].int ?? 0) · \(st["stage"].string ?? "") → "
+                + assignments.compactMap { $0["agent"].string.map { "@\($0)" } }.joined(separator: ", "))
+            var reports: [JSON] = []
+            if parallel && assignments.count > 1 {
+                // Agents of a parallel stage interleave on the main actor while each waits for
+                // its model; every edit is still one attributed transaction.
+                let tasks = assignments.map { a in Task { await self.runAssignment(a) } }
+                for t in tasks { reports.append(await t.value) }
+            } else {
+                for a in assignments { reports.append(await runAssignment(a)) }
+            }
+            if loopCancelled {
+                engine.call("studio_loop_stop", ["loop": .string(name), "reason": "stopped from the editor"], actor: "editor")
+                loopLog.append("■ stopped")
+                return
+            }
+            studio.refresh()
+            r = engine.call("studio_loop_advance", ["loop": .string(name), "reports": .array(reports)], actor: "editor")
+        }
+    }
+
+    private func runAssignment(_ a: JSON) async -> JSON {
+        let id = a["agent"].string ?? ""
+        guard let c = cloudlings.first(where: { $0.id == id }) else {
+            return ["agent": .string(id), "report": "(agent no longer on the roster)"]
+        }
+        let report = await send(a["prompt"].string ?? "", to: c, depth: 1, loopMember: true)
+        loopLog.append("  ↳ @\(id): \(report.prefix(160))")
+        return ["agent": .string(id), "report": .string(report)]
     }
 
     // MARK: Weave (intent -> Wander)
 
-    /// Asks the gameplay Cloudling to turn a behavior's natural-language intent into Wander code.
+    /// Asks the gameplay programmer to turn a behavior's natural-language intent into Wander code.
     func weave(entity: UInt64, entityName: String, behavior: String, intent: String) async {
-        guard let coder = cloudlings.first(where: { $0.roleID == "gameplay" }) ?? cloudlings.first else { return }
+        guard let coder = cloudlings.first(where: { $0.roleID == "gameplay_programmer" })
+            ?? cloudlings.first(where: { $0.discipline == "engineering" }) ?? cloudlings.first else { return }
         await send("""
             Write the Wander behavior "\(behavior)" for entity #\(entity) (\(entityName)).
             Intent: \(intent)

@@ -37,6 +37,9 @@
 namespace sky {
 
 class SocketServer;
+namespace studio {
+class Studio;
+}
 
 struct EngineConfig {
     RendererBackend renderer = RendererBackend::Auto;
@@ -225,6 +228,10 @@ public:
     Status setActionMap(input::ActionMap map);
     /// Re-reads input.json / audio.json if they changed on disk (called periodically).
     void reloadProjectSettings(bool force = false);
+    // --- Studio (multi-agent roster, board, feedback, loops; docs/STUDIO.md) -----------
+    /// Created on first use from the project's agents/ and studio/ folders. Main thread only.
+    studio::Studio& studio();
+    bool hasStudio() const { return studio_ != nullptr; }
 
     // --- Events (activity feed) -----------------------------------------------------
     void emitEvent(Json event);
@@ -316,6 +323,7 @@ private:
     int editDepth_ = 0;
     std::deque<std::pair<std::function<Json()>, std::promise<Json>>> jobs_;
     std::unique_ptr<SocketServer> server_;
+    std::unique_ptr<studio::Studio> studio_;
 };
 
 void registerEngineTools(Engine& engine);

@@ -102,6 +102,8 @@ final class EngineStore {
     @ObservationIgnored private var lastTick = Date()
     @ObservationIgnored private var lastOverview = Date.distantPast
     @ObservationIgnored let projectDirectory: URL
+    /// Called when the engine reports studio activity (tasks, feedback, decisions, loops...).
+    @ObservationIgnored var onStudioEvent: (() -> Void)?
 
     init(projectDirectory: URL) {
         self.projectDirectory = projectDirectory
@@ -314,6 +316,15 @@ final class EngineStore {
                 playState = e["state"].string ?? playState
             case "selection":
                 syncSelectionFromEngine()
+            case "studio":
+                onStudioEvent?()
+                let kind = e["kind"].string ?? ""
+                let action = e["action"].string ?? ""
+                let notable = kind == "decision" || kind == "playtest" || (kind == "feedback" && action != "seen_again")
+                    || (kind == "loop" && (action == "started" || action == "finished"))
+                if notable {
+                    append(ActivityItem(actor: actor, kind: "studio", text: e["summary"].string ?? kind, ok: true))
+                }
             case "asset_request":
                 append(ActivityItem(actor: e["request"]["requestedBy"].string ?? actor, kind: "asset",
                                     text: "requested \(e["request"]["kind"].string ?? "asset"): \(e["request"]["prompt"].string ?? "")", ok: true))

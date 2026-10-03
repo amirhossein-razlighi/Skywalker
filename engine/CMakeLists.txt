@@ -58,6 +58,13 @@ set(SKY_ENGINE_SOURCES
     src/input/ActionMap.cpp
     src/agent/AudioTools.cpp
     src/agent/InputTools.cpp
+    # Studio (multi-agent roster, board, feedback, loops, playtests, runner)
+    src/studio/Catalog.cpp
+    src/studio/Studio.cpp
+    src/studio/Playtest.cpp
+    src/studio/Llm.cpp
+    src/studio/Runner.cpp
+    src/agent/StudioTools.cpp
 )
 
 # DCC bridge: the Python helper library and the Blender add-on are embedded so the engine can

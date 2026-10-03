@@ -46,5 +46,6 @@ Status applySimInput(Engine& engine, const Json& args);
 /// DCC bridge tools (Blender, Maya, Houdini, 3ds Max). Pass a manager to use a specific state
 /// folder / host (tests); the default talks to the real machine. Returns the manager in use.
 std::shared_ptr<dcc::Manager> addDccTools(Engine& engine, ToolRegistry& reg, std::shared_ptr<dcc::Manager> manager = nullptr);
+void addStudioTools(Engine& engine, ToolRegistry& reg);
 
 }  // namespace sky::tools

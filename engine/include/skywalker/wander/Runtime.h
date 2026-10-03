@@ -67,6 +67,9 @@ public:
     std::function<void(EntityId emitter, int count)> burst;
     /// Water surface height for water_height(); set by the engine (ocean simulation).
     std::function<float(float x, float z)> waterHeight;
+    // Studio builtins/hooks: observes every emitted event (scripts and external emit())
+    // so playtest bots can record deaths, objectives and damage. Optional.
+    std::function<void(const std::string& name, EntityId target, EntityId source)> onEmit;
 
     // audio builtins: set by the engine (audio system). Each returns an error message, "" on success.
     std::function<std::string(EntityId entity)> playAudio;                                    // play(e)

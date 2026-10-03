@@ -31,6 +31,7 @@ set(SKY_TEST_SOURCES
     test_input.cpp
     test_capi_input.cpp
     test_dcc.cpp
+    test_studio.cpp
 )
 
 add_executable(skywalker_tests ${SKY_TEST_SOURCES})
