@@ -86,7 +86,12 @@ struct Stmt {
     Stmt(Kind k, SourceLoc l) : kind(k), loc(l) {}
 };
 
-enum class Trigger { Start, Tick, Event, Key, Click };
+enum class Trigger {
+    Start, Tick, Event, Key, Click,
+    // physics triggers: `on collide "filter"?`, `on trigger_enter "filter"?`, `on trigger_exit "filter"?`
+    // (filter = the other entity's name or one of its tags; `other` names it in the handler)
+    Collide, TriggerEnter, TriggerExit,
+};
 const char* toString(Trigger t);
 
 struct Handler {

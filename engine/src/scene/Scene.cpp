@@ -58,6 +58,13 @@ void Scene::registerKinds() {
     kinds_.push_back(makeReflectedKind<ParticleEmitter>());
     kinds_.push_back(makeReflectedKind<Water>());
     kinds_.push_back(makeReflectedKind<FluidVolume>());
+    kinds_.push_back(makeReflectedKind<RigidBody>());
+    kinds_.push_back(makeReflectedKind<Collider>());
+    kinds_.push_back(makeReflectedKind<CharacterController>());
+    kinds_.push_back(makeReflectedKind<Joint>());
+    kinds_.push_back(makeReflectedKind<PhysicsSettings>());
+    kinds_.push_back(makeReflectedKind<NavAgent>());
+    kinds_.push_back(makeReflectedKind<NavMeshSurface>());
 }
 
 const ComponentKind* Scene::componentKind(std::string_view n) const {

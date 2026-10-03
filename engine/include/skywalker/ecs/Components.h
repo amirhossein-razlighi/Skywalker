@@ -248,3 +248,5 @@ struct Environment {
 };
 
 }  // namespace sky
+
+#include "skywalker/ecs/PhysicsComponents.h"  // body, collider, character, joint, physics_world, nav_agent, navmesh

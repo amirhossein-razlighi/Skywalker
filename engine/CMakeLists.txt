@@ -35,6 +35,14 @@ set(SKY_ENGINE_SOURCES
     src/agent/SocketServer.cpp
     src/engine/Engine.cpp
     src/engine/Gizmo.cpp
+    # Physics (Jolt) + navigation (Recast/Detour)
+    src/ecs/PhysicsComponents.cpp
+    src/physics/JoltCommon.cpp
+    src/physics/Shapes.cpp
+    src/physics/PhysicsWorld.cpp
+    src/physics/PhysicsSystem.cpp
+    src/nav/NavMesh.cpp
+    src/nav/NavSystem.cpp
 )
 
 add_library(skywalker_engine STATIC ${SKY_ENGINE_SOURCES})
@@ -47,6 +55,10 @@ find_package(Threads REQUIRED)
 target_include_directories(skywalker_engine PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
 target_link_libraries(skywalker_engine PUBLIC sky::options PRIVATE ZLIB::ZLIB CURL::libcurl Threads::Threads)
+
+# Physics (Jolt) and navigation (Recast/Detour), see cmake/PhysicsDeps.cmake.
+include(${PROJECT_SOURCE_DIR}/cmake/PhysicsDeps.cmake)
+target_link_libraries(skywalker_engine PRIVATE Jolt Recast Detour DetourCrowd)
 # Definitions are C-family only (Swift consumers of the C API must not see them).
 target_compile_definitions(skywalker_engine PUBLIC
     $<$<COMPILE_LANGUAGE:C,CXX,OBJCXX>:SKY_VERSION_STRING="${PROJECT_VERSION}">)

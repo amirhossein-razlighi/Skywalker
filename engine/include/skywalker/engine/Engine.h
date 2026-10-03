@@ -25,6 +25,8 @@
 #include "skywalker/engine/Gizmo.h"
 #include "skywalker/fx/Ocean.h"
 #include "skywalker/fx/Particles.h"
+#include "skywalker/nav/NavSystem.h"
+#include "skywalker/physics/PhysicsSystem.h"
 #include "skywalker/render/MeshData.h"
 #include "skywalker/render/Renderer.h"
 #include "skywalker/scene/History.h"
@@ -194,6 +196,10 @@ public:
     /// Height of the water surface at world (x, z), waves included. False if no water covers it.
     bool waterHeight(float x, float z, float& height, Vec3* normal = nullptr);
 
+    // --- Physics & navigation (Jolt, Recast/Detour) -------------------------------------
+    physics::PhysicsSystem& physics() { return *physics_; }
+    nav::NavSystem& navigation() { return *nav_; }
+
     // --- Events (activity feed) -----------------------------------------------------
     void emitEvent(Json event);
     std::vector<Json> drainEvents();
@@ -244,6 +250,8 @@ private:
     fx::Ocean& oceanFor(EntityId e, const Water& w);
     wander::InputState input_;
     std::deque<Json> messages_;
+    std::unique_ptr<physics::PhysicsSystem> physics_;  // after scene_/runtime_; nav_ refers to it
+    std::unique_ptr<nav::NavSystem> nav_;
 
     std::vector<EntityId> selection_;
     std::string scenePath_;

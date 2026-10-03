@@ -63,6 +63,13 @@ Engine::Engine(EngineConfig config)
         float h = 0;
         return waterHeight(x, z, h) ? h : 0.f;
     };
+    // Physics & navigation: worlds mirror the scene; Wander's physics builtins go through physics_.
+    physics_ = std::make_unique<physics::PhysicsSystem>(
+        *scene_, [this](const std::string& key) { return cpuMesh(key); },
+        [this](const std::string& path) { return resolvePath(path); });
+    nav_ = std::make_unique<nav::NavSystem>(*scene_, *physics_, [this](const std::string& path) { return resolvePath(path); });
+    physics_->setNavigation(nav_.get());
+    runtime_->physics = physics_.get();
     registerEngineTools(*this);
     log::info("engine", std::string("Skywalker ") + SKY_VERSION_STRING + " ready (renderer: " + renderer_->info().backend +
                             " " + renderer_->info().device + ")");
@@ -152,6 +159,8 @@ void Engine::play() {
         runtime_->reset(/*keepQueuedEvents=*/true);
         accumulator_ = 0;
         particles_.reset();  // play sessions replay exactly
+        physics_->beginPlay();  // the world is built from the scene on the first tick
+        nav_->beginPlay();
     }
     playState_ = PlayState::Playing;
     emitEvent(Json::object({{"type", "play_state"}, {"state", "playing"}}));
@@ -172,6 +181,8 @@ void Engine::stop() {
     playSnapshot_ = Json();
     runtime_->reset();
     particles_.reset();
+    physics_->endPlay();
+    nav_->endPlay();
     input_ = {};
     std::erase_if(selection_, [&](EntityId id) { return !scene_->exists(id); });
     emitEvent(Json::object({{"type", "play_state"}, {"state", "editing"}}));
@@ -184,6 +195,7 @@ void Engine::step(int ticks) {
     }
     for (int i = 0; i < ticks; ++i) {
         runtime_->tick(kFixedDt, input_);
+        physics_->step(static_cast<float>(kFixedDt), *runtime_);  // nav steering, bodies, characters, contacts
         particles_.update(*scene_, static_cast<float>(kFixedDt));
         input_.pressed.clear();
         input_.clicked.clear();
