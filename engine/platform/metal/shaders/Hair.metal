@@ -179,7 +179,7 @@ kernel void hairInterpolate(uint i [[thread_position_in_grid]], constant HairPar
         if (k == 0) {
             float3 n0 = ref - T * dot(ref, T);
             if (length(n0) < 0.1) {
-                float3 alt = float3(0, 0, 1);
+                float3 alt = normalize((H.model * float4(0.0, 0.0, 1.0, 0.0)).xyz);
                 n0 = alt - T * dot(alt, T);
             }
             float l0 = length(n0);

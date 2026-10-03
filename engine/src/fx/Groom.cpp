@@ -164,7 +164,8 @@ float valueNoise3(Vec3 p) {
 }
 
 /// Parallel-transport frames of a polyline (mirrored by the GPU in Hair.metal).
-void transportFrames(const Vec3* b, int P, Vec3 ref, Vec3* T, Vec3* N) {
+/// `ref` / `alt` are the mesh X / Z axes in the curve's space (rotate with the groom).
+void transportFrames(const Vec3* b, int P, Vec3 ref, Vec3* T, Vec3* N, Vec3 alt = Vec3{0, 0, 1}) {
     Vec3 prevT{0, 1, 0};
     for (int k = 0; k < P; ++k) {
         Vec3 d = k + 1 < P ? b[k + 1] - b[k] : b[k] - b[k - 1];
@@ -172,10 +173,7 @@ void transportFrames(const Vec3* b, int P, Vec3 ref, Vec3* T, Vec3* N) {
         prevT = T[k];
     }
     Vec3 n0 = ref - T[0] * dot(ref, T[0]);
-    if (length(n0) < 0.1f) {
-        Vec3 alt{0, 0, 1};
-        n0 = alt - T[0] * dot(alt, T[0]);
-    }
+    if (length(n0) < 0.1f) n0 = alt - T[0] * dot(alt, T[0]);
     N[0] = safeNormalize(n0, Vec3{1, 0, 0});
     for (int k = 1; k < P; ++k) {
         Vec3 n = N[k - 1] - T[k] * dot(N[k - 1], T[k]);
@@ -786,11 +784,12 @@ void reconstructStrands(const GroomData& d, const std::vector<Vec3>& guides, con
     Vec3 ax = model.transformDir({1, 0, 0}), ay = model.transformDir({0, 1, 0}), az = model.transformDir({0, 0, 1});
     float scale = (length(ax) + length(ay) + length(az)) / 3.f;
     Vec3 ref = safeNormalize(ax, Vec3{1, 0, 0});
+    Vec3 alt = safeNormalize(az, Vec3{0, 0, 1});
     parallelFor(d.children.size(), [&](size_t i) {
         std::array<Vec3, 32> base, T, Nn;
         const auto& c = d.children[i];
         baseCurve(d, c, guides.data(), model.transformPoint(c.root), base.data());
-        transportFrames(base.data(), P, ref, T.data(), Nn.data());
+        transportFrames(base.data(), P, ref, T.data(), Nn.data(), alt);
         for (int k = 0; k < P; ++k) {
             Vec3 o = d.offsets[i * P + static_cast<size_t>(k)];
             Vec3 bn = cross(T[k], Nn[k]);
