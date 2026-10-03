@@ -82,8 +82,14 @@ std::string AssetDatabase::absolute(std::string_view projectPath) const {
 std::string AssetDatabase::relative(std::string_view path) const {
     std::error_code ec;
     fs::path abs = fs::path(path).is_absolute() ? fs::path(path) : fs::path(root_) / path;
-    fs::path rel = fs::relative(abs.lexically_normal(), fs::path(root_), ec);
-    std::string s = ec ? std::string() : rel.generic_string();
+    // Lexical first: this runs for every material / prefab lookup of a frame, and the
+    // canonicalizing fs::relative costs several file-system calls. Symlinked spellings of the
+    // root (e.g. /tmp vs /private/tmp) fall back to it.
+    std::string s = abs.lexically_normal().lexically_relative(fs::path(root_).lexically_normal()).generic_string();
+    if (s.empty() || s.rfind("..", 0) == 0) {
+        fs::path rel = fs::relative(abs.lexically_normal(), fs::path(root_), ec);
+        s = ec ? std::string() : rel.generic_string();
+    }
     if (s.empty() || s.rfind("..", 0) == 0) return {};
     return s;
 }

@@ -769,6 +769,25 @@ void addViewTools(Engine& engine, ToolRegistry& reg) {
                  return ToolResult::json(cam.toJson(), "camera:");
              }});
 
+    reg.add({"viewport_quality", "Viewport quality",
+             "How the live editor viewport renders while editing: fast (default; lower internal resolution, no "
+             "screen-space GI/reflections, flat clouds, near foliage shadows, coarser LODs) keeps heavy worlds "
+             "responsive; balanced; full (what the game and captures show). Play mode always renders full.",
+             "view", object({{"quality", enumeration({"fast", "balanced", "full"}, "Editing quality (omit to read)")}}),
+             false, false, [&engine](const Json& a, ToolContext&) {
+                 static const char* names[] = {"full", "balanced", "fast"};
+                 if (a.contains("quality")) {
+                     std::string q = a.get("quality").asString();
+                     engine.setViewportQuality(q == "full" ? ViewportQuality::Full
+                                               : q == "balanced" ? ViewportQuality::Balanced
+                                                                 : ViewportQuality::Fast);
+                 }
+                 std::string cur = names[static_cast<int>(engine.viewportQuality())];
+                 ToolResult r = ToolResult::text("viewport quality: " + cur);
+                 r.structured = Json::object({{"quality", cur}});
+                 return r;
+             }});
+
     reg.add({"selection_get", "Get selection",
              "Entities the human currently has selected in the editor (\"this\", \"these\" usually means them).",
              "view", object({}), false, false, [&engine](const Json&, ToolContext&) {

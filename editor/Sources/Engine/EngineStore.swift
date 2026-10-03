@@ -88,6 +88,8 @@ final class EngineStore {
     var snapping = false
     var snapStep: Float = 0.5 { didSet { applyGizmo() } }
     var viewSceneCamera = false { didSet { sky_set_view_scene_camera(handle, viewSceneCamera ? 1 : 0) } }
+    /// Editing-time viewport quality (fast / balanced / full); play mode always renders full.
+    var viewportQuality = "fast" { didSet { call("viewport_quality", ["quality": .string(viewportQuality)]) } }
     @ObservationIgnored private var frameCount = 0
     @ObservationIgnored private var fpsWindowStart = Date()
     var selection: Set<UInt64> = [] {

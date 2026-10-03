@@ -21,6 +21,7 @@ public:
         std::function<std::string(const std::string&)> resolvePath;                     // project-relative -> absolute
         std::function<const Surface*(const std::string&)> material;                     // material asset -> surface
         std::function<std::optional<Aabb>(const std::string&)> meshBounds;              // mesh key -> local bounds
+        std::function<bool(const std::string&)> meshReady;  // false while a mesh is still streaming in
         std::function<bool(float x, float z, float top, float bottom, float& y, Vec3& n)> sceneSurface;  // ray down
         struct Part {
             std::string mesh, material;

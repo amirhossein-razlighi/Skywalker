@@ -261,6 +261,22 @@ struct ViewportPanel: View {
                             engine.call("environment_update", ["showGrid": .bool(!gridOn)])
                         }
                         IconButton(symbol: "chart.bar.xaxis", help: "Toggle stats", active: showStats) { showStats.toggle() }
+                        Divider().frame(height: 14)
+                        Menu {
+                            Picker("Editing Quality", selection: $engine.viewportQuality) {
+                                Text("Fast — responsive editing").tag("fast")
+                                Text("Balanced").tag("balanced")
+                                Text("Full — final look").tag("full")
+                            }
+                            .pickerStyle(.inline)
+                        } label: {
+                            Label(engine.viewportQuality.capitalized, systemImage: "gauge.with.dots.needle.33percent")
+                                .font(Theme.label)
+                        }
+                        .menuStyle(.borderlessButton)
+                        .fixedSize()
+                        .padding(.horizontal, 6)
+                        .help("Viewport quality while editing (play mode always renders full quality)")
                     }
                     .padding(3)
                     .background(Theme.panel.opacity(0.88), in: RoundedRectangle(cornerRadius: 6))

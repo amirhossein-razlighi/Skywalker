@@ -51,6 +51,9 @@ struct SkywalkerApp: App {
                 }
                 .keyboardShortcut("z", modifiers: [.command, .shift])
             }
+            CommandGroup(replacing: .newItem) {
+                Button("Open Project…") { Self.chooseProject() }.keyboardShortcut("o")
+            }
             CommandGroup(replacing: .saveItem) {
                 Button("Save Scene") { engine.call("scene_save", ["path": "scenes/main.sky.json"]) }.keyboardShortcut("s")
             }
@@ -72,11 +75,21 @@ struct SkywalkerApp: App {
         }
     }
 
-    /// The project folder: $SKY_PROJECT, or ~/Documents/Skywalker/Hello Sky (created from the
-    /// bundled template on first launch).
+    static let lastProjectKey = "lastProjectDirectory"
+
+    /// The project folder: `--project DIR`, $SKY_PROJECT, the last opened project, or
+    /// ~/Documents/Skywalker/Hello Sky (created from the bundled template on first launch).
     static func projectDirectory() -> URL {
+        let args = ProcessInfo.processInfo.arguments
+        if let i = args.firstIndex(of: "--project"), i + 1 < args.count {
+            return remember(URL(filePath: args[i + 1], directoryHint: .isDirectory))
+        }
         if let env = ProcessInfo.processInfo.environment["SKY_PROJECT"], !env.isEmpty {
             return URL(filePath: env, directoryHint: .isDirectory)
+        }
+        if let last = UserDefaults.standard.string(forKey: lastProjectKey),
+           FileManager.default.fileExists(atPath: last) {
+            return URL(filePath: last, directoryHint: .isDirectory)
         }
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         let project = docs.appending(path: "Skywalker/Hello Sky", directoryHint: .isDirectory)
@@ -87,6 +100,29 @@ struct SkywalkerApp: App {
         }
         try? FileManager.default.createDirectory(at: project, withIntermediateDirectories: true)
         return project
+    }
+
+    private static func remember(_ url: URL) -> URL {
+        UserDefaults.standard.set(url.path, forKey: lastProjectKey)
+        return url
+    }
+
+    /// Picks a project folder and relaunches the editor on it (each window owns one project).
+    static func chooseProject() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.prompt = "Open"
+        panel.message = "Choose a Skywalker project folder"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        _ = remember(url)
+        let config = NSWorkspace.OpenConfiguration()
+        config.createsNewApplicationInstance = true
+        config.arguments = ["--project", url.path]
+        NSWorkspace.shared.openApplication(at: Bundle.main.bundleURL, configuration: config) { _, _ in
+            DispatchQueue.main.async { NSApp.terminate(nil) }
+        }
     }
 }
 

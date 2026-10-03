@@ -1019,6 +1019,7 @@ private:
         float scale = std::max({length(d.model.transformDir({1, 0, 0})), length(d.model.transformDir({0, 1, 0})),
                                 length(d.model.transformDir({0, 0, 1}))});
         float dist = distance(lodFrame_->camera.eye, d.worldBounds.center());
+        bias += lodFrame_->quality >= 2 ? 1 : 0;
         return std::min(m.lodFor(pixelsPerUnit(*lodFrame_, dist) * scale) + bias, m.lodCount - 1);
     }
     int lodForChunk(const GpuMesh& m, const InstanceBatch& b, int bias = 0) const {
@@ -1026,10 +1027,11 @@ private:
         const Vec3 e = lodFrame_->camera.eye;
         Vec3 c{std::clamp(e.x, b.bounds.min.x, b.bounds.max.x), std::clamp(e.y, b.bounds.min.y, b.bounds.max.y),
                std::clamp(e.z, b.bounds.min.z, b.bounds.max.z)};
+        bias += lodFrame_->quality >= 2 ? 1 : 0;  // fast editing view
         int lod = std::min(m.lodFor(pixelsPerUnit(*lodFrame_, distance(e, c)) * 1.3f) + bias, m.lodCount - 1);
         // Leaf/grass cards thin out badly when simplified hard: keep the canopy readable
         // (distant forests should use impostors).
-        if (b.surface.alphaCutoff > 0.f) lod = std::min(lod, 1 + bias);
+        if (b.surface.alphaCutoff > 0.f && lodFrame_->quality < 2) lod = std::min(lod, 1 + bias);
         return lod;
     }
 
@@ -1703,7 +1705,8 @@ private:
             if (!b.castShadows || !b.instances || b.instances->empty() || !fr.intersects(b.bounds)) continue;
             Vec3 c{std::clamp(frame.camera.eye.x, b.bounds.min.x, b.bounds.max.x), std::clamp(frame.camera.eye.y, b.bounds.min.y, b.bounds.max.y),
                    std::clamp(frame.camera.eye.z, b.bounds.min.z, b.bounds.max.z)};
-            if (distance(c, frame.camera.eye) > b.cullDistance) continue;
+            float dist = distance(c, frame.camera.eye);
+            if (dist > b.cullDistance || (frame.quality >= 2 && dist > 60.f)) continue;  // fast view: near shadows only
             const GpuMesh* m = mesh(b.mesh);
             if (!m) continue;
             if (!bound) {
