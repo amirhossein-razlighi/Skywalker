@@ -23,6 +23,7 @@ set(SKY_ENGINE_SOURCES
     src/world/Foliage.cpp
     src/world/WorldRuntime.cpp
     src/render/Vegetation.cpp
+    src/render/ColorGrading.cpp
     src/render/MeshFormats.cpp
     src/assets/Fetch.cpp
     src/render/TextureGen.cpp

@@ -142,3 +142,23 @@ TEST_CASE("world: vegetation meshes stand on the ground with sane sizes") {
         CHECK(m->hasVertexColors);
     }
 }
+
+#include "skywalker/render/ColorGrading.h"
+
+TEST_CASE("grading: looks bake valid LUTs and .cube files parse") {
+    for (const auto& look : grading::looks()) {
+        auto lut = grading::lookLut(look, 9);
+        REQUIRE(lut);
+        CHECK(lut->rgb.size() == 9u * 9 * 9 * 3);
+        for (float v : lut->rgb) CHECK((v >= 0.f && v <= 1.f));
+    }
+    auto none = grading::lookLut("none", 5);
+    REQUIRE(none);
+    CHECK(none->rgb[3] == doctest::Approx(0.25f));  // identity: second red step
+    CHECK(!grading::lookLut("tealorange"));
+    auto cube = grading::parseCube("TITLE \"t\"\nLUT_3D_SIZE 2\n0 0 0\n1 0 0\n0 1 0\n1 1 0\n0 0 1\n1 0 1\n0 1 1\n1 1 1\n");
+    REQUIRE(cube);
+    CHECK(cube->size == 2);
+    CHECK(cube->rgb[3] == doctest::Approx(1.f));
+    CHECK(!grading::parseCube("LUT_3D_SIZE 2\n0 0 0\n"));
+}

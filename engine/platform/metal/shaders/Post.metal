@@ -19,8 +19,9 @@ static float3 sampleBox4(texture2d<float> t, float2 uv, float2 texel) {
 }
 
 fragment float4 bloomPrefilter(FullscreenOut in [[stage_in]], texture2d<float> src [[texture(0)]],
-                               constant PostUniforms& p [[buffer(0)]]) {
-    float3 c = sampleBox4(src, uvOf(in), p.texel.xy) * p.params.x;
+                               texture2d<float> exposureTex [[texture(1)]], constant PostUniforms& p [[buffer(0)]]) {
+    float autoExp = p.grade.w > 0.5 ? exposureTex.read(uint2(0, 0)).r : 1.0;
+    float3 c = sampleBox4(src, uvOf(in), p.texel.xy) * p.params.x * autoExp;
     float brightness = max(c.r, max(c.g, c.b));
     float knee = p.params.z * 0.5;
     float soft = clamp(brightness - p.params.z + knee, 0.0, 2.0 * knee);
@@ -198,10 +199,147 @@ fragment float4 temporalFragment(FullscreenOut in [[stage_in]], constant FrameUn
     return float4(max(fromYCoCg(outC), 0.0), 1.0);
 }
 
+// ---------------------------------------------------------------------------
+// Camera: auto exposure (center-weighted log-average metering + eye adaptation), motion
+// blur (camera motion from depth reprojection), and bokeh depth of field (thin-lens circle
+// of confusion, half-resolution golden-angle gather that keeps sharp foregrounds clean).
+// ---------------------------------------------------------------------------
+
+struct LensUniforms {
+    float4 lens;    // x = f-stop (0 = off), y = focus distance (m, 0 = auto), z = focal length (mm), w = max CoC (half-res px)
+    float4 motion;  // x = shutter (0 = off), yzw = unused
+    float4 texel;   // xy = full-res texel, zw = half-res texel
+    float4 view;    // x = image height (px), yzw = unused
+};
+
+fragment float2 lumaFragment(FullscreenOut in [[stage_in]], texture2d<float> hdr [[texture(0)]]) {
+    float2 uv = uvOf(in);
+    float lum = dot(hdr.sample(linearClamp, uv).rgb, float3(0.2126, 0.7152, 0.0722));
+    float2 d = uv - 0.5;
+    float w = exp(-dot(d, d) * 5.0);  // center-weighted metering
+    return float2(clamp(log2(max(lum, 1e-5)), -16.0, 16.0) * w, w);
+}
+
+fragment float exposureFragment(FullscreenOut in [[stage_in]], constant float4& p [[buffer(0)]],
+                                texture2d<float> lum [[texture(0)]], texture2d<float> prev [[texture(1)]]) {
+    uint last = lum.get_num_mip_levels() - 1;
+    float2 v = lum.read(uint2(0, 0), last).rg;
+    float avgLum = exp2(v.r / max(v.g, 1e-5));
+    float target = clamp(0.16 / max(avgLum, 1e-5), exp2(p.z), exp2(p.w));
+    if (p.x < 0.0) return target;
+    float cur = prev.read(uint2(0, 0)).r;
+    if (!(cur > 0.0) || !isfinite(cur)) return target;
+    return exp2(mix(log2(cur), log2(target), 1.0 - exp(-p.x)));
+}
+
+fragment float4 motionBlurFragment(FullscreenOut in [[stage_in]], constant FrameUniforms& f [[buffer(0)]],
+                                   constant LensUniforms& l [[buffer(1)]], texture2d<float> src [[texture(0)]],
+                                   depth2d<float> depthTex [[texture(1)]]) {
+    float2 uv = uvOf(in);
+    float d = depthTex.sample(pointClamp, uv);
+    float3 p = reconstructWorld(f, uv, min(d, 0.999999));
+    float4 pc = f.prevViewProj * float4(p, 1.0);
+    float2 puv = float2(pc.x / pc.w * 0.5 + 0.5, 0.5 - pc.y / pc.w * 0.5);
+    float2 vel = (uv - puv) * l.motion.x;
+    float len = length(vel);
+    if (len < l.texel.x * 0.5 || pc.w <= 0.0) return src.sample(pointClamp, uv);
+    vel *= min(1.0, 0.06 / len);  // cap the streak
+    float jitter = interleavedGradientNoise(in.position.xy) - 0.5;
+    float3 sum = 0.0;
+    const int N = 12;
+    for (int i = 0; i < N; ++i) {
+        float t = (float(i) + 0.5 + jitter) / float(N) - 0.5;
+        sum += src.sample(linearClamp, uv + vel * t).rgb;
+    }
+    return float4(sum / float(N), 1.0);
+}
+
+// Signed circle of confusion in half-resolution pixels (negative = in front of focus).
+static float circleOfConfusion(constant FrameUniforms& f, constant LensUniforms& l, float2 uv, float depth, float focus) {
+    float3 p = reconstructWorld(f, uv, min(depth, 0.999999));
+    float z = max(dot(p - f.cameraPos.xyz, f.cameraForward.xyz), 0.01) * 1000.0;  // mm
+    float zf = focus * 1000.0;
+    float fl = l.lens.z;
+    float A = fl / max(l.lens.x, 0.5);
+    float cocMM = A * fl * (z - zf) / (z * max(zf - fl, 1.0));
+    float px = cocMM / 24.0 * l.view.x * 0.5;  // 24 mm sensor height, half resolution
+    return clamp(px, -l.lens.w, l.lens.w);
+}
+
+static float focusDistance(constant FrameUniforms& f, constant LensUniforms& l, depth2d<float> depthTex) {
+    if (l.lens.y > 0.0) return l.lens.y;
+    float sum = 0.0;
+    for (int i = 0; i < 5; ++i) {
+        float2 o = float2(i == 1 ? 0.02 : (i == 2 ? -0.02 : 0.0), i == 3 ? 0.02 : (i == 4 ? -0.02 : 0.0));
+        float d = depthTex.sample(pointClamp, float2(0.5) + o);
+        float3 p = reconstructWorld(f, float2(0.5) + o, min(d, 0.999999));
+        sum += min(dot(p - f.cameraPos.xyz, f.cameraForward.xyz), 5000.0);
+    }
+    return max(sum / 5.0, 0.2);
+}
+
+fragment float4 dofCocFragment(FullscreenOut in [[stage_in]], constant FrameUniforms& f [[buffer(0)]],
+                               constant LensUniforms& l [[buffer(1)]], texture2d<float> src [[texture(0)]],
+                               depth2d<float> depthTex [[texture(1)]]) {
+    float2 uv = uvOf(in);
+    float focus = focusDistance(f, l, depthTex);
+    // Nearest depth of the 2x2 footprint: foreground edges keep their blur.
+    float d = 1.0;
+    for (int y = 0; y < 2; ++y) {
+        for (int x = 0; x < 2; ++x) d = min(d, depthTex.sample(pointClamp, uv + (float2(x, y) - 0.5) * l.texel.xy));
+    }
+    return float4(src.sample(linearClamp, uv).rgb, circleOfConfusion(f, l, uv, d, focus));
+}
+
+fragment float4 dofBlurFragment(FullscreenOut in [[stage_in]], constant LensUniforms& l [[buffer(1)]],
+                                texture2d<float> cocTex [[texture(0)]]) {
+    float2 uv = uvOf(in);
+    float4 center = cocTex.sample(pointClamp, uv);
+    float centerSize = abs(center.a);
+    float3 color = center.rgb;
+    float tot = 1.0;
+    const float kGolden = 2.39996323;
+    float radius = 0.5;
+    float maxR = l.lens.w;
+    for (float ang = 0.0; radius < maxR; ang += kGolden) {
+        float2 tc = uv + float2(cos(ang), sin(ang)) * l.texel.zw * radius;
+        float4 s = cocTex.sample(linearClamp, tc);
+        float size = abs(s.a);
+        if (s.a > center.a) size = clamp(size, 0.0, centerSize * 2.0);  // background never blurs over a sharper foreground
+        float m = smoothstep(radius - 0.5, radius + 0.5, size);
+        color += mix(color / tot, s.rgb, m);
+        tot += 1.0;
+        radius += 0.85 / radius;
+    }
+    return float4(color / tot, center.a);
+}
+
+fragment float4 dofCombineFragment(FullscreenOut in [[stage_in]], constant FrameUniforms& f [[buffer(0)]],
+                                   constant LensUniforms& l [[buffer(1)]], texture2d<float> sharp [[texture(0)]],
+                                   texture2d<float> blurred [[texture(1)]], depth2d<float> depthTex [[texture(2)]]) {
+    float2 uv = uvOf(in);
+    float focus = focusDistance(f, l, depthTex);
+    float coc = abs(circleOfConfusion(f, l, uv, depthTex.sample(pointClamp, uv), focus));
+    float4 b = blurred.sample(linearClamp, uv);
+    float amount = saturate(max(coc, abs(b.a)) - 0.6);
+    return float4(mix(sharp.sample(pointClamp, uv).rgb, b.rgb, amount), 1.0);
+}
+
+struct GradeUniforms {
+    float4 params;  // x = auto exposure on, y = look/LUT strength, z = grain, w = chromatic aberration
+};
+
 fragment float4 compositeFragment(FullscreenOut in [[stage_in]], texture2d<float> hdr [[texture(0)]],
-                                  texture2d<float> bloom [[texture(1)]], constant PostUniforms& p [[buffer(0)]]) {
+                                  texture2d<float> bloom [[texture(1)]], texture2d<float> exposureTex [[texture(2)]],
+                                  texture3d<float> lut [[texture(3)]], constant PostUniforms& p [[buffer(0)]],
+                                  constant GradeUniforms& g [[buffer(1)]]) {
     float2 uv = uvOf(in);
     float3 c = hdr.sample(linearClamp, uv).rgb;
+    if (g.params.w > 0.0) {  // chromatic aberration: red and blue focus at slightly different scales
+        float2 off = (uv - 0.5) * g.params.w * 0.012;
+        c.r = hdr.sample(linearClamp, uv - off).r;
+        c.b = hdr.sample(linearClamp, uv + off).b;
+    }
     // Contrast-adaptive sharpening (restores detail softened by temporal filtering).
     float sharp = p.grade.z;
     if (sharp > 0.0) {
@@ -216,8 +354,9 @@ fragment float4 compositeFragment(FullscreenOut in [[stage_in]], texture2d<float
     // White balance (approximate: warm/cool along blue-orange, tint along green-magenta)
     float3 wb = float3(1.0 + p.grade.x * 0.18 + p.grade.y * 0.06, 1.0 - p.grade.y * 0.12, 1.0 - p.grade.x * 0.22 + p.grade.y * 0.06);
     c *= wb;
-    c *= p.params.x;
-    c += bloom.sample(linearClamp, uv).rgb * p.params.y;
+    float exposure = p.params.x * (g.params.x > 0.5 ? exposureTex.read(uint2(0, 0)).r : 1.0);
+    c *= exposure;
+    c += bloom.sample(linearClamp, uv).rgb * p.params.y;  // bloom is already exposed (prefilter)
     int tm = int(p.params2.w + 0.5);
     if (tm == 0) c = tonemapACES(c);
     else if (tm == 1) c = tonemapAgX(c);
@@ -227,9 +366,19 @@ fragment float4 compositeFragment(FullscreenOut in [[stage_in]], texture2d<float
     float luma = dot(c, float3(0.2126, 0.7152, 0.0722));
     c = max(mix(float3(luma), c, p.params.w), 0.0);
     c = saturate((c - 0.5) * p.params2.x + 0.5);
+    if (g.params.y > 0.0) {  // look / 3D LUT (in display space)
+        float n = float(lut.get_width());
+        float3 l = lut.sample(linearClamp, saturate(c) * ((n - 1.0) / n) + 0.5 / n).rgb;
+        c = mix(c, l, g.params.y);
+    }
     float2 v = (uv - 0.5) * float2(p.params2.z, 1.0);
     c *= 1.0 - p.params2.y * smoothstep(0.35, 1.05, length(v) * 1.15);
     // Dither before quantizing to 8 bits (removes banding in skies and fog).
+    if (g.params.z > 0.0) {  // film grain: strongest in the mid-tones
+        float gn = hash12(floor(in.position.xy) + float2(p.texel.w * 17.0, p.texel.w * 7.0)) - 0.5;
+        float lumC = dot(c, float3(0.2126, 0.7152, 0.0722));
+        c = saturate(c + gn * g.params.z * 0.11 * (1.0 - abs(lumC - 0.5) * 1.2));
+    }
     float n = interleavedGradientNoise(in.position.xy + p.texel.w * 5.588238) - 0.5;
     c += n / 255.0;
     return float4(c, 1.0);

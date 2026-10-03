@@ -34,6 +34,9 @@ struct ViewCamera {
     float farPlane = 1000.f;
     bool orthographic = false;
     float orthoSize = 5.f;
+    float aperture = 0.f;       // f-stop (0 = no depth of field)
+    float focusDistance = 0.f;  // 0 = autofocus
+    float motionBlur = 0.f;     // shutter fraction
 
     Mat4 view() const { return Mat4::lookAt(eye, target, up); }
     Mat4 projection(float aspect) const;

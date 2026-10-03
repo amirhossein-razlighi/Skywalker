@@ -30,6 +30,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <filesystem>
 #include <functional>
 #include <unordered_map>
 #include <unordered_set>
@@ -37,6 +38,7 @@
 #include <dispatch/dispatch.h>
 
 #include "skywalker/core/Log.h"
+#include "skywalker/render/ColorGrading.h"
 #include "skywalker/render/Hdr.h"
 #include "skywalker/render/MeshData.h"
 #include "skywalker/render/Renderer.h"
@@ -152,6 +154,14 @@ struct TerrainNodeGpu {
 
 struct FoliageUniformsGpu {
     simd_float4 wind, params;
+};
+
+struct LensUniformsGpu {
+    simd_float4 lens, motion, texel, view;
+};
+
+struct GradeUniformsGpu {
+    simd_float4 params;
 };
 
 struct GPULight {
@@ -418,7 +428,10 @@ public:
             const FrameUniforms base = frameUniforms(frame, cascades);
             std::vector<GPULight> lights = gpuLights(frame);
             const Mat4 vp = frame.viewProjection();
-            if (frame.resetHistory || cameraCut(frame)) historyValid_ = false;
+            if (frame.resetHistory || cameraCut(frame)) {
+                historyValid_ = false;
+                motionValid_ = false;
+            }
             const int samples = std::clamp(frame.samples, 1, 256);
             const bool accumulate = samples > 1;
             const bool jittered = accumulate || env.taa;
@@ -463,7 +476,7 @@ public:
                 if (!accumulate) historyValid_ = true;
             }
             if (accumulate) historyValid_ = true;  // the converged still seeds later TAA frames
-            encodePost(cmd, frame, accumulate);
+            encodePost(cmd, frame, accumulate, base);
             if (frame.debugView > 0) {
                 PostUniforms pu{};
                 pu.params = simd_make_float4(static_cast<float>(frame.debugView), 0, 0, 0);
@@ -475,6 +488,8 @@ public:
             lastCommand_ = cmd;
             evictWorldCaches();
             prevViewProj_ = vp;
+            motionPrevVP_ = vp;
+            motionValid_ = true;
             prevEye_ = frame.camera.eye;
             prevTarget_ = frame.camera.target;
             ++frameIndex_;
@@ -583,7 +598,9 @@ private:
                                      "ssgiFragment", "ssrFragment", "ssTemporalFragment", "lightingResolveFragment",
                                      "temporalFragment", "debugViewFragment", "terrainVertex", "terrainFragment",
                                      "terrainShadowVertex", "foliageVertex", "foliageShadowVertex", "cloudsFragment",
-                                     "cloudTemporalFragment", "cloudShapeKernel", "cloudDetailKernel"}) {
+                                     "cloudTemporalFragment", "cloudShapeKernel", "cloudDetailKernel", "lumaFragment",
+                                     "exposureFragment", "motionBlurFragment", "dofCocFragment", "dofBlurFragment",
+                                     "dofCombineFragment"}) {
             if (!fn(required)) {
                 return Error::make("shader_missing_function", std::string("shader source must define ") + required);
             }
@@ -677,7 +694,13 @@ private:
         id<MTLRenderPipelineState> cloudTemporal = clouds ? make("fullscreenVertex", "cloudTemporalFragment", kHDRFormat, 1, Blend::None, false, &e) : nil;
         id<MTLComputePipelineState> cloudShapeK = cloudTemporal ? [device_ newComputePipelineStateWithFunction:fn("cloudShapeKernel") error:&e] : nil;
         id<MTLComputePipelineState> cloudDetailK = cloudShapeK ? [device_ newComputePipelineStateWithFunction:fn("cloudDetailKernel") error:&e] : nil;
-        if (!cloudDetailK) volume = nil;
+        id<MTLRenderPipelineState> luma = cloudDetailK ? make("fullscreenVertex", "lumaFragment", MTLPixelFormatRG16Float, 1, Blend::None, false, &e) : nil;
+        id<MTLRenderPipelineState> exposure = luma ? make("fullscreenVertex", "exposureFragment", MTLPixelFormatR32Float, 1, Blend::None, false, &e) : nil;
+        id<MTLRenderPipelineState> motionBlur = exposure ? make("fullscreenVertex", "motionBlurFragment", kHDRFormat, 1, Blend::None, false, &e) : nil;
+        id<MTLRenderPipelineState> dofCoc = motionBlur ? make("fullscreenVertex", "dofCocFragment", kHDRFormat, 1, Blend::None, false, &e) : nil;
+        id<MTLRenderPipelineState> dofBlur = dofCoc ? make("fullscreenVertex", "dofBlurFragment", kHDRFormat, 1, Blend::None, false, &e) : nil;
+        id<MTLRenderPipelineState> dofCombine = dofBlur ? make("fullscreenVertex", "dofCombineFragment", kHDRFormat, 1, Blend::None, false, &e) : nil;
+        if (!dofCombine) volume = nil;
         if (volume) {
             for (const char* k : {"fluidAdvect", "fluidCorrect", "fluidCombust", "fluidCurl", "fluidForces", "fluidDivergence",
                                   "fluidJacobi", "fluidProject"}) {
@@ -732,6 +755,12 @@ private:
         cloudShapeKernel_ = cloudShapeK;
         cloudDetailKernel_ = cloudDetailK;
         cloudNoiseReady_ = false;
+        lumaPipeline_ = luma;
+        exposurePipeline_ = exposure;
+        motionBlurPipeline_ = motionBlur;
+        dofCocPipeline_ = dofCoc;
+        dofBlurPipeline_ = dofBlur;
+        dofCombinePipeline_ = dofCombine;
         return {};
     }
 
@@ -798,6 +827,19 @@ private:
         ssrRaw_ = target2D(kHDRFormat, hw, hh, rt);
         for (auto& t : giHist_) t = target2D(kHDRFormat, hw, hh, rt);
         cloudRaw_ = target2D(kHDRFormat, hw, hh, rt);
+        postA_ = target2D(kHDRFormat, w, h, rt);
+        postB_ = target2D(kHDRFormat, w, h, rt);
+        dofCoc_ = target2D(kHDRFormat, hw, hh, rt);
+        dofBlur_ = target2D(kHDRFormat, hw, hh, rt);
+        {
+            const NSUInteger qw = std::max<NSUInteger>(1, w / 4), qh = std::max<NSUInteger>(1, h / 4);
+            MTLTextureDescriptor* ld = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRG16Float width:qw height:qh mipmapped:YES];
+            ld.usage = rt;
+            ld.storageMode = MTLStorageModePrivate;
+            lum_ = [device_ newTextureWithDescriptor:ld];
+            for (auto& t : exposure_) t = target2D(MTLPixelFormatR32Float, 1, 1, rt);
+            exposureValid_ = false;
+        }
         for (auto& t : cloudHist_) t = target2D(kHDRFormat, hw, hh, rt);
         for (auto& t : ssrHist_) t = target2D(kHDRFormat, hw, hh, rt);
         msaaDepth_ = targetMSAA(kDepthFormat, w, h);
@@ -2235,20 +2277,97 @@ private:
         return 0;
     }
 
-    void encodePost(id<MTLCommandBuffer> cmd, const FrameData& frame, bool accumulated) {
+    /// Look / .cube LUT as a 3D texture (rebuilt when the grading settings change).
+    bool ensureLut(const Environment& env) {
+        std::string key = env.look + "|" + env.lut;
+        if (!env.lut.empty()) {
+            std::error_code ec;
+            auto t = std::filesystem::last_write_time(env.lut, ec);
+            key += ec ? "" : std::to_string(static_cast<long long>(t.time_since_epoch().count()));
+        }
+        if (key == lutKey_) return lut_ != nil;
+        lutKey_ = key;
+        lut_ = nil;
+        Result<grading::Lut3D> lut = !env.lut.empty() ? grading::loadCube(env.lut)
+                                     : (env.look.empty() || env.look == "none") ? Result<grading::Lut3D>(Error::make("none", ""))
+                                                                                : grading::lookLut(env.look);
+        if (!lut) {
+            if (!env.lut.empty()) log::warn("render", "LUT '" + env.lut + "': " + lut.error().message);
+            return false;
+        }
+        const int n = lut->size;
+        std::vector<__fp16> px(static_cast<size_t>(n) * n * n * 4);
+        for (size_t i = 0, cnt = static_cast<size_t>(n) * n * n; i < cnt; ++i) {
+            for (int c = 0; c < 3; ++c) px[i * 4 + c] = static_cast<__fp16>(lut->rgb[i * 3 + c]);
+            px[i * 4 + 3] = static_cast<__fp16>(1.f);
+        }
+        MTLTextureDescriptor* d = [MTLTextureDescriptor new];
+        d.textureType = MTLTextureType3D;
+        d.pixelFormat = MTLPixelFormatRGBA16Float;
+        d.width = d.height = d.depth = static_cast<NSUInteger>(n);
+        d.usage = MTLTextureUsageShaderRead;
+        d.storageMode = MTLStorageModeShared;
+        lut_ = [device_ newTextureWithDescriptor:d];
+        [lut_ replaceRegion:MTLRegionMake3D(0, 0, 0, n, n, n) mipmapLevel:0 slice:0 withBytes:px.data()
+                bytesPerRow:static_cast<NSUInteger>(n) * 8 bytesPerImage:static_cast<NSUInteger>(n) * n * 8];
+        return true;
+    }
+
+    void encodePost(id<MTLCommandBuffer> cmd, const FrameData& frame, bool accumulated, const FrameUniforms& base) {
         const Environment& env = frame.environment;
         id<MTLTexture> src = taa_[taaCurrent_];
+        const ViewCamera& cam = frame.camera;
+        LensUniformsGpu lu{};
+        float fl = 12.f / std::tan(radians(std::clamp(cam.fovDeg, 5.f, 170.f)) * 0.5f);  // focal length (mm), 24 mm sensor
+        lu.lens = simd_make_float4(cam.aperture, cam.focusDistance, fl, 24.f);
+        lu.motion = simd_make_float4(cam.motionBlur, 0, 0, 0);
+        lu.texel = simd_make_float4(1.f / src.width, 1.f / src.height, 1.f / dofCoc_.width, 1.f / dofCoc_.height);
+        lu.view = simd_make_float4(static_cast<float>(src.height), 0, 0, 0);
+
+        // Motion blur (camera motion since the previous rendered frame).
+        if (cam.motionBlur > 0.001f && motionValid_ && !cam.orthographic) {
+            FrameUniforms mfu = base;
+            mfu.prevViewProj = toSimd(motionPrevVP_);
+            fullscreenFU(cmd, motionBlurPipeline_, postA_, {src, depthResolved_}, mfu, &lu, sizeof(lu), @"Motion blur");
+            src = postA_;
+        }
+        // Depth of field.
+        if (cam.aperture > 0.01f && !cam.orthographic) {
+            fullscreenFU(cmd, dofCocPipeline_, dofCoc_, {src, depthResolved_}, base, &lu, sizeof(lu), @"DOF CoC");
+            fullscreenFU(cmd, dofBlurPipeline_, dofBlur_, {dofCoc_}, base, &lu, sizeof(lu), @"DOF gather");
+            id<MTLTexture> dst = src == postA_ ? postB_ : postA_;
+            fullscreenFU(cmd, dofCombinePipeline_, dst, {src, dofBlur_, depthResolved_}, base, &lu, sizeof(lu), @"DOF combine");
+            src = dst;
+        }
+        // Auto exposure: metering -> mip average -> adaptation.
+        const bool autoExp = env.autoExposure;
+        if (autoExp) {
+            fullscreen(cmd, lumaPipeline_, lum_, {src}, &lu, sizeof(lu), false, @"Exposure metering");
+            id<MTLBlitCommandEncoder> blit = [cmd blitCommandEncoder];
+            [blit generateMipmapsForTexture:lum_];
+            [blit endEncoding];
+            float dt = 1.f / 60.f;
+            simd_float4 ep = simd_make_float4(accumulated || !exposureValid_ ? -1.f : dt * env.adaptationSpeed * 3.f,
+                                              0.f, -10.f, 10.f);
+            id<MTLTexture> dst = exposure_[exposureCurrent_ ^ 1];
+            fullscreen(cmd, exposurePipeline_, dst, {lum_, exposure_[exposureCurrent_]}, &ep, sizeof(ep), false, @"Exposure adapt");
+            exposureCurrent_ ^= 1;
+            exposureValid_ = true;
+        }
+        id<MTLTexture> exposureTex = exposure_[exposureCurrent_];
+
         PostUniforms pu{};
-        pu.params = simd_make_float4(env.exposure, env.bloomIntensity, env.bloomThreshold, env.saturation);
+        pu.params = simd_make_float4(env.exposure * std::exp2(env.exposureCompensation), env.bloomIntensity, env.bloomThreshold,
+                                     env.saturation);
         pu.params2 = simd_make_float4(env.contrast, env.vignette,
                                       static_cast<float>(frame.width) / static_cast<float>(std::max(frame.height, 1)),
                                       tonemapIndex(env.tonemap));
         const float sharpen = (env.taa || accumulated) ? env.sharpen * (accumulated ? 0.5f : 1.f) : 0.f;
-        pu.grade = simd_make_float4(env.temperature, env.tint, sharpen, 0);
+        pu.grade = simd_make_float4(env.temperature, env.tint, sharpen, autoExp ? 1.f : 0.f);
         const size_t levels = bloomViews_.size();
         if (env.bloomIntensity > 0.001f && levels > 0) {
             pu.texel = simd_make_float4(1.f / src.width, 1.f / src.height, 0, 0);
-            fullscreen(cmd, bloomPrefilterPipeline_, bloomViews_[0], {src}, &pu, sizeof(pu), false, @"Bloom prefilter");
+            fullscreen(cmd, bloomPrefilterPipeline_, bloomViews_[0], {src, exposureTex}, &pu, sizeof(pu), false, @"Bloom prefilter");
             for (size_t i = 1; i < levels; ++i) {
                 pu.texel = simd_make_float4(1.f / bloomViews_[i - 1].width, 1.f / bloomViews_[i - 1].height, 0, 0);
                 fullscreen(cmd, bloomDownPipeline_, bloomViews_[i], {bloomViews_[i - 1]}, &pu, sizeof(pu), false, @"Bloom down");
@@ -2261,7 +2380,24 @@ private:
             pu.params.y = 0;
         }
         pu.texel = simd_make_float4(1.f / src.width, 1.f / src.height, 0.f, static_cast<float>(frameIndex_ % 64));
-        fullscreen(cmd, compositePipeline_, resolve_, {src, levels ? bloomViews_[0] : src}, &pu, sizeof(pu), false, @"Composite");
+        GradeUniformsGpu gu{};
+        bool hasLut = ensureLut(env);
+        gu.params = simd_make_float4(autoExp ? 1.f : 0.f, hasLut ? env.lookStrength : 0.f, env.grain, env.chromaticAberration);
+        MTLRenderPassDescriptor* rp = [MTLRenderPassDescriptor renderPassDescriptor];
+        rp.colorAttachments[0].texture = resolve_;
+        rp.colorAttachments[0].loadAction = MTLLoadActionDontCare;
+        rp.colorAttachments[0].storeAction = MTLStoreActionStore;
+        id<MTLRenderCommandEncoder> enc = [cmd renderCommandEncoderWithDescriptor:rp];
+        enc.label = @"Composite";
+        [enc setRenderPipelineState:compositePipeline_];
+        [enc setFragmentTexture:src atIndex:0];
+        [enc setFragmentTexture:(levels ? bloomViews_[0] : src) atIndex:1];
+        [enc setFragmentTexture:exposureTex atIndex:2];
+        [enc setFragmentTexture:(hasLut ? lut_ : cloudDetail_) atIndex:3];  // any 3D texture when unused
+        [enc setFragmentBytes:&pu length:sizeof(pu) atIndex:0];
+        [enc setFragmentBytes:&gu length:sizeof(gu) atIndex:1];
+        [enc drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:3];
+        [enc endEncoding];
     }
 
     id<MTLDevice> device_;
@@ -2273,7 +2409,15 @@ private:
         aoBlurPipeline_, meshCutoutPipeline_, shadowAlphaPipeline_, waterPipeline_, particlePipeline_, volumePipeline_, volumetricPipeline_,
         ssgiPipeline_, ssrPipeline_, ssTemporalPipeline_, resolvePipeline_, temporalPipeline_, debugViewPipeline_,
         terrainPipeline_, terrainShadowPipeline_, foliagePipeline_, foliageCutoutPipeline_, foliageShadowPipeline_,
-        cloudsPipeline_, cloudTemporalPipeline_;
+        cloudsPipeline_, cloudTemporalPipeline_, lumaPipeline_, exposurePipeline_, motionBlurPipeline_, dofCocPipeline_,
+        dofBlurPipeline_, dofCombinePipeline_;
+    id<MTLTexture> lum_, exposure_[2], postA_, postB_, dofCoc_, dofBlur_, lut_;
+    std::vector<id<MTLTexture>> lumViews_;
+    int exposureCurrent_ = 0;
+    bool exposureValid_ = false;
+    std::string lutKey_;
+    Mat4 motionPrevVP_;
+    bool motionValid_ = false;
     id<MTLComputePipelineState> cloudShapeKernel_, cloudDetailKernel_;
     id<MTLTexture> cloudShape_, cloudDetail_, cloudRaw_, cloudHist_[2], cloudOut_, clearCloud_;
     int cloudCurrent_ = 0;

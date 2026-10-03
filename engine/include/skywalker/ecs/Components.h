@@ -73,6 +73,10 @@ struct Camera {
     bool orthographic = false;
     float orthoSize = 5.f;
     bool primary = true;
+    // Cinematic lens (used by the post stack)
+    float aperture = 0.f;       // f-stop for depth of field (1.4 shallow .. 16 deep), 0 = everything sharp
+    float focusDistance = 0.f;  // meters, 0 = autofocus on the center of the frame
+    float motionBlur = 0.f;     // shutter fraction 0..1 (0.5 = 180-degree shutter), 0 = off
 
     static const TypeInfo& type();
 };
@@ -214,6 +218,9 @@ struct Environment {
     Vec4 fogColor{0.74f, 0.80f, 0.88f, 1.f};
     float fogDensity = 0.004f;
     float exposure = 1.f;
+    bool autoExposure = false;         // adapt exposure to the scene brightness like an eye / camera
+    float exposureCompensation = 0.f;  // EV stops added on top (auto or manual)
+    float adaptationSpeed = 1.5f;      // auto exposure speed (higher = faster)
     bool showGrid = true;
     // Post-processing (HDR pipeline)
     float bloomIntensity = 0.55f;
@@ -221,6 +228,11 @@ struct Environment {
     float saturation = 1.05f;
     float contrast = 1.05f;
     float vignette = 0.22f;
+    float grain = 0.f;                 // film grain 0..1
+    float chromaticAberration = 0.f;   // lens color fringing toward the edges 0..1
+    std::string look = "none";         // color grading look: none | warm | cool | teal_orange | golden_hour | bleach | noir | vivid | moonlight | vintage
+    std::string lut;                   // optional .cube 3D LUT (project-relative), applied after the look
+    float lookStrength = 1.f;          // blend of the look / LUT
     // Sky, atmosphere, lighting quality
     std::string skyMode = "gradient";  // gradient | atmosphere | hdri
     std::string hdri;                  // equirectangular .hdr panorama (skyMode "hdri"), project-relative

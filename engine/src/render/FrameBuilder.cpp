@@ -103,6 +103,9 @@ bool sceneCamera(const Scene& scene, ViewCamera& out, EntityId preferred) {
     out.farPlane = c->farPlane;
     out.orthographic = c->orthographic;
     out.orthoSize = c->orthoSize;
+    out.aperture = c->aperture;
+    out.focusDistance = c->focusDistance;
+    out.motionBlur = c->motionBlur;
     return true;
 }
 

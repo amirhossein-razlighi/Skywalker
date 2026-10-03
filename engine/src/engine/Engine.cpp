@@ -964,6 +964,7 @@ Result<Json> Engine::importMeshAsset(const std::string& path, const MeshImportOp
 
 void Engine::resolveTexturePaths(FrameData& f) const {
     if (!f.environment.hdri.empty()) f.environment.hdri = resolvePath(f.environment.hdri);
+    if (!f.environment.lut.empty()) f.environment.lut = resolvePath(f.environment.lut);
     for (auto& d : f.draws) {
         for (std::string* p : {&d.surface.texture, &d.surface.normalMap, &d.surface.ormMap, &d.surface.emissiveMap}) {
             if (!p->empty()) *p = resolvePath(*p);

@@ -98,6 +98,9 @@ const TypeInfo& Camera::type() {
             SKY_FIELD(Camera, orthographic, Bool, "Orthographic projection (2D games)"),
             SKY_FIELD_RANGE(Camera, orthoSize, Float, "Half the visible height in orthographic mode", 0.01f, 10000.f),
             SKY_FIELD(Camera, primary, Bool, "Use this camera for gameplay"),
+            SKY_FIELD_RANGE(Camera, aperture, Float, "Depth of field f-stop: 1.4 very shallow .. 16 deep (0 = off)", 0.f, 64.f),
+            SKY_FIELD_RANGE(Camera, focusDistance, Float, "Focus distance in meters (0 = autofocus on the frame center)", 0.f, 100000.f),
+            SKY_FIELD_RANGE(Camera, motionBlur, Float, "Motion blur shutter (0.5 = film-like 180 degrees, 0 = off)", 0.f, 1.f),
         }};
     return info;
 }
@@ -285,12 +288,21 @@ const TypeInfo& Environment::type() {
             SKY_FIELD(Environment, fogColor, Color, "Distance fog color"),
             SKY_FIELD_RANGE(Environment, fogDensity, Float, "Exponential fog density (0 = off)", 0.f, 1.f),
             SKY_FIELD_RANGE(Environment, exposure, Float, "Camera exposure multiplier", 0.01f, 20.f),
+            SKY_FIELD(Environment, autoExposure, Bool, "Adapt exposure to scene brightness (eye adaptation)"),
+            SKY_FIELD_RANGE(Environment, exposureCompensation, Float, "Exposure compensation in EV stops", -6.f, 6.f),
+            SKY_FIELD_RANGE(Environment, adaptationSpeed, Float, "Auto exposure adaptation speed", 0.05f, 20.f),
             SKY_FIELD(Environment, showGrid, Bool, "Draw the editor ground grid"),
             SKY_FIELD_RANGE(Environment, bloomIntensity, Float, "Glow around bright/emissive things (0 = off)", 0.f, 5.f),
             SKY_FIELD_RANGE(Environment, bloomThreshold, Float, "Brightness where glow starts (lower = more glow)", 0.f, 10.f),
             SKY_FIELD_RANGE(Environment, saturation, Float, "Color saturation (1 = neutral)", 0.f, 2.f),
             SKY_FIELD_RANGE(Environment, contrast, Float, "Contrast (1 = neutral)", 0.5f, 2.f),
             SKY_FIELD_RANGE(Environment, vignette, Float, "Darken the image corners", 0.f, 1.f),
+            SKY_FIELD_RANGE(Environment, grain, Float, "Film grain", 0.f, 1.f),
+            SKY_FIELD_RANGE(Environment, chromaticAberration, Float, "Lens color fringing toward the frame edges", 0.f, 1.f),
+            SKY_FIELD_ENUM(Environment, look, "Color grading look", "none", "warm", "cool", "teal_orange", "golden_hour", "bleach",
+                           "noir", "vivid", "moonlight", "vintage"),
+            SKY_FIELD(Environment, lut, String, "Optional .cube 3D LUT file (project-relative) applied after the look"),
+            SKY_FIELD_RANGE(Environment, lookStrength, Float, "Strength of the look / LUT", 0.f, 1.f),
             SKY_FIELD_ENUM(Environment, skyMode,
                            "gradient = two artist colors; atmosphere = physically inspired sky from the sun; hdri = a "
                            "photographed .hdr panorama lights and backs the scene (set `hdri`)",
