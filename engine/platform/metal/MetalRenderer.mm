@@ -71,6 +71,8 @@ struct FrameUniforms {
     simd_float4x4 prevViewProj;
     simd_float4x4 viewProjNoJitter;
     simd_float4 temporal;
+    simd_float4 clouds;
+    simd_float4 clouds2;
 };
 
 struct DrawUniforms {
@@ -358,6 +360,22 @@ public:
         bakeBrdf();
         for (auto& r : ring_) r = [device_ newBufferWithLength:kRingSize options:MTLResourceStorageModeShared | MTLResourceCPUCacheModeWriteCombined];
         buildTerrainPatch();
+        auto volume3D = [&](NSUInteger n) {
+            MTLTextureDescriptor* d = [MTLTextureDescriptor new];
+            d.textureType = MTLTextureType3D;
+            d.pixelFormat = MTLPixelFormatRGBA8Unorm;
+            d.width = d.height = d.depth = n;
+            d.usage = MTLTextureUsageShaderRead | MTLTextureUsageShaderWrite;
+            d.storageMode = MTLStorageModePrivate;
+            return [device_ newTextureWithDescriptor:d];
+        };
+        cloudShape_ = volume3D(128);
+        cloudDetail_ = volume3D(32);
+        MTLTextureDescriptor* cd1 = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:kHDRFormat width:1 height:1 mipmapped:NO];
+        cd1.usage = MTLTextureUsageShaderRead;
+        clearCloud_ = [device_ newTextureWithDescriptor:cd1];
+        const __fp16 clear[4] = {0, 0, 0, 1};
+        [clearCloud_ replaceRegion:MTLRegionMake2D(0, 0, 1, 1) mipmapLevel:0 withBytes:clear bytesPerRow:8];
         return true;
     }
 
@@ -414,6 +432,7 @@ public:
             cmd.label = @"Skywalker Frame";
             dispatch_semaphore_t sem = inFlight_;
             [cmd addCompletedHandler:^(id<MTLCommandBuffer>) { dispatch_semaphore_signal(sem); }];
+            ensureCloudNoise(cmd);
             encodeEnvironment(cmd, frame, base);
             encodeShadows(cmd, frame, base, cascades);
             for (int i = 0; i < samples; ++i) {
@@ -429,6 +448,7 @@ public:
                 fu.prevViewProj = toSimd(accumulate || !historyValid_ ? vp : prevViewProj_);
                 fu.temporal = simd_make_float4(jn.x, jn.y, static_cast<float>(frameIndex_ % 4096), static_cast<float>(i));
                 const uint64_t seed = frameIndex_ * 17 + static_cast<uint64_t>(i);
+                encodeClouds(cmd, frame, fu, reproject, accumulate, seed);
                 encodeMain(cmd, frame, fu, lights);
                 encodeAO(cmd, frame);
                 encodeScreenSpace(cmd, frame, fu, reproject, accumulate, seed);
@@ -562,7 +582,8 @@ private:
                                      "fluidCurl", "fluidForces", "fluidDivergence", "fluidJacobi", "fluidProject", "volumetricFragment",
                                      "ssgiFragment", "ssrFragment", "ssTemporalFragment", "lightingResolveFragment",
                                      "temporalFragment", "debugViewFragment", "terrainVertex", "terrainFragment",
-                                     "terrainShadowVertex", "foliageVertex", "foliageShadowVertex"}) {
+                                     "terrainShadowVertex", "foliageVertex", "foliageShadowVertex", "cloudsFragment",
+                                     "cloudTemporalFragment", "cloudShapeKernel", "cloudDetailKernel"}) {
             if (!fn(required)) {
                 return Error::make("shader_missing_function", std::string("shader source must define ") + required);
             }
@@ -652,7 +673,11 @@ private:
         id<MTLRenderPipelineState> foliage = terrainShadow ? make("foliageVertex", "meshFragment", kHDRFormat, kSamples, Blend::None, true, &e, true) : nil;
         id<MTLRenderPipelineState> foliageCutout = foliage ? make("foliageVertex", "meshFragment", kHDRFormat, kSamples, Blend::None, true, &e, true, true) : nil;
         id<MTLRenderPipelineState> foliageShadow = foliageCutout ? make("foliageShadowVertex", nullptr, MTLPixelFormatInvalid, 1, Blend::None, true, &e) : nil;
-        if (!foliageShadow) volume = nil;
+        id<MTLRenderPipelineState> clouds = foliageShadow ? make("fullscreenVertex", "cloudsFragment", kHDRFormat, 1, Blend::None, false, &e) : nil;
+        id<MTLRenderPipelineState> cloudTemporal = clouds ? make("fullscreenVertex", "cloudTemporalFragment", kHDRFormat, 1, Blend::None, false, &e) : nil;
+        id<MTLComputePipelineState> cloudShapeK = cloudTemporal ? [device_ newComputePipelineStateWithFunction:fn("cloudShapeKernel") error:&e] : nil;
+        id<MTLComputePipelineState> cloudDetailK = cloudShapeK ? [device_ newComputePipelineStateWithFunction:fn("cloudDetailKernel") error:&e] : nil;
+        if (!cloudDetailK) volume = nil;
         if (volume) {
             for (const char* k : {"fluidAdvect", "fluidCorrect", "fluidCombust", "fluidCurl", "fluidForces", "fluidDivergence",
                                   "fluidJacobi", "fluidProject"}) {
@@ -702,6 +727,11 @@ private:
         foliagePipeline_ = foliage;
         foliageCutoutPipeline_ = foliageCutout;
         foliageShadowPipeline_ = foliageShadow;
+        cloudsPipeline_ = clouds;
+        cloudTemporalPipeline_ = cloudTemporal;
+        cloudShapeKernel_ = cloudShapeK;
+        cloudDetailKernel_ = cloudDetailK;
+        cloudNoiseReady_ = false;
         return {};
     }
 
@@ -767,6 +797,8 @@ private:
         giRaw_ = target2D(kHDRFormat, hw, hh, rt);
         ssrRaw_ = target2D(kHDRFormat, hw, hh, rt);
         for (auto& t : giHist_) t = target2D(kHDRFormat, hw, hh, rt);
+        cloudRaw_ = target2D(kHDRFormat, hw, hh, rt);
+        for (auto& t : cloudHist_) t = target2D(kHDRFormat, hw, hh, rt);
         for (auto& t : ssrHist_) t = target2D(kHDRFormat, hw, hh, rt);
         msaaDepth_ = targetMSAA(kDepthFormat, w, h);
     }
@@ -890,6 +922,8 @@ private:
         float envLod = hdri_ ? std::max(0.f, std::log2(static_cast<float>(hdri_.width) / (4.f * kEnvSize))) : 0.f;
         fu.hdri = simd_make_float4(radians(env.hdriRotation), env.hdriIntensity, envLod,
                                    hdri_ ? static_cast<float>(hdri_.mipmapLevelCount) : 0.f);
+        fu.clouds = simd_make_float4(0.f, env.cloudHeight, env.cloudThickness, env.cloudDensity);
+        fu.clouds2 = simd_make_float4(env.cloudScale, env.cloudSpeed, env.cloudMode == "flat" ? 1.f : 0.f, radians(env.windDirection));
         return fu;
     }
 
@@ -928,6 +962,7 @@ private:
 
     // --- Environment (image-based lighting) ------------------------------------------------
     std::string environmentKey(const FrameData& frame) const {
+        // (cloud drift is excluded: reflections keep a static sky)
         const Environment& e = frame.environment;
         char buf[1024];
         Vec3 d = e.sunDirection();
@@ -936,7 +971,10 @@ private:
                       e.skyHorizon.x, e.skyHorizon.y, e.skyHorizon.z, e.ground.x, e.ground.y, e.ground.z, e.ambient,
                       e.fogColor.x, e.fogColor.y, e.fogColor.z, e.fogDensity, e.skyMode.c_str(), e.clouds, e.stars, e.sunSize,
                       e.hdri.c_str(), e.hdriRotation, e.hdriIntensity);
-        return buf;
+        char more[256];
+        std::snprintf(more, sizeof(more), "|%s %.1f %.1f %.3f %.3f", e.cloudMode.c_str(), e.cloudHeight, e.cloudThickness,
+                      e.cloudDensity, e.cloudScale);
+        return std::string(buf) + more;
     }
 
     void bakeBrdf() {
@@ -966,6 +1004,8 @@ private:
             [enc setFragmentBytes:&envFu length:sizeof(envFu) atIndex:0];
             [enc setFragmentBytes:&eu length:sizeof(eu) atIndex:1];
             [enc setFragmentTexture:(hdri_ ?: white_) atIndex:0];
+            [enc setFragmentTexture:cloudShape_ atIndex:1];
+            [enc setFragmentTexture:cloudDetail_ atIndex:2];
             [enc drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:3];
             [enc endEncoding];
         }
@@ -1250,6 +1290,7 @@ private:
             [enc setFragmentTexture:g.normal atIndex:0];
             [enc setFragmentTexture:g.weights0 atIndex:2];
             [enc setFragmentTexture:g.weights1 atIndex:3];
+            [enc setFragmentTexture:cloudShape_ atIndex:4];
             for (size_t i = 0; i < 8; ++i) {
                 const Surface* s = i < item.layers.size() ? &item.layers[i].surface : nullptr;
                 id<MTLTexture> a = s ? texture(s->texture, true) : nil, n = s ? texture(s->normalMap, false) : nil,
@@ -1473,6 +1514,7 @@ private:
         [enc setDepthStencilState:depthNone_];
         [enc setFragmentBytes:&fu length:sizeof(fu) atIndex:0];
         [enc setFragmentTexture:(hdri_ ?: white_) atIndex:0];
+        [enc setFragmentTexture:(cloudsActive_ ? cloudOut_ : clearCloud_) atIndex:1];
         [enc drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:3];
 
         // Opaque meshes
@@ -1482,6 +1524,7 @@ private:
         [enc setFragmentTexture:shadowMap_ atIndex:1];
         [enc setFragmentTexture:envCube_ atIndex:5];
         [enc setFragmentTexture:brdfLut_ atIndex:6];
+        [enc setFragmentTexture:cloudShape_ atIndex:7];
         [enc setRenderPipelineState:meshPipeline_];
         [enc setDepthStencilState:depthWrite_];
         std::vector<const DrawItem*> blended, outlined;
@@ -2030,6 +2073,37 @@ private:
         [enc endEncoding];
     }
 
+    void ensureCloudNoise(id<MTLCommandBuffer> cmd) {
+        if (cloudNoiseReady_) return;
+        id<MTLComputeCommandEncoder> enc = [cmd computeCommandEncoder];
+        enc.label = @"Cloud noise";
+        for (auto [k, t] : {std::pair{cloudShapeKernel_, cloudShape_}, std::pair{cloudDetailKernel_, cloudDetail_}}) {
+            [enc setComputePipelineState:k];
+            [enc setTexture:t atIndex:0];
+            MTLSize grid = MTLSizeMake(t.width, t.height, t.depth), group = MTLSizeMake(4, 4, 4);
+            [enc dispatchThreads:grid threadsPerThreadgroup:group];
+        }
+        [enc endEncoding];
+        cloudNoiseReady_ = true;
+    }
+
+    void encodeClouds(id<MTLCommandBuffer> cmd, const FrameData& frame, const FrameUniforms& fu, bool reproject,
+                      bool accumulate, uint64_t seed) {
+        const Environment& env = frame.environment;
+        cloudsActive_ = env.clouds > 0.001f && env.cloudMode != "flat" && env.skyMode != "hdri";
+        cloudOut_ = cloudRaw_;
+        if (!cloudsActive_) return;
+        simd_float4 sd = simd_make_float4(static_cast<float>(seed % 1024), accumulate ? 64.f : 48.f, 0, 0);
+        fullscreenFU(cmd, cloudsPipeline_, cloudRaw_, {cloudShape_, cloudDetail_}, fu, &sd, sizeof(sd), @"Clouds");
+        if (!accumulate && reproject) {
+            simd_float4 p = simd_make_float4(0.88f, 0, 1.f / cloudRaw_.width, 1.f / cloudRaw_.height);
+            id<MTLTexture> dst = cloudHist_[cloudCurrent_ ^ 1];
+            fullscreenFU(cmd, cloudTemporalPipeline_, dst, {cloudRaw_, cloudHist_[cloudCurrent_]}, fu, &p, sizeof(p), @"Clouds temporal");
+            cloudCurrent_ ^= 1;
+            cloudOut_ = dst;
+        }
+    }
+
     void encodeScreenSpace(id<MTLCommandBuffer> cmd, const FrameData& frame, const FrameUniforms& fu, bool reproject,
                            bool accumulate, uint64_t seed) {
         const Environment& env = frame.environment;
@@ -2198,7 +2272,12 @@ private:
         bloomUpPipeline_, compositePipeline_, envSkyPipeline_, envPrefilterPipeline_, brdfPipeline_, ssaoPipeline_,
         aoBlurPipeline_, meshCutoutPipeline_, shadowAlphaPipeline_, waterPipeline_, particlePipeline_, volumePipeline_, volumetricPipeline_,
         ssgiPipeline_, ssrPipeline_, ssTemporalPipeline_, resolvePipeline_, temporalPipeline_, debugViewPipeline_,
-        terrainPipeline_, terrainShadowPipeline_, foliagePipeline_, foliageCutoutPipeline_, foliageShadowPipeline_;
+        terrainPipeline_, terrainShadowPipeline_, foliagePipeline_, foliageCutoutPipeline_, foliageShadowPipeline_,
+        cloudsPipeline_, cloudTemporalPipeline_;
+    id<MTLComputePipelineState> cloudShapeKernel_, cloudDetailKernel_;
+    id<MTLTexture> cloudShape_, cloudDetail_, cloudRaw_, cloudHist_[2], cloudOut_, clearCloud_;
+    int cloudCurrent_ = 0;
+    bool cloudNoiseReady_ = false, cloudsActive_ = false;
     // Transient per-frame data: a ring of shared buffers, one per frame in flight.
     static constexpr int kFramesInFlight = 3;
     static constexpr NSUInteger kRingSize = 8u << 20;

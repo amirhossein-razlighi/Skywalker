@@ -136,6 +136,7 @@ fragment MainOut terrainFragment(TerrainOut in [[stage_in]],
                                  depth2d<float> shadowAtlas [[texture(1)]],
                                  texture2d<float> weights0 [[texture(2)]],
                                  texture2d<float> weights1 [[texture(3)]],
+                                 texture3d<float> cloudShape [[texture(4)]],
                                  texturecube<float> envTex [[texture(5)]],
                                  texture2d<float> brdfLut [[texture(6)]],
                                  texture2d<float> l0a [[texture(7)]], texture2d<float> l0n [[texture(8)]], texture2d<float> l0o [[texture(9)]],
@@ -221,7 +222,7 @@ fragment MainOut terrainFragment(TerrainOut in [[stage_in]],
     }
     s.clearcoat = 0.0;
     s.subsurface = 0.0;
-    float3 color = shadeSurface(s, Ngeo, wp, in.position.xy, V, false, 0.0, f, lights, shadowAtlas, envTex, brdfLut);
+    float3 color = shadeSurface(s, Ngeo, wp, in.position.xy, V, false, 0.0, f, lights, shadowAtlas, envTex, brdfLut, cloudShape);
     if (tu.water.z > 0.5) color = mix(color, float3(1.0, 0.5, 0.1), 0.15);  // selection tint
     color = applyFog(color, wp, V, f);
     return mainOut(float4(color, 1.0), s.albedo, s.ao, N, s.roughness, s.metallic);

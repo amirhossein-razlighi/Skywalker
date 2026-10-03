@@ -226,7 +226,13 @@ struct Environment {
     std::string hdri;                  // equirectangular .hdr panorama (skyMode "hdri"), project-relative
     float hdriRotation = 0.f;          // degrees around the vertical axis
     float hdriIntensity = 1.f;         // panorama brightness (sky and image-based light)
-    float clouds = 0.f;                // procedural cloud cover 0..1
+    float clouds = 0.f;                // cloud cover 0..1
+    std::string cloudMode = "volumetric";  // volumetric (ray-marched, lit, casting shadows) | flat (cheap painted layer)
+    float cloudHeight = 1500.f;        // base of the cloud layer (m above the ground)
+    float cloudThickness = 1800.f;     // meters
+    float cloudDensity = 1.f;          // 0.3 wispy .. 2 heavy/stormy
+    float cloudScale = 1.f;            // feature size multiplier (0.5 small puffy .. 3 huge banks)
+    float cloudSpeed = 8.f;            // drift (m/s) along windDirection
     float stars = 0.f;                 // night-sky stars 0..1
     float sunSize = 1.f;               // sun/moon disc size multiplier
     float fogHeight = 0.f;             // height falloff: > 0 makes fog pool near the ground

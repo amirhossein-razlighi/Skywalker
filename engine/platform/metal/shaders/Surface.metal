@@ -67,10 +67,11 @@ static float3 triplanarNormal(texture2d<float> tex, Triplanar t, float3 N, float
 // emission and fog. Shared by meshes, instanced foliage and terrain.
 static float3 shadeSurface(SurfaceData s, float3 Ngeo, float3 worldPos, float2 fragXY, float3 V, bool toon, float rim,
                            constant FrameUniforms& f, constant GPULight* lights, depth2d<float> shadowAtlas,
-                           texturecube<float> envTex, texture2d<float> brdfLut) {
+                           texturecube<float> envTex, texture2d<float> brdfLut, texture3d<float> cloudShape) {
     // Sun
     float3 L = -f.sunDir.xyz;
     float sunVisible = L.y > -0.08 ? shadowFactor(worldPos, Ngeo, fragXY, f, shadowAtlas) : 0.0;
+    if (sunVisible > 0.0) sunVisible *= cloudShadow(worldPos, L, f, cloudShape);  // drifting cloud shadows
     float3 sunRad = f.sunColor.rgb * f.sunDir.w * sunVisible;
     float3 color = toon ? toonLight(s, V, L, sunRad) : directLight(s, V, L, sunRad);
 
@@ -154,7 +155,8 @@ fragment MainOut meshFragment(MeshOut in [[stage_in]],
                               texture2d<float> ormTex [[texture(3)]],
                               texture2d<float> emissiveTex [[texture(4)]],
                               texturecube<float> envTex [[texture(5)]],
-                              texture2d<float> brdfLut [[texture(6)]]) {
+                              texture2d<float> brdfLut [[texture(6)]],
+                              texture3d<float> cloudShape [[texture(7)]]) {
     float3 Ngeo = normalize(in.normal) * (frontFacing ? 1.0 : -1.0);
     float3 V = normalize(f.cameraPos.xyz - in.worldPos);
     if (f.cameraForward.w > 0.5) V = -f.cameraForward.xyz;
@@ -242,7 +244,7 @@ fragment MainOut meshFragment(MeshOut in [[stage_in]],
     bool toon = shading == 1;
 
     float3 color = shadeSurface(s, Ngeo, in.worldPos, in.position.xy, V, toon, d.material3.z, f, lights, shadowAtlas,
-                                envTex, brdfLut) + emissive;
+                                envTex, brdfLut, cloudShape) + emissive;
     color = applyFog(color, in.worldPos, V, f);
 
 

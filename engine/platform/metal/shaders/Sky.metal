@@ -17,7 +17,7 @@ static float3 atmosphere(float3 rd, float3 toSun, float sunIntensity) {
     const float3 betaR = float3(5.5e-6, 13.0e-6, 22.4e-6);
     const float betaM = 21e-6;
     float3 ro = float3(0.0, Rg + 50.0, 0.0);
-    rd.y = max(rd.y, -0.02);
+    rd.y = max(rd.y, 0.0015);  // below the horizon: the horizon's own color (never a ray through the planet)
     rd = normalize(rd);
     float2 t = raySphere(ro, rd, Ra);
     float tMax = t.y;
@@ -49,7 +49,12 @@ static float3 atmosphere(float3 rd, float3 toSun, float sunIntensity) {
     float phaseR = 3.0 / (16.0 * M_PI_F) * (1.0 + mu * mu);
     const float g = 0.76;
     float phaseM = 3.0 / (8.0 * M_PI_F) * ((1.0 - g * g) * (1.0 + mu * mu)) / ((2.0 + g * g) * pow(1.0 + g * g - 2.0 * g * mu, 1.5));
-    return (sumR * betaR * phaseR + sumM * betaM * phaseM) * sunIntensity * 9.0;
+    float3 single = (sumR * betaR * phaseR + sumM * betaM * phaseM) * sunIntensity * 9.0;
+    // Multiple scattering (approximation): long, hazy paths toward the horizon fill with
+    // light scattered more than once — bright and bluish-white instead of dark and brown.
+    float3 viewT = exp(-(betaR * odR + betaM * 1.1 * odM));
+    float3 multi = (1.0 - viewT) * float3(0.62, 0.72, 0.86) * sunIntensity * 0.32 * saturate(toSun.y * 2.5 + 0.12);
+    return single + multi;
 }
 
 static float3 starField(float3 dir, float time) {
@@ -93,7 +98,7 @@ static float3 skyColor(float3 dir, constant FrameUniforms& f, bool withClouds) {
     float above = smoothstep(-0.03, 0.01, toSun.y);
     sky += f.sunColor.rgb * (disc * 14.0 + pow(sd, 12.0 / size) * 0.18) * above * (f.sky.x > 0.5 ? 0.6 : 1.0);
     // Clouds on a virtual plane
-    if (withClouds && f.sky.y > 0.0 && dir.y > 0.0) {
+    if (withClouds && f.sky.y > 0.0 && dir.y > 0.0 && f.clouds2.z > 0.5) {
         float2 p = dir.xz / (dir.y + 0.08) * 0.55 + float2(f.cameraPos.w * 0.006, f.cameraPos.w * 0.002);
         float n = fbm(p * 1.6);
         float cover = f.sky.y;
@@ -117,15 +122,68 @@ static float3 panorama(float3 dir, constant FrameUniforms& f, texture2d<float> p
 }
 
 fragment MainOut skyFragment(FullscreenOut in [[stage_in]], constant FrameUniforms& f [[buffer(0)]],
-                             texture2d<float> pano [[texture(0)]]) {
+                             texture2d<float> pano [[texture(0)]], texture2d<float> cloudTex [[texture(1)]]) {
     float4 farP = f.invViewProj * float4(in.ndc, 1.0, 1.0);
     float4 nearP = f.invViewProj * float4(in.ndc, 0.0, 1.0);
     float3 dir = normalize(farP.xyz / farP.w - nearP.xyz / nearP.w);
     float3 c = f.sky.x > 1.5 ? panorama(dir, f, pano, 0.0) : skyColor(dir, f, true);
+    // Volumetric clouds (rendered at half resolution before this pass).
+    if (f.sky.x < 1.5 && f.clouds2.z < 0.5 && f.sky.y > 0.0) {
+        float4 cl = cloudTex.sample(linearClamp, uvOf(in));
+        c = c * cl.a + cl.rgb;
+    }
     // Height fog veils the horizon when the fog is dense.
     float fogAmt = saturate(f.fog.w * 60.0) * (1.0 - smoothstep(0.0, 0.35, dir.y));
     c = mix(c, f.fog.rgb, fogAmt);
     return mainOutFlat(float4(c, 1.0));  // linear HDR; tonemapped in the composite pass
+}
+
+// Sky light that illuminates the clouds: zenith sky above, horizon sky + ground bounce below.
+static void cloudAmbient(constant FrameUniforms& f, thread float3& top, thread float3& bottom) {
+    top = skyColor(float3(0.0, 1.0, 0.0), f, false) * 0.9;
+    float3 horizon = skyColor(normalize(float3(0.3, 0.08, 0.95)), f, false);
+    bottom = mix(horizon * 0.55, f.ground.rgb * max(f.sunDir.w, 0.05) * saturate(-f.sunDir.y) * 0.35, 0.35);
+}
+
+fragment float4 cloudsFragment(FullscreenOut in [[stage_in]], constant FrameUniforms& f [[buffer(0)]],
+                               constant float4& seed [[buffer(1)]], texture3d<float> shape [[texture(0)]],
+                               texture3d<float> detail [[texture(1)]]) {
+    float4 farP = f.invViewProj * float4(in.ndc, 1.0, 1.0);
+    float4 nearP = f.invViewProj * float4(in.ndc, 0.0, 1.0);
+    float3 dir = normalize(farP.xyz / farP.w - nearP.xyz / nearP.w);
+    CloudParams c = cloudParams(f);
+    float3 top, bottom;
+    cloudAmbient(f, top, bottom);
+    float jitter = interleavedGradientNoise(in.position.xy + seed.x * 5.588238);
+    float3 toSun = -f.sunDir.xyz;
+    float3 sunRad = f.sunColor.rgb * f.sunDir.w * smoothstep(-0.05, 0.05, toSun.y);
+    return marchClouds(f.cameraPos.xyz, dir, c, toSun, sunRad, top, bottom, shape, detail, int(seed.y), jitter, 60000.0);
+}
+
+// Temporal accumulation of the half-resolution clouds (reprojected by view direction).
+fragment float4 cloudTemporalFragment(FullscreenOut in [[stage_in]], constant FrameUniforms& f [[buffer(0)]],
+                                      constant float4& params [[buffer(1)]], texture2d<float> current [[texture(0)]],
+                                      texture2d<float> history [[texture(1)]]) {
+    float2 uv = uvOf(in);
+    float4 c = current.sample(pointClamp, uv);
+    if (params.x <= 0.0) return c;
+    float4 farP = f.invViewProj * float4(in.ndc, 1.0, 1.0);
+    float4 nearP = f.invViewProj * float4(in.ndc, 0.0, 1.0);
+    float3 dir = normalize(farP.xyz / farP.w - nearP.xyz / nearP.w);
+    float4 pc = f.prevViewProj * float4(f.cameraPos.xyz + dir * 20000.0, 1.0);
+    float2 puv = float2(pc.x / pc.w * 0.5 + 0.5, 0.5 - pc.y / pc.w * 0.5);
+    if (pc.w <= 0.0 || any(puv < 0.0) || any(puv > 1.0)) return c;
+    float4 h = history.sample(linearClamp, puv);
+    float4 mn = c, mx = c;
+    for (int y = -1; y <= 1; ++y) {
+        for (int x = -1; x <= 1; ++x) {
+            float4 n = current.sample(pointClamp, uv + float2(x, y) * params.zw);
+            mn = min(mn, n);
+            mx = max(mx, n);
+        }
+    }
+    h = clamp(h, mn - (mx - mn) * 0.25, mx + (mx - mn) * 0.25);
+    return mix(c, h, params.x);
 }
 
 // ---------------------------------------------------------------------------
@@ -146,13 +204,23 @@ static float3 cubeDir(float face, float2 uv) {
 }
 
 fragment float4 envSkyFragment(FullscreenOut in [[stage_in]], constant FrameUniforms& f [[buffer(0)]],
-                               constant EnvUniforms& e [[buffer(1)]], texture2d<float> pano [[texture(0)]]) {
+                               constant EnvUniforms& e [[buffer(1)]], texture2d<float> pano [[texture(0)]],
+                               texture3d<float> shape [[texture(1)]], texture3d<float> detail [[texture(2)]]) {
     float3 dir = cubeDir(e.face.x, uvOf(in));
     if (f.sky.x > 1.5) {  // a photographed panorama already contains its ground
         float3 p = panorama(dir, f, pano, f.hdri.z);
         return float4(min(p, float3(48.0)), 1.0);
     }
     float3 c = skyColor(dir, f, true);
+    if (f.clouds2.z < 0.5 && f.sky.y > 0.0 && dir.y > 0.0) {
+        CloudParams cp = cloudParams(f);
+        float3 top, bottom;
+        cloudAmbient(f, top, bottom);
+        float3 toSun = -f.sunDir.xyz;
+        float3 sunRad = f.sunColor.rgb * f.sunDir.w * smoothstep(-0.05, 0.05, toSun.y);
+        float4 cl = marchClouds(float3(0.0, f.cameraPos.y, 0.0), dir, cp, toSun, sunRad, top, bottom, shape, detail, 20, 0.5, 50000.0);
+        c = c * cl.a + cl.rgb;
+    }
     // Below the horizon, reflect a ground tinted by the ambient color and fog.
     if (dir.y < 0.0) {
         float3 groundC = f.ground.rgb * (max(f.sunDir.w, 0.0) * saturate(-f.sunDir.y) * 0.35 + 0.4);

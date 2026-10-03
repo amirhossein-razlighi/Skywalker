@@ -211,6 +211,13 @@ fragment EffectOut waterFragment(WaterOut in [[stage_in]],
     float3 foamColor = (sunRad * (NdotL * 0.8 + 0.2) * shadow + skyIrr * ambientK) * 0.8;
     color = mix(color, foamColor, foam * 0.9);
 
+    // Far away the sea becomes a mirror of the horizon sky (grazing Fresnel), so it meets the
+    // sky without a seam where the simulated grid ends.
+    float far = smoothstep(1500.0, 18000.0, length(in.worldPos.xz - f.cameraPos.xz));
+    if (far > 0.0) {
+        float3 hd = normalize(float3(-V.x, 0.04, -V.z));  // just above the probe's horizon (below it is ground)
+        color = mix(color, envTex.sample(cubeSampler, hd, level(0.0)).rgb * mix(1.0, 0.85, saturate(w.params.z)), far * 0.9);
+    }
     float fogAmt = fogFactor(f, in.worldPos);
     float3 fogC = f.fog.rgb + f.sunColor.rgb * f.sunDir.w * pow(saturate(dot(-V, L)), 8.0) * 0.25;
     color = mix(color, fogC, fogAmt);

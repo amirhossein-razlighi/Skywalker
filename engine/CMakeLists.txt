@@ -61,7 +61,7 @@ if(SKY_HAS_METAL)
     # by agents and does not require the offline Metal toolchain).
     # The standard shader library is several modules concatenated in dependency order.
     set(_shader_dir ${CMAKE_CURRENT_SOURCE_DIR}/platform/metal/shaders)
-    set(_shader_modules Common.metal Sky.metal Surface.metal Terrain.metal Lighting.metal Effects.metal Post.metal)
+    set(_shader_modules Common.metal Clouds.metal Sky.metal Surface.metal Terrain.metal Lighting.metal Effects.metal Post.metal)
     list(TRANSFORM _shader_modules PREPEND ${_shader_dir}/ OUTPUT_VARIABLE _shader_src)
     string(REPLACE ";" "," _shader_list "${_shader_modules}")
     set(_shader_inc ${CMAKE_CURRENT_BINARY_DIR}/generated/ShaderSource.inc)

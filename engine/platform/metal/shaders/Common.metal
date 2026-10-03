@@ -43,6 +43,8 @@ struct FrameUniforms {
     float4x4 prevViewProj; // previous frame, unjittered (reprojection)
     float4x4 viewProjNoJitter;
     float4 temporal;       // xy = jitter (NDC), z = frame index, w = sub-sample index
+    float4 clouds;         // x = unused (coverage is sky.y), y = base height (m), z = thickness (m), w = density
+    float4 clouds2;        // x = scale, y = drift speed (m/s), z = mode (0 volumetric, 1 flat), w = wind angle (rad)
 };
 
 struct DrawUniforms {
