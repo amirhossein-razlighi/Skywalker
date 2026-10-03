@@ -53,5 +53,6 @@ void addStudioTools(Engine& engine, ToolRegistry& reg);
 void addPhysicsTools(Engine& engine, ToolRegistry& reg);
 void addNavTools(Engine& engine, ToolRegistry& reg);
 void addAnimationTools(Engine& engine, ToolRegistry& reg);  // AnimationTools.cpp (+ SequenceTools.cpp)
+void addHairTools(Engine& engine, ToolRegistry& reg);
 
 }  // namespace sky::tools

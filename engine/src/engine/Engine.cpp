@@ -463,6 +463,14 @@ FrameData Engine::frame(const CaptureOptions& opts) {
     if (!opts.fog) f.environment.fogDensity = 0;
     // Effects: simulated particles (+ the light fires cast) and FFT water.
     particles_.gather(*scene_, view, f.particles, f.lights);
+    {  // [hair+vfx] GPU particles, hair grooms, and the lights GPU effects cast (from a recent frame)
+        auto meshes = [this](const std::string& key) { return cpuMesh(key); };
+        auto paths = [this](const std::string& path) { return resolvePath(path); };
+        particles_.gatherGpu(*scene_, meshes, paths, f.gpuEmitters);
+        grooms_.gather(*scene_, meshes, paths, f.grooms);
+        for (const auto& ge : f.gpuEmitters) ensureMeshUploaded(ge.particleMesh);
+        for (const LightItem& l : renderer_->effectLights()) f.lights.push_back(l);
+    }
     prioritizeLights(f);
     std::vector<EntityId> waterIds;
     for (EntityId e : scene_->entities()) {

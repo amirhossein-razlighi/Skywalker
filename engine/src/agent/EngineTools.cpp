@@ -1015,6 +1015,7 @@ void registerEngineTools(Engine& engine) {
     tools::addStudioTools(engine, reg);
     tools::addPhysicsTools(engine, reg);
     tools::addAnimationTools(engine, reg);
+    tools::addHairTools(engine, reg);
 }
 
 }  // namespace sky

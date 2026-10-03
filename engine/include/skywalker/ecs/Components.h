@@ -87,7 +87,7 @@ struct Camera {
 struct ParticleEmitter {
     std::string preset;            // the preset it was made from (informational)
     bool emitting = true;
-    std::string look = "glow";     // glow | flame | smoke | spark | rain | snow | mist
+    std::string look = "glow";     // glow | flame | smoke | spark | rain | snow | mist | sprite (gpu)
     float rate = 20.f;             // particles per second
     int burst = 0;                 // particles emitted at once when the emitter starts (explosions)
     int maxParticles = 600;
@@ -123,6 +123,43 @@ struct ParticleEmitter {
     float lightRange = 8.f;
     bool prewarm = true;           // start fully developed (a fire that is already burning)
     int seed = 0;
+    // --- GPU simulation (visual effects with up to millions of particles) -------------------
+    // simulation "gpu" runs on the GPU compute pipeline (not deterministic, not countable by
+    // gameplay); "cpu" is the deterministic gameplay path. Fields below only apply to "gpu".
+    std::string simulation = "cpu";   // cpu | gpu
+    std::string facing = "camera";    // camera | velocity | horizontal | ribbon | mesh
+    std::string mesh;                 // facing "mesh": primitive, "asset:...", fx:leaf, fx:shard, fx:pebble
+    float roughness = 0.6f;           // mesh particles
+    float metallic = 0.f;             // mesh particles
+    std::string texture;              // look "sprite": sprite / flipbook sheet (project-relative)
+    int flipbookColumns = 1;
+    int flipbookRows = 1;
+    float flipbookFps = 0.f;          // 0 = the sheet plays once over each particle's life
+    std::string colorGradient;        // "#rrggbbaa@0 #rrggbbaa@0.5 ..." (overrides colorStart/colorEnd)
+    std::string sizeCurve;            // "1@0 1.4@0.3 0@1": multiplies the size over life
+    std::string opacityCurve;         // multiplies the opacity over life
+    std::string shapeMesh;            // shape "mesh": mesh to emit from ("" = this entity's mesh)
+    std::string field = "none";       // none | vortex | attractor | texture
+    float fieldStrength = 1.f;
+    float fieldRadius = 2.f;          // m
+    Vec3 fieldCenter{0.f, 0.f, 0.f};  // local offset
+    Vec3 fieldAxis{0.f, 1.f, 0.f};    // vortex axis (local)
+    float fieldPull = 0.f;            // vortex: inward pull (m/s)
+    float fieldLift = 0.f;            // vortex: lift along the axis (m/s)
+    std::string fieldTexture;         // field "texture": vector field (.fga), project-relative
+    Vec3 fieldSize{4.f, 4.f, 4.f};    // field "texture": box covered by the field (m)
+    bool depthCollision = false;      // collide with everything on screen (scene depth + normals)
+    bool stick = false;               // stick where they hit instead of bouncing / dying
+    float friction = 0.3f;            // tangential slow-down on bounce
+    std::string colliders;            // comma-separated entity names: spheres / planes from their meshes
+    std::string subEmitter;           // entity (with gpu particles) spawned from these particles
+    std::string subEmitOn = "death";  // death | collision | both
+    int subEmitCount = 8;             // particles spawned per event
+    float subEmitInherit = 0.3f;      // fraction of the parent's velocity inherited
+    float trailLength = 0.25f;        // facing "ribbon": seconds of history
+    int trailSegments = 12;           // facing "ribbon": history samples (2..32)
+    bool sort = true;                 // blended looks: GPU sort back to front
+    float hueVariation = 0.f;         // random hue rotation per particle (per burst for sub-emitted ones)
 
     static const TypeInfo& type();
 };
@@ -286,3 +323,5 @@ struct Environment {
 #include "skywalker/ecs/PhysicsComponents.h"  // body, collider, character, joint, physics_world, nav_agent, navmesh
 // Workstream components (each in its own header).
 #include "skywalker/ecs/AnimationComponents.h"
+// Workstream components (kept in their own headers).
+#include "skywalker/ecs/GroomComponent.h"

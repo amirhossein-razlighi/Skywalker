@@ -39,6 +39,8 @@ set(SKY_ENGINE_SOURCES
     src/render/ColorGrading.cpp
     src/render/LightClusters.cpp
     src/render/MeshLod.cpp
+    src/fx/Groom.cpp
+    src/fx/GpuParticles.cpp
     src/render/MeshFormats.cpp
     src/assets/Fetch.cpp
     src/render/TextureGen.cpp
@@ -59,6 +61,7 @@ set(SKY_ENGINE_SOURCES
     src/dcc/Apps.cpp
     src/dcc/Manager.cpp
     src/dcc/Embedded.cpp
+    src/agent/HairTools.cpp
     src/agent/McpServer.cpp
     src/agent/SocketServer.cpp
     src/engine/Engine.cpp
@@ -208,7 +211,7 @@ if(SKY_HAS_METAL)
     # by agents and does not require the offline Metal toolchain).
     # The standard shader library is several modules concatenated in dependency order.
     set(_shader_dir ${CMAKE_CURRENT_SOURCE_DIR}/platform/metal/shaders)
-    set(_shader_modules Common.metal Clouds.metal Sky.metal Surface.metal Terrain.metal Lighting.metal Effects.metal Post.metal)
+    set(_shader_modules Common.metal Clouds.metal Sky.metal Surface.metal Terrain.metal Lighting.metal Effects.metal Post.metal GpuParticles.metal Hair.metal)
     list(TRANSFORM _shader_modules PREPEND ${_shader_dir}/ OUTPUT_VARIABLE _shader_src)
     string(REPLACE ";" "," _shader_list "${_shader_modules}")
     set(_shader_inc ${CMAKE_CURRENT_BINARY_DIR}/generated/ShaderSource.inc)
@@ -229,7 +232,8 @@ if(SKY_HAS_METAL)
         DEPENDS ${_skin_src} ${PROJECT_SOURCE_DIR}/cmake/EmbedText.cmake
         COMMENT "Embedding Metal skinning shader source")
 
-    target_sources(skywalker_engine PRIVATE platform/metal/MetalRenderer.mm ${_shader_inc} ${_skin_inc})
+    target_sources(skywalker_engine PRIVATE platform/metal/MetalRenderer.mm platform/metal/MetalFx.mm
+        platform/metal/MetalGpuParticles.mm platform/metal/MetalHair.mm ${_shader_inc} ${_skin_inc})
     target_include_directories(skywalker_engine PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/generated)
     target_compile_definitions(skywalker_engine PUBLIC $<$<COMPILE_LANGUAGE:C,CXX,OBJCXX>:SKY_HAS_METAL=1>)
     target_link_libraries(skywalker_engine PUBLIC

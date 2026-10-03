@@ -29,6 +29,7 @@ set(SKY_TEST_SOURCES
     test_wander_examples.cpp
     test_wander2.cpp
     test_wander_native.cpp
+    test_hair_vfx.cpp
     test_world.cpp
     test_audio.cpp
     test_input.cpp

@@ -25,6 +25,7 @@
 #include "skywalker/audio/AudioSystem.h"
 #include "skywalker/core/Json.h"
 #include "skywalker/engine/Gizmo.h"
+#include "skywalker/fx/Groom.h"
 #include "skywalker/fx/Ocean.h"
 #include "skywalker/fx/Particles.h"
 #include "skywalker/input/ActionMap.h"
@@ -227,6 +228,7 @@ public:
 
     // --- Effects: particles and water -----------------------------------------------
     fx::ParticleSystem& particles() { return particles_; }
+    fx::GroomSystem& grooms() { return grooms_; }  // hair & fur (generated grooms, cached)
     /// Seconds on the effects clock: simulation time while playing, a live preview clock while editing.
     double effectsTime() const;
     /// Height of the water surface at world (x, z), waves included. False if no water covers it.
@@ -301,6 +303,7 @@ private:
     double accumulator_ = 0;
     fx::ParticleSystem particles_;
     std::unique_ptr<world::WorldRuntime> world_;
+    fx::GroomSystem grooms_;
     std::unordered_map<EntityId, fx::Ocean> oceans_;
     double previewTime_ = 0;
     fx::Ocean& oceanFor(EntityId e, const Water& w);

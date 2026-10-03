@@ -31,12 +31,12 @@ struct EntityDetails: View {
     @State private var schemas: JSON = .null
 
     private var selectedID: UInt64? { engine.selection.count == 1 ? engine.selection.first : nil }
-    private static let componentOrder = ["transform", "mesh", "light", "camera", "particles", "water", "terrain", "foliage",
-                                         "audio", "listener", "body", "collider", "character", "joint", "nav_agent", "navmesh",
-                                         "physics_world", "animator", "attach", "ik", "sequencer"]
+    private static let componentOrder = ["transform", "mesh", "light", "camera", "particles", "groom", "water", "terrain",
+                                         "foliage", "audio", "listener", "body", "collider", "character", "joint", "nav_agent",
+                                         "navmesh", "physics_world", "animator", "attach", "ik", "sequencer"]
     /// Components offered by Add Component (transform is always present).
-    private static let addable = ["mesh", "light", "camera", "particles", "water", "terrain", "foliage", "audio", "listener",
-                                  "body", "collider", "character", "joint", "nav_agent", "navmesh", "physics_world",
+    private static let addable = ["mesh", "light", "camera", "particles", "groom", "water", "terrain", "foliage", "audio",
+                                  "listener", "body", "collider", "character", "joint", "nav_agent", "navmesh", "physics_world",
                                   "animator", "attach", "ik", "sequencer"]
 
     var body: some View {
@@ -86,6 +86,7 @@ struct EntityDetails: View {
         case "light": "lightbulb"
         case "camera": "video"
         case "particles": "flame"
+        case "groom": "comb"
         case "water": "water.waves"
         case "audio": "speaker.wave.2"
         case "listener": "ear"
