@@ -31,7 +31,7 @@ struct EntityDetails: View {
     @State private var schemas: JSON = .null
 
     private var selectedID: UInt64? { engine.selection.count == 1 ? engine.selection.first : nil }
-    private static let componentOrder = ["transform", "mesh", "light", "camera", "particles", "water"]
+    private static let componentOrder = ["transform", "mesh", "light", "camera", "particles", "water", "animator", "attach", "sequencer"]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -42,6 +42,9 @@ struct EntityDetails: View {
                                     onRemove: { update(id, ["components": .object([(comp, .null)])]) }) {
                         PropertyGrid(schema: schemas[comp], values: doc["components"][comp]) { field, value in
                             update(id, ["components": .object([(comp, .object([(field, value)]))])])
+                        }
+                        if comp == "animator" || comp == "sequencer" {
+                            AnimationScrubBar(entityID: id, component: comp, values: doc["components"][comp]) { reload() }
                         }
                     }
                 }
@@ -78,6 +81,9 @@ struct EntityDetails: View {
         case "camera": "video"
         case "particles": "flame"
         case "water": "water.waves"
+        case "animator": "figure.walk"
+        case "attach": "link"
+        case "sequencer": "film.stack"
         default: "puzzlepiece"
         }
     }
@@ -119,7 +125,8 @@ struct EntityDetails: View {
 
     private func addComponent(id: UInt64) -> some View {
         Menu {
-            ForEach(["mesh", "light", "camera", "particles", "water"].filter { doc["components"][$0].isNull }, id: \.self) { comp in
+            ForEach(["mesh", "light", "camera", "particles", "water", "animator", "attach", "sequencer"].filter { doc["components"][$0].isNull },
+                    id: \.self) { comp in
                 Button(comp.capitalized) { update(id, ["components": .object([(comp, [:])])]) }
             }
         } label: {

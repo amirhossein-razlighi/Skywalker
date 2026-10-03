@@ -20,6 +20,12 @@ namespace {
 using namespace schema;
 namespace fs = std::filesystem;
 
+std::string secs(float t) {
+    char buf[32];
+    std::snprintf(buf, sizeof(buf), "%g s", std::round(t * 1000.f) / 1000.f);
+    return buf;
+}
+
 bool endsWith(const std::string& s, const char* suffix) {
     size_t n = std::strlen(suffix);
     return s.size() >= n && str::lower(s).compare(s.size() - n, n, suffix) == 0;
@@ -442,7 +448,7 @@ void addSequenceTools(Engine& engine, ToolRegistry& reg) {
                  r["camera"] = cam;
                  r["start"] = start;
                  r["preview"] = path;
-                 return ToolResult::json(r, a.get("shot").asString() + " shot on " + camRef + " at " + std::to_string(start) + " s");
+                 return ToolResult::json(r, a.get("shot").asString() + " shot on " + camRef + " at " + secs(start));
              }});
 
     reg.add({"sequence_get", "Inspect sequence",
@@ -472,7 +478,7 @@ void addSequenceTools(Engine& engine, ToolRegistry& reg) {
                  }
                  if (target->player && engine.playState() != PlayState::Editing) r["playback"] = engine.animation().sequenceState(target->player);
                  return ToolResult::json(r, def->name + ": " + std::to_string(def->tracks.size()) + " tracks, " +
-                                                std::to_string(def->length()) + " s");
+                                                secs(def->length()));
              }});
 
     reg.add({"sequence_play", "Play sequence",
@@ -525,7 +531,10 @@ void addSequenceTools(Engine& engine, ToolRegistry& reg) {
                      {"camera", enumeration({"sequence", "editor"}, "Look through the sequence's camera (default) or the editor camera")},
                      {"width", integer("Image width (default 768)")},
                      {"height", integer("Image height (default 432)")},
-                     {"persist", boolean("Keep showing this time in the editor (sets sequencer preview/time)")}},
+                     {"persist", boolean("Keep showing this time in the editor (sets sequencer preview/time)")},
+                     {"include_image", boolean("Return the images (default true; false = just render / save)")},
+                     {"transient", boolean("Only show `time` in the editor viewport (no capture, not saved) until clear")},
+                     {"clear", boolean("End a transient scrub")}},
                     {"sequence"}),
              true, false, [&engine](const Json& a, ToolContext& ctx) {
                  if (engine.playState() != PlayState::Editing) {
@@ -542,13 +551,21 @@ void addSequenceTools(Engine& engine, ToolRegistry& reg) {
                  anim::AnimationSystem& as = engine.animation();
                  auto def = as.sequence(target->path);
                  if (!def) return ToolResult::error(def.error());
+                 if (a.get("clear").asBool()) {
+                     as.clearSequenceScrub(player);
+                     return ToolResult::text("scrub cleared");
+                 }
+                 if (a.get("transient").asBool()) {
+                     as.setSequenceScrub(player, std::max(0.f, a.get("time").asFloat(0.f)));
+                     return ToolResult::json(Json::object({{"time", a.get("time")}}), "showing " + secs(a.get("time").asFloat(0.f)));
+                 }
                  if (a.get("persist").asBool()) {
                      float t = a.get("time").asFloat(0.f);
-                     Status st = engine.edit(ctx.actor, "Scrub to " + std::to_string(t) + " s", [&]() {
+                     Status st = engine.edit(ctx.actor, "Scrub to " + secs(t), [&]() {
                          return engine.scene().patchComponent(player, "sequencer", Json::object({{"preview", true}, {"time", t}}));
                      });
                      if (!st) return fail(st);
-                     return ToolResult::json(Json::object({{"time", t}}), "the editor now shows the sequence at " + std::to_string(t) + " s");
+                     return ToolResult::json(Json::object({{"time", t}}), "the editor now shows the sequence at " + secs(t));
                  }
                  std::vector<float> times;
                  std::string saveDir = a.get("save_dir").asString();
@@ -590,7 +607,7 @@ void addSequenceTools(Engine& engine, ToolRegistry& reg) {
                          if (Status st = writePng(cap->image, engine.resolvePath(file)); !st) return fail(st);
                          shot["file"] = file;
                      }
-                     if (times.size() <= 8) {
+                     if (times.size() <= 8 && a.get("include_image").asBool(true)) {
                          std::vector<uint8_t> png = encodePng(cap->image);
                          res.image(str::base64Encode(png.data(), png.size()));
                      }

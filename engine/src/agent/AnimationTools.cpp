@@ -397,7 +397,8 @@ void addAnimationTools(Engine& engine, ToolRegistry& reg) {
                      {"time", number("Editor preview time in seconds")},
                      {"preview", enumeration({"rest", "pose", "play"}, "Editor preview mode")},
                      {"look_at", string("Entity the head turns toward (\"\" = off)")},
-                     {"clear_preview", boolean("Remove a preview set by play while editing")}},
+                     {"preview_time", number("Editing: show the default state (or `play`) at this time without saving it (live scrubbing)")},
+                     {"clear_preview", boolean("Remove a preview set by play / preview_time while editing")}},
                     {"entity"}),
              true, false, [&engine](const Json& a, ToolContext& ctx) {
                  auto ae = animatorOf(engine, a.get("entity"));
@@ -430,11 +431,11 @@ void addAnimationTools(Engine& engine, ToolRegistry& reg) {
                      if (!st) return fail(st);
                  }
                  if (a.get("clear_preview").asBool()) as.clearPreview(*ae);
-                 if (a.contains("play")) {
+                 if (a.contains("play") || (editing && a.contains("preview_time"))) {
                      std::string what = a.get("play").asString();
                      Status s;
                      if (editing) {
-                         s = as.setPreview(*ae, what, a.get("time").asFloat(0.f));
+                         s = as.setPreview(*ae, what, a.contains("preview_time") ? a.get("preview_time").asFloat() : a.get("time").asFloat(0.f));
                      } else {
                          std::optional<bool> loop;
                          if (a.get("loop").isBool()) loop = a.get("loop").asBool();

@@ -617,6 +617,10 @@ bool AnimationSystem::writeComponent(EntityId e, const std::string& component, c
 AnimationSystem::FrameOverrides AnimationSystem::beginFrame(bool editing) {
     FrameOverrides ov;
     playing_ = !editing;
+    // Forget runtime state of entities that were deleted (or lost their component).
+    std::erase_if(animators_, [&](const auto& kv) { return !scene_.get<Animator>(kv.first); });
+    std::erase_if(sequencers_, [&](const auto& kv) { return !scene_.get<SequencePlayer>(kv.first); });
+    std::erase_if(scrubs_, [&](const auto& kv) { return !scene_.exists(kv.first); });
     if (!editing) return ov;
     ov.active = true;
     ecs::Registry& reg = scene_.registry();

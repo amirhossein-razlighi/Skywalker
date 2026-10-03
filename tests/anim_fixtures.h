@@ -67,6 +67,7 @@ struct StripOptions {
     bool u8Joints = false;      // JOINTS_0 as unsigned bytes instead of shorts
     bool twoMaterials = false;  // a second primitive (a "hat" quad on the upper bone) with its own material
     bool withMesh = true;       // false: an animation-only file (clip library)
+    bool humanNames = false;    // name the bones Spine / Head (look-at IK finds a head)
 };
 
 inline std::string makeStripGltf(const StripOptions& o = {}) {
@@ -166,8 +167,8 @@ inline std::string makeStripGltf(const StripOptions& o = {}) {
 
     sky::Json nodes = sky::Json::array();
     nodes.push(sky::Json::object({{"name", "Armature"}, {"children", sky::Json::array({1})}}));
-    nodes.push(sky::Json::object({{"name", "Root"}, {"children", sky::Json::array({2})}}));
-    nodes.push(sky::Json::object({{"name", "Upper"}, {"translation", sky::Json::array({0, 1, 0})}}));
+    nodes.push(sky::Json::object({{"name", o.humanNames ? "Spine" : "Root"}, {"children", sky::Json::array({2})}}));
+    nodes.push(sky::Json::object({{"name", o.humanNames ? "Head" : "Upper"}, {"translation", sky::Json::array({0, 1, 0})}}));
     sky::Json sceneNodes = sky::Json::array({0});
     if (o.withMesh) {
         nodes.push(sky::Json::object({{"name", "Body"}, {"mesh", 0}, {"skin", 0}}));

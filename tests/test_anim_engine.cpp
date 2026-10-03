@@ -224,3 +224,29 @@ TEST_CASE("anim wander: set_param / trigger / play_animation / anim_state and on
     CHECK(found);
     p.engine->stop();
 }
+
+TEST_CASE("anim look-at: the head turns toward a target, within the angle limit") {
+    Project p({.humanNames = true});
+    EntityId hero = p.character();
+    EntityId target = p.scene().create("Target");
+    p.patch(target, "transform", R"({"position": [5, 1.5, 0]})");  // to the character's side
+    p.patch(hero, "animator", R"({"clip": "Bend", "time": 0})");
+    anim::AnimationSystem& as = p.engine->animation();
+    Mat4 rest = as.boneWorld(hero, "Head").value();
+    auto facing = [&](const Mat4& head) {
+        // The character faces -Z; the head's turn relative to its rest pose turns that direction.
+        anim::Quat delta = anim::rotationOf(head) * anim::rotationOf(rest).conjugate();
+        return delta.rotate({0, 0, -1});
+    };
+    p.patch(hero, "animator", R"({"lookAt": "Target", "lookAtLimit": 120})");
+    Mat4 head = as.boneWorld(hero, "Head").value();
+    Vec3 want = normalize(Vec3{5, 1.5f, 0} - head.translation());
+    CHECK(dot(facing(head), want) > 0.98f);
+    p.patch(hero, "animator", R"({"lookAtLimit": 45})");
+    head = as.boneWorld(hero, "Head").value();
+    float angle = degrees(std::acos(std::clamp(dot(facing(head), Vec3{0, 0, -1}), -1.f, 1.f)));
+    CHECK(angle == doctest::Approx(45.f).epsilon(0.05));
+    p.patch(hero, "animator", R"({"lookAtWeight": 0})");
+    head = as.boneWorld(hero, "Head").value();
+    CHECK(dot(facing(head), Vec3{0, 0, -1}) > 0.999f);
+}
