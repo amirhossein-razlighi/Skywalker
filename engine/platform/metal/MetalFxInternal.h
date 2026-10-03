@@ -141,10 +141,12 @@ public:
     bool build(id<MTLLibrary> lib, const FxFormats& formats);
     bool ready() const { return ready_; }
     void simulate(id<MTLCommandBuffer> cmd, const FrameData& frame);
+    /// Deep opacity maps (after simulate, in its own command buffer for timing).
+    void renderShadowMaps(id<MTLCommandBuffer> cmd, const FrameData& frame);
     void encodeShadowCaster(id<MTLRenderCommandEncoder> enc, const FrameData& frame, simd_float4x4 lightViewProj);
     void encodeOpaque(id<MTLRenderCommandEncoder> enc);
     Json stats() const;
-    FxGpuTimer timer;
+    FxGpuTimer timer, domTimer;
 
 private:
     struct GroomGpu {
@@ -172,7 +174,7 @@ private:
     std::unordered_map<std::string, id<MTLComputePipelineState>> kernels_;
     id<MTLRenderPipelineState> strandPipeline_, cardPipeline_, shadowPipeline_, domDepthPipeline_, domDensityPipeline_,
         domMeshPipeline_;
-    id<MTLDepthStencilState> depthWrite_, depthAlways_;
+    id<MTLDepthStencilState> depthWrite_;
     std::unordered_map<EntityId, GroomGpu> grooms_;
     std::vector<EntityId> order_;
     static constexpr NSUInteger kDomSize = 512;

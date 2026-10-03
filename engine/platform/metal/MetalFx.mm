@@ -48,6 +48,11 @@ void MetalFx::simulate(const FrameData& frame, id<MTLTexture> prevDepth, id<MTLT
         hair_->simulate(cmd, frame);
         hair_->timer.track(cmd);
         [cmd commit];
+        id<MTLCommandBuffer> dom = [queue_ commandBuffer];
+        dom.label = @"Hair deep opacity";
+        hair_->renderShadowMaps(dom, frame);
+        hair_->domTimer.track(dom);
+        [dom commit];
     } else {
         hair_->simulate(nil, frame);
     }
@@ -83,6 +88,7 @@ Json MetalFx::stats() const {
     return Json::object({{"frameGpuMs", timing_->frame.value()},
                          {"particlesGpuMs", particles_->timer.value()},
                          {"hairGpuMs", hair_->timer.value()},
+                         {"hairShadowGpuMs", hair_->domTimer.value()},
                          {"gpuParticles", particles_->ready()},
                          {"hair", hair_->ready()},
                          {"emitters", particles_->stats()},

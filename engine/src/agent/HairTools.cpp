@@ -7,6 +7,8 @@
 //   fx_stats       GPU timings, live GPU particle counts and groom costs from the renderer
 
 #include <algorithm>
+#include <chrono>
+#include <cstdio>
 #include <fstream>
 
 #include "ToolHelpers.h"
@@ -202,6 +204,54 @@ void addHairTools(Engine& engine, ToolRegistry& reg) {
                  if (!out) return ToolResult::error(Error::make("io_error", "failed writing " + rel));
                  return ToolResult::json(Json::object({{"path", rel}, {"strands", strands.strandCount()}}),
                                          "exported " + std::to_string(strands.strandCount()) + " strands to " + rel);
+             }});
+
+    reg.add({"fx_benchmark", "Benchmark GPU frame time",
+             "Render `frames` real-time frames back to back (no readback, effects time advancing 1/60 s per frame, so "
+             "GPU particles and hair simulate) and report the GPU time per frame and per effects pass, plus the wall-clock "
+             "time. Use it to budget effects: e.g. {\"width\":1920,\"height\":1080,\"frames\":120}. The view is the "
+             "editor camera unless eye/target are given.",
+             "render",
+             object({{"width", integer("Width (default 1920)")},
+                     {"height", integer("Height (default 1080)")},
+                     {"frames", integer("Frames to render (default 120, max 2000)")},
+                     {"eye", vec3("Camera position")},
+                     {"target", vec3("Look-at point")},
+                     {"serial", boolean("Wait for each frame (default true): exact per-pass GPU times; false = frames "
+                                        "overlap like a game loop (throughput)")}}),
+             false, false, [&engine](const Json& a, ToolContext&) {
+                 CaptureOptions o;
+                 o.width = static_cast<int>(std::clamp<int64_t>(a.get("width").asInt(1920), 16, 4096));
+                 o.height = static_cast<int>(std::clamp<int64_t>(a.get("height").asInt(1080), 16, 4096));
+                 o.samples = 1;
+                 o.editorOverlays = false;
+                 Vec3 eye, target;
+                 if (reflect::jsonToVec3(a.get("eye"), eye)) {
+                     o.hasCustomView = true;
+                     o.customView = engine.camera().toView();
+                     o.customView.eye = eye;
+                     if (reflect::jsonToVec3(a.get("target"), target)) o.customView.target = target;
+                 }
+                 const int frames = static_cast<int>(std::clamp<int64_t>(a.get("frames").asInt(120), 1, 2000));
+                 const bool serial = a.get("serial").asBool(true);
+                 FrameData base = engine.frame(o);
+                 auto start = std::chrono::steady_clock::now();
+                 for (int i = 0; i < frames; ++i) {
+                     FrameData f = base;
+                     f.time = base.time + static_cast<float>(i + 1) / 60.f;
+                     if (Status st = engine.renderer().render(f); !st) return fail(st);
+                     if (serial) (void)engine.renderer().readback();
+                 }
+                 (void)engine.renderer().readback();  // waits for the GPU
+                 double wall = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
+                 Json stats = engine.renderer().stats();
+                 stats["frames"] = frames;
+                 stats["wallMsPerFrame"] = wall / frames;
+                 stats["resolution"] = std::to_string(o.width) + "x" + std::to_string(o.height);
+                 char buf[160];
+                 std::snprintf(buf, sizeof(buf), "%d frames: %.2f ms GPU/frame, %.2f ms wall/frame", frames,
+                               stats.get("frameGpuMs").asNumber(), wall / frames);
+                 return ToolResult::json(stats, buf);
              }});
 
     reg.add({"fx_stats", "GPU effects stats",

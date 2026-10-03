@@ -68,6 +68,7 @@ bool MetalHair::build(id<MTLLibrary> lib, const FxFormats& fmt) {
         return [device_ newRenderPipelineStateWithDescriptor:d error:&err];
     };
     strandPipeline_ = mainPass("hairVertex", "hairFragment");
+
     cardPipeline_ = mainPass("hairCardVertex", "hairCardFragment");
     shadowPipeline_ = depthOnly("hairShadowVertex", "hairShadowFragment");
     domDepthPipeline_ = depthOnly("hairDomVertex", "hairDomDepthFragment");
@@ -90,9 +91,7 @@ bool MetalHair::build(id<MTLLibrary> lib, const FxFormats& fmt) {
     ds.depthCompareFunction = MTLCompareFunctionLess;
     ds.depthWriteEnabled = YES;
     depthWrite_ = [device_ newDepthStencilStateWithDescriptor:ds];
-    ds.depthCompareFunction = MTLCompareFunctionAlways;
-    ds.depthWriteEnabled = NO;
-    depthAlways_ = [device_ newDepthStencilStateWithDescriptor:ds];
+
     ready_ = true;
     return true;
 }
@@ -181,7 +180,14 @@ void MetalHair::simulate(id<MTLCommandBuffer> cmd, const FrameData& frame) {
         float widthM = p.widthRoot * 0.001f * scale;
         float ratio = widthM / (pixelAt1m * (ortho ? 1.f : dist));
         float fraction = 1.f;
-        if (frame.samples <= 1 && g.N > 20000) fraction = std::clamp(12.f * ratio, 0.3f, 1.f);
+        if (frame.samples <= 1 && g.N > 20000) {
+            // Real time: thin strands far away merge into the coverage of fewer, more opaque
+            // ones, and the strand count follows the groom's size on screen (geometry is the cost
+            // on tile-based GPUs). Stills (accumulated sub-samples) always draw every strand.
+            fraction = std::clamp(12.f * ratio, 0.3f, 1.f);
+            float budget = std::clamp(screenPx * 36.f, 6000.f, static_cast<float>(g.N));
+            fraction = std::min(fraction, budget / static_cast<float>(g.N));
+        }
         if (g.cards) fraction = std::min(fraction, 0.3f);
         g.drawn = std::max<uint32_t>(1, static_cast<uint32_t>(static_cast<float>(g.N) * fraction));
         g.castShadows = p.castShadows;
@@ -263,6 +269,10 @@ void MetalHair::simulate(id<MTLCommandBuffer> cmd, const FrameData& frame) {
         order_.push_back(item.entity);
     }
     [enc endEncoding];
+}
+
+void MetalHair::renderShadowMaps(id<MTLCommandBuffer> cmd, const FrameData& frame) {
+    if (!ready_) return;
     for (const GroomItem& item : frame.grooms) {
         auto it = grooms_.find(item.entity);
         if (it != grooms_.end() && it->second.posValid) renderDom(cmd, it->second, item, frame);
@@ -287,6 +297,11 @@ void MetalHair::renderDom(id<MTLCommandBuffer> cmd, GroomGpu& g, const GroomItem
     u.dom = simd_make_float4(std::clamp(r * 0.012f, 0.0015f, 0.03f), farP - nearP, texel, 1.f);
     simd_float4 lightInfo = simd_make_float4(L.x, L.y, L.z, texel);
     const MTLViewport vpt{0, 0, static_cast<double>(kDomSize), static_cast<double>(kDomSize), 0, 1};
+    // A uniform subset of ~16k strands (with proportionally more coverage) is plenty for the map.
+    HairParamsUniforms du = u;
+    const uint32_t domStride = std::max<uint32_t>(1, g.drawn / 8000);
+    du.cards.z = static_cast<float>(domStride);
+    const uint32_t domCount = std::max<uint32_t>(1, g.drawn / domStride);
 
     // 1. Opaque meshes around the groom (head, shoulders): their depth from the sun.
     {
@@ -333,11 +348,11 @@ void MetalHair::renderDom(id<MTLCommandBuffer> cmd, GroomGpu& g, const GroomItem
         [enc setRenderPipelineState:domDepthPipeline_];
         [enc setDepthStencilState:depthWrite_];
         [enc setCullMode:MTLCullModeNone];
-        [enc setVertexBytes:&u length:sizeof(u) atIndex:3];
+        [enc setVertexBytes:&du length:sizeof(du) atIndex:3];
         [enc setVertexBuffer:g.render offset:0 atIndex:4];
         [enc setVertexBuffer:g.children offset:0 atIndex:5];
         [enc setVertexBytes:&lightInfo length:sizeof(lightInfo) atIndex:6];
-        [enc drawPrimitives:MTLPrimitiveTypeTriangleStrip vertexStart:0 vertexCount:g.P * 2 instanceCount:g.drawn];
+        [enc drawPrimitives:MTLPrimitiveTypeTriangleStrip vertexStart:0 vertexCount:g.P * 2 instanceCount:domCount];
         [enc endEncoding];
     }
     // 3. Cumulative density in 4 layers behind the nearest hair.
@@ -352,13 +367,13 @@ void MetalHair::renderDom(id<MTLCommandBuffer> cmd, GroomGpu& g, const GroomItem
         [enc setViewport:vpt];
         [enc setRenderPipelineState:domDensityPipeline_];
         [enc setCullMode:MTLCullModeNone];
-        [enc setVertexBytes:&u length:sizeof(u) atIndex:3];
+        [enc setVertexBytes:&du length:sizeof(du) atIndex:3];
         [enc setVertexBuffer:g.render offset:0 atIndex:4];
         [enc setVertexBuffer:g.children offset:0 atIndex:5];
         [enc setVertexBytes:&lightInfo length:sizeof(lightInfo) atIndex:6];
-        [enc setFragmentBytes:&u length:sizeof(u) atIndex:3];
+        [enc setFragmentBytes:&du length:sizeof(du) atIndex:3];
         [enc setFragmentTexture:g.domDepth atIndex:0];
-        [enc drawPrimitives:MTLPrimitiveTypeTriangleStrip vertexStart:0 vertexCount:g.P * 2 instanceCount:g.drawn];
+        [enc drawPrimitives:MTLPrimitiveTypeTriangleStrip vertexStart:0 vertexCount:g.P * 2 instanceCount:domCount];
         [enc endEncoding];
     }
 }
@@ -384,11 +399,10 @@ void MetalHair::encodeShadowCaster(id<MTLRenderCommandEncoder> enc, const FrameD
             bound = true;
         }
         HairParamsUniforms u = g.params;
-        uint32_t count = g.drawn;
-        if (count > 20000) {  // half the strands (with twice the coverage) are plenty for the sun's shadow
-            count /= 2;
-            u.width.w *= static_cast<float>(g.drawn) / static_cast<float>(count);
-        }
+        // Every 2nd/3rd strand (with that much more coverage) is plenty for the sun's shadow.
+        const uint32_t stride = g.drawn > 60000 ? 3 : (g.drawn > 20000 ? 2 : 1);
+        u.cards.z = static_cast<float>(stride);
+        const uint32_t count = std::max<uint32_t>(1, g.drawn / stride);
         [enc setVertexBytes:&u length:sizeof(u) atIndex:3];
         [enc setVertexBuffer:g.render offset:0 atIndex:4];
         [enc setVertexBuffer:g.children offset:0 atIndex:5];
@@ -414,9 +428,9 @@ void MetalHair::encodeOpaque(id<MTLRenderCommandEncoder> enc) {
             [enc setVertexBuffer:g.pos offset:0 atIndex:4];
             [enc drawPrimitives:MTLPrimitiveTypeTriangleStrip vertexStart:0 vertexCount:g.P * 2 instanceCount:g.G];
         } else {
-            [enc setRenderPipelineState:strandPipeline_];
             [enc setVertexBuffer:g.render offset:0 atIndex:4];
             [enc setVertexBuffer:g.children offset:0 atIndex:5];
+            [enc setRenderPipelineState:strandPipeline_];
             [enc drawPrimitives:MTLPrimitiveTypeTriangleStrip vertexStart:0 vertexCount:g.P * 2 instanceCount:g.drawn];
         }
     }

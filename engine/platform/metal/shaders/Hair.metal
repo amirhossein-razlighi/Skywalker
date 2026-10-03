@@ -37,7 +37,7 @@ struct HairParams {
     float4 sim;            // x dt, y time, z damping, w stiffness
     float4 sim2;           // x root stiffness, y gravity (m/s^2), z collider count, w wind drag
     float4 wind;           // xyz wind (m/s), w gust
-    float4 cards;          // x card width (m), y strands per card, z 0, w 0
+    float4 cards;          // x card width (m), y strands per card, z strand stride (shadow passes), w 0
     float4 colliders[16];  // [a.xyz, kind], [b.xyz, radius]
 };
 
@@ -171,6 +171,9 @@ kernel void hairInterpolate(uint i [[thread_position_in_grid]], constant HairPar
     float3 root = (H.model * float4(c.root.xyz, 1.0)).xyz;
     float3 ref = normalize((H.model * float4(1.0, 0.0, 0.0, 0.0)).xyz);
     float scale = H.dims.w;
+    // w packs the strand's width multiplier (integer part, 1/256 steps) and random value (fraction),
+    // so drawing reads one float4 per point and nothing else.
+    float packed = floor(as_type<float>(c.guides.w) * 256.0 + 0.5) + c.weights.w * 0.999;
     float3 bPrev = root, bCur = hairBase(c, root, guides, P, 0), bNext = hairBase(c, root, guides, P, 1);
     float3 prevT = float3(0, 1, 0), Nk = float3(1, 0, 0);
     for (uint k = 0; k < P; ++k) {
@@ -192,7 +195,7 @@ kernel void hairInterpolate(uint i [[thread_position_in_grid]], constant HairPar
             Nk = ln > 1e-12 ? n / ln : Nk;
         }
         float3 o = float3(offsets[i * P + k].xyz);
-        out[i * P + k] = float4(bCur + (T * o.x + Nk * o.y + cross(T, Nk) * o.z) * scale, 0.0);
+        out[i * P + k] = float4(bCur + (T * o.x + Nk * o.y + cross(T, Nk) * o.z) * scale, packed);
         bPrev = bCur;
         bCur = bNext;
         if (k + 2 < P) bNext = hairBase(c, root, guides, P, k + 2);
@@ -415,22 +418,21 @@ static float3 hairExpand(constant HairParams& H, device const float4* pos, devic
     uint k = min(vid >> 1, P - 1);
     float side = (vid & 1) ? 1.0 : -1.0;
     uint base = strand * P;
-    float3 p = hairPoint(pos, base, k);
-    float3 pa = hairPoint(pos, base, k > 0 ? k - 1 : 0), pb = hairPoint(pos, base, min(k + 1, P - 1));
-    float3 T = pb - pa;
+    float4 p4 = pos[base + k];
+    float3 p = p4.xyz;
+    float3 T = k + 1 < P ? pos[base + k + 1].xyz - p : p - pos[base + k - 1].xyz;
     T = dot(T, T) > 1e-14 ? normalize(T) : float3(0, 1, 0);
     float3 V = ortho ? -fwd : normalize(eye - p);
     float3 B = cross(T, V);
     B = dot(B, B) > 1e-12 ? normalize(B) : normalize(cross(T, float3(0.31, 0.92, 0.23)));
     t = float(k) / float(P - 1);
-    HairChild c = children[strand];
-    float widthMul = as_type<float>(c.guides.w);
+    float widthMul = floor(p4.w) * (1.0 / 256.0);
     float wPhys = mix(H.width.x, H.width.y, t) * widthMul * H.dims.w;
     float pix = ortho ? pixelAt1m : pixelAt1m * max(dot(p - eye, fwd), 1e-3);
     float wDraw = max(wPhys, pix * 0.9);
     coverage = wPhys / wDraw * H.width.z * H.width.w * (1.0 - smoothstep(0.9, 1.0, t) * 0.5);
     tangent = T;
-    rand = c.weights.w;
+    rand = fract(p4.w) / 0.999;
     return p + B * side * wDraw * 0.5;
 }
 
@@ -549,7 +551,10 @@ vertex HairShadowOut hairShadowVertex(uint vid [[vertex_id]], uint iid [[instanc
     // lightInfo: xyz = direction the light travels, w = texel size (m)
     float3 T;
     float cov, t, rnd;
-    float3 world = hairExpand(H, pos, children, iid, vid, float3(0.0), lightInfo.xyz, true, lightInfo.w, T, cov, t, rnd);
+    // Every `stride`-th strand with `stride` times the coverage: same opacity, fraction of the cost.
+    uint stride = max(uint(H.cards.z), 1u);
+    float3 world = hairExpand(H, pos, children, iid * stride, vid, float3(0.0), lightInfo.xyz, true, lightInfo.w, T, cov, t, rnd);
+    cov *= float(stride);
     HairShadowOut o;
     o.position = lightViewProj * float4(world, 1.0);
     o.coverage = cov;
@@ -574,10 +579,11 @@ vertex HairDomOut hairDomVertex(uint vid [[vertex_id]], uint iid [[instance_id]]
                                 constant float4& lightInfo [[buffer(6)]]) {
     float3 T;
     float cov, t, rnd;
-    float3 world = hairExpand(H, pos, children, iid, vid, float3(0.0), lightInfo.xyz, true, lightInfo.w, T, cov, t, rnd);
+    uint stride = max(uint(H.cards.z), 1u);
+    float3 world = hairExpand(H, pos, children, iid * stride, vid, float3(0.0), lightInfo.xyz, true, lightInfo.w, T, cov, t, rnd);
     HairDomOut o;
     o.position = H.domViewProj * float4(world, 1.0);
-    o.coverage = cov / max(H.width.w, 1e-3);  // physical coverage (LOD boost does not darken shadows)
+    o.coverage = cov * float(stride);
     return o;
 }
 

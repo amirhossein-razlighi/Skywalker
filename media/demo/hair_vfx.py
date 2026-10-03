@@ -319,45 +319,40 @@ if wanted("vfx"):
 
 # --- Benchmark ---------------------------------------------------------------------------------------
 if wanted("bench"):
+    # GPU timings at 1080p with frames rendered back to back (fx_benchmark), so the GPU runs at
+    # full clock like in a game. Numbers are per frame; "frame" is the whole frame command buffer.
     print("bench", flush=True)
     s = Session("bench")
     s.call("scene_new", name="Bench", empty=True)
     stage(s, True)
     s.call("environment_update", **NIGHT)
-    view = ([7, 3, 9], [0, 1.5, 0])
 
-    def gpu_ms(frames=40):
-        for _ in range(frames):
-            s.call("sim_control", action="step", ticks=1)
-            s.call("viewport_capture", width=1920, height=1080, annotate=False, overlays=False, include_image=False,
-                   samples=1, eye=view[0], target=view[1])
-        return s.call("fx_stats")
+    def bench(label, eye, target, frames=180):
+        st = s.call("fx_benchmark", width=1920, height=1080, frames=frames, eye=eye, target=target)
+        print(f"  {label}: frame {st['frameGpuMs']:.2f} ms GPU ({st['wallMsPerFrame']:.2f} ms wall), particle sim "
+              f"{st['particlesGpuMs']:.2f} ms, hair sim {st['hairGpuMs']:.2f} ms, hair deep opacity "
+              f"{st['hairShadowGpuMs']:.2f} ms", flush=True)
+        return st
 
-    base = gpu_ms()
-    print("  empty scene:", round(base["frameGpuMs"], 2), "ms", flush=True)
+    far = ([7, 3, 9], [0, 1.5, 0])
+    bench("empty stage", *far)
     s.call("fx_create", effect="ember_storm", name="Million",
            overrides={"rate": 250000, "lifetime": 4, "maxParticles": 1000000, "shapeSize": [24, 8, 24], "intensity": 2,
                       "light": 0, "facing": "camera"})
-    st = gpu_ms(60)
-    alive = sum(e["alive"] for e in st["emitters"])
-    print(f"  {alive} GPU particles (curl noise, additive): frame {st['frameGpuMs']:.2f} ms, simulation "
-          f"{st['particlesGpuMs']:.2f} ms", flush=True)
+    st = bench("1M particles, additive, curl noise", *far)
+    print("    alive:", sum(e["alive"] for e in st["emitters"]), flush=True)
     s.call("entity_update", entity="Million", components={"particles": {"look": "smoke", "sort": True, "sizeStart": 0.05,
                                                                           "sizeEnd": 0.08, "colorStart": "#a0a0a040"}})
-    st = gpu_ms(60)
-    alive = sum(e["alive"] for e in st["emitters"])
-    print(f"  {alive} GPU particles (lit smoke, GPU bitonic sort): frame {st['frameGpuMs']:.2f} ms, simulation "
-          f"{st['particlesGpuMs']:.2f} ms", flush=True)
+    bench("1M particles, lit smoke + GPU bitonic sort", *far)
     s.call("entity_delete", entity="Million")
     bust(s, "hair_wavy", {"strands": 100000})
-    view = ([0.45, 1.7, 0.55], [0, 1.6, 0])
-    st = gpu_ms(60)
-    g = st["grooms"][0]
-    print(f"  100k-strand groom ({g['strands']} strands x {g['pointsPerStrand']} points, drawn {g['drawn']}): frame "
-          f"{st['frameGpuMs']:.2f} ms, simulation + deep opacity {st['hairGpuMs']:.2f} ms", flush=True)
+    close = ([0.45, 1.7, 0.55], [0, 1.6, 0])
+    mid = ([1.2, 1.7, 1.5], [0, 1.5, 0])
+    st = bench("100k-strand groom, close-up (fills the screen)", *close)
+    print("    drawn strands:", st["grooms"][0]["drawn"], flush=True)
+    st = bench("100k-strand groom, medium shot", *mid)
+    print("    drawn strands:", st["grooms"][0]["drawn"], flush=True)
     s.call("environment_update", windSpeed=6)
-    st = gpu_ms(60)
-    print(f"  same groom in wind: frame {st['frameGpuMs']:.2f} ms, simulation + deep opacity {st['hairGpuMs']:.2f} ms",
-          flush=True)
+    bench("100k-strand groom, close-up, wind", *close)
     s.close()
 print("done", flush=True)
