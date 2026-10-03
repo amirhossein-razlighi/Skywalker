@@ -969,7 +969,16 @@ void addAssetAndRenderTools(Engine& engine, ToolRegistry& reg) {
                      } else if (req->kind == "texture") {
                          patch = Json::object({{"texture", req->path}});
                      } else if (req->kind == "sprite") {
-                         patch = Json::object({{"mesh", "quad"}, {"texture", req->path}, {"billboard", true}, {"color", "#ffffff"}});
+                         // The target becomes a sprite (camera-facing in 3D scenes; flat when it already was a 2D sprite).
+                         EntityId target = req->target;
+                         Scene& sc = engine.scene();
+                         Json sprite = Json::object({{"texture", req->path}, {"frame", ""}, {"color", "#ffffff"}});
+                         if (!sc.get<Sprite>(target)) sprite["billboard"] = "y";
+                         Status st = engine.edit(ctx.actor, "Apply generated sprite", [&]() -> Status {
+                             if (Status r = sc.patchComponent(target, "sprite", sprite); !r) return r;
+                             return sc.get<MeshRenderer>(target) ? sc.patchComponent(target, "mesh", Json()) : Status{};
+                         });
+                         if (!st) return fail(st);
                      }
                      if (patch.isObject()) {
                          EntityId target = req->target;
@@ -1027,6 +1036,9 @@ void registerEngineTools(Engine& engine) {
     tools::addWorldTools(engine, reg);
     tools::addNetworkTools(engine, reg);
     tools::addFxTools(engine, reg);
+    tools::addTools2D(engine, reg);
+    tools::addUiTools(engine, reg);
+    tools::addDialogueTools(engine, reg);
     tools::addWorldBuildTools(engine, reg);
     tools::addAudioTools(engine, reg);
     tools::addInputTools(engine, reg);

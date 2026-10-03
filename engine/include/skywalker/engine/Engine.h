@@ -42,6 +42,7 @@
 namespace sky {
 
 class SocketServer;
+class World2D;
 class NativeModules;
 namespace studio {
 class Studio;
@@ -236,6 +237,8 @@ public:
 
     // --- Effects: particles and water -----------------------------------------------
     fx::ParticleSystem& particles() { return particles_; }
+    /// 2D, text, UI and dialogue (sprites, tilemaps, 2D lights, canvases, conversations).
+    World2D& world2d() { return *world2d_; }
     fx::GroomSystem& grooms() { return grooms_; }  // hair & fur (generated grooms, cached)
     /// Seconds on the effects clock: simulation time while playing, a live preview clock while editing.
     double effectsTime() const;
@@ -369,6 +372,7 @@ private:
     int editDepth_ = 0;
     std::deque<std::pair<std::function<Json()>, std::promise<Json>>> jobs_;
     std::unique_ptr<SocketServer> server_;
+    std::unique_ptr<World2D> world2d_;
     std::unique_ptr<studio::Studio> studio_;
 };
 

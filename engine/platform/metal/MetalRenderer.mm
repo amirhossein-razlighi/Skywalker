@@ -46,6 +46,7 @@
 #include "skywalker/render/LightClusters.h"
 #include "skywalker/render/MeshData.h"
 #include "skywalker/render/Renderer.h"
+#include "MetalRenderer2D.h"  // 2D world quads + UI (Frame2D)
 
 namespace sky {
 
@@ -417,6 +418,8 @@ public:
         bd.storageMode = MTLStorageModePrivate;
         brdfLut_ = [device_ newTextureWithDescriptor:bd];
         bakeBrdf();
+        r2d_ = std::make_unique<MetalRenderer2D>(device_);  // 2D + UI
+        if (!r2d_->init()) r2d_.reset();
         for (auto& r : ring_) r = [device_ newBufferWithLength:kRingSize options:MTLResourceStorageModeShared | MTLResourceCPUCacheModeWriteCombined];
         buildTerrainPatch();
         auto volume3D = [&](NSUInteger n) {
@@ -483,6 +486,7 @@ public:
         meshes_.erase(key);
         textures_.erase(key + "#srgb");
         textures_.erase(key + "#linear");
+        if (r2d_) r2d_->invalidate(key);  // 2D
     }
 
     Status render(const FrameData& frame) override {
@@ -537,6 +541,7 @@ public:
             trianglesDrawn_ = 0;
             fx_->simulate(frame, depthPrev_, gbufB_, prevViewProj_, historyValid_);  // [hair+vfx]
             encodeShadows(cmd, frame, base, cascades);
+            if (r2d_) r2d_->encodeOccluders(cmd, frame);  // 2D shadow casters
             for (int i = 0; i < samples; ++i) {
                 // Sub-pixel jitter (Halton 2,3): TAA spreads it over frames, stills over sub-samples.
                 Vec2 j = jittered ? halton23(accumulate ? static_cast<uint64_t>(i) : frameIndex_) : Vec2{0, 0};
@@ -575,6 +580,7 @@ public:
                 fullscreen(cmd, debugViewPipeline_, resolve_, {gbufA_, gbufB_, giOut_, ssrOut_, aoBlurred_, depthResolved_, hdr_},
                            &pu, sizeof(pu), false, @"Debug view");
             }
+            if (r2d_) r2d_->encodeUI(cmd, frame, resolve_, depthResolved_);  // UI at output resolution
             encodeOverlays(cmd, frame, base);
             fx_->trackFrame(cmd);  // [hair+vfx] GPU frame time
             [cmd commit];
@@ -1899,6 +1905,7 @@ private:
             [enc drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:6];
         }
 
+        if (r2d_) r2d_->encodeWorld(enc, rp, frame);  // 2D: sprites, tiles, world text (depth-tested)
         [enc endEncoding];
     }
 
@@ -2753,6 +2760,7 @@ private:
     uint64_t frameIndex_ = 0;
     bool aoActive_ = false;
     bool volumetricActive_ = false;
+    std::unique_ptr<MetalRenderer2D> r2d_;  // 2D world quads + UI
     std::unique_ptr<MetalFx> fx_;  // [hair+vfx]
 };
 

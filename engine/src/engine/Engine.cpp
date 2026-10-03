@@ -20,6 +20,7 @@
 #include "skywalker/assets/Prefab.h"
 #include "skywalker/render/Gltf.h"
 #include "skywalker/render/MeshData.h"
+#include "skywalker/ui/World2D.h"
 #include "skywalker/studio/Playtest.h"
 #include "skywalker/studio/Studio.h"
 
@@ -106,6 +107,7 @@ Engine::Engine(EngineConfig config)
         if (!s) return s.error();
         return Json();
     };
+    world2d_ = std::make_unique<World2D>(config_.projectDir);
     world::WorldRuntime::Hooks hooks;
     hooks.resolvePath = [this](const std::string& p) { return resolvePath(p); };
     hooks.material = [this](const std::string& p) { return resolveMaterial(p); };
@@ -287,6 +289,8 @@ void Engine::play() {
         runtime_->reset(/*keepQueuedEvents=*/true);
         accumulator_ = 0;
         particles_.reset();  // play sessions replay exactly
+        world2d_->reset();
+        world2d_->onPlay(*scene_, *runtime_);  // auto-start dialogues
         animation_->reset();
         animation_->setPlaying(true);
         physics_->beginPlay();  // the world is built from the scene on the first tick
@@ -311,6 +315,7 @@ void Engine::stop() {
     playSnapshot_ = Json();
     runtime_->reset();
     particles_.reset();
+    world2d_->reset();
     animation_->reset();
     animation_->setPlaying(false);
     physics_->endPlay();
@@ -328,7 +333,9 @@ void Engine::step(int ticks) {
     }
     for (int i = 0; i < ticks; ++i) {
         actionMap_.evaluate(input_);  // device state + agent input -> actions for this tick
+        world2d_->preTick(*scene_, input_, *runtime_, kFixedDt);  // UI input, dialogue
         runtime_->tick(kFixedDt, input_);
+        world2d_->postTick(*scene_, *runtime_, kFixedDt);  // sprite animation, 2D cameras
         animation_->tick(kFixedDt);  // sequencers, animators, bone attachments
         native_->tick(kFixedDt);     // per-tick systems of native modules
         physics_->step(static_cast<float>(kFixedDt), *runtime_);  // nav steering, bodies, characters, contacts
@@ -359,6 +366,7 @@ void Engine::update(double seconds) {
         float dt = static_cast<float>(std::min(seconds, 0.1));
         previewTime_ += dt;
         particles_.update(*scene_, dt);
+        world2d_->preview(*scene_, dt);
         animation_->editorUpdate(dt);
     }
     settingsTimer_ += seconds;
@@ -536,15 +544,23 @@ FrameData Engine::frame(const CaptureOptions& opts) {
         ~PreviewGuard() { a.endFrame(ov); }
     } previewGuard{*animation_, animation_->beginFrame(playState_ == PlayState::Editing)};
     ViewCamera view = camera_.toView();
+    EntityId viewCamera = kNoEntity;  // the scene camera entity looked through (camera2d applies to it)
     if (opts.hasCustomView) {
         view = opts.customView;
     } else if (opts.useSceneCamera || opts.cameraEntity) {
         ViewCamera sc;
-        if (sceneCamera(*scene_, sc, opts.cameraEntity)) view = sc;
+        if (sceneCamera(*scene_, sc, opts.cameraEntity)) {
+            view = sc;
+            viewCamera = render2d::activeCamera(*scene_, opts.cameraEntity);
+        }
     } else if (playState_ != PlayState::Editing || viewSceneCamera_) {
         ViewCamera sc;
-        if (sceneCamera(*scene_, sc)) view = sc;
+        if (sceneCamera(*scene_, sc)) {
+            view = sc;
+            viewCamera = render2d::activeCamera(*scene_);
+        }
     }
+    const float texelSnap = viewCamera ? world2d_->adjustView(*scene_, viewCamera, view, opts.width, opts.height) : 0.f;
     BuildOptions bo;
     bo.editorOverlays = opts.editorOverlays && playState_ == PlayState::Editing;
     bo.selection = selection_;
@@ -558,6 +574,7 @@ FrameData Engine::frame(const CaptureOptions& opts) {
     f.samples = opts.samples;
     f.debugView = opts.debugView;
     if (!opts.fog) f.environment.fogDensity = 0;
+    world2d_->gather(*scene_, f, bo.editorOverlays ? selection_ : std::vector<EntityId>{}, bo.time, texelSnap);  // 2D + UI
     // Effects: simulated particles (+ the light fires cast) and FFT water.
     particles_.gather(*scene_, view, f.particles, f.lights);
     {  // [hair+vfx] GPU particles, hair grooms, and the lights GPU effects cast (from a recent frame)
@@ -647,6 +664,7 @@ Result<Capture> Engine::capture(const CaptureOptions& opts) {
     if (!img) return img.error();
     c.image = std::move(img.value());
     c.visible = visibleEntities(*scene_, c.frame);
+    world2d_->refineVisible(c.frame, c.visible, *scene_);  // real boxes for sprites, tiles, text, UI
     if (opts.annotate) annotate(c.image, c.visible);
     return c;
 }
@@ -658,6 +676,7 @@ Status Engine::renderToSurface(void* surface, int width, int height) {
     opts.height = height;
     opts.samples = 1;  // real time: temporal anti-aliasing across frames
     opts.quality = playState_ == PlayState::Editing ? static_cast<int>(editQuality_) : 0;
+    world2d_->setViewport(width, height);  // the UI maps the normalized mouse into this view
     drainStreamedMeshes();
     streamMeshes_ = true;
     FrameData f = frame(opts);
@@ -737,7 +756,12 @@ EntityId Engine::pickAt(float x, float y, int width, int height) {
     CaptureOptions opts;
     opts.width = width;
     opts.height = height;
-    return pick(*scene_, frame(opts), x, y);
+    FrameData f = frame(opts);
+    // UI and sprites first. While playing, UI under the pointer consumes the click (no 3D pick).
+    const bool playing = playState_ != PlayState::Editing;
+    if (EntityId ui = world2d_->pick(*scene_, f, x, y, true)) return playing ? kNoEntity : ui;
+    if (EntityId sprite = world2d_->pick(*scene_, f, x, y, false)) return sprite;
+    return pick(*scene_, f, x, y);
 }
 
 void Engine::beginDrag(EntityId id, float x, float y, int width, int height) {
@@ -988,6 +1012,7 @@ std::string stripAssetPrefix(const std::string& ref) {
 std::vector<std::string> Engine::refreshAssets() {
     std::vector<std::string> changed = assets_->refresh();
     for (const auto& path : changed) {
+        world2d_->invalidate(resolvePath(path));  // images, atlases, tilesets, dialogue scripts
         animation_->invalidate(path);
         switch (assetTypeForPath(path)) {
             case AssetType::Script: runtime_->refreshModules(); break;

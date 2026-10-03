@@ -277,6 +277,12 @@ void sky_input_scroll(SkyEngine* h, float dx, float dy) {
     e->input().scrollY += dy;
 }
 
+void sky_input_text(SkyEngine* h, const char* utf8) {
+    Engine* e = E(h);
+    if (!e || !utf8) return;
+    if (e->input().text.size() < 4096) e->input().text += utf8;
+}
+
 void sky_input_gamepad(SkyEngine* h, int index, int connected, const char* name, const SkyGamepad* state) {
     Engine* e = E(h);
     if (!e || index < 0 || index >= input::kMaxGamepads) return;

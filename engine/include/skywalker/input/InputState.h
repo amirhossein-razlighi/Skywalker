@@ -78,6 +78,8 @@ struct InputState {
     std::set<std::string> mousePressed;
     std::set<std::string> mouseReleased;
 
+    std::string text;  // characters typed since the last tick (UI text fields consume it)
+
     std::array<GamepadState, kMaxGamepads> pads;
 
     // Evaluated by ActionMap::evaluate() at the start of every tick.

@@ -651,6 +651,16 @@ private:
             } else {
                 h.argument = "anim:" + next().text;
             }
+        } else if (t.text == "ui" || t.text == "dialogue") {
+            // 2D/UI: `on ui "Play"` == on event "ui:Play" (a widget named Play was used);
+            // `on dialogue "end"` == on event "dialogue:end" (also start, line, choice, <<command>>s).
+            h.trigger = Trigger::Event;
+            if (peek().kind != Tok::String) {
+                error(peek().loc, "expected_string", "'on " + t.text + "' needs a quoted name, e.g. on " + t.text +
+                                                         (t.text == "ui" ? " \"PlayButton\"" : " \"end\""));
+            } else {
+                h.argument = t.text + ":" + next().text;
+            }
         } else if (t.text == "collide" || t.text == "trigger_enter" || t.text == "trigger_exit") {
             // Physics contacts, optionally filtered by the other entity's name or tag.
             h.trigger = t.text == "collide" ? Trigger::Collide : t.text == "trigger_enter" ? Trigger::TriggerEnter : Trigger::TriggerExit;

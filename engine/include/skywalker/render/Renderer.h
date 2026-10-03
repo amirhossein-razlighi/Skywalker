@@ -19,6 +19,7 @@
 #include "skywalker/math/Math.h"
 #include "skywalker/render/FxItems.h"
 #include "skywalker/render/Image.h"
+#include "skywalker/render/Render2D.h"
 #include "skywalker/scene/Scene.h"
 #include "skywalker/world/Foliage.h"
 #include "skywalker/world/Terrain.h"
@@ -236,6 +237,7 @@ struct FrameData {
     std::vector<GroomItem> grooms;            // strand hair and fur
     bool drawGrid = true;
     float time = 0;
+    Frame2D render2d;  // sprites, tilemaps, world text, 2D lights and UI (see Render2D.h)
     /// Jittered sub-samples accumulated into this frame (stills and cinematics: supersampling,
     /// noise-free GI). 1 = real-time (temporal anti-aliasing across frames).
     int samples = 1;

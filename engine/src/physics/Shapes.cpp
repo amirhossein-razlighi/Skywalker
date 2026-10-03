@@ -67,6 +67,8 @@ void Hasher::reflected(const void* object, const TypeInfo& type, std::initialize
             case FieldType::Vec3: bytes(p, sizeof(Vec3)); break;
             case FieldType::Color: bytes(p, sizeof(Vec4)); break;
             case FieldType::Json: str(reinterpret_cast<const Json*>(p)->dump()); break;
+            case FieldType::Vec2: bytes(p, sizeof(Vec2)); break;
+            case FieldType::Vec4: bytes(p, sizeof(Vec4)); break;
         }
     }
 }

@@ -131,7 +131,7 @@ generator / agent produces a file in the project
 asset_complete {id, path}
   → mesh:    imported (OBJ) and assigned to the target
   → texture: set on the target's material
-  → sprite:  target becomes a camera-facing textured quad
+  → sprite:  target gets a `sprite` component with the image (camera-facing in 3D scenes)
 ```
 
 Any MCP-capable generator bridge can serve the queue: poll `asset_requests`, generate,

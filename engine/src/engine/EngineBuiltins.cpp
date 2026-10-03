@@ -7,6 +7,7 @@
 #include <mutex>
 
 #include "skywalker/engine/Engine.h"
+#include "skywalker/ui/World2D.h"
 #include "skywalker/wander/Builtins.h"
 
 namespace sky {
@@ -119,6 +120,7 @@ void registerEngineBuiltins() {
         BuiltinRegistry& reg = BuiltinRegistry::global();
         registerEffectsBuiltins(reg);
         registerAnimationBuiltins(reg);
+        registerUiBuiltins(reg);  // 2D, UI, dialogue (World2D)
         // Subsystem builtins: one line each.
     });
 }

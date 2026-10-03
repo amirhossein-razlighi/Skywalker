@@ -26,6 +26,11 @@ set(SKY_TEST_SOURCES
     test_texturegen.cpp
     test_import.cpp
     test_fx.cpp
+    test_text.cpp
+    test_2d.cpp
+    test_ui.cpp
+    test_dialogue.cpp
+    test_2d_tools.cpp
     test_wander_examples.cpp
     test_wander2.cpp
     test_wander_native.cpp

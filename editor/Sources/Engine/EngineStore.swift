@@ -365,6 +365,7 @@ final class EngineStore {
     /// button: 0 left, 1 right, 2 middle.
     func mouseButton(_ button: Int, down: Bool) { sky_input_mouse_button(handle, Int32(button), down ? 1 : 0) }
     func scroll(dx: Float, dy: Float) { sky_input_scroll(handle, dx, dy) }
+    func text(_ characters: String) { sky_input_text(handle, characters) }
     func click(entity: UInt64) { sky_input_click(handle, entity) }
 
     // MARK: Assets
