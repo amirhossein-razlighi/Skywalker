@@ -291,6 +291,8 @@ public:
     /// Replaces the shader source at runtime; returns compiler diagnostics on failure.
     virtual Status reloadShaders(const std::string& source) = 0;
     virtual std::string shaderSource() const = 0;
+    /// Backend statistics of the last completed frame (GPU time in ms, items drawn, ...).
+    virtual Json stats() const { return Json::object(); }
 };
 
 enum class RendererBackend { Auto, Metal, Null };

@@ -27,6 +27,7 @@
 #include <simd/simd.h>
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
@@ -392,6 +393,16 @@ public:
         return true;
     }
 
+    Json stats() const override {
+        return Json::object({{"gpuMs", std::round(gpuMs_->load() * 100.0) / 100.0},
+                             {"culledDraws", static_cast<int64_t>(culled_)},
+                             {"terrainNodes", static_cast<int64_t>(terrainNodesDrawn_)},
+                             {"instancesDrawn", static_cast<int64_t>(instancesDrawn_)},
+                             {"meshesCached", static_cast<int64_t>(meshes_.size())},
+                             {"texturesCached", static_cast<int64_t>(textures_.size())},
+                             {"instanceBuffers", static_cast<int64_t>(instanceBuffers_.size())}});
+    }
+
     RendererInfo info() const override { return {"metal", device_ ? std::string(device_.name.UTF8String) : ""}; }
 
     std::string shaderSource() const override { return source_; }
@@ -455,7 +466,12 @@ public:
             id<MTLCommandBuffer> cmd = [queue_ commandBuffer];
             cmd.label = @"Skywalker Frame";
             dispatch_semaphore_t sem = inFlight_;
-            [cmd addCompletedHandler:^(id<MTLCommandBuffer>) { dispatch_semaphore_signal(sem); }];
+            auto gpuMs = gpuMs_;
+            [cmd addCompletedHandler:^(id<MTLCommandBuffer> done) {
+                double ms = (done.GPUEndTime - done.GPUStartTime) * 1000.0;
+                if (ms > 0.0) gpuMs->store(ms);
+                dispatch_semaphore_signal(sem);
+            }];
             lightsBuf_ = transient(allLights.data(), allLights.size() * sizeof(GPULight));
             clusterCellsBuf_ = transient(grid.cells.data(), grid.cells.size() * sizeof(uint32_t));
             clusterIndexBuf_ = transient(grid.indices.data(), grid.indices.size() * sizeof(uint32_t));
@@ -2480,6 +2496,7 @@ private:
     std::string source_;
     size_t culled_ = 0;
     size_t terrainNodesDrawn_ = 0, instancesDrawn_ = 0;
+    std::shared_ptr<std::atomic<double>> gpuMs_ = std::make_shared<std::atomic<double>>(0.0);
     uint64_t frameIndex_ = 0;
     bool aoActive_ = false;
     bool volumetricActive_ = false;
