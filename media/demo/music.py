@@ -24,9 +24,12 @@ def hz(m):
 
 def env(length, a, r):
     e = np.ones(length)
-    ai, ri = int(a * SR), int(r * SR)
-    e[:ai] = np.linspace(0, 1, ai) ** 2
-    e[-ri:] *= np.linspace(1, 0, ri) ** 2
+    # Short segments (the last chord) squeeze attack and release to fit.
+    ai, ri = min(int(a * SR), length // 2), min(int(r * SR), length - length // 2)
+    if ai > 0:
+        e[:ai] = np.linspace(0, 1, ai) ** 2
+    if ri > 0:
+        e[-ri:] *= np.linspace(1, 0, ri) ** 2
     return e
 
 
