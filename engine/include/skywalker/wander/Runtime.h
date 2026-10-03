@@ -27,6 +27,14 @@ struct InputState {
     std::set<std::string> held;     // keys currently held ("w", "space", "left", ...)
     std::set<std::string> pressed;  // keys pressed since last tick
     std::vector<EntityId> clicked;  // entities clicked since last tick
+    // Pointer and typed text (consumed by the UI each tick).
+    struct Pointer {
+        float x = -1, y = -1;       // pixels in a `width` x `height` view; negative = no pointer
+        int width = 0, height = 0;
+        bool down = false;          // primary button held
+        float wheel = 0;            // scroll lines since last tick (positive = up)
+    } pointer;
+    std::string text;               // characters typed since last tick
 };
 
 struct RuntimeMessage {
@@ -69,6 +77,9 @@ public:
     std::function<void(EntityId emitter, int count)> burst;
     /// Water surface height for water_height(); set by the engine (ocean simulation).
     std::function<float(float x, float z)> waterHeight;
+    /// Engine-implemented builtins (2D/UI/dialogue: play_anim, start_dialogue, dialogue_var, tile_at, ...).
+    /// Arguments and results are JSON (entities as {"$entity": id}); errors abort the handler.
+    std::function<Result<Json>(const std::string& fn, const std::vector<Json>& args, EntityId self)> external;
 
     /// Maximum AST nodes evaluated per handler invocation.
     static constexpr int kBudget = 200000;

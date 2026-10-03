@@ -8,6 +8,7 @@
 #include "skywalker/core/Log.h"
 #include "skywalker/render/MeshData.h"
 #include "skywalker/render/Renderer.h"
+#include "skywalker/render2d/Raster2D.h"
 
 namespace sky {
 
@@ -74,6 +75,9 @@ public:
                 }
             }
         }
+        // 2D: sprites, tiles, world text and lights, then UI (so headless captures show HUDs and menus).
+        raster2d::drawWorld(image_, frame, textures_);
+        raster2d::drawUI(image_, frame, textures_);
         return {};
     }
 
@@ -83,7 +87,7 @@ public:
     }
     Status present(void*) override { return {}; }
     Status uploadMesh(const std::string&, const MeshData&) override { return {}; }
-    void invalidate(const std::string&) override {}
+    void invalidate(const std::string& key) override { textures_.invalidate(key); }
     Status reloadShaders(const std::string&) override {
         return Error::make("unsupported", "the null renderer has no shaders");
     }
@@ -91,6 +95,7 @@ public:
 
 private:
     Image image_;
+    render2d::ImageCache textures_;  // decoded sprite/UI images
 };
 
 }  // namespace

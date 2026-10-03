@@ -34,6 +34,7 @@
 namespace sky {
 
 class SocketServer;
+class World2D;
 
 struct EngineConfig {
     RendererBackend renderer = RendererBackend::Auto;
@@ -189,6 +190,8 @@ public:
 
     // --- Effects: particles and water -----------------------------------------------
     fx::ParticleSystem& particles() { return particles_; }
+    /// 2D, text, UI and dialogue (sprites, tilemaps, 2D lights, canvases, conversations).
+    World2D& world2d() { return *world2d_; }
     /// Seconds on the effects clock: simulation time while playing, a live preview clock while editing.
     double effectsTime() const;
     /// Height of the water surface at world (x, z), waves included. False if no water covers it.
@@ -274,6 +277,7 @@ private:
     int editDepth_ = 0;
     std::deque<std::pair<std::function<Json()>, std::promise<Json>>> jobs_;
     std::unique_ptr<SocketServer> server_;
+    std::unique_ptr<World2D> world2d_;
 };
 
 void registerEngineTools(Engine& engine);

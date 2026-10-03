@@ -189,6 +189,9 @@ const std::unordered_map<std::string, FnSig>& functions() {
         {"vec", {3, 3}},      {"color", {3, 4}},     {"length", {1, 1}},    {"normalize", {1, 1}},
         {"dot", {2, 2}},      {"cross", {2, 2}},     {"key", {1, 1}},       {"exists", {1, 1}},
         {"str", {1, 1}},      {"spawn", {1, 3}},     {"tagged", {2, 2}},    {"forward", {1, 1}},
+        // 2D, UI and dialogue builtins (workstream T): implemented by the engine via Runtime::external.
+        {"play_anim", {2, 3}},      {"start_dialogue", {1, 2}}, {"dialogue_var", {1, 2}}, {"dialogue_choose", {1, 1}},
+        {"dialogue_advance", {0, 0}}, {"tile_at", {2, 3}},      {"set_tile", {3, 4}},
     };
     return fns;
 }
@@ -346,8 +349,18 @@ private:
         Handler h;
         h.loc = next().loc;  // 'on'
         const Token& t = next();
-        static const std::vector<std::string> triggers{"start", "tick", "event", "key", "click"};
-        if (t.text == "start") {
+        static const std::vector<std::string> triggers{"start", "tick", "event", "key", "click", "ui", "dialogue"};
+        if (t.text == "ui" || t.text == "dialogue") {
+            // 2D/UI triggers (workstream T): sugar for named events. `on ui "Play"` == on event "ui:Play";
+            // `on dialogue "end"` == on event "dialogue:end" (and "dialogue:<command>" for <<command>>s).
+            h.trigger = Trigger::Event;
+            if (peek().kind != Tok::String) {
+                error(peek().loc, "expected_string", "'on " + t.text + "' needs a quoted name, e.g. on " + t.text +
+                                                         (t.text == "ui" ? " \"PlayButton\"" : " \"end\""));
+            } else {
+                h.argument = t.text + ":" + next().text;
+            }
+        } else if (t.text == "start") {
             h.trigger = Trigger::Start;
         } else if (t.text == "tick" || t.text == "update") {
             h.trigger = Trigger::Tick;
@@ -363,7 +376,7 @@ private:
             h.trigger = Trigger::Click;
         } else {
             std::string guess = str::closest(t.text, triggers);
-            error(t.loc, "unknown_trigger", "unknown trigger '" + t.text + "' (use start, tick, event, key, click)",
+            error(t.loc, "unknown_trigger", "unknown trigger '" + t.text + "' (use start, tick, event, key, click, ui, dialogue)",
                   guess.empty() ? "" : "did you mean '" + guess + "'?");
         }
         scopes_.clear();
@@ -922,6 +935,7 @@ behavior Patrol
 end
 
 Triggers:   on start | on tick | on event "name" | on key "space" | on click
+            on ui "PlayButton" (a button/toggle/slider named PlayButton was used) | on dialogue "end" / "choice" / "<command>"
 Statements: let x = v | target = v | set target to v | if c then .. elif c then .. else .. end
             every <sec> .. end | after <sec> .. end | repeat <n> times .. end   (n <= 1000)
             move <e> by <vec> | move <e> toward <point|entity> at <speed> | rotate <e> by <deg vec>
@@ -939,6 +953,11 @@ Functions:  find(name) nearest(tag) count(tag) tagged(e, tag) exists(e) spawn(me
 Effects:    burst(n) / burst(e, n) emits n particles now (particles component; explosions, muzzle flashes)
             water_height(x, z) / water_height(pos): the animated water surface height (boats, buoyancy)
             e.particles.rate / .emitting / .colorStart ... and e.water.windSpeed ... like any component
+2D & UI:    play_anim(e, "run") / play_anim(e, "attack", true) restarts; e.sprite.flipX = true; e.sprite.frame = "3"
+            find("Score").ui.text = "Score: " + str(score); find("Menu").ui.visible = false; find("Volume").ui.value
+            tile_at(map, pos) / tile_at(map, pos, "layer") -> tile id; set_tile(map, pos, 5 | "terrain", "layer"?)
+Dialogue:   start_dialogue("Intro") / start_dialogue(e, "Intro"); dialogue_var("trust") / dialogue_var("trust", 3)
+            dialogue_choose(0) dialogue_advance(); read e.dialogue.speaker / .line / .running
 Comments:   -- comment   // comment   # comment (a '#' followed by a space)
 Rules:      no while-loops (every handler always terminates); randomness is seeded (replayable);
             entities are -Z forward; rotations are Euler degrees (pitch X, yaw Y, roll Z).

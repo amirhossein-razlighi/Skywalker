@@ -727,6 +727,16 @@ private:
             if (a.size() > 1) scene_.get<Transform>(id)->position = v(1);
             return Value::entity(id);
         }
+        // 2D/UI/dialogue builtins (workstream T): forwarded to the engine.
+        if (rt_.external && (f == "play_anim" || f == "start_dialogue" || f == "dialogue_var" || f == "dialogue_choose" ||
+                             f == "dialogue_advance" || f == "tile_at" || f == "set_tile")) {
+            std::vector<Json> jsonArgs;
+            for (const auto& arg : a) jsonArgs.push_back(toJson(arg));
+            Result<Json> r = rt_.external(f, jsonArgs, self_);
+            if (!r) fail(e.loc, f + "(): " + r.error().message);
+            scene_.markDirty();
+            return fromJson(r.value());
+        }
         fail(e.loc, "unknown function '" + f + "'");
     }
 

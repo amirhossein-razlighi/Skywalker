@@ -17,6 +17,7 @@
 #include "skywalker/assets/Prefab.h"
 #include "skywalker/render/Gltf.h"
 #include "skywalker/render/MeshData.h"
+#include "skywalker/ui/World2D.h"
 
 namespace sky {
 
@@ -62,6 +63,10 @@ Engine::Engine(EngineConfig config)
     runtime_->waterHeight = [this](float x, float z) {
         float h = 0;
         return waterHeight(x, z, h) ? h : 0.f;
+    };
+    world2d_ = std::make_unique<World2D>(config_.projectDir);
+    runtime_->external = [this](const std::string& fn, const std::vector<Json>& args, EntityId self) {
+        return world2d_->callBuiltin(*scene_, *runtime_, fn, args, self);
     };
     registerEngineTools(*this);
     log::info("engine", std::string("Skywalker ") + SKY_VERSION_STRING + " ready (renderer: " + renderer_->info().backend +
@@ -152,6 +157,8 @@ void Engine::play() {
         runtime_->reset(/*keepQueuedEvents=*/true);
         accumulator_ = 0;
         particles_.reset();  // play sessions replay exactly
+        world2d_->reset();
+        world2d_->onPlay(*scene_, *runtime_);  // auto-start dialogues
     }
     playState_ = PlayState::Playing;
     emitEvent(Json::object({{"type", "play_state"}, {"state", "playing"}}));
@@ -172,6 +179,7 @@ void Engine::stop() {
     playSnapshot_ = Json();
     runtime_->reset();
     particles_.reset();
+    world2d_->reset();
     input_ = {};
     std::erase_if(selection_, [&](EntityId id) { return !scene_->exists(id); });
     emitEvent(Json::object({{"type", "play_state"}, {"state", "editing"}}));
@@ -183,7 +191,9 @@ void Engine::step(int ticks) {
         pause();
     }
     for (int i = 0; i < ticks; ++i) {
+        world2d_->preTick(*scene_, input_, *runtime_, kFixedDt);  // UI input, dialogue
         runtime_->tick(kFixedDt, input_);
+        world2d_->postTick(*scene_, *runtime_, kFixedDt);  // sprite animation, 2D cameras
         particles_.update(*scene_, static_cast<float>(kFixedDt));
         input_.pressed.clear();
         input_.clicked.clear();
@@ -211,6 +221,7 @@ void Engine::update(double seconds) {
         float dt = static_cast<float>(std::min(seconds, 0.1));
         previewTime_ += dt;
         particles_.update(*scene_, dt);
+        world2d_->preview(*scene_, dt);
     }
     if (playState_ != PlayState::Playing) return;
     accumulator_ += std::min(seconds, 0.25);  // avoid spiral of death after stalls
@@ -278,15 +289,23 @@ void Engine::ensureMeshUploaded(const std::string& meshKey) {
 
 FrameData Engine::frame(const CaptureOptions& opts) {
     ViewCamera view = camera_.toView();
+    EntityId viewCamera = kNoEntity;  // the scene camera entity looked through (camera2d applies to it)
     if (opts.hasCustomView) {
         view = opts.customView;
     } else if (opts.useSceneCamera || opts.cameraEntity) {
         ViewCamera sc;
-        if (sceneCamera(*scene_, sc, opts.cameraEntity)) view = sc;
+        if (sceneCamera(*scene_, sc, opts.cameraEntity)) {
+            view = sc;
+            viewCamera = render2d::activeCamera(*scene_, opts.cameraEntity);
+        }
     } else if (playState_ != PlayState::Editing || viewSceneCamera_) {
         ViewCamera sc;
-        if (sceneCamera(*scene_, sc)) view = sc;
+        if (sceneCamera(*scene_, sc)) {
+            view = sc;
+            viewCamera = render2d::activeCamera(*scene_);
+        }
     }
+    const float texelSnap = viewCamera ? world2d_->adjustView(*scene_, viewCamera, view, opts.width, opts.height) : 0.f;
     BuildOptions bo;
     bo.editorOverlays = opts.editorOverlays && playState_ == PlayState::Editing;
     bo.selection = selection_;
@@ -297,6 +316,7 @@ FrameData Engine::frame(const CaptureOptions& opts) {
     }
     FrameData f = buildFrame(*scene_, view, opts.width, opts.height, bo);
     if (!opts.fog) f.environment.fogDensity = 0;
+    world2d_->gather(*scene_, f, bo.editorOverlays ? selection_ : std::vector<EntityId>{}, bo.time, texelSnap);  // 2D + UI
     // Effects: simulated particles (+ the light fires cast) and FFT water.
     particles_.gather(*scene_, view, f.particles, f.lights);
     prioritizeLights(f);
@@ -340,6 +360,7 @@ Result<Capture> Engine::capture(const CaptureOptions& opts) {
     if (!img) return img.error();
     c.image = std::move(img.value());
     c.visible = visibleEntities(*scene_, c.frame);
+    world2d_->refineVisible(c.frame, c.visible, *scene_);  // real boxes for sprites, tiles, text, UI
     if (opts.annotate) annotate(c.image, c.visible);
     return c;
 }
@@ -425,7 +446,12 @@ EntityId Engine::pickAt(float x, float y, int width, int height) {
     CaptureOptions opts;
     opts.width = width;
     opts.height = height;
-    return pick(*scene_, frame(opts), x, y);
+    FrameData f = frame(opts);
+    // UI and sprites first. While playing, UI under the pointer consumes the click (no 3D pick).
+    const bool playing = playState_ != PlayState::Editing;
+    if (EntityId ui = world2d_->pick(*scene_, f, x, y, true)) return playing ? kNoEntity : ui;
+    if (EntityId sprite = world2d_->pick(*scene_, f, x, y, false)) return sprite;
+    return pick(*scene_, f, x, y);
 }
 
 void Engine::beginDrag(EntityId id, float x, float y, int width, int height) {
@@ -568,6 +594,7 @@ std::string stripAssetPrefix(const std::string& ref) {
 std::vector<std::string> Engine::refreshAssets() {
     std::vector<std::string> changed = assets_->refresh();
     for (const auto& path : changed) {
+        world2d_->invalidate(resolvePath(path));  // images, atlases, tilesets, dialogue scripts
         switch (assetTypeForPath(path)) {
             case AssetType::Mesh: {
                 std::string key = "asset:" + path;
