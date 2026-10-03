@@ -22,6 +22,7 @@
 
 #import <Foundation/Foundation.h>
 #import <Metal/Metal.h>
+#import <MetalFX/MetalFX.h>
 #import <MetalKit/MetalKit.h>
 #import <QuartzCore/CAMetalLayer.h>
 #include <simd/simd.h>
@@ -472,7 +473,10 @@ public:
 
     Status render(const FrameData& frame) override {
         @autoreleasepool {
-            ensureTargets(frame.width, frame.height);
+            const bool accumulateFrame = std::clamp(frame.samples, 1, 256) > 1;
+            const float renderScale = accumulateFrame ? 1.f : std::clamp(frame.environment.renderScale, 0.33f, 1.f);
+            ensureTargets(frame.width, frame.height, renderScale);
+            const bool upscale = !accumulateFrame && renderScale < 0.999f && temporalScaler() != nil;
             ensureHdri(frame.environment);
             const Environment& env = frame.environment;
             Cascades cascades = computeCascades(frame);
@@ -494,7 +498,7 @@ public:
             const int samples = std::clamp(frame.samples, 1, 256);
             const bool accumulate = samples > 1;
             const bool jittered = accumulate || env.taa;
-            const float w = static_cast<float>(std::max(frame.width, 1)), h = static_cast<float>(std::max(frame.height, 1));
+            const float w = static_cast<float>(hdr_.width), h = static_cast<float>(hdr_.height);  // internal resolution
 
             // Bound the frames in flight so the transient ring is never overwritten in use.
             dispatch_semaphore_wait(inFlight_, DISPATCH_TIME_FOREVER);
@@ -538,14 +542,16 @@ public:
                 encodeResolve(cmd, frame, fu);
                 encodeEffects(cmd, frame, fu, lights, i == 0);
                 encodeVolumetrics(cmd, frame, fu, lights, seed);
-                int mode = accumulate ? 2 : (env.taa && historyValid_ ? 1 : 0);
+                int mode = accumulate ? 2 : (env.taa && historyValid_ && !upscale ? 1 : 0);
                 encodeTemporal(cmd, frame, fu, mode, 1.f / static_cast<float>(i + 1));
+                if (upscale) encodeUpscale(cmd, fu, j);
                 id<MTLBlitCommandEncoder> blit = [cmd blitCommandEncoder];
                 [blit copyFromTexture:depthResolved_ toTexture:depthPrev_];
                 [blit endEncoding];
                 if (!accumulate) historyValid_ = true;
             }
             if (accumulate) historyValid_ = true;  // the converged still seeds later TAA frames
+            postSource_ = upscale ? upscaled_ : taa_[taaCurrent_];
             encodePost(cmd, frame, accumulate, base);
             if (frame.debugView > 0) {
                 PostUniforms pu{};
@@ -674,7 +680,7 @@ private:
                                      "cloudsFragment",
                                      "cloudTemporalFragment", "cloudShapeKernel", "cloudDetailKernel", "lumaFragment",
                                      "exposureFragment", "motionBlurFragment", "dofCocFragment", "dofBlurFragment",
-                                     "dofCombineFragment"}) {
+                                     "dofCombineFragment", "motionVectorFragment"}) {
             if (!fn(required)) {
                 return Error::make("shader_missing_function", std::string("shader source must define ") + required);
             }
@@ -776,7 +782,8 @@ private:
         id<MTLRenderPipelineState> dofCoc = motionBlur ? make("fullscreenVertex", "dofCocFragment", kHDRFormat, 1, Blend::None, false, &e) : nil;
         id<MTLRenderPipelineState> dofBlur = dofCoc ? make("fullscreenVertex", "dofBlurFragment", kHDRFormat, 1, Blend::None, false, &e) : nil;
         id<MTLRenderPipelineState> dofCombine = dofBlur ? make("fullscreenVertex", "dofCombineFragment", kHDRFormat, 1, Blend::None, false, &e) : nil;
-        if (!dofCombine) volume = nil;
+        id<MTLRenderPipelineState> motionVec = dofCombine ? make("fullscreenVertex", "motionVectorFragment", MTLPixelFormatRG16Float, 1, Blend::None, false, &e) : nil;
+        if (!motionVec) volume = nil;
         if (volume) {
             for (const char* k : {"fluidAdvect", "fluidCorrect", "fluidCombust", "fluidCurl", "fluidForces", "fluidDivergence",
                                   "fluidJacobi", "fluidProject"}) {
@@ -838,6 +845,7 @@ private:
         dofCocPipeline_ = dofCoc;
         dofBlurPipeline_ = dofBlur;
         dofCombinePipeline_ = dofCombine;
+        motionPipeline_ = motionVec;
         return {};
     }
 
@@ -863,25 +871,19 @@ private:
         return t;
     }
 
-    void ensureTargets(int width, int height) {
+    /// Scene targets render at the internal resolution (renderScale x output); post-processing
+    /// and the final image use the output resolution. MetalFX upscales between the two.
+    void ensureTargets(int width, int height, float scale) {
         auto w = static_cast<NSUInteger>(std::max(width, 1));
         auto h = static_cast<NSUInteger>(std::max(height, 1));
-        if (resolve_ && resolve_.width == w && resolve_.height == h) return;
+        auto iw = static_cast<NSUInteger>(std::max<long>(16, std::lround(static_cast<double>(w) * scale)));
+        auto ih = static_cast<NSUInteger>(std::max<long>(16, std::lround(static_cast<double>(h) * scale)));
+        if (resolve_ && resolve_.width == w && resolve_.height == h && hdr_.width == iw && hdr_.height == ih) return;
         const MTLTextureUsage rt = MTLTextureUsageRenderTarget | MTLTextureUsageShaderRead;
+        // --- output resolution ---
         resolve_ = target2D(kColorFormat, w, h, rt);
-        hdr_ = target2D(kHDRFormat, w, h, rt);
-        lit_ = target2D(kHDRFormat, w, h, rt);
-        gbufA_ = target2D(kGbufAFormat, w, h, rt);
-        gbufB_ = target2D(kGbufBFormat, w, h, rt);
-        for (auto& t : taa_) t = target2D(kHDRFormat, w, h, rt);
-        historyValid_ = false;
-        depthResolved_ = target2D(kDepthFormat, w, h, rt);
-        const NSUInteger hw = std::max<NSUInteger>(1, w / 2), hh = std::max<NSUInteger>(1, h / 2);
-        aoRaw_ = target2D(kAOFormat, hw, hh, rt);
-        aoBlurred_ = target2D(kAOFormat, hw, hh, rt);
-
-        // Bloom mip chain (half resolution).
-        MTLTextureDescriptor* bd = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:kHDRFormat width:hw height:hh mipmapped:YES];
+        const NSUInteger ow2 = std::max<NSUInteger>(1, w / 2), oh2 = std::max<NSUInteger>(1, h / 2);
+        MTLTextureDescriptor* bd = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:kHDRFormat width:ow2 height:oh2 mipmapped:YES];
         bd.mipmapLevelCount = std::min<NSUInteger>(kBloomLevels, bd.mipmapLevelCount);
         bd.storageMode = MTLStorageModePrivate;
         bd.usage = rt | MTLTextureUsagePixelFormatView;
@@ -893,21 +895,11 @@ private:
                                                                  levels:NSMakeRange(i, 1)
                                                                  slices:NSMakeRange(0, 1)]);
         }
-        sceneCopy_ = target2D(kHDRFormat, w, h, MTLTextureUsageShaderRead);
-        volumetric_ = target2D(kHDRFormat, hw, hh, rt);
-        depthCopy_ = target2D(kDepthFormat, w, h, MTLTextureUsageShaderRead);
-        msaaColor_ = targetMSAA(kHDRFormat, w, h);
-        msaaGbufA_ = targetMSAA(kGbufAFormat, w, h);
-        msaaGbufB_ = targetMSAA(kGbufBFormat, w, h);
-        depthPrev_ = target2D(kDepthFormat, w, h, MTLTextureUsageShaderRead);
-        giRaw_ = target2D(kHDRFormat, hw, hh, rt);
-        ssrRaw_ = target2D(kHDRFormat, hw, hh, rt);
-        for (auto& t : giHist_) t = target2D(kHDRFormat, hw, hh, rt);
-        cloudRaw_ = target2D(kHDRFormat, hw, hh, rt);
         postA_ = target2D(kHDRFormat, w, h, rt);
         postB_ = target2D(kHDRFormat, w, h, rt);
-        dofCoc_ = target2D(kHDRFormat, hw, hh, rt);
-        dofBlur_ = target2D(kHDRFormat, hw, hh, rt);
+        upscaled_ = target2D(kHDRFormat, w, h, rt | MTLTextureUsageShaderWrite);
+        dofCoc_ = target2D(kHDRFormat, ow2, oh2, rt);
+        dofBlur_ = target2D(kHDRFormat, ow2, oh2, rt);
         {
             const NSUInteger qw = std::max<NSUInteger>(1, w / 4), qh = std::max<NSUInteger>(1, h / 4);
             MTLTextureDescriptor* ld = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRG16Float width:qw height:qh mipmapped:YES];
@@ -917,9 +909,51 @@ private:
             for (auto& t : exposure_) t = target2D(MTLPixelFormatR32Float, 1, 1, rt);
             exposureValid_ = false;
         }
-        for (auto& t : cloudHist_) t = target2D(kHDRFormat, hw, hh, rt);
+        // --- internal (scene) resolution ---
+        hdr_ = target2D(kHDRFormat, iw, ih, rt);
+        lit_ = target2D(kHDRFormat, iw, ih, rt);
+        gbufA_ = target2D(kGbufAFormat, iw, ih, rt);
+        gbufB_ = target2D(kGbufBFormat, iw, ih, rt);
+        for (auto& t : taa_) t = target2D(kHDRFormat, iw, ih, rt);
+        historyValid_ = false;
+        depthResolved_ = target2D(kDepthFormat, iw, ih, rt);
+        motion_ = target2D(MTLPixelFormatRG16Float, iw, ih, rt);
+        const NSUInteger hw = std::max<NSUInteger>(1, iw / 2), hh = std::max<NSUInteger>(1, ih / 2);
+        aoRaw_ = target2D(kAOFormat, hw, hh, rt);
+        aoBlurred_ = target2D(kAOFormat, hw, hh, rt);
+        sceneCopy_ = target2D(kHDRFormat, iw, ih, MTLTextureUsageShaderRead);
+        volumetric_ = target2D(kHDRFormat, hw, hh, rt);
+        depthCopy_ = target2D(kDepthFormat, iw, ih, MTLTextureUsageShaderRead);
+        msaaColor_ = targetMSAA(kHDRFormat, iw, ih);
+        msaaGbufA_ = targetMSAA(kGbufAFormat, iw, ih);
+        msaaGbufB_ = targetMSAA(kGbufBFormat, iw, ih);
+        msaaDepth_ = targetMSAA(kDepthFormat, iw, ih);
+        depthPrev_ = target2D(kDepthFormat, iw, ih, MTLTextureUsageShaderRead);
+        giRaw_ = target2D(kHDRFormat, hw, hh, rt);
+        ssrRaw_ = target2D(kHDRFormat, hw, hh, rt);
+        for (auto& t : giHist_) t = target2D(kHDRFormat, hw, hh, rt);
         for (auto& t : ssrHist_) t = target2D(kHDRFormat, hw, hh, rt);
-        msaaDepth_ = targetMSAA(kDepthFormat, w, h);
+        cloudRaw_ = target2D(kHDRFormat, hw, hh, rt);
+        for (auto& t : cloudHist_) t = target2D(kHDRFormat, hw, hh, rt);
+        scaler_ = nil;  // rebuilt for the new sizes on demand
+    }
+
+    /// MetalFX temporal upscaler from the internal to the output resolution (nil if unsupported).
+    id<MTLFXTemporalScaler> temporalScaler() {
+        if (scaler_) return scaler_;
+        if (![MTLFXTemporalScalerDescriptor supportsDevice:device_]) return nil;
+        MTLFXTemporalScalerDescriptor* d = [MTLFXTemporalScalerDescriptor new];
+        d.colorTextureFormat = kHDRFormat;
+        d.depthTextureFormat = kDepthFormat;
+        d.motionTextureFormat = MTLPixelFormatRG16Float;
+        d.outputTextureFormat = kHDRFormat;
+        d.inputWidth = hdr_.width;
+        d.inputHeight = hdr_.height;
+        d.outputWidth = upscaled_.width;
+        d.outputHeight = upscaled_.height;
+        d.autoExposureEnabled = YES;
+        scaler_ = [d newTemporalScalerWithDevice:device_];
+        return scaler_;
     }
 
     GpuMesh makeMesh(const MeshData& m) {
@@ -1162,7 +1196,7 @@ private:
         bool shadows = env.sunElevation > 0.f && env.sunIntensity > 0.f;
         fu.params = simd_make_float4(env.exposure, static_cast<float>(std::min(frame.lights.size(), FrameData::kMaxEffectLights)),
                                      shadows ? 1.f : 0.f, 1.f / static_cast<float>(kShadowAtlas));
-        float w = static_cast<float>(std::max(frame.width, 1)), h = static_cast<float>(std::max(frame.height, 1));
+        float w = static_cast<float>(hdr_ ? hdr_.width : std::max(frame.width, 1)), h = static_cast<float>(hdr_ ? hdr_.height : std::max(frame.height, 1));
         fu.viewport = simd_make_float4(w, h, 1.f / w, 1.f / h);
         float mode = env.skyMode == "atmosphere" ? 1.f : 0.f;
         if (env.skyMode == "hdri") mode = hdri_ ? 2.f : 1.f;  // no panorama loaded: fall back to the atmosphere
@@ -2409,6 +2443,23 @@ private:
         (void)frame;
     }
 
+    /// MetalFX temporal upscaling: camera motion vectors from depth, then the scaler.
+    void encodeUpscale(id<MTLCommandBuffer> cmd, const FrameUniforms& fu, Vec2 jitterPx) {
+        fullscreenFU(cmd, motionPipeline_, motion_, {depthResolved_}, fu, &fu.temporal, sizeof(fu.temporal), @"Motion vectors");
+        id<MTLFXTemporalScaler> sc = temporalScaler();
+        sc.colorTexture = taa_[taaCurrent_];
+        sc.depthTexture = depthResolved_;
+        sc.motionTexture = motion_;
+        sc.outputTexture = upscaled_;
+        sc.jitterOffsetX = -jitterPx.x;
+        sc.jitterOffsetY = jitterPx.y;
+        sc.motionVectorScaleX = static_cast<float>(motion_.width);
+        sc.motionVectorScaleY = static_cast<float>(motion_.height);
+        sc.reset = !historyValid_;
+        sc.depthReversed = NO;
+        [sc encodeToCommandBuffer:cmd];
+    }
+
     void encodeAO(id<MTLCommandBuffer> cmd, const FrameData& frame) {
         aoActive_ = frame.environment.ao > 0.001f;
         if (!aoActive_) return;
@@ -2517,7 +2568,7 @@ private:
 
     void encodePost(id<MTLCommandBuffer> cmd, const FrameData& frame, bool accumulated, const FrameUniforms& base) {
         const Environment& env = frame.environment;
-        id<MTLTexture> src = taa_[taaCurrent_];
+        id<MTLTexture> src = postSource_ ?: taa_[taaCurrent_];
         const ViewCamera& cam = frame.camera;
         LensUniformsGpu lu{};
         float fl = 12.f / std::tan(radians(std::clamp(cam.fovDeg, 5.f, 170.f)) * 0.5f);  // focal length (mm), 24 mm sensor
@@ -2614,7 +2665,9 @@ private:
         foliageShadowAlphaPipeline_,
         cloudsPipeline_, cloudTemporalPipeline_, lumaPipeline_, exposurePipeline_, motionBlurPipeline_, dofCocPipeline_,
         dofBlurPipeline_, dofCombinePipeline_;
-    id<MTLTexture> lum_, exposure_[2], postA_, postB_, dofCoc_, dofBlur_, lut_;
+    id<MTLTexture> lum_, exposure_[2], postA_, postB_, dofCoc_, dofBlur_, lut_, upscaled_, motion_, postSource_;
+    id<MTLFXTemporalScaler> scaler_;
+    id<MTLRenderPipelineState> motionPipeline_;
     std::vector<id<MTLTexture>> lumViews_;
     int exposureCurrent_ = 0;
     bool exposureValid_ = false;

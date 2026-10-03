@@ -327,6 +327,10 @@ const TypeInfo& Environment::type() {
             SKY_FIELD_RANGE(Environment, giDistance, Float, "Global illumination ray length in meters", 0.5f, 50.f),
             SKY_FIELD_RANGE(Environment, ssr, Float, "Screen-space reflections on glossy surfaces (wet streets, floors, metal)", 0.f, 1.f),
             SKY_FIELD(Environment, taa, Bool, "Temporal anti-aliasing (smooth edges, stable shimmer-free detail)"),
+            SKY_FIELD_RANGE(Environment, renderScale, Float,
+                            "Real-time internal resolution: 0.5-0.77 renders fewer pixels and MetalFX temporal upscaling "
+                            "reconstructs full resolution (faster); 1 = native. Stills and captures with samples > 1 render native.",
+                            0.33f, 1.f),
             SKY_FIELD_RANGE(Environment, sharpen, Float, "Sharpening after temporal anti-aliasing", 0.f, 1.f),
             SKY_FIELD_RANGE(Environment, shadowSoftness, Float, "Sun shadow penumbra size", 0.f, 6.f),
             SKY_FIELD_ENUM(Environment, tonemap, "HDR to display curve", "aces", "agx", "neutral", "filmic", "none"),

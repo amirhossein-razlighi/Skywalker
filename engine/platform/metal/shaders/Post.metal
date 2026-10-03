@@ -141,6 +141,18 @@ static float3 sampleCatmullRom(texture2d<float> tex, float2 uv, float2 texel) {
     return max(r / wsum, 0.0);
 }
 
+// Camera motion vectors (uv units, current -> previous) for MetalFX temporal upscaling.
+fragment float2 motionVectorFragment(FullscreenOut in [[stage_in]], constant FrameUniforms& f [[buffer(0)]],
+                                     depth2d<float> depthTex [[texture(0)]]) {
+    float2 uv = uvOf(in);
+    float d = depthTex.sample(pointClamp, uv);
+    float3 p = reconstructWorld(f, uv, min(d, 0.999999));
+    float4 pc = f.prevViewProj * float4(p, 1.0);
+    if (pc.w <= 0.0) return float2(0.0);
+    float2 puv = float2(pc.x / pc.w * 0.5 + 0.5, 0.5 - pc.y / pc.w * 0.5) + f.temporal.xy * float2(0.5, -0.5);
+    return puv - uv;
+}
+
 fragment float4 temporalFragment(FullscreenOut in [[stage_in]], constant FrameUniforms& f [[buffer(0)]],
                                  constant TemporalUniforms& t [[buffer(1)]], texture2d<float> lit [[texture(0)]],
                                  texture2d<float> vol [[texture(1)]], texture2d<float> history [[texture(2)]],

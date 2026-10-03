@@ -233,7 +233,7 @@ if(SKY_HAS_METAL)
     target_include_directories(skywalker_engine PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/generated)
     target_compile_definitions(skywalker_engine PUBLIC $<$<COMPILE_LANGUAGE:C,CXX,OBJCXX>:SKY_HAS_METAL=1>)
     target_link_libraries(skywalker_engine PUBLIC
-        "-framework Foundation" "-framework Metal" "-framework MetalKit" "-framework QuartzCore")
+        "-framework Foundation" "-framework Metal" "-framework MetalKit" "-framework MetalFX" "-framework QuartzCore")
 else()
     target_compile_definitions(skywalker_engine PUBLIC $<$<COMPILE_LANGUAGE:C,CXX,OBJCXX>:SKY_HAS_METAL=0>)
 endif()

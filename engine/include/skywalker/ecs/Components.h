@@ -261,6 +261,7 @@ struct Environment {
     float giDistance = 4.f;            // GI ray length in meters (scaled up with view distance)
     float ssr = 1.f;                   // screen-space reflections on glossy surfaces, 0 = off
     bool taa = true;                   // temporal anti-aliasing (jitter + history)
+    float renderScale = 1.f;           // real-time internal resolution (0.5..1); < 1 upscales with MetalFX
     float sharpen = 0.35f;             // contrast-adaptive sharpening after temporal filtering
     float aoRadius = 0.6f;             // meters
     float shadowSoftness = 1.f;        // penumbra size multiplier
