@@ -20,6 +20,9 @@ struct ParseResult {
 /// precede so the formatter and the graph view can preserve them.
 ParseResult parse(std::string_view source);
 
+/// Parses a single expression ("self.position + (0, 1, 0)"). Null with diagnostics on error.
+ExprPtr parseExpression(std::string_view text, std::vector<Diagnostic>* diagnostics = nullptr);
+
 /// Words that cannot be used as names.
 const std::vector<std::string>& reservedWords();
 

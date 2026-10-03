@@ -234,8 +234,9 @@ struct Program {
     uint64_t registryGeneration = 0;
 
     size_t instructionCount() const;
-    /// Human-readable listing (wander_check with disassemble=true; debugging).
-    std::string disassemble() const;
+    /// Human-readable listing (wander_check with disassemble=true; debugging). Without
+    /// line numbers it compares programs independently of source layout.
+    std::string disassemble(bool withLines = true) const;
 };
 
 uint64_t fnv1a(std::string_view data, uint64_t seed = 1469598103934665603ULL);

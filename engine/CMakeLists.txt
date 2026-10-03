@@ -11,6 +11,7 @@ set(SKY_ENGINE_SOURCES
     src/wander/Value.cpp
     src/wander/Parser.cpp
     src/wander/Format.cpp
+    src/wander/Graph.cpp
     src/wander/Compiler.cpp
     src/wander/Bytecode.cpp
     src/wander/Builtins.cpp

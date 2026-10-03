@@ -46,7 +46,7 @@ std::string rk(const Program& p, uint16_t x) {
 }
 }  // namespace
 
-std::string Program::disassemble() const {
+std::string Program::disassemble(bool withLines) const {
     std::ostringstream os;
     for (size_t i = 0; i < protos.size(); ++i) {
         const Proto& p = protos[i];
@@ -54,7 +54,7 @@ std::string Program::disassemble() const {
         for (size_t pc = 0; pc < p.code.size(); ++pc) {
             const Ins& in = p.code[pc];
             char head[48];
-            std::snprintf(head, sizeof(head), "  %4zu  L%-4d %-10s", pc, p.locs[pc].line, opName(in.op));
+            std::snprintf(head, sizeof(head), "  %4zu  L%-4d %-10s", pc, withLines ? p.locs[pc].line : 0, opName(in.op));
             os << head;
             auto target = [&]() { return static_cast<int64_t>(pc) + 1 + in.sbx(); };
             switch (in.op) {

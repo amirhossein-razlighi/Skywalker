@@ -266,6 +266,15 @@ public:
     Parser(std::vector<Token> tokens, std::vector<Comment> comments, std::vector<Diagnostic>& diags)
         : toks_(std::move(tokens)), comments_(std::move(comments)), diags_(diags) {}
 
+    // A lone expression (graph pins, tool arguments).
+    ExprPtr runExpression() {
+        ExprPtr e = expression();
+        if (!atEnd()) {
+            error(peek().loc, "unexpected_token", "unexpected '" + describe(peek()) + "' after the expression");
+        }
+        return e;
+    }
+
     std::shared_ptr<Module> run() {
         auto m = std::make_shared<Module>();
         BehaviorDef implicitB;
@@ -1299,6 +1308,16 @@ private:
 };
 
 }  // namespace
+
+ExprPtr parseExpression(std::string_view text, std::vector<Diagnostic>* diagnostics) {
+    std::vector<Diagnostic> diags;
+    std::vector<Comment> comments;
+    auto tokens = Lexer(text, diags).run(comments);
+    ExprPtr e = Parser(std::move(tokens), std::move(comments), diags).runExpression();
+    bool ok = std::none_of(diags.begin(), diags.end(), [](const Diagnostic& d) { return d.severity == Severity::Error; });
+    if (diagnostics) *diagnostics = std::move(diags);
+    return ok ? std::move(e) : nullptr;
+}
 
 ParseResult parse(std::string_view source) {
     ParseResult r;
