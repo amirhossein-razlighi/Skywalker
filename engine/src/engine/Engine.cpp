@@ -58,11 +58,9 @@ Engine::Engine(EngineConfig config)
         placement.name = name;
         return instantiatePrefabAsset(ref, placement);
     };
-    runtime_->burst = [this](EntityId e, int count) { particles_.burst(e, count); };
-    runtime_->waterHeight = [this](float x, float z) {
-        float h = 0;
-        return waterHeight(x, z, h) ? h : 0.f;
-    };
+    registerEngineBuiltins();
+    runtime_->provide<Engine>(this);  // engine-side Wander builtins reach subsystems through this
+    runtime_->setProjectDir(config_.projectDir);
     registerEngineTools(*this);
     log::info("engine", std::string("Skywalker ") + SKY_VERSION_STRING + " ready (renderer: " + renderer_->info().backend +
                             " " + renderer_->info().device + ")");
@@ -149,6 +147,7 @@ void Engine::play() {
     if (playState_ == PlayState::Playing) return;
     if (playState_ == PlayState::Editing) {
         playSnapshot_ = scene_->toJson();
+        runtime_->refreshModules();  // hot reload of `use`d Wander modules
         runtime_->reset(/*keepQueuedEvents=*/true);
         accumulator_ = 0;
         particles_.reset();  // play sessions replay exactly
@@ -569,6 +568,7 @@ std::vector<std::string> Engine::refreshAssets() {
     std::vector<std::string> changed = assets_->refresh();
     for (const auto& path : changed) {
         switch (assetTypeForPath(path)) {
+            case AssetType::Script: runtime_->refreshModules(); break;
             case AssetType::Mesh: {
                 std::string key = "asset:" + path;
                 std::vector<std::string> keys{key};

@@ -53,6 +53,9 @@ struct ComponentKind {
     std::function<void(Scene&, EntityId)> remove;
     std::function<Json(const Scene&, EntityId)> toJson;
     std::function<Status(Scene&, EntityId, const Json&)> apply;
+    /// Raw component pointer (null if absent; reflected kinds only). Wander reads and
+    /// writes fields through it without a JSON round trip.
+    std::function<void*(Scene&, EntityId)> ptr;
 };
 
 class Scene {

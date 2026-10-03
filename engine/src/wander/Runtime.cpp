@@ -1,792 +1,1570 @@
+// Wander runtime: instance scheduling, entity vars, events, coroutines, state machines,
+// and the bytecode interpreter.
+
 #include "skywalker/wander/Runtime.h"
 
+#include <algorithm>
+#include <chrono>
 #include <cmath>
+#include <filesystem>
+#include <fstream>
 #include <sstream>
 
+#include "RuntimeInternal.h"
 #include "skywalker/core/Strings.h"
-#include "skywalker/wander/Compiler.h"
+#include "skywalker/ecs/Reflection.h"
+#include "skywalker/wander/Aot.h"
 
 namespace sky::wander {
 
+namespace fs = std::filesystem;
+
+namespace {
+constexpr size_t kStackSize = 1u << 16;
+constexpr int kMaxTransitionsPerTick = 32;
+constexpr size_t kMaxPendingEvents = 100000;
+constexpr int kMaxErrorsBeforeDisable = 5;
+}  // namespace
+
 Json RuntimeMessage::toJson() const {
     const char* k = kind == Kind::Log ? "log" : kind == Kind::Error ? "runtime_error" : "compile_error";
-    return Json::object({{"kind", k}, {"entity", entity}, {"script", script}, {"line", line}, {"text", text}});
+    Json j = Json::object({{"kind", k}, {"entity", entity}, {"script", script}, {"line", line}, {"text", text}});
+    if (!file.empty()) j["file"] = file;
+    return j;
+}
+
+// ---------------------------------------------------------------------------
+// Shared helpers
+// ---------------------------------------------------------------------------
+
+void raise(SourceLoc loc, std::string message) { throw RuntimeError{loc, std::move(message), {}}; }
+
+bool truthy(const Scene& scene, const Value& v) {
+    if (v.isEntity()) return scene.exists(v.e());
+    return v.truthyData();
 }
 
 namespace {
 
-struct Value {
-    enum class Type { None, Number, Bool, String, Vec, Color, Entity };
-    Type type = Type::None;
-    double n = 0;
-    std::string s;
-    Vec3 v;
-    Vec4 c;
-    EntityId e = kNoEntity;
-
-    static Value number(double x) { Value r; r.type = Type::Number; r.n = x; return r; }
-    static Value boolean(bool b) { Value r; r.type = Type::Bool; r.n = b ? 1 : 0; return r; }
-    static Value string(std::string x) { Value r; r.type = Type::String; r.s = std::move(x); return r; }
-    static Value vec(Vec3 x) { Value r; r.type = Type::Vec; r.v = x; return r; }
-    static Value color(Vec4 x) { Value r; r.type = Type::Color; r.c = x; return r; }
-    static Value entity(EntityId x) { Value r; r.type = Type::Entity; r.e = x; return r; }
-};
-
-const char* typeName(Value::Type t) {
-    switch (t) {
-        case Value::Type::None: return "none";
-        case Value::Type::Number: return "number";
-        case Value::Type::Bool: return "boolean";
-        case Value::Type::String: return "string";
-        case Value::Type::Vec: return "vector";
-        case Value::Type::Color: return "color";
-        case Value::Type::Entity: return "entity";
+void appendDisplay(const Scene& scene, std::string& out, const Value& v, bool quoteStrings) {
+    switch (v.type()) {
+        case VType::Entity: {
+            const EntityRecord* r = scene.record(v.e());
+            out += r ? r->name : "<destroyed entity>";
+            return;
+        }
+        case VType::String:
+            if (quoteStrings) {
+                out += '"';
+                out += v.str();
+                out += '"';
+            } else {
+                out += v.str();
+            }
+            return;
+        case VType::List: {
+            out += "[";
+            bool first = true;
+            for (const auto& item : v.items()) {
+                if (!first) out += ", ";
+                first = false;
+                appendDisplay(scene, out, item, true);
+            }
+            out += "]";
+            return;
+        }
+        case VType::Map: {
+            out += "{";
+            bool first = true;
+            for (const auto& [k, item] : v.mapObj().entries) {
+                if (!first) out += ", ";
+                first = false;
+                out += k + ": ";
+                appendDisplay(scene, out, item, true);
+            }
+            out += "}";
+            return;
+        }
+        default: out += toDisplayString(v); return;
     }
-    return "?";
 }
-
-std::string fmt(double d) {
-    std::ostringstream os;
-    os << d;
-    return os.str();
-}
-
-struct RuntimeError {
-    SourceLoc loc;
-    std::string message;
-};
-struct StopSignal {};
 
 }  // namespace
 
-// Executes handlers for one entity/script pair. Errors are thrown internally as
-// RuntimeError and caught at the handler boundary (exceptions never escape the runtime).
-class Exec {
-public:
-    // The script is addressed by index, never by reference: `spawn` can add Behavior
-    // components mid-handler and reallocate their storage.
-    Exec(Runtime& rt, EntityId self, size_t scriptIndex, Runtime::Instance& inst, float dt, const InputState& input)
-        : rt_(rt), scene_(rt.scene_), self_(self), scriptIndex_(scriptIndex), inst_(inst), dt_(dt), input_(input) {
-        if (Script* s = script()) scriptName_ = s->name;
-    }
+std::string displayValue(const Scene& scene, const Value& v) {
+    if (v.isString()) return v.str();
+    std::string out;
+    appendDisplay(scene, out, v, false);
+    return out;
+}
 
-    void run(const Block& body) {
-        locals_.clear();
-        locals_.emplace_back();
-        budget_ = Runtime::kBudget;
-        try {
-            block(body);
-        } catch (const StopSignal&) {
-        } catch (const RuntimeError& err) {
-            rt_.messages_.push_back({RuntimeMessage::Kind::Error, self_, scriptName_, err.loc.line, err.message});
-            Script* s = script();
-            if (s && ++s->runtimeErrors >= 5) {
-                s->enabled = false;
-                rt_.messages_.push_back({RuntimeMessage::Kind::Error, self_, scriptName_, err.loc.line,
-                                         "script disabled after repeated runtime errors"});
+Vec3 worldPosition(const Scene& scene, EntityId id) { return scene.worldMatrix(id).translation(); }
+
+std::vector<std::string> utf8Chars(const std::string& s) {
+    std::vector<std::string> out;
+    for (size_t i = 0; i < s.size();) {
+        auto c = static_cast<unsigned char>(s[i]);
+        size_t n = c < 0x80 ? 1 : (c >> 5) == 0x6 ? 2 : (c >> 4) == 0xe ? 3 : (c >> 3) == 0x1e ? 4 : 1;
+        n = std::min(n, s.size() - i);
+        out.push_back(s.substr(i, n));
+        i += n;
+    }
+    return out;
+}
+
+size_t utf8Length(const std::string& s) {
+    size_t n = 0;
+    for (char ch : s) {
+        if ((static_cast<unsigned char>(ch) & 0xc0) != 0x80) ++n;
+    }
+    return n;
+}
+
+VarTable& varTable(Runtime::Impl& impl, Scene& scene, EntityId id) {
+    auto it = impl.vars.find(id);
+    if (it != impl.vars.end()) return it->second;
+    VarTable& t = impl.vars[id];
+    t.entity = id;
+    if (const EntityRecord* rec = scene.record(id)) {
+        for (const auto& [k, v] : rec->vars.members()) {
+            VarSlot s;
+            s.sym = intern(k);
+            s.value = fromJson(v);
+            s.mirrored = v;
+            t.slots.push_back(std::move(s));
+        }
+    }
+    return t;
+}
+
+Value getEntityVar(Runtime::Impl& impl, Scene& scene, EntityId id, uint32_t sym) {
+    VarTable& t = varTable(impl, scene, id);
+    int i = t.find(sym);
+    if (i >= 0) return t.slots[i].value;
+    // Set from outside since the table was built (an agent or tool between ticks)?
+    if (const EntityRecord* rec = scene.record(id)) {
+        if (const Json* j = rec->vars.find(symbolName(sym))) {
+            VarSlot s;
+            s.sym = sym;
+            s.value = fromJson(*j);
+            s.mirrored = *j;
+            t.slots.push_back(s);
+            return t.slots.back().value;
+        }
+    }
+    return {};
+}
+
+void setEntityVar(Runtime::Impl& impl, Scene& scene, EntityId id, uint32_t sym, Value v) {
+    VarTable& t = varTable(impl, scene, id);
+    int i = t.find(sym);
+    if (i < 0) {
+        VarSlot s;
+        s.sym = sym;
+        t.slots.push_back(std::move(s));
+        i = static_cast<int>(t.slots.size() - 1);
+    }
+    t.slots[i].value = std::move(v);
+    t.slots[i].dirty = true;
+    t.anyDirty = true;
+}
+
+// ---------------------------------------------------------------------------
+// CallContext
+// ---------------------------------------------------------------------------
+
+namespace {
+std::string argLabel(const CallContext& c, int i) {
+    std::string name = c.def().name;
+    const auto& ps = c.def().params;
+    int pi = c.def().receiver ? i - 1 : i;
+    std::string label = name + "(): ";
+    if (c.def().receiver && i == 0) return label + "the receiver";
+    if (pi >= 0 && pi < static_cast<int>(ps.size())) return label + "argument " + std::to_string(pi + 1) + " (" + ps[pi].name + ")";
+    return label + "argument " + std::to_string(pi + 1);
+}
+}  // namespace
+
+double CallContext::number(int i) const {
+    const Value& v = args_[i];
+    if (v.isNumber()) return v.num();
+    if (v.isBool()) return v.b() ? 1 : 0;
+    fail(argLabel(*this, i) + " must be a number, got " + typeName(v.type()));
+}
+bool CallContext::boolean(int i) const { return wander::truthy(scene(), args_[i]); }
+const std::string& CallContext::string(int i) const {
+    const Value& v = args_[i];
+    if (!v.isString()) fail(argLabel(*this, i) + " must be a string, got " + typeName(v.type()));
+    return v.str();
+}
+Vec3 CallContext::vec(int i) const {
+    const Value& v = args_[i];
+    if (!v.isVec()) fail(argLabel(*this, i) + " must be a vector (x, y, z), got " + typeName(v.type()));
+    return v.v();
+}
+Vec3 CallContext::point(int i) const {
+    const Value& v = args_[i];
+    if (v.isVec()) return v.v();
+    if (v.isEntity()) return worldPosition(scene(), entity(i));
+    fail(argLabel(*this, i) + " must be a vector (x, y, z) or an entity, got " + typeName(v.type()));
+}
+Vec4 CallContext::color(int i) const {
+    const Value& v = args_[i];
+    if (!v.isColor()) fail(argLabel(*this, i) + " must be a color like #ff8800, got " + typeName(v.type()));
+    return v.c();
+}
+EntityRef CallContext::entity(int i) const {
+    const Value& v = args_[i];
+    if (!v.isEntity()) fail(argLabel(*this, i) + " must be an entity, got " + typeName(v.type()));
+    if (!state_.scene.exists(v.e())) fail(argLabel(*this, i) + " refers to an entity that no longer exists");
+    return v.e();
+}
+const std::vector<Value>& CallContext::list(int i) const {
+    const Value& v = args_[i];
+    if (!v.isList()) fail(argLabel(*this, i) + " must be a list, got " + typeName(v.type()));
+    return v.items();
+}
+const MapObj& CallContext::map(int i) const {
+    const Value& v = args_[i];
+    if (!v.isMap()) fail(argLabel(*this, i) + " must be a map, got " + typeName(v.type()));
+    return v.mapObj();
+}
+Runtime& CallContext::runtime() const { return state_.rt; }
+Scene& CallContext::scene() const { return state_.scene; }
+EntityRef CallContext::self() const { return state_.self; }
+EntityRef CallContext::other() const { return state_.other; }
+double CallContext::time() const { return state_.rt.time(); }
+float CallContext::dt() const { return state_.dt; }
+uint64_t CallContext::frame() const { return state_.rt.frame(); }
+Random& CallContext::rng() const { return state_.rt.rng(); }
+const InputState& CallContext::input() const {
+    static const InputState empty;
+    return state_.input ? *state_.input : empty;
+}
+std::string CallContext::display(const Value& v) const { return displayValue(state_.scene, v); }
+bool CallContext::truthy(const Value& v) const { return wander::truthy(state_.scene, v); }
+void CallContext::charge(int64_t units) const {
+    state_.budget -= units;
+    if (state_.budget < 0) {
+        fail("execution budget exceeded in " + def_.name + "() (more than " + std::to_string(Runtime::kBudget) +
+             " steps in one handler run)");
+    }
+}
+void CallContext::fail(std::string message) const { throw RuntimeError{loc_, std::move(message), {}}; }
+void* CallContext::serviceById(std::type_index t) const { return state_.rt.serviceById(t); }
+ExecState& CallContextAccess(CallContext& c) { return c.state_; }
+
+// ---------------------------------------------------------------------------
+// The interpreter
+// ---------------------------------------------------------------------------
+
+namespace {
+
+[[noreturn]] void budgetExceeded(SourceLoc loc) {
+    raise(loc, "execution budget exceeded: this handler ran more than " + std::to_string(Runtime::kBudget) +
+                   " steps (an endless loop?); spread long work over several ticks with `wait`");
+}
+
+inline void charge(ExecState& st, int64_t units, SourceLoc loc) {
+    st.budget -= units;
+    if (st.budget < 0) budgetExceeded(loc);
+}
+
+double asNumber(const Value& v, SourceLoc loc, const char* what) {
+    if (v.isNumber()) return v.num();
+    if (v.isBool()) return v.b() ? 1 : 0;
+    raise(loc, std::string(what) + " must be a number, got " + typeName(v.type()));
+}
+
+const char* opSymbol(Op op) {
+    switch (op) {
+        case Op::Add: return "+";
+        case Op::Sub: return "-";
+        case Op::Mul: return "*";
+        case Op::Div: return "/";
+        case Op::Mod: return "%";
+        case Op::Lt: return "<";
+        case Op::Le: return "<=";
+        case Op::Gt: return ">";
+        case Op::Ge: return ">=";
+        default: return "?";
+    }
+}
+
+Value arith(const Scene& scene, Op op, const Value& a, const Value& b, SourceLoc loc) {
+    using T = VType;
+    auto numeric = [](const Value& v) { return v.isNumber() || v.isBool(); };
+    auto n = [](const Value& v) { return v.isBool() ? (v.b() ? 1.0 : 0.0) : v.num(); };
+    if (op == Op::Add && (a.isString() || b.isString())) return Value::string(displayValue(scene, a) + displayValue(scene, b));
+    if (numeric(a) && numeric(b)) {
+        double x = n(a), y = n(b);
+        switch (op) {
+            case Op::Add: return Value::number(x + y);
+            case Op::Sub: return Value::number(x - y);
+            case Op::Mul: return Value::number(x * y);
+            case Op::Div:
+                if (y == 0) raise(loc, "division by zero");
+                return Value::number(x / y);
+            case Op::Mod:
+                if (y == 0) raise(loc, "modulo by zero");
+                return Value::number(std::fmod(x, y));
+            default: break;
+        }
+    }
+    if (a.type() == T::Vec && b.type() == T::Vec) {
+        if (op == Op::Add) return Value::vec(a.v() + b.v());
+        if (op == Op::Sub) return Value::vec(a.v() - b.v());
+        if (op == Op::Mul) return Value::vec(a.v() * b.v());
+    }
+    if (a.type() == T::Vec && numeric(b)) {
+        if (op == Op::Mul) return Value::vec(a.v() * static_cast<float>(n(b)));
+        if (op == Op::Div) {
+            if (n(b) == 0) raise(loc, "division by zero");
+            return Value::vec(a.v() / static_cast<float>(n(b)));
+        }
+    }
+    if (numeric(a) && b.type() == T::Vec && op == Op::Mul) return Value::vec(b.v() * static_cast<float>(n(a)));
+    if (a.type() == T::Color && numeric(b) && op == Op::Mul) {
+        auto f = static_cast<float>(n(b));
+        Vec4 c = a.c();
+        return Value::color({c.x * f, c.y * f, c.z * f, c.w});
+    }
+    if (numeric(a) && b.type() == T::Color && op == Op::Mul) {
+        auto f = static_cast<float>(n(a));
+        Vec4 c = b.c();
+        return Value::color({c.x * f, c.y * f, c.z * f, c.w});
+    }
+    if (a.type() == T::Color && b.type() == T::Color && op == Op::Add) {
+        Vec4 x = a.c(), y = b.c();
+        return Value::color({x.x + y.x, x.y + y.y, x.z + y.z, std::max(x.w, y.w)});
+    }
+    if (a.type() == T::List && b.type() == T::List && op == Op::Add) {
+        std::vector<Value> items = a.items();
+        items.insert(items.end(), b.items().begin(), b.items().end());
+        return Value::list(std::move(items));
+    }
+    std::string hint;
+    if (op == Op::Add && (a.isNone() || b.isNone())) hint = " (a value is none: was a var never set, or did find() return none?)";
+    raise(loc, std::string("cannot apply '") + opSymbol(op) + "' to " + typeName(a.type()) + " and " + typeName(b.type()) + hint);
+}
+
+bool compare(Op op, const Value& a, const Value& b, SourceLoc loc) {
+    auto numeric = [](const Value& v) { return v.isNumber() || v.isBool(); };
+    auto n = [](const Value& v) { return v.isBool() ? (v.b() ? 1.0 : 0.0) : v.num(); };
+    int c;
+    if (numeric(a) && numeric(b)) {
+        double x = n(a), y = n(b);
+        switch (op) {
+            case Op::Lt: return x < y;
+            case Op::Le: return x <= y;
+            case Op::Gt: return x > y;
+            default: return x >= y;
+        }
+    }
+    if (a.isString() && b.isString()) {
+        c = a.str().compare(b.str());
+        switch (op) {
+            case Op::Lt: return c < 0;
+            case Op::Le: return c <= 0;
+            case Op::Gt: return c > 0;
+            default: return c >= 0;
+        }
+    }
+    std::string hint;
+    if (a.isNone() || b.isNone()) hint = " (a value is none: was a var never set?)";
+    raise(loc, std::string("cannot compare ") + typeName(a.type()) + " and " + typeName(b.type()) + " with '" + opSymbol(op) + "'" + hint);
+}
+
+bool contains(const Value& item, const Value& coll, SourceLoc loc) {
+    if (coll.isList()) {
+        for (const auto& v : coll.items()) {
+            if (v == item) return true;
+        }
+        return false;
+    }
+    if (coll.isMap()) {
+        if (!item.isString()) return false;
+        return coll.mapObj().find(item.str()) != nullptr;
+    }
+    if (coll.isString()) {
+        if (!item.isString()) raise(loc, std::string("'in' on a string needs a string on the left, got ") + typeName(item.type()));
+        return coll.str().find(item.str()) != std::string::npos;
+    }
+    raise(loc, std::string("'in' needs a list, map or string on the right, got ") + typeName(coll.type()));
+}
+
+int64_t listIndex(const Value& index, size_t size, SourceLoc loc, const char* what) {
+    if (!index.isNumber()) raise(loc, std::string(what) + " indexes are numbers, got " + typeName(index.type()));
+    double d = index.num();
+    if (d != std::floor(d)) raise(loc, std::string(what) + " index must be a whole number, got " + formatNumber(d));
+    auto i = static_cast<int64_t>(d);
+    if (i < 0) i += static_cast<int64_t>(size);
+    if (i < 0 || i >= static_cast<int64_t>(size)) {
+        raise(loc, "index " + formatNumber(d) + " is out of range (the " + what + " has " + std::to_string(size) +
+                       (size == 1 ? " item" : " items") + ")");
+    }
+    return i;
+}
+
+Value indexValue(const Value& obj, const Value& index, SourceLoc loc) {
+    if (obj.isList()) return obj.items()[static_cast<size_t>(listIndex(index, obj.items().size(), loc, "list"))];
+    if (obj.isMap()) {
+        if (!index.isString()) raise(loc, std::string("map keys are strings, got ") + typeName(index.type()));
+        const Value* v = obj.mapObj().find(index.str());
+        return v ? *v : Value();
+    }
+    if (obj.isString()) {
+        auto chars = utf8Chars(obj.str());
+        return Value::string(chars[static_cast<size_t>(listIndex(index, chars.size(), loc, "string"))]);
+    }
+    std::string hint = obj.isNone() ? " (the value is none)" : "";
+    raise(loc, std::string("cannot index a ") + typeName(obj.type()) + " with []" + hint);
+}
+
+void setIndexValue(Value& obj, const Value& index, const Value& v, SourceLoc loc) {
+    if (obj.isList()) {
+        auto i = listIndex(index, obj.items().size(), loc, "list");
+        obj.mutItems()[static_cast<size_t>(i)] = v;
+        return;
+    }
+    if (obj.isMap()) {
+        if (!index.isString()) raise(loc, std::string("map keys are strings, got ") + typeName(index.type()));
+        obj.mutMap().set(index.str(), v);
+        return;
+    }
+    if (obj.isString()) raise(loc, "strings cannot be changed in place; build a new one");
+    raise(loc, std::string("cannot set [] on a ") + typeName(obj.type()));
+}
+
+// --- entity properties --------------------------------------------------------------
+
+EntityId requireEntity(const Scene& scene, const Value& v, SourceLoc loc, const char* what) {
+    if (!v.isEntity()) raise(loc, std::string(what) + " must be an entity, got " + typeName(v.type()));
+    if (!scene.exists(v.e())) raise(loc, std::string(what) + " refers to an entity that no longer exists");
+    return v.e();
+}
+
+std::string currentStateOf(const Runtime::Impl& impl, EntityId e) {
+    for (auto it = impl.instances.lower_bound({e, 0}); it != impl.instances.end() && it->first.first == e; ++it) {
+        const Instance& inst = it->second;
+        if (!inst.program) continue;
+        for (size_t b = 0; b < inst.behaviors.size() && b < inst.program->behaviors.size(); ++b) {
+            int s = inst.behaviors[b].state;
+            if (s >= 0) return inst.program->behaviors[b].states[s].name;
+        }
+    }
+    return {};
+}
+
+Value getEntityMember(ExecState& st, EntityId id, const MemberRef& m, SourceLoc loc) {
+    using K = MemberRef::Kind;
+    Scene& scene = st.scene;
+    switch (m.kind) {
+        case K::Position:
+        case K::Rotation:
+        case K::Scale: {
+            const Transform* t = scene.get<Transform>(id);
+            if (!t) return Value::vec(m.kind == K::Scale ? Vec3{1, 1, 1} : Vec3{0, 0, 0});
+            return Value::vec(m.kind == K::Position ? t->position : m.kind == K::Rotation ? t->rotation : t->scale);
+        }
+        case K::Color:
+            if (const auto* mr = scene.get<MeshRenderer>(id)) return Value::color(mr->color);
+            if (const auto* l = scene.get<Light>(id)) return Value::color(l->color);
+            return {};
+        case K::Name: return Value::string(scene.record(id)->name);
+        case K::Id: return Value::number(static_cast<double>(id));
+        case K::Enabled: return Value::boolean(scene.record(id)->enabled);
+        case K::Tags: {
+            std::vector<Value> tags;
+            for (const auto& t : scene.record(id)->tags) tags.push_back(Value::string(t));
+            return Value::list(std::move(tags));
+        }
+        case K::Parent: {
+            EntityId p = scene.record(id)->parent;
+            return p ? Value::entity(p) : Value();
+        }
+        case K::State: {
+            std::string s = currentStateOf(st.impl, id);
+            return s.empty() ? Value() : Value::string(s);
+        }
+        default: break;
+    }
+    Value v = getEntityVar(st.impl, scene, id, m.sym);
+    if (v.isNone() && scene.componentKind(m.name)) {
+        raise(loc, "'" + m.name + "' is a component; read one of its fields like ." + m.name + ".<field>");
+    }
+    return v;
+}
+
+void setEntityMember(ExecState& st, EntityId id, const MemberRef& m, const Value& v, SourceLoc loc) {
+    using K = MemberRef::Kind;
+    Scene& scene = st.scene;
+    scene.markDirty();
+    switch (m.kind) {
+        case K::Position:
+        case K::Rotation:
+        case K::Scale: {
+            Vec3 x;
+            if (v.isVec()) {
+                x = v.v();
+            } else if (v.isEntity()) {
+                x = worldPosition(scene, requireEntity(scene, v, loc, m.name.c_str()));
+            } else {
+                raise(loc, m.name + " must be a vector like (0, 1, 0), got " + typeName(v.type()));
             }
+            Transform& t = scene.add<Transform>(id);
+            (m.kind == K::Position ? t.position : m.kind == K::Rotation ? t.rotation : t.scale) = x;
+            return;
         }
-    }
-
-    void initVars(const BehaviorDef& b) {
-        locals_.assign(1, {});
-        budget_ = Runtime::kBudget;
-        EntityRecord* rec = scene_.record(self_);
-        if (!rec) return;
-        for (const auto& v : b.vars) {
-            if (rec->vars.contains(v.name) || !v.initial) continue;
-            try {
-                rec->vars[v.name] = toJson(eval(*v.initial));
-            } catch (const RuntimeError& err) {
-                rt_.messages_.push_back({RuntimeMessage::Kind::Error, self_, scriptName_, err.loc.line, err.message});
+        case K::Color: {
+            if (!v.isColor()) raise(loc, std::string("color must be a color like #ff8800, got ") + typeName(v.type()));
+            if (auto* mr = scene.get<MeshRenderer>(id)) {
+                mr->color = v.c();
+            } else if (auto* l = scene.get<Light>(id)) {
+                l->color = v.c();
+            } else {
+                scene.add<MeshRenderer>(id).color = v.c();
             }
+            return;
         }
+        case K::Name: scene.record(id)->name = displayValue(scene, v); return;
+        case K::Enabled: scene.record(id)->enabled = truthy(scene, v); return;
+        case K::Id: raise(loc, "id is read-only");
+        case K::Tags: raise(loc, "tags is read-only (use add_tag / remove_tag)");
+        case K::Parent: raise(loc, "parent is read-only (use set_parent)");
+        case K::State: raise(loc, "state is read-only (use go to inside the behavior)");
+        default: break;
     }
-
-private:
-    [[noreturn]] void fail(SourceLoc loc, std::string msg) { throw RuntimeError{loc, std::move(msg)}; }
-
-    void spend(SourceLoc loc) {
-        if (--budget_ < 0) fail(loc, "execution budget exceeded (too much work in one handler)");
+    if (scene.componentKind(m.name)) {
+        raise(loc, "'" + m.name + "' is a component; assign one of its fields like ." + m.name + ".<field> = ...");
     }
+    setEntityVar(st.impl, scene, id, m.sym, v);
+}
 
-    // --- conversions -----------------------------------------------------------
-    static Json toJson(const Value& v) {
-        switch (v.type) {
-            case Value::Type::None: return {};
-            case Value::Type::Number: return v.n;
-            case Value::Type::Bool: return v.n != 0;
-            case Value::Type::String: return v.s;
-            case Value::Type::Vec: return reflect::vec3ToJson(v.v);
-            case Value::Type::Color: return reflect::colorToJson(v.c);
-            case Value::Type::Entity: return Json::object({{"$entity", v.e}});
-        }
-        return {};
-    }
-
-    static Value fromJson(const Json& j) {
-        switch (j.type()) {
-            case Json::Type::Number: return Value::number(j.asNumber());
-            case Json::Type::Bool: return Value::boolean(j.asBool());
-            case Json::Type::String: {
-                Vec4 c;
-                if (j.asString().size() > 1 && j.asString()[0] == '#' && reflect::parseHexColor(j.asString(), c)) {
-                    return Value::color(c);
-                }
-                return Value::string(j.asString());
+Value getMember(ExecState& st, const Value& obj, const MemberRef& m, SourceLoc loc) {
+    using K = MemberRef::Kind;
+    switch (obj.type()) {
+        case VType::Entity: return getEntityMember(st, requireEntity(st.scene, obj, loc, "the property owner"), m, loc);
+        case VType::Vec:
+            switch (m.kind) {
+                case K::X: return Value::number(obj.v().x);
+                case K::Y: return Value::number(obj.v().y);
+                case K::Z: return Value::number(obj.v().z);
+                case K::Length: return Value::number(length(obj.v()));
+                default: break;
             }
-            case Json::Type::Array: {
-                Vec3 v;
-                if (reflect::jsonToVec3(j, v)) return Value::vec(v);
-                Vec4 c;
-                if (reflect::jsonToColor(j, c)) return Value::color(c);
-                return {};
+            break;
+        case VType::Color:
+            switch (m.kind) {
+                case K::R: return Value::number(obj.c().x);
+                case K::G: return Value::number(obj.c().y);
+                case K::B: return Value::number(obj.c().z);
+                case K::A: return Value::number(obj.c().w);
+                default: break;
             }
-            case Json::Type::Object:
-                if (const Json* e = j.find("$entity")) return Value::entity(static_cast<EntityId>(e->asInt()));
-                return {};
-            case Json::Type::Null: return {};
+            break;
+        case VType::Map: {
+            const Value* v = obj.mapObj().find(m.name);
+            return v ? *v : Value();
         }
-        return {};
+        case VType::List:
+            if (m.kind == K::Length) return Value::number(static_cast<double>(obj.items().size()));
+            break;
+        case VType::String:
+            if (m.kind == K::Length) return Value::number(static_cast<double>(utf8Length(obj.str())));
+            break;
+        case VType::None:
+            raise(loc, "cannot read '." + m.name + "' of none (is the entity missing, or was a var never set?)");
+        default: break;
     }
+    raise(loc, std::string("a ") + typeName(obj.type()) + " has no property '" + m.name + "'");
+}
 
-    bool truthy(const Value& v) const {
-        switch (v.type) {
-            case Value::Type::None: return false;
-            case Value::Type::Number:
-            case Value::Type::Bool: return v.n != 0;
-            case Value::Type::String: return !v.s.empty();
-            case Value::Type::Entity: return scene_.exists(v.e);
-            default: return true;
+void setMember(ExecState& st, Value& obj, const MemberRef& m, const Value& v, SourceLoc loc) {
+    using K = MemberRef::Kind;
+    switch (obj.type()) {
+        case VType::Entity: setEntityMember(st, requireEntity(st.scene, obj, loc, "the assignment target"), m, v, loc); return;
+        case VType::Vec: {
+            float* f = obj.floats();
+            float x = static_cast<float>(asNumber(v, loc, ("." + m.name).c_str()));
+            if (m.kind == K::X) f[0] = x;
+            else if (m.kind == K::Y) f[1] = x;
+            else if (m.kind == K::Z) f[2] = x;
+            else raise(loc, "cannot set '." + m.name + "' on a vector");
+            return;
+        }
+        case VType::Color: {
+            float* f = obj.floats();
+            float x = static_cast<float>(asNumber(v, loc, ("." + m.name).c_str()));
+            if (m.kind == K::R) f[0] = x;
+            else if (m.kind == K::G) f[1] = x;
+            else if (m.kind == K::B) f[2] = x;
+            else if (m.kind == K::A) f[3] = x;
+            else raise(loc, "cannot set '." + m.name + "' on a color");
+            return;
+        }
+        case VType::Map: obj.mutMap().set(m.name, v); return;
+        case VType::None: raise(loc, "cannot set '." + m.name + "' on none (is the entity missing, or was a var never set?)");
+        default: raise(loc, std::string("cannot set '.") + m.name + "' on a " + typeName(obj.type()));
+    }
+}
+
+const Runtime::Impl::ResolvedField& resolveField(ExecState& st, const FieldRef& f, SourceLoc loc) {
+    std::string key = f.component + "." + f.field;
+    auto it = st.impl.fieldCache.find(key);
+    if (it != st.impl.fieldCache.end()) return it->second;
+    const ComponentKind* kind = st.scene.componentKind(f.component);
+    if (!kind || !kind->info) raise(loc, "unknown component '" + f.component + "'");
+    const FieldInfo* field = kind->info->field(f.field);
+    if (!field) {
+        std::string guess = str::closest(f.field, kind->info->fieldNames());
+        raise(loc, f.component + " has no field '" + f.field + "'" + (guess.empty() ? "" : " (did you mean '" + guess + "'?)"));
+    }
+    return st.impl.fieldCache[key] = {kind, field};
+}
+
+Value getField(ExecState& st, const Value& obj, const FieldRef& f, SourceLoc loc) {
+    EntityId id = requireEntity(st.scene, obj, loc, "the component owner");
+    const auto& r = resolveField(st, f, loc);
+    void* c = r.kind->ptr ? r.kind->ptr(st.scene, id) : nullptr;
+    if (!c) {
+        if (!r.kind->has(st.scene, id)) return {};
+        return fromJson(r.kind->toJson(st.scene, id).get(f.field));
+    }
+    const auto* base = static_cast<const char*>(c) + r.field->offset;
+    switch (r.field->type) {
+        case FieldType::Float: return Value::number(*reinterpret_cast<const float*>(base));
+        case FieldType::Int: return Value::number(*reinterpret_cast<const int*>(base));
+        case FieldType::Bool: return Value::boolean(*reinterpret_cast<const bool*>(base));
+        case FieldType::String:
+        case FieldType::Enum: return Value::string(*reinterpret_cast<const std::string*>(base));
+        case FieldType::Vec3: return Value::vec(*reinterpret_cast<const Vec3*>(base));
+        case FieldType::Color: return Value::color(*reinterpret_cast<const Vec4*>(base));
+    }
+    return {};
+}
+
+void setField(ExecState& st, const Value& obj, const FieldRef& f, const Value& v, SourceLoc loc) {
+    EntityId id = requireEntity(st.scene, obj, loc, "the component owner");
+    const auto& r = resolveField(st, f, loc);
+    st.scene.markDirty();
+    void* c = r.kind->ptr ? r.kind->ptr(st.scene, id) : nullptr;
+    const FieldInfo& fi = *r.field;
+    std::string what = f.component + "." + f.field;
+    if (c) {
+        char* base = static_cast<char*>(c) + fi.offset;
+        switch (fi.type) {
+            case FieldType::Float:
+                if (!v.isNumber()) raise(loc, what + " must be a number, got " + typeName(v.type()));
+                *reinterpret_cast<float*>(base) = std::clamp(static_cast<float>(v.num()), fi.minValue, fi.maxValue);
+                return;
+            case FieldType::Int:
+                if (!v.isNumber()) raise(loc, what + " must be a whole number, got " + typeName(v.type()));
+                *reinterpret_cast<int*>(base) = static_cast<int>(v.num());
+                return;
+            case FieldType::Bool:
+                if (!v.isBool()) raise(loc, what + " must be true or false, got " + typeName(v.type()));
+                *reinterpret_cast<bool*>(base) = v.b();
+                return;
+            case FieldType::Vec3:
+                if (!v.isVec()) raise(loc, what + " must be a vector (x, y, z), got " + typeName(v.type()));
+                *reinterpret_cast<Vec3*>(base) = v.v();
+                return;
+            case FieldType::Color:
+                if (!v.isColor()) raise(loc, what + " must be a color like #ff8800, got " + typeName(v.type()));
+                *reinterpret_cast<Vec4*>(base) = v.c();
+                return;
+            case FieldType::String:
+            case FieldType::Enum: break;  // validated through reflection below
         }
     }
+    // Missing component (added on assignment, like the inspector) or validated string fields.
+    Status s = r.kind->apply(st.scene, id, Json::object({{f.field, toJson(v)}}));
+    if (!s) raise(loc, s.error().message + (s.error().hint.empty() ? "" : " (" + s.error().hint + ")"));
+}
 
-    std::string toText(const Value& v) const {
-        switch (v.type) {
-            case Value::Type::None: return "none";
-            case Value::Type::Number: return fmt(v.n);
-            case Value::Type::Bool: return v.n != 0 ? "true" : "false";
-            case Value::Type::String: return v.s;
-            case Value::Type::Vec: return "(" + fmt(v.v.x) + ", " + fmt(v.v.y) + ", " + fmt(v.v.z) + ")";
-            case Value::Type::Color: return reflect::toHexColor(v.c);
-            case Value::Type::Entity: {
-                const EntityRecord* r = scene_.record(v.e);
-                return r ? r->name : "<destroyed entity>";
-            }
+void iterSet(Value* R, int a, bool two, const Value& coll, size_t i) {
+    if (coll.isList()) {
+        if (two) {
+            R[a + 2] = Value::number(static_cast<double>(i));
+            R[a + 3] = coll.items()[i];
+        } else {
+            R[a + 2] = coll.items()[i];
         }
-        return "";
+    } else {  // map
+        const auto& e = coll.mapObj().entries[i];
+        R[a + 2] = Value::string(e.first);
+        if (two) R[a + 3] = e.second;
     }
+}
 
-    double num(const Value& v, SourceLoc loc, std::string_view what) {
-        if (v.type == Value::Type::Number || v.type == Value::Type::Bool) return v.n;
-        fail(loc, std::string(what) + " must be a number, got " + typeName(v.type));
-    }
+size_t iterSize(const Value& coll) { return coll.isList() ? coll.items().size() : coll.mapObj().entries.size(); }
 
-    Vec3 vec(const Value& v, SourceLoc loc, std::string_view what) {
-        if (v.type == Value::Type::Vec) return v.v;
-        if (v.type == Value::Type::Entity) return worldPos(entity(v, loc, what));
-        fail(loc, std::string(what) + " must be a vector (x, y, z) or an entity, got " + typeName(v.type));
-    }
-
-    EntityId entity(const Value& v, SourceLoc loc, std::string_view what) {
-        if (v.type != Value::Type::Entity) fail(loc, std::string(what) + " must be an entity, got " + typeName(v.type));
-        if (!scene_.exists(v.e)) fail(loc, std::string(what) + " refers to an entity that no longer exists");
-        return v.e;
-    }
-
-    Vec3 worldPos(EntityId id) { return scene_.worldMatrix(id).translation(); }
-
-    // --- statements --------------------------------------------------------------
-    void block(const Block& b) {
-        locals_.emplace_back();
-        for (const auto& s : b) stmt(*s);
-        locals_.pop_back();
-    }
-
-    Value* findLocal(const std::string& name) {
-        for (auto it = locals_.rbegin(); it != locals_.rend(); ++it) {
-            auto f = it->find(name);
-            if (f != it->end()) return &f->second;
+const BehaviorRun* behaviorRunFor(ExecState& st) {
+    if (st.behavior < 0) return nullptr;
+    if (st.inst && st.inst->program.get() == st.prog) return &st.inst->behaviors[st.behavior];
+    // Test drivers: the instance of this program on `self`.
+    for (auto it = st.impl.instances.lower_bound({st.self, 0}); it != st.impl.instances.end() && it->first.first == st.self; ++it) {
+        if (it->second.program.get() == st.prog && st.behavior < static_cast<int>(it->second.behaviors.size())) {
+            return &it->second.behaviors[st.behavior];
         }
-        return nullptr;
     }
+    return nullptr;
+}
 
-    void stmt(const Stmt& s) {
-        spend(s.loc);
-        switch (s.kind) {
-            case Stmt::Kind::Let: locals_.back()[s.name] = eval(*s.value); break;
-            case Stmt::Kind::Assign: assign(*s.target, eval(*s.value)); break;
-            case Stmt::Kind::If:
-                for (const auto& [cond, body] : s.branches) {
-                    if (!cond || truthy(eval(*cond))) {
-                        block(body);
+Value& varRef(ExecState& st, int var) {
+    if (st.inst && st.inst->program.get() == st.prog) {
+        VarTable& t = *st.inst->vars;
+        return t.slots[st.inst->behaviors[st.behavior].varSlots[var]].value;
+    }
+    // Slow path (test drivers): by name on self.
+    uint32_t sym = st.prog->behaviors[st.behavior].vars[var].sym;
+    VarTable& t = varTable(st.impl, st.scene, st.self);
+    int i = t.find(sym);
+    if (i < 0) {
+        (void)getEntityVar(st.impl, st.scene, st.self, sym);
+        i = t.find(sym);
+        if (i < 0) {
+            VarSlot s;
+            s.sym = sym;
+            t.slots.push_back(std::move(s));
+            i = static_cast<int>(t.slots.size() - 1);
+        }
+    }
+    return t.slots[i].value;
+}
+
+void markVarDirty(ExecState& st, int var) {
+    if (st.inst && st.inst->program.get() == st.prog) {
+        VarTable& t = *st.inst->vars;
+        t.slots[st.inst->behaviors[st.behavior].varSlots[var]].dirty = true;
+        t.anyDirty = true;
+        return;
+    }
+    uint32_t sym = st.prog->behaviors[st.behavior].vars[var].sym;
+    VarTable& t = varTable(st.impl, st.scene, st.self);
+    int i = t.find(sym);
+    if (i >= 0) {
+        t.slots[i].dirty = true;
+        t.anyDirty = true;
+    }
+}
+
+#define RK(x) (isK(x) ? K[(x)&0x7fff] : R[x])
+
+template <bool Single>
+bool interpret(ExecState& st, int protoIndex, Value* R, size_t& pc, Outcome& out) {
+    const Program& prog = *st.prog;
+    const Proto& P = prog.protos[protoIndex];
+    const Ins* code = P.code.data();
+    const Value* K = prog.constants.data();
+    const SourceLoc* locs = P.locs.data();
+#define LOC (locs[pc - 1])
+    for (;;) {
+        const Ins in = code[pc++];
+        switch (in.op) {
+            case Op::Nop: break;
+            case Op::Move: R[in.a] = R[in.b]; break;
+            case Op::LoadK: R[in.a] = K[in.b]; break;
+            case Op::LoadNone: R[in.a] = Value(); break;
+            case Op::LoadBool: R[in.a] = Value::boolean(in.b != 0); break;
+            case Op::LoadSelf: R[in.a] = Value::entity(st.self); break;
+            case Op::LoadEnv:
+                switch (static_cast<Env>(in.b)) {
+                    case Env::Dt: R[in.a] = Value::number(st.dt); break;
+                    case Env::Time: R[in.a] = Value::number(st.rt.time()); break;
+                    case Env::Frame: R[in.a] = Value::number(static_cast<double>(st.rt.frame())); break;
+                    case Env::Other: R[in.a] = st.other ? Value::entity(st.other) : Value(); break;
+                    case Env::State: {
+                        const BehaviorRun* br = behaviorRunFor(st);
+                        if (br && br->state >= 0) {
+                            R[in.a] = Value::string(prog.behaviors[st.behavior].states[br->state].name);
+                        } else {
+                            R[in.a] = Value();
+                        }
+                        break;
+                    }
+                    case Env::StateTime: {
+                        const BehaviorRun* br = behaviorRunFor(st);
+                        R[in.a] = Value::number(br ? br->stateTime : 0.0);
                         break;
                     }
                 }
                 break;
-            case Stmt::Kind::Every: {
-                double interval = num(eval(*s.value), s.loc, "every interval");
-                if (interval <= 0) fail(s.loc, "every interval must be positive");
-                double& t = inst_.timers[s.nodeId];
-                t += dt_;
-                if (t >= interval) {
-                    t = std::fmod(t, interval);  // at most once per tick, no burst catch-up
-                    block(s.body);
-                }
+            case Op::GetVar: R[in.a] = varRef(st, in.b); break;
+            case Op::SetVar:
+                varRef(st, in.a) = RK(in.b);
+                markVarDirty(st, in.a);
                 break;
-            }
-            case Stmt::Kind::After: {
-                if (inst_.fired.count(s.nodeId)) break;
-                double delay = num(eval(*s.value), s.loc, "after delay");
-                double& t = inst_.timers[s.nodeId];
-                t += dt_;
-                if (t >= delay) {
-                    inst_.fired.insert(s.nodeId);
-                    block(s.body);
-                }
-                break;
-            }
-            case Stmt::Kind::Repeat: {
-                double n = num(eval(*s.value), s.loc, "repeat count");
-                int count = static_cast<int>(std::clamp(n, 0.0, 1000.0));
-                for (int i = 0; i < count; ++i) block(s.body);
-                break;
-            }
-            case Stmt::Kind::Move: {
-                EntityId id = entity(eval(*s.target), s.loc, "move target");
-                Vec3 delta = vec(eval(*s.value), s.loc, "move offset");
-                if (auto* t = scene_.get<Transform>(id)) t->position += delta;
-                scene_.markDirty();
-                break;
-            }
-            case Stmt::Kind::MoveToward: {
-                EntityId id = entity(eval(*s.target), s.loc, "move target");
-                Vec3 goal = vec(eval(*s.value), s.loc, "move destination");
-                double speed = num(eval(*s.extra), s.loc, "move speed");
-                if (auto* t = scene_.get<Transform>(id)) {
-                    Vec3 from = worldPos(id);
-                    Vec3 delta = goal - from;
-                    float dist = length(delta);
-                    float step = static_cast<float>(speed) * dt_;
-                    if (dist > 1e-6f) t->position += delta * (std::min(step, dist) / dist);
-                }
-                scene_.markDirty();
-                break;
-            }
-            case Stmt::Kind::Rotate: {
-                EntityId id = entity(eval(*s.target), s.loc, "rotate target");
-                Vec3 delta = vec(eval(*s.value), s.loc, "rotation");
-                if (auto* t = scene_.get<Transform>(id)) {
-                    t->rotation += delta;
-                    // Keep angles bounded so long sessions don't lose float precision.
-                    for (float* a : {&t->rotation.x, &t->rotation.y, &t->rotation.z}) *a = std::remainder(*a, 360.f);
-                }
-                scene_.markDirty();
-                break;
-            }
-            case Stmt::Kind::Look: {
-                EntityId id = entity(eval(*s.target), s.loc, "look target");
-                Vec3 at = vec(eval(*s.value), s.loc, "look point");
-                Vec3 d = at - worldPos(id);
-                if (auto* t = scene_.get<Transform>(id); t && length(d) > 1e-6f) {
-                    float horizontal = std::sqrt(d.x * d.x + d.z * d.z);
-                    t->rotation = {degrees(std::atan2(d.y, horizontal)), degrees(std::atan2(-d.x, -d.z)), 0.f};
-                }
-                scene_.markDirty();
-                break;
-            }
-            case Stmt::Kind::Emit: {
-                EntityId target = s.extra ? entity(eval(*s.extra), s.loc, "emit receiver") : kNoEntity;
-                rt_.nextPending_.push_back({s.name, target});
-                break;
-            }
-            case Stmt::Kind::Destroy: {
-                Value v = eval(*s.target);
-                if (v.type == Value::Type::Entity && scene_.exists(v.e)) rt_.toDestroy_.push_back(v.e);
-                break;
-            }
-            case Stmt::Kind::Log:
-                rt_.messages_.push_back({RuntimeMessage::Kind::Log, self_, scriptName_, s.loc.line, toText(eval(*s.value))});
-                break;
-            case Stmt::Kind::Stop: throw StopSignal{};
-            case Stmt::Kind::Call: (void)eval(*s.value); break;
-        }
-    }
-
-    // --- property access -----------------------------------------------------------
-    static void flatten(const Expr& e, const Expr*& base, std::vector<std::string>& path) {
-        if (e.kind == Expr::Kind::Member) {
-            flatten(*e.lhs, base, path);
-            path.push_back(e.text);
-        } else {
-            base = &e;
-        }
-    }
-
-    Value getProp(EntityId id, const std::string& name, SourceLoc loc) {
-        EntityRecord* rec = scene_.record(id);
-        if (name == "position" || name == "rotation" || name == "scale") {
-            auto* t = scene_.get<Transform>(id);
-            return Value::vec(name == "position" ? t->position : name == "rotation" ? t->rotation : t->scale);
-        }
-        if (name == "color") {
-            auto* m = scene_.get<MeshRenderer>(id);
-            if (m) return Value::color(m->color);
-            if (auto* l = scene_.get<Light>(id)) return Value::color(l->color);
-            return {};
-        }
-        if (name == "name") return Value::string(rec->name);
-        if (name == "id") return Value::number(static_cast<double>(id));
-        if (name == "enabled") return Value::boolean(rec->enabled);
-        if (const ComponentKind* k = scene_.componentKind(name)) {
-            (void)k;
-            fail(loc, "'" + name + "' is a component; access a field like ." + name + ".<field>");
-        }
-        if (const Json* v = rec->vars.find(name)) return fromJson(*v);
-        return {};
-    }
-
-    Value getComponentField(EntityId id, const std::string& comp, const std::string& field, SourceLoc loc) {
-        const ComponentKind* k = scene_.componentKind(comp);
-        if (!k->has(scene_, id)) return {};
-        const FieldInfo* f = k->info->field(field);
-        if (!f) {
-            std::string guess = str::closest(field, k->info->fieldNames());
-            fail(loc, comp + " has no field '" + field + "'" + (guess.empty() ? "" : " (did you mean '" + guess + "'?)"));
-        }
-        return fromJson(k->toJson(scene_, id).get(field));
-    }
-
-    static Value swizzle(const Value& v, const std::string& name, SourceLoc loc, Exec& ex) {
-        if (v.type == Value::Type::Vec) {
-            if (name == "x") return Value::number(v.v.x);
-            if (name == "y") return Value::number(v.v.y);
-            if (name == "z") return Value::number(v.v.z);
-        }
-        if (v.type == Value::Type::Color) {
-            if (name == "r") return Value::number(v.c.x);
-            if (name == "g") return Value::number(v.c.y);
-            if (name == "b") return Value::number(v.c.z);
-            if (name == "a") return Value::number(v.c.w);
-        }
-        ex.fail(loc, std::string("cannot read '.") + name + "' of a " + typeName(v.type));
-    }
-
-    Value member(const Expr& e) {
-        const Expr* base = nullptr;
-        std::vector<std::string> path;
-        flatten(e, base, path);
-        Value cur = eval(*base);
-        for (size_t i = 0; i < path.size(); ++i) {
-            if (cur.type == Value::Type::Entity) {
-                EntityId id = entity(cur, e.loc, "property owner");
-                if (scene_.componentKind(path[i]) && i + 1 < path.size()) {
-                    cur = getComponentField(id, path[i], path[i + 1], e.loc);
-                    ++i;
+            case Op::GetMember: R[in.a] = getMember(st, R[in.b], prog.members[in.c], LOC); break;
+            case Op::SetMember: setMember(st, R[in.a], prog.members[in.b], RK(in.c), LOC); break;
+            case Op::GetField: R[in.a] = getField(st, R[in.b], prog.fields[in.c], LOC); break;
+            case Op::SetField: setField(st, R[in.a], prog.fields[in.b], RK(in.c), LOC); break;
+            case Op::Index: R[in.a] = indexValue(R[in.b], RK(in.c), LOC); break;
+            case Op::SetIndex: setIndexValue(R[in.a], RK(in.b), RK(in.c), LOC); break;
+            case Op::Add: {
+                const Value& b = RK(in.b);
+                const Value& c = RK(in.c);
+                if (b.isNumber() && c.isNumber()) {
+                    R[in.a] = Value::number(b.num() + c.num());
                 } else {
-                    cur = getProp(id, path[i], e.loc);
+                    R[in.a] = arith(st.scene, Op::Add, b, c, LOC);
                 }
-            } else {
-                cur = swizzle(cur, path[i], e.loc, *this);
+                break;
             }
-        }
-        return cur;
-    }
-
-    static bool setSwizzle(Value& target, const std::string& name, double x) {
-        auto f = static_cast<float>(x);
-        if (target.type == Value::Type::Vec) {
-            if (name == "x") { target.v.x = f; return true; }
-            if (name == "y") { target.v.y = f; return true; }
-            if (name == "z") { target.v.z = f; return true; }
-        }
-        if (target.type == Value::Type::Color) {
-            if (name == "r") { target.c.x = f; return true; }
-            if (name == "g") { target.c.y = f; return true; }
-            if (name == "b") { target.c.z = f; return true; }
-            if (name == "a") { target.c.w = f; return true; }
-        }
-        return false;
-    }
-
-    void setProp(EntityId id, const std::vector<std::string>& path, size_t start, const Value& value, SourceLoc loc) {
-        const std::string& name = path[start];
-        size_t rest = path.size() - start - 1;
-        scene_.markDirty();
-        if (scene_.componentKind(name)) {
-            if (rest != 1) fail(loc, "assign a component field, e.g. self." + name + ".<field> = ...");
-            const ComponentKind* k = scene_.componentKind(name);
-            if (!k->info->field(path[start + 1])) {
-                std::string guess = str::closest(path[start + 1], k->info->fieldNames());
-                fail(loc, name + " has no field '" + path[start + 1] + "'" +
-                              (guess.empty() ? "" : " (did you mean '" + guess + "'?)"));
-            }
-            Status st = k->apply(scene_, id, Json::object({{path[start + 1], toJson(value)}}));
-            if (!st) fail(loc, st.error().message);
-            return;
-        }
-        Value current = rest ? getProp(id, name, loc) : Value{};
-        Value next = value;
-        if (rest == 1) {
-            current = getProp(id, name, loc);
-            if (!setSwizzle(current, path[start + 1], num(value, loc, "component value"))) {
-                fail(loc, "cannot set '." + path[start + 1] + "' on " + name + " (a " + typeName(current.type) + ")");
-            }
-            next = current;
-        } else if (rest > 1) {
-            fail(loc, "property path is too deep");
-        }
-        if (name == "position" || name == "rotation" || name == "scale") {
-            Vec3 v = vec(next, loc, name);
-            auto* t = scene_.get<Transform>(id);
-            (name == "position" ? t->position : name == "rotation" ? t->rotation : t->scale) = v;
-            return;
-        }
-        if (name == "color") {
-            if (next.type != Value::Type::Color) fail(loc, "color must be a color like #ff8800");
-            scene_.add<MeshRenderer>(id).color = next.c;
-            return;
-        }
-        if (name == "name") {
-            scene_.record(id)->name = toText(next);
-            return;
-        }
-        if (name == "enabled") {
-            scene_.record(id)->enabled = truthy(next);
-            return;
-        }
-        if (name == "id") fail(loc, "id is read-only");
-        scene_.record(id)->vars[name] = toJson(next);
-    }
-
-    void assign(const Expr& target, const Value& value) {
-        if (target.kind == Expr::Kind::Ident) {
-            if (Value* local = findLocal(target.text)) {
-                *local = value;
-                return;
-            }
-            fail(target.loc, "unknown variable '" + target.text + "'");
-        }
-        const Expr* base = nullptr;
-        std::vector<std::string> path;
-        flatten(target, base, path);
-        if (base->kind == Expr::Kind::Ident) {
-            if (Value* local = findLocal(base->text); local && local->type != Value::Type::Entity) {
-                if (path.size() != 1 || !setSwizzle(*local, path[0], num(value, target.loc, "component value"))) {
-                    fail(target.loc, "cannot assign that property of local '" + base->text + "'");
+            case Op::Sub: {
+                const Value& b = RK(in.b);
+                const Value& c = RK(in.c);
+                if (b.isNumber() && c.isNumber()) {
+                    R[in.a] = Value::number(b.num() - c.num());
+                } else {
+                    R[in.a] = arith(st.scene, Op::Sub, b, c, LOC);
                 }
-                return;
+                break;
             }
-        }
-        Value owner = eval(*base);
-        // Walk through entity-valued vars (e.g. self.target.position = ...).
-        size_t i = 0;
-        EntityId id = entity(owner, target.loc, "assignment target");
-        while (i + 1 < path.size() && !scene_.componentKind(path[i])) {
-            Value v = getProp(id, path[i], target.loc);
-            if (v.type != Value::Type::Entity) break;
-            id = entity(v, target.loc, path[i]);
-            ++i;
-        }
-        setProp(id, path, i, value, target.loc);
-    }
-
-    // --- expressions -------------------------------------------------------------
-    Value eval(const Expr& e) {
-        spend(e.loc);
-        switch (e.kind) {
-            case Expr::Kind::Number: return Value::number(e.number);
-            case Expr::Kind::String: return Value::string(e.text);
-            case Expr::Kind::Bool: return Value::boolean(e.number != 0);
-            case Expr::Kind::None: return {};
-            case Expr::Kind::Color: return Value::color(e.color);
-            case Expr::Kind::Vector: {
+            case Op::Mul: {
+                const Value& b = RK(in.b);
+                const Value& c = RK(in.c);
+                if (b.isNumber() && c.isNumber()) {
+                    R[in.a] = Value::number(b.num() * c.num());
+                } else {
+                    R[in.a] = arith(st.scene, Op::Mul, b, c, LOC);
+                }
+                break;
+            }
+            case Op::Div: {
+                const Value& b = RK(in.b);
+                const Value& c = RK(in.c);
+                if (b.isNumber() && c.isNumber() && c.num() != 0) {
+                    R[in.a] = Value::number(b.num() / c.num());
+                } else {
+                    R[in.a] = arith(st.scene, Op::Div, b, c, LOC);
+                }
+                break;
+            }
+            case Op::Mod: R[in.a] = arith(st.scene, Op::Mod, RK(in.b), RK(in.c), LOC); break;
+            case Op::Neg: {
+                const Value& b = R[in.b];
+                if (b.isNumber()) R[in.a] = Value::number(-b.num());
+                else if (b.isVec()) R[in.a] = Value::vec(-b.v());
+                else if (b.isBool()) R[in.a] = Value::number(b.b() ? -1 : 0);
+                else raise(LOC, std::string("cannot negate a ") + typeName(b.type()));
+                break;
+            }
+            case Op::Not: {
+                bool t = truthy(st.scene, R[in.b]);
+                R[in.a] = Value::boolean(in.x ? t : !t);
+                break;
+            }
+            case Op::Eq: R[in.a] = Value::boolean(RK(in.b) == RK(in.c)); break;
+            case Op::Ne: R[in.a] = Value::boolean(!(RK(in.b) == RK(in.c))); break;
+            case Op::Lt:
+            case Op::Le:
+            case Op::Gt:
+            case Op::Ge: {
+                const Value& b = RK(in.b);
+                const Value& c = RK(in.c);
+                bool r;
+                if (b.isNumber() && c.isNumber()) {
+                    double x = b.num(), y = c.num();
+                    r = in.op == Op::Lt ? x < y : in.op == Op::Le ? x <= y : in.op == Op::Gt ? x > y : x >= y;
+                } else {
+                    r = compare(in.op, b, c, LOC);
+                }
+                R[in.a] = Value::boolean(r);
+                break;
+            }
+            case Op::In: R[in.a] = Value::boolean(contains(RK(in.b), RK(in.c), LOC)); break;
+            case Op::Jmp: {
+                int32_t off = in.sbx();
+                if (off < 0) charge(st, -off, LOC);
+                pc = static_cast<size_t>(static_cast<int64_t>(pc) + off);
+                break;
+            }
+            case Op::JmpIf:
+                if (truthy(st.scene, R[in.a])) pc = static_cast<size_t>(static_cast<int64_t>(pc) + in.sbx());
+                break;
+            case Op::JmpIfNot:
+                if (!truthy(st.scene, R[in.a])) pc = static_cast<size_t>(static_cast<int64_t>(pc) + in.sbx());
+                break;
+            case Op::NewList: {
+                std::vector<Value> items;
+                items.reserve(in.c);
+                for (int i = 0; i < in.c; ++i) items.push_back(R[in.b + i]);
+                R[in.a] = Value::list(std::move(items));
+                break;
+            }
+            case Op::NewMap: {
+                Value m = Value::map();
+                auto& mo = m.mutMap();
+                for (int i = 0; i < in.c; ++i) mo.set(R[in.b + 2 * i].str(), R[in.b + 2 * i + 1]);
+                R[in.a] = std::move(m);
+                break;
+            }
+            case Op::MakeVec: {
                 float c[4] = {0, 0, 0, 1};
-                for (size_t i = 0; i < e.args.size() && i < 4; ++i) {
-                    c[i] = static_cast<float>(num(eval(*e.args[i]), e.args[i]->loc, "vector component"));
+                for (int i = 0; i < in.c && i < 4; ++i) {
+                    c[i] = static_cast<float>(asNumber(R[in.b + i], LOC, "a vector component"));
                 }
-                if (e.args.size() == 4) return Value::color({c[0], c[1], c[2], c[3]});
-                return Value::vec({c[0], c[1], c[2]});
+                R[in.a] = in.c == 4 ? Value::color({c[0], c[1], c[2], c[3]}) : Value::vec({c[0], c[1], c[2]});
+                break;
             }
-            case Expr::Kind::Ident: {
-                if (Value* local = findLocal(e.text)) return *local;
-                if (e.text == "self") return Value::entity(self_);
-                if (e.text == "dt") return Value::number(dt_);
-                if (e.text == "time") return Value::number(rt_.time_);
-                if (e.text == "frame") return Value::number(static_cast<double>(rt_.frame_));
-                if (e.text == "pi") return Value::number(kPi);
-                fail(e.loc, "unknown name '" + e.text + "'");
+            case Op::Concat: {
+                std::string s;
+                for (int i = 0; i < in.c; ++i) s += displayValue(st.scene, R[in.b + i]);
+                R[in.a] = Value::string(std::move(s));
+                break;
             }
-            case Expr::Kind::Member: return member(e);
-            case Expr::Kind::Call: return call(e);
-            case Expr::Kind::Unary: {
-                Value v = eval(*e.lhs);
-                if (e.text == "not") return Value::boolean(!truthy(v));
-                if (v.type == Value::Type::Vec) return Value::vec(-v.v);
-                return Value::number(-num(v, e.loc, "negation operand"));
+            case Op::Call: {
+                const BuiltinDef& def = *prog.builtins[in.b];
+                CallContext ctx(st, def, &R[in.a], in.c, LOC);
+                Value r = def.fn(ctx);
+                R[in.a] = std::move(r);
+                break;
             }
-            case Expr::Kind::Binary: return binary(e);
-        }
-        return {};
-    }
-
-    Value binary(const Expr& e) {
-        const std::string& op = e.text;
-        if (op == "and") {
-            Value l = eval(*e.lhs);
-            return truthy(l) ? Value::boolean(truthy(eval(*e.rhs))) : Value::boolean(false);
-        }
-        if (op == "or") {
-            Value l = eval(*e.lhs);
-            return truthy(l) ? Value::boolean(true) : Value::boolean(truthy(eval(*e.rhs)));
-        }
-        Value a = eval(*e.lhs);
-        Value b = eval(*e.rhs);
-        using T = Value::Type;
-        if (op == "==" || op == "!=") {
-            bool eq = false;
-            if ((a.type == T::Number || a.type == T::Bool) && (b.type == T::Number || b.type == T::Bool)) eq = a.n == b.n;
-            else if (a.type != b.type) eq = false;
-            else if (a.type == T::None) eq = true;
-            else if (a.type == T::String) eq = a.s == b.s;
-            else if (a.type == T::Vec) eq = a.v == b.v;
-            else if (a.type == T::Color) eq = a.c == b.c;
-            else if (a.type == T::Entity) eq = a.e == b.e;
-            return Value::boolean(op == "==" ? eq : !eq);
-        }
-        if (op == "<" || op == "<=" || op == ">" || op == ">=") {
-            double x = num(a, e.loc, "left side of " + op), y = num(b, e.loc, "right side of " + op);
-            bool r = op == "<" ? x < y : op == "<=" ? x <= y : op == ">" ? x > y : x >= y;
-            return Value::boolean(r);
-        }
-        if (op == "+" && (a.type == T::String || b.type == T::String)) return Value::string(toText(a) + toText(b));
-        if (a.type == T::Vec && b.type == T::Vec) {
-            if (op == "+") return Value::vec(a.v + b.v);
-            if (op == "-") return Value::vec(a.v - b.v);
-            if (op == "*") return Value::vec(a.v * b.v);
-        }
-        if (a.type == T::Vec && (b.type == T::Number)) {
-            if (op == "*") return Value::vec(a.v * static_cast<float>(b.n));
-            if (op == "/") {
-                if (b.n == 0) fail(e.loc, "division by zero");
-                return Value::vec(a.v / static_cast<float>(b.n));
-            }
-        }
-        if (a.type == T::Number && b.type == T::Vec && op == "*") return Value::vec(b.v * static_cast<float>(a.n));
-        if (a.type == T::Color && b.type == T::Number && op == "*") {
-            auto f = static_cast<float>(b.n);
-            return Value::color({a.c.x * f, a.c.y * f, a.c.z * f, a.c.w});
-        }
-        if (a.type == T::Color && b.type == T::Color && op == "+") {
-            return Value::color({a.c.x + b.c.x, a.c.y + b.c.y, a.c.z + b.c.z, std::max(a.c.w, b.c.w)});
-        }
-        if ((a.type == T::Number || a.type == T::Bool) && (b.type == T::Number || b.type == T::Bool)) {
-            if (op == "+") return Value::number(a.n + b.n);
-            if (op == "-") return Value::number(a.n - b.n);
-            if (op == "*") return Value::number(a.n * b.n);
-            if (op == "/") {
-                if (b.n == 0) fail(e.loc, "division by zero");
-                return Value::number(a.n / b.n);
-            }
-            if (op == "%") {
-                if (b.n == 0) fail(e.loc, "modulo by zero");
-                return Value::number(std::fmod(a.n, b.n));
-            }
-        }
-        fail(e.loc, std::string("cannot apply '") + op + "' to " + typeName(a.type) + " and " + typeName(b.type));
-    }
-
-    Value call(const Expr& e) {
-        std::vector<Value> a;
-        a.reserve(e.args.size());
-        for (const auto& arg : e.args) a.push_back(eval(*arg));
-        const std::string& f = e.text;
-        auto n = [&](size_t i) { return num(a[i], e.args[i]->loc, f + "() argument " + std::to_string(i + 1)); };
-        auto v = [&](size_t i) { return vec(a[i], e.args[i]->loc, f + "() argument " + std::to_string(i + 1)); };
-        auto s = [&](size_t i) {
-            if (a[i].type != Value::Type::String) fail(e.args[i]->loc, f + "() expects a string, got " + typeName(a[i].type));
-            return a[i].s;
-        };
-
-        if (f == "find") {
-            EntityId id = scene_.find(s(0));
-            return id ? Value::entity(id) : Value{};
-        }
-        if (f == "nearest") {
-            Vec3 me = worldPos(self_);
-            EntityId best = kNoEntity;
-            float bestD = 1e30f;
-            for (EntityId id : scene_.findTagged(s(0))) {
-                if (id == self_ || !scene_.isActive(id)) continue;
-                float d = distance(me, worldPos(id));
-                if (d < bestD) {
-                    bestD = d;
-                    best = id;
+            case Op::CallM: {
+                Value& recv = R[in.a];
+                const auto& def = prog.methods[in.b][static_cast<uint32_t>(recv.type())];
+                const std::string& name = prog.methodNames[in.b];
+                if (!def) {
+                    std::vector<std::string> names = st.rt.registry().methodNames(recv.type());
+                    std::string guess = str::closest(name, names);
+                    std::string hint = guess.empty() ? "" : " (did you mean '" + guess + "'?)";
+                    if (recv.isNone()) hint = " (the value is none)";
+                    raise(LOC, std::string("a ") + typeName(recv.type()) + " has no method '" + name + "'" + hint);
                 }
+                int argc = in.c;
+                if (argc < def->minArgs() || (def->maxArgs() >= 0 && argc > def->maxArgs())) {
+                    raise(LOC, name + "() takes " + std::to_string(def->minArgs()) +
+                                   (def->maxArgs() == def->minArgs() ? "" : "-" + std::to_string(def->maxArgs())) +
+                                   " argument(s) but was given " + std::to_string(argc));
+                }
+                CallContext ctx(st, *def, &R[in.a], argc + 1, LOC);
+                Value r = def->fn(ctx);
+                R[in.a + argc + 1] = std::move(r);
+                break;
             }
-            return best ? Value::entity(best) : Value{};
-        }
-        if (f == "count") return Value::number(static_cast<double>(scene_.findTagged(s(0)).size()));
-        if (f == "tagged") {
-            if (a[0].type != Value::Type::Entity || !scene_.exists(a[0].e)) return Value::boolean(false);
-            const auto& tags = scene_.record(a[0].e)->tags;
-            return Value::boolean(std::find(tags.begin(), tags.end(), s(1)) != tags.end());
-        }
-        if (f == "exists") return Value::boolean(a[0].type == Value::Type::Entity && scene_.exists(a[0].e));
-        if (f == "distance") return Value::number(distance(v(0), v(1)));
-        if (f == "direction") return Value::vec(normalize(v(1) - v(0)));
-        if (f == "forward") {
-            EntityId id = entity(a[0], e.args[0]->loc, "forward() argument");
-            return Value::vec(normalize(scene_.worldMatrix(id).transformDir({0, 0, -1})));
-        }
-        if (f == "length") return Value::number(length(v(0)));
-        if (f == "normalize") return Value::vec(normalize(v(0)));
-        if (f == "dot") return Value::number(dot(v(0), v(1)));
-        if (f == "cross") return Value::vec(cross(v(0), v(1)));
-        if (f == "vec") return Value::vec({static_cast<float>(n(0)), static_cast<float>(n(1)), static_cast<float>(n(2))});
-        if (f == "color") {
-            return Value::color({static_cast<float>(n(0)), static_cast<float>(n(1)), static_cast<float>(n(2)),
-                                 a.size() > 3 ? static_cast<float>(n(3)) : 1.f});
-        }
-        if (f == "sin") return Value::number(std::sin(n(0)));
-        if (f == "cos") return Value::number(std::cos(n(0)));
-        if (f == "tan") return Value::number(std::tan(n(0)));
-        if (f == "abs") return Value::number(std::fabs(n(0)));
-        if (f == "sqrt") return Value::number(std::sqrt(std::max(0.0, n(0))));
-        if (f == "floor") return Value::number(std::floor(n(0)));
-        if (f == "ceil") return Value::number(std::ceil(n(0)));
-        if (f == "round") return Value::number(std::round(n(0)));
-        if (f == "sign") return Value::number(n(0) > 0 ? 1 : n(0) < 0 ? -1 : 0);
-        if (f == "min") return Value::number(std::min(n(0), n(1)));
-        if (f == "max") return Value::number(std::max(n(0), n(1)));
-        if (f == "clamp") return Value::number(std::clamp(n(0), std::min(n(1), n(2)), std::max(n(1), n(2))));
-        if (f == "lerp") {
-            double t = n(2);
-            if (a[0].type == Value::Type::Vec || a[1].type == Value::Type::Vec) {
-                return Value::vec(lerp(v(0), v(1), static_cast<float>(t)));
+            case Op::CallF: {
+                const FnInfo& f = prog.functions[in.b];
+                const Proto& callee = prog.protos[f.proto];
+                charge(st, static_cast<int64_t>(callee.code.size()), LOC);
+                if (st.depth + 1 > Runtime::kMaxDepth) {
+                    raise(LOC, "recursion too deep: more than " + std::to_string(Runtime::kMaxDepth) +
+                                   " nested calls (calling " + f.name + "())");
+                }
+                Value* CR = R + P.numRegs;
+                if (CR + callee.numRegs > st.impl.stack.data() + st.impl.stack.size()) {
+                    raise(LOC, "out of stack space calling " + f.name + "()");
+                }
+                for (int i = 0; i < in.c; ++i) CR[i] = std::move(R[in.a + i]);
+                ++st.depth;
+                Outcome o = runProto(st, f.proto, CR, 0);
+                --st.depth;
+                for (int i = 0; i < callee.numRegs; ++i) CR[i] = Value();
+                if (o.kind != Outcome::Kind::Done) {
+                    out = std::move(o);
+                    return false;
+                }
+                R[in.a] = std::move(o.ret);
+                break;
             }
-            return Value::number(n(0) + (n(1) - n(0)) * t);
-        }
-        if (f == "random") {
-            double r = rt_.rng_.nextFloat();
-            if (a.empty()) return Value::number(r);
-            if (a.size() == 1) return Value::number(r * n(0));
-            return Value::number(n(0) + (n(1) - n(0)) * r);
-        }
-        if (f == "chance") return Value::boolean(rt_.rng_.nextFloat() < n(0));
-        if (f == "key") return Value::boolean(input_.held.count(str::lower(s(0))) != 0);
-        if (f == "burst") {
-            // burst(n) from self's particles, or burst(entity, n)
-            EntityId target = self_;
-            double count = 0;
-            if (a.size() == 2) {
-                target = entity(a[0], e.args[0]->loc, "burst() argument 1");
-                count = n(1);
-            } else {
-                count = n(0);
+            case Op::Ret:
+                out.kind = Outcome::Kind::Done;
+                out.ret = std::move(R[in.a]);
+                return false;
+            case Op::RetNone:
+                out.kind = Outcome::Kind::Done;
+                out.ret = Value();
+                return false;
+            case Op::Every:
+            case Op::After: {
+                if (!st.inst || st.behavior < 0) raise(LOC, "timers need a running behavior");
+                double interval = asNumber(RK(in.b), LOC, in.op == Op::Every ? "the every interval" : "the after delay");
+                BehaviorRun& br = st.inst->behaviors[st.behavior];
+                bool fire = false;
+                if (in.op == Op::Every) {
+                    if (interval <= 0) raise(LOC, "the every interval must be positive");
+                    double& t = br.timers[in.c];
+                    t += st.dt;
+                    if (t >= interval) {
+                        t = std::fmod(t, interval);  // at most once per tick, no burst catch-up
+                        fire = true;
+                    }
+                } else if (!br.fired[in.c]) {
+                    double& t = br.timers[in.c];
+                    t += st.dt;
+                    if (t >= interval) {
+                        br.fired[in.c] = 1;
+                        fire = true;
+                    }
+                }
+                R[in.a] = Value::boolean(fire);
+                break;
             }
-            if (!scene_.get<ParticleEmitter>(target)) fail(e.loc, "burst(): the entity has no particles component");
-            if (rt_.burst) rt_.burst(target, static_cast<int>(std::clamp(count, 0.0, 20000.0)));
-            return {};
-        }
-        if (f == "water_height") {
-            // water_height(x, z) or water_height(position)
-            float x, z;
-            if (a.size() == 1) {
-                Vec3 p = v(0);
-                x = p.x;
-                z = p.z;
-            } else {
-                x = static_cast<float>(n(0));
-                z = static_cast<float>(n(1));
+            case Op::ForPrep: {
+                double s = asNumber(R[in.a], LOC, "the loop start");
+                double l = asNumber(R[in.a + 1], LOC, "the loop end");
+                double d = asNumber(R[in.a + 2], LOC, "the loop step");
+                if (d == 0) raise(LOC, "the loop step cannot be 0");
+                bool run = d > 0 ? (in.x ? s <= l : s < l) : (in.x ? s >= l : s > l);
+                R[in.a] = Value::number(s);
+                R[in.a + 1] = Value::number(l);
+                R[in.a + 2] = Value::number(d);
+                if (!run) {
+                    pc = static_cast<size_t>(static_cast<int64_t>(pc) + in.sbx());
+                } else {
+                    R[in.a + 3] = Value::number(s);
+                }
+                break;
             }
-            return Value::number(rt_.waterHeight ? rt_.waterHeight(x, z) : 0.0);
-        }
-        if (f == "str") return Value::string(toText(a[0]));
-        if (f == "spawn") {
-            if (++rt_.spawnedThisTick_ > 256) fail(e.loc, "too many spawns in one tick (limit 256)");
-            if (scene_.size() >= 20000) fail(e.loc, "entity limit reached (20000)");
-            std::string mesh = s(0);
-            if (str::startsWith(mesh, "prefab:")) {
-                if (!rt_.spawnPrefab) fail(e.loc, "prefabs are not available in this context");
-                Vec3 pos = a.size() > 1 ? v(1) : Vec3{0, 0, 0};
-                auto id = rt_.spawnPrefab(mesh.substr(7), pos, a.size() > 2 ? toText(a[2]) : "");
-                if (!id) fail(e.loc, id.error().message);
-                return Value::entity(*id);
+            case Op::ForLoop: {
+                double v = R[in.a].num() + R[in.a + 2].num();
+                double l = R[in.a + 1].num();
+                double d = R[in.a + 2].num();
+                bool run = d > 0 ? (in.x ? v <= l : v < l) : (in.x ? v >= l : v > l);
+                if (run) {
+                    R[in.a] = Value::number(v);
+                    R[in.a + 3] = Value::number(v);
+                    int32_t off = in.sbx();
+                    charge(st, -off, LOC);
+                    pc = static_cast<size_t>(static_cast<int64_t>(pc) + off);
+                }
+                break;
             }
-            const auto& prims = MeshRenderer::primitives();
-            if (std::find(prims.begin(), prims.end(), mesh) == prims.end() && !str::startsWith(mesh, "asset:")) {
-                std::string guess = str::closest(mesh, prims, 3);
-                fail(e.loc, "unknown mesh '" + mesh + "'" + (guess.empty() ? "" : " (did you mean '" + guess + "'?)"));
+            case Op::IterPrep: {
+                Value& coll = R[in.a];
+                if (coll.isString()) {
+                    std::vector<Value> chars;
+                    for (auto& ch : utf8Chars(coll.str())) chars.push_back(Value::string(std::move(ch)));
+                    coll = Value::list(std::move(chars));
+                }
+                if (!coll.isList() && !coll.isMap()) {
+                    raise(LOC, std::string("cannot loop over a ") + typeName(coll.type()) +
+                                   (coll.isNone() ? " (the value is none)" : "") + "; loop over a list, map, string or range");
+                }
+                if (iterSize(coll) == 0) {
+                    pc = static_cast<size_t>(static_cast<int64_t>(pc) + in.sbx());
+                    break;
+                }
+                R[in.a + 1] = Value::number(0);
+                iterSet(R, in.a, in.x != 0, coll, 0);
+                break;
             }
-            std::string name = a.size() > 2 ? toText(a[2]) : mesh;
-            EntityId id = scene_.create(name);
-            scene_.add<MeshRenderer>(id).mesh = mesh;
-            if (a.size() > 1) scene_.get<Transform>(id)->position = v(1);
-            return Value::entity(id);
+            case Op::IterNext: {
+                auto i = static_cast<size_t>(R[in.a + 1].num()) + 1;
+                const Value& coll = R[in.a];
+                if (i < iterSize(coll)) {
+                    R[in.a + 1] = Value::number(static_cast<double>(i));
+                    iterSet(R, in.a, in.x != 0, coll, i);
+                    int32_t off = in.sbx();
+                    charge(st, -off, LOC);
+                    pc = static_cast<size_t>(static_cast<int64_t>(pc) + off);
+                }
+                break;
+            }
+            case Op::Wait: {
+                double amount = asNumber(RK(in.b), LOC, in.x ? "the frame count" : "the wait time");
+                if (!std::isfinite(amount)) raise(LOC, "the wait time must be a finite number");
+                out.kind = Outcome::Kind::Wait;
+                out.waitFrames = in.x != 0;
+                out.waitAmount = amount;
+                out.pc = pc;
+                return false;
+            }
+            case Op::GoTo:
+                out.kind = Outcome::Kind::GoTo;
+                out.state = in.b;
+                return false;
+            case Op::Stop:
+                out.kind = Outcome::Kind::Stop;
+                return false;
+            case Op::Expect: {
+                if (!st.test) raise(LOC, "expect can only run inside tests");
+                ++st.test->expectations;
+                if (!truthy(st.scene, R[in.a])) {
+                    std::string detail;
+                    if (in.x) {
+                        detail = "left side was " + displayValue(st.scene, R[in.c]) + ", right side was " +
+                                 displayValue(st.scene, R[in.c + 1]);
+                        if (R[in.c].isString()) detail = "left side was \"" + R[in.c].str() + "\", right side was " + displayValue(st.scene, R[in.c + 1]);
+                    }
+                    if (st.test->fail) st.test->fail(LOC, K[in.b].str(), detail);
+                }
+                break;
+            }
+            case Op::Count: break;
         }
-        fail(e.loc, "unknown function '" + f + "'");
+        if constexpr (Single) return true;
     }
+#undef LOC
+}
 
-    Script* script() {
-        Behavior* b = scene_.get<Behavior>(self_);
-        return b && scriptIndex_ < b->scripts.size() ? &b->scripts[scriptIndex_] : nullptr;
+#undef RK
+
+}  // namespace
+
+Outcome runProto(ExecState& st, int proto, Value* regs, size_t pc) {
+    Outcome out;
+    if (st.native) {
+        if (aotRun(st, proto, regs, pc, out)) return out;
     }
+    interpret<false>(st, proto, regs, pc, out);
+    return out;
+}
 
-    Runtime& rt_;
-    Scene& scene_;
-    EntityId self_;
-    size_t scriptIndex_;
-    std::string scriptName_;
-    Runtime::Instance& inst_;
-    float dt_;
-    const InputState& input_;
-    int budget_ = Runtime::kBudget;
-    std::vector<std::unordered_map<std::string, Value>> locals_;
-};
+bool execOne(ExecState& st, int proto, Value* regs, size_t& pc, Outcome& out) {
+    return interpret<true>(st, proto, regs, pc, out);
+}
 
-Runtime::Runtime(Scene& scene) : scene_(scene), rng_(scene.seed) {}
+// ---------------------------------------------------------------------------
+// Runtime
+// ---------------------------------------------------------------------------
+
+Runtime::Runtime(Scene& scene, const BuiltinRegistry* registry)
+    : scene_(scene),
+      registry_(registry ? registry : &BuiltinRegistry::global()),
+      impl_(std::make_unique<Impl>()),
+      rng_(scene.seed) {}
+
+Runtime::~Runtime() = default;
 
 void Runtime::reset(bool keepQueuedEvents) {
     rng_.reseed(scene_.seed);
     time_ = 0;
     frame_ = 0;
-    pending_.clear();
-    if (!keepQueuedEvents) nextPending_.clear();
-    instances_.clear();
-    toDestroy_.clear();
+    impl_->pending.clear();
+    if (!keepQueuedEvents) impl_->nextPending.clear();
+    impl_->instances.clear();
+    impl_->vars.clear();
+    impl_->toDestroy.clear();
+    impl_->revisionValid = false;
+    impl_->fieldCache.clear();
     scene_.registry().each<Behavior>([](ecs::Entity, Behavior& b) {
         for (auto& s : b.scripts) s.runtimeErrors = 0;
     });
 }
 
+CompileOptions Runtime::compileOptions() const {
+    CompileOptions o;
+    o.registry = registry_;
+    for (const auto& k : scene_.componentKinds()) {
+        o.components.push_back(k.name);
+        if (k.info) o.componentTypes.push_back(k.info);
+    }
+    if (!projectDir_.empty()) {
+        Impl* impl = impl_.get();
+        std::string root = projectDir_;
+        o.loadModule = [impl, root](const std::string& path) -> Result<std::string> {
+            auto it = impl->modules.find(path);
+            if (it == impl->modules.end()) {
+                Impl::ModuleFile mf;
+                std::error_code ec;
+                fs::path p = fs::path(root) / path;
+                auto t = fs::last_write_time(p, ec);
+                if (!ec) {
+                    std::ifstream f(p, std::ios::binary);
+                    std::ostringstream ss;
+                    ss << f.rdbuf();
+                    mf.text = ss.str();
+                    mf.exists = static_cast<bool>(f) || !mf.text.empty();
+                    mf.mtime = std::chrono::duration_cast<std::chrono::nanoseconds>(t.time_since_epoch()).count();
+                }
+                it = impl->modules.emplace(path, std::move(mf)).first;
+            }
+            if (!it->second.exists) {
+                return Error::make("not_found", "no file " + path + " in the project",
+                                   "create it (e.g. with file_write) or fix the path");
+            }
+            return it->second.text;
+        };
+    }
+    return o;
+}
+
+void Runtime::setProjectDir(std::string dir) {
+    projectDir_ = std::move(dir);
+    impl_->modules.clear();
+    ++impl_->moduleRevision;
+}
+
+bool Runtime::refreshModules() {
+    bool changed = false;
+    for (auto it = impl_->modules.begin(); it != impl_->modules.end();) {
+        std::error_code ec;
+        fs::path p = fs::path(projectDir_) / it->first;
+        auto t = fs::last_write_time(p, ec);
+        int64_t mtime = ec ? -1 : std::chrono::duration_cast<std::chrono::nanoseconds>(t.time_since_epoch()).count();
+        if (mtime != it->second.mtime || (ec && it->second.exists)) {
+            it = impl_->modules.erase(it);  // reloaded on next use
+            changed = true;
+        } else {
+            ++it;
+        }
+    }
+    if (changed) ++impl_->moduleRevision;
+    return changed;
+}
+
 void Runtime::compileScripts() {
-    auto names = scene_.componentNames();
+    uint64_t epoch = impl_->moduleRevision * 1000003ULL + registry_->generation();
+    std::optional<CompileOptions> opts;
     for (EntityId id : scene_.entities()) {
         Behavior* b = scene_.get<Behavior>(id);
         if (!b) continue;
         for (auto& s : b->scripts) {
-            if (s.compiledSource == s.source && (s.program || s.hasErrors)) continue;
-            CompileResult r = compile(s.source, names);
+            if (s.compiledSource == s.source && s.compiledEpoch == epoch && (s.program || s.hasErrors)) continue;
+            auto& entry = impl_->compileCache[s.source];
+            if (entry.epoch != epoch) {
+                if (!opts) opts = compileOptions();
+                entry.result = compile(s.source, *opts);
+                entry.epoch = epoch;
+            }
+            const CompileResult& r = entry.result;
             s.compiledSource = s.source;
+            s.compiledEpoch = epoch;
             s.program = r.program;
             s.hasErrors = !r.ok();
             for (const auto& d : r.diagnostics) {
                 if (d.severity != Severity::Error) continue;
-                messages_.push_back({RuntimeMessage::Kind::Compile, id, s.name, d.loc.line, d.message});
+                impl_->messages.push_back({RuntimeMessage::Kind::Compile, id, s.name, d.loc.line, d.message, d.file});
             }
         }
     }
+    if (impl_->compileCache.size() > 4096) impl_->compileCache.clear();  // bound memory in long sessions
 }
 
-void Runtime::emit(std::string name, EntityId target) { nextPending_.push_back({std::move(name), target}); }
+void Runtime::emit(std::string name, EntityId target, Value payload, EntityId other) {
+    if (impl_->nextPending.size() >= kMaxPendingEvents) return;
+    PendingEvent e;
+    e.sym = intern(name);
+    e.name = std::move(name);
+    e.target = target;
+    e.other = other;
+    e.payload = std::move(payload);
+    impl_->nextPending.push_back(std::move(e));
+}
+
+void Runtime::emitJson(std::string name, EntityId target, const Json& payload, EntityId other) {
+    emit(std::move(name), target, fromJson(payload), other);
+}
+
+std::vector<RuntimeMessage> Runtime::drainMessages() {
+    std::vector<RuntimeMessage> out;
+    out.swap(impl_->messages);
+    return out;
+}
+
+void Runtime::attachNative(uint64_t programHash, std::shared_ptr<const NativeProgram> native) {
+    native_[programHash] = std::move(native);
+}
+void Runtime::detachNative(uint64_t programHash) { native_.erase(programHash); }
+void Runtime::clearNative() { native_.clear(); }
+
+std::string Runtime::currentState(EntityId e) const { return currentStateOf(*impl_, e); }
+
+// --- scheduling ------------------------------------------------------------------------
+
+namespace {
+
+struct Scheduler {
+    Runtime& rt;
+    Runtime::Impl& impl;
+    Scene& scene;
+    float dt;
+    const InputState& input;
+    const std::unordered_map<uint64_t, std::shared_ptr<const NativeProgram>>& native;
+
+    Script* script(const Instance& inst) {
+        Behavior* b = scene.get<Behavior>(inst.entity);
+        return b && inst.scriptIndex < b->scripts.size() ? &b->scripts[inst.scriptIndex] : nullptr;
+    }
+    bool alive(const Instance& inst) {
+        Script* s = script(inst);
+        return s && s->enabled && s->program == inst.program;
+    }
+
+    void report(Instance& inst, const RuntimeError& err, const std::string& file) {
+        impl.messages.push_back({RuntimeMessage::Kind::Error, inst.entity, inst.scriptName, err.loc.line, err.message, file});
+        Script* s = script(inst);
+        if (s && ++s->runtimeErrors >= kMaxErrorsBeforeDisable && s->enabled) {
+            s->enabled = false;
+            impl.messages.push_back({RuntimeMessage::Kind::Error, inst.entity, inst.scriptName, err.loc.line,
+                                     "script disabled after repeated runtime errors", file});
+        }
+    }
+
+    ExecState state(Instance& inst, int behavior, EntityId other) {
+        ExecState st(rt, impl, scene);
+        st.prog = inst.program.get();
+        auto it = native.find(inst.program->hash);
+        st.native = it == native.end() ? nullptr : it->second.get();
+        st.inst = &inst;
+        st.scriptName = &inst.scriptName;
+        st.behavior = behavior;
+        st.self = inst.entity;
+        st.other = other;
+        st.dt = dt;
+        st.input = &input;
+        return st;
+    }
+
+    // Runs a proto as the top frame; handles errors, waits and state changes.
+    void run(Instance& inst, int behavior, int handler, int proto, std::vector<Value>* resumeRegs, size_t pc,
+             Value payload, EntityId other) {
+        const Program& prog = *inst.program;
+        const Proto& P = prog.protos[proto];
+        Value* R = impl.stack.data() + impl.stackTop;
+        if (impl.stackTop + static_cast<size_t>(P.numRegs) > impl.stack.size()) return;
+        size_t savedTop = impl.stackTop;
+        impl.stackTop += static_cast<size_t>(P.numRegs);
+        if (resumeRegs) {
+            for (int i = 0; i < P.numRegs && i < static_cast<int>(resumeRegs->size()); ++i) R[i] = std::move((*resumeRegs)[i]);
+        } else if (P.numParams > 0) {
+            R[0] = std::move(payload);
+        }
+        ExecState st = state(inst, behavior, other);
+        Outcome out;
+        bool failed = false;
+        try {
+            out = runProto(st, proto, R, pc);
+        } catch (const RuntimeError& err) {
+            failed = true;
+            report(inst, err, P.file);
+        }
+        if (!failed && out.kind == Outcome::Kind::Wait) {
+            if (inst.coroutines.size() >= Runtime::kMaxCoroutines) {
+                report(inst, RuntimeError{P.locs.empty() ? SourceLoc{} : P.locs[std::min(out.pc, P.locs.size()) - 1],
+                                          "too many waiting handler runs (more than " +
+                                              std::to_string(Runtime::kMaxCoroutines) + "): events arrive faster than they finish",
+                                          {}},
+                       P.file);
+            } else {
+                Coroutine co;
+                co.behavior = behavior;
+                co.handler = handler;
+                co.state = handler >= 0 ? prog.behaviors[behavior].handlers[handler].state : -1;
+                co.proto = proto;
+                co.pc = out.pc;
+                co.regs.resize(static_cast<size_t>(P.numRegs));
+                for (int i = 0; i < P.numRegs; ++i) co.regs[i] = std::move(R[i]);
+                co.byFrames = out.waitFrames;
+                co.remaining = out.waitAmount;
+                co.other = other;
+                inst.coroutines.push_back(std::move(co));
+            }
+        }
+        for (int i = 0; i < P.numRegs; ++i) R[i] = Value();
+        impl.stackTop = savedTop;
+        if (!failed && out.kind == Outcome::Kind::GoTo) transition(inst, behavior, out.state, P.file);
+    }
+
+    void invoke(Instance& inst, int behavior, int handler, Value payload = {}, EntityId other = kNoEntity) {
+        if (!alive(inst)) return;
+        const HandlerInfo& h = inst.program->behaviors[behavior].handlers[handler];
+        run(inst, behavior, handler, h.proto, nullptr, 0, std::move(payload), other);
+    }
+
+    void transition(Instance& inst, int behavior, int newState, const std::string& file) {
+        if (!alive(inst)) return;
+        const BehaviorInfo& info = inst.program->behaviors[behavior];
+        BehaviorRun& br = inst.behaviors[behavior];
+        if (br.exiting) {
+            report(inst, RuntimeError{info.states[newState].loc, "go to inside 'on exit' is ignored (the state is already changing)", {}},
+                   file);
+            return;
+        }
+        if (++inst.transitionsThisTick > kMaxTransitionsPerTick) {
+            report(inst, RuntimeError{info.states[newState].loc, "too many state changes in one tick (more than " +
+                                                                     std::to_string(kMaxTransitionsPerTick) +
+                                                                     "): states keep switching with go to",
+                                      {}},
+                   file);
+            return;
+        }
+        int old = br.state;
+        // Waiting runs of the old state's handlers are cancelled.
+        if (old >= 0) {
+            auto ownedByOld = [&](const Coroutine& c) { return c.behavior == behavior && c.state == old; };
+            std::erase_if(inst.coroutines, ownedByOld);
+            if (int exitH = info.states[old].exit; exitH >= 0) {
+                br.exiting = true;
+                invoke(inst, behavior, exitH);
+                br.exiting = false;
+                if (!alive(inst)) return;
+                std::erase_if(inst.coroutines, ownedByOld);
+            }
+        }
+        br.state = newState;
+        br.stateTime = 0;
+        if (int enterH = info.states[newState].enter; enterH >= 0) invoke(inst, behavior, enterH);
+    }
+
+    void start(Instance& inst) {
+        const Program& prog = *inst.program;
+        inst.started = true;
+        inst.vars = &varTable(impl, scene, inst.entity);
+        inst.behaviors.assign(prog.behaviors.size(), {});
+        for (size_t b = 0; b < prog.behaviors.size(); ++b) {
+            const BehaviorInfo& info = prog.behaviors[b];
+            BehaviorRun& br = inst.behaviors[b];
+            br.timers.assign(static_cast<size_t>(info.timerCount), 0.0);
+            br.fired.assign(static_cast<size_t>(info.timerCount), 0);
+            for (const auto& v : info.vars) {
+                VarTable& t = *inst.vars;
+                int slot = t.find(v.sym);
+                if (slot < 0) {
+                    (void)getEntityVar(impl, scene, inst.entity, v.sym);  // imports a value set from outside
+                    slot = t.find(v.sym);
+                }
+                if (slot < 0) {
+                    // Initialize: the var did not exist on the entity.
+                    Value init;
+                    if (v.init >= 0) {
+                        Value* R = impl.stack.data() + impl.stackTop;
+                        ExecState st = state(inst, static_cast<int>(b), kNoEntity);
+                        const Proto& P = prog.protos[v.init];
+                        try {
+                            Outcome o = runProto(st, v.init, R, 0);
+                            init = std::move(o.ret);
+                        } catch (const RuntimeError& err) {
+                            report(inst, err, P.file);
+                        }
+                        for (int i = 0; i < P.numRegs; ++i) R[i] = Value();
+                    }
+                    setEntityVar(impl, scene, inst.entity, v.sym, std::move(init));
+                    slot = t.find(v.sym);
+                }
+                br.varSlots.push_back(slot);
+            }
+        }
+        for (size_t b = 0; b < prog.behaviors.size(); ++b) {
+            const auto& hs = prog.behaviors[b].handlers;
+            for (size_t h = 0; h < hs.size(); ++h) {
+                if (hs[h].trigger == Trigger::Start && hs[h].state < 0) invoke(inst, static_cast<int>(b), static_cast<int>(h));
+            }
+        }
+        for (size_t b = 0; b < prog.behaviors.size(); ++b) {
+            if (!prog.behaviors[b].states.empty() && inst.behaviors[b].state == -1 && alive(inst)) {
+                transition(inst, static_cast<int>(b), 0, std::string());
+            }
+        }
+    }
+
+    void resumeCoroutines(Instance& inst) {
+        // Snapshot: coroutines created while resuming wait for the next tick.
+        size_t n = inst.coroutines.size();
+        size_t i = 0;
+        while (i < n && i < inst.coroutines.size()) {
+            Coroutine& c = inst.coroutines[i];
+            c.remaining -= c.byFrames ? 1.0 : dt;
+            if (c.remaining > 1e-9) {
+                ++i;
+                continue;
+            }
+            Coroutine co = std::move(c);
+            inst.coroutines.erase(inst.coroutines.begin() + static_cast<std::ptrdiff_t>(i));
+            --n;
+            if (!alive(inst)) return;
+            // A state change since it started cancels state-owned coroutines (erased above).
+            run(inst, co.behavior, co.handler, co.proto, &co.regs, co.pc, {}, co.other);
+        }
+    }
+
+    bool busy(const Instance& inst, int behavior, int handler) const {
+        for (const auto& c : inst.coroutines) {
+            if (c.behavior == behavior && c.handler == handler) return true;
+        }
+        return false;
+    }
+
+    template <typename Pred>
+    void fire(Instance& inst, Pred matches, const Value& payload = {}, EntityId other = kNoEntity) {
+        const Program& prog = *inst.program;
+        for (size_t b = 0; b < prog.behaviors.size(); ++b) {
+            const auto& hs = prog.behaviors[b].handlers;
+            // Behavior-level handlers first, then the current state's.
+            for (int pass = 0; pass < 2; ++pass) {
+                for (size_t h = 0; h < hs.size(); ++h) {
+                    if (!alive(inst)) return;
+                    const HandlerInfo& hi = hs[h];
+                    if (pass == 0 ? hi.state >= 0 : hi.state < 0) continue;
+                    if (hi.state >= 0 && hi.state != inst.behaviors[b].state) continue;
+                    if (!matches(hi)) continue;
+                    invoke(inst, static_cast<int>(b), static_cast<int>(h), payload, other);
+                }
+            }
+        }
+    }
+
+    void tickInstance(Instance& inst) {
+        inst.transitionsThisTick = 0;
+        if (!inst.started) start(inst);
+        if (!alive(inst)) return;
+        resumeCoroutines(inst);
+        for (const auto& ev : impl.pending) {
+            if (ev.target != kNoEntity && ev.target != inst.entity) continue;
+            fire(inst, [&](const HandlerInfo& h) { return h.trigger == Trigger::Event && h.sym == ev.sym; }, ev.payload,
+                 ev.other);
+        }
+        for (const auto& key : input.pressed) {
+            fire(inst, [&](const HandlerInfo& h) { return h.trigger == Trigger::Key && h.argument == key; });
+        }
+        for (EntityId clicked : input.clicked) {
+            if (clicked == inst.entity) fire(inst, [](const HandlerInfo& h) { return h.trigger == Trigger::Click; });
+        }
+        const Program& prog = *inst.program;
+        for (size_t b = 0; b < prog.behaviors.size(); ++b) {
+            const auto& hs = prog.behaviors[b].handlers;
+            for (int pass = 0; pass < 2; ++pass) {
+                for (size_t h = 0; h < hs.size(); ++h) {
+                    if (!alive(inst)) return;
+                    const HandlerInfo& hi = hs[h];
+                    if (hi.trigger != Trigger::Tick) continue;
+                    if (pass == 0 ? hi.state >= 0 : hi.state < 0) continue;
+                    if (hi.state >= 0 && hi.state != inst.behaviors[b].state) continue;
+                    // A tick handler that is waiting does not start again until it finishes.
+                    if (prog.protos[hi.proto].canWait && busy(inst, static_cast<int>(b), static_cast<int>(h))) continue;
+                    invoke(inst, static_cast<int>(b), static_cast<int>(h));
+                }
+            }
+            if (b < inst.behaviors.size() && inst.behaviors[b].state >= 0) inst.behaviors[b].stateTime += dt;
+        }
+    }
+};
+
+}  // namespace
 
 void Runtime::tick(float dt, const InputState& input) {
+    Impl& impl = *impl_;
+    if (impl.stack.empty()) impl.stack.resize(kStackSize);
     compileScripts();
-    pending_ = std::move(nextPending_);
-    nextPending_.clear();
-    spawnedThisTick_ = 0;
+    impl.dt = dt;
+    impl.input = &input;
+    impl.pending = std::move(impl.nextPending);
+    impl.nextPending.clear();
+    impl.spawnedThisTick = 0;
 
+    // Pick up var edits made between ticks (tools, agents, the inspector).
+    if (impl.revisionValid && scene_.revision() != impl.lastRevision) {
+        for (auto& [id, table] : impl.vars) {
+            const EntityRecord* rec = scene_.record(id);
+            if (!rec) continue;
+            for (auto& slot : table.slots) {
+                const Json* j = rec->vars.find(symbolName(slot.sym));
+                if (!j) {
+                    if (!slot.mirrored.isNull()) {
+                        slot.value = Value();
+                        slot.mirrored = Json();
+                    }
+                } else if (*j != slot.mirrored) {
+                    slot.value = fromJson(*j);
+                    slot.mirrored = *j;
+                }
+            }
+        }
+    }
+
+    Scheduler sched{*this, impl, scene_, dt, input, native_};
     // Snapshot the order: entities spawned this tick start running next tick.
     const std::vector<EntityId> order = scene_.entities();
     for (EntityId id : order) {
@@ -797,52 +1575,145 @@ void Runtime::tick(float dt, const InputState& input) {
             if (!b || si >= b->scripts.size()) break;
             const Script& script = b->scripts[si];
             if (!script.enabled || !script.program) continue;
-            std::shared_ptr<const Program> program = script.program;  // keep alive during execution
-            Instance& inst = instances_[{id, si}];
-            if (inst.program != program) {  // behavior replaced (e.g. live edit): start fresh
+            Instance& inst = impl.instances[{id, si}];
+            if (inst.program != script.program) {  // behavior replaced (e.g. live edit): start fresh
                 inst = Instance{};
-                inst.program = program;
+                inst.program = script.program;
+                inst.entity = id;
+                inst.scriptIndex = si;
+                inst.scriptName = script.name;
             }
-            Exec exec(*this, id, si, inst, dt, input);
-            auto runAll = [&](Trigger trig, const std::string& arg) {
-                for (const auto& beh : program->behaviors) {
-                    for (const auto& h : beh.handlers) {
-                        if (h.trigger == trig && (arg.empty() || h.argument == arg)) {
-                            Behavior* cur = scene_.get<Behavior>(id);
-                            if (!cur || si >= cur->scripts.size() || !cur->scripts[si].enabled) return;
-                            Exec(*this, id, si, inst, dt, input).run(h.body);
-                        }
-                    }
-                }
-            };
-            if (!inst.started) {
-                inst.started = true;
-                for (const auto& beh : program->behaviors) exec.initVars(beh);
-                runAll(Trigger::Start, "");
-            }
-            for (const auto& ev : pending_) {
-                if (ev.target == kNoEntity || ev.target == id) runAll(Trigger::Event, ev.name);
-            }
-            for (const auto& key : input.pressed) runAll(Trigger::Key, key);
-            for (EntityId clicked : input.clicked) {
-                if (clicked == id) runAll(Trigger::Click, "");
-            }
-            runAll(Trigger::Tick, "");
+            sched.tickInstance(inst);
         }
     }
-    for (EntityId id : toDestroy_) {
+    for (EntityId id : impl.toDestroy) {
+        if (!scene_.exists(id)) continue;
         scene_.destroy(id);
-        std::erase_if(instances_, [&](const auto& kv) { return !scene_.exists(kv.first.first); });
     }
-    toDestroy_.clear();
+    if (!impl.toDestroy.empty()) {
+        std::erase_if(impl.instances, [&](const auto& kv) { return !scene_.exists(kv.first.first); });
+        for (auto it = impl.vars.begin(); it != impl.vars.end();) {
+            it = scene_.exists(it->first) ? std::next(it) : impl.vars.erase(it);
+        }
+    }
+    impl.toDestroy.clear();
+
+    // Mirror changed vars into the scene so tools and agents see current values.
+    for (auto& [id, table] : impl.vars) {
+        if (!table.anyDirty) continue;
+        table.anyDirty = false;
+        EntityRecord* rec = scene_.record(id);
+        for (auto& slot : table.slots) {
+            if (!slot.dirty) continue;
+            slot.dirty = false;
+            if (!rec) continue;
+            Json j = toJson(slot.value);
+            rec->vars[symbolName(slot.sym)] = j;
+            slot.mirrored = std::move(j);
+        }
+    }
+    impl.lastRevision = scene_.revision();
+    impl.revisionValid = true;
+    impl.input = nullptr;
     time_ += dt;
     ++frame_;
 }
 
-std::vector<RuntimeMessage> Runtime::drainMessages() {
-    std::vector<RuntimeMessage> out;
-    out.swap(messages_);
+Json Runtime::inspect(EntityId e) const {
+    Json out = Json::array();
+    for (auto it = impl_->instances.lower_bound({e, 0}); it != impl_->instances.end() && it->first.first == e; ++it) {
+        const Instance& inst = it->second;
+        if (!inst.program) continue;
+        Json behaviors = Json::array();
+        for (size_t b = 0; b < inst.program->behaviors.size(); ++b) {
+            const BehaviorInfo& info = inst.program->behaviors[b];
+            Json j = Json::object({{"name", info.name}});
+            if (b < inst.behaviors.size()) {
+                const BehaviorRun& br = inst.behaviors[b];
+                if (br.state >= 0) {
+                    j["state"] = info.states[br.state].name;
+                    j["state_time"] = br.stateTime;
+                }
+                Json waits = Json::array();
+                for (const auto& c : inst.coroutines) {
+                    if (c.behavior != static_cast<int>(b)) continue;
+                    const Proto& p = inst.program->protos[c.proto];
+                    int line = c.pc > 0 && c.pc <= p.locs.size() ? p.locs[c.pc - 1].line : 0;
+                    waits.push(Json::object({{"handler", p.name},
+                                             {"line", line},
+                                             {"remaining", c.remaining},
+                                             {"unit", c.byFrames ? "frames" : "seconds"}}));
+                }
+                if (waits.size()) j["waiting"] = waits;
+            }
+            behaviors.push(j);
+        }
+        out.push(Json::object({{"script", inst.scriptName}, {"started", inst.started}, {"behaviors", behaviors}}));
+    }
     return out;
 }
+
+// --- tests ------------------------------------------------------------------------------
+
+namespace {
+
+void driveTest(Runtime& rt, Runtime::Impl& impl, Scene& scene, Runtime::TestDriver& d, float dt) {
+    const Proto& P = d.program->protos[d.proto];
+    if (impl.stack.empty()) impl.stack.resize(kStackSize);
+    Value* R = impl.stack.data() + impl.stackTop;
+    size_t savedTop = impl.stackTop;
+    impl.stackTop += static_cast<size_t>(P.numRegs);
+    for (int i = 0; i < P.numRegs && i < static_cast<int>(d.regs.size()); ++i) R[i] = std::move(d.regs[i]);
+    ExecState st(rt, impl, scene);
+    st.prog = d.program.get();
+    static const std::string kTestScript = "test";
+    st.behavior = P.behavior;
+    st.self = d.self;
+    st.dt = dt;
+    st.test = d.hooks;
+    st.scriptName = &kTestScript;
+    Outcome out;
+    try {
+        out = runProto(st, d.proto, R, d.pc);
+    } catch (const RuntimeError& err) {
+        impl.messages.push_back({RuntimeMessage::Kind::Error, d.self, P.name, err.loc.line, err.message, P.file});
+        out.kind = Outcome::Kind::Stop;
+        if (d.hooks && d.hooks->fail) d.hooks->fail(err.loc, "runtime error", err.message);
+    }
+    d.regs.assign(static_cast<size_t>(P.numRegs), Value());
+    if (out.kind == Outcome::Kind::Wait) {
+        for (int i = 0; i < P.numRegs; ++i) d.regs[i] = std::move(R[i]);
+        d.pc = out.pc;
+        d.byFrames = out.waitFrames;
+        d.remaining = out.waitAmount;
+    } else {
+        d.finished = true;
+    }
+    for (int i = 0; i < P.numRegs; ++i) R[i] = Value();
+    impl.stackTop = savedTop;
+}
+
+}  // namespace
+
+std::unique_ptr<Runtime::TestDriver> Runtime::startTest(std::shared_ptr<const Program> program, int proto, EntityId self,
+                                                        TestHooks* hooks) {
+    auto d = std::make_unique<TestDriver>();
+    d->program = std::move(program);
+    d->proto = proto;
+    d->self = self;
+    d->hooks = hooks;
+    driveTest(*this, *impl_, scene_, *d, impl_->dt);
+    return d;
+}
+
+bool Runtime::stepTest(TestDriver& d, float dt) {
+    if (d.finished) return true;
+    d.remaining -= d.byFrames ? 1.0 : dt;
+    if (d.remaining > 1e-9) return false;
+    driveTest(*this, *impl_, scene_, d, dt);
+    return d.finished;
+}
+
+bool Runtime::testFinished(const TestDriver& d) const { return d.finished; }
 
 }  // namespace sky::wander

@@ -8,8 +8,17 @@ set(SKY_ENGINE_SOURCES
     src/ecs/Components.cpp
     src/scene/Scene.cpp
     src/scene/History.cpp
+    src/wander/Value.cpp
+    src/wander/Parser.cpp
+    src/wander/Format.cpp
     src/wander/Compiler.cpp
+    src/wander/Bytecode.cpp
+    src/wander/Builtins.cpp
+    src/wander/CoreBuiltins.cpp
+    src/wander/Reference.cpp
     src/wander/Runtime.cpp
+    src/wander/Aot.cpp
+    src/native/Process.cpp
     src/render/Png.cpp
     src/render/MeshData.cpp
     src/render/FrameBuilder.cpp
@@ -35,6 +44,7 @@ set(SKY_ENGINE_SOURCES
     src/agent/SocketServer.cpp
     src/engine/Engine.cpp
     src/engine/Gizmo.cpp
+    src/engine/EngineBuiltins.cpp
 )
 
 add_library(skywalker_engine STATIC ${SKY_ENGINE_SOURCES})
@@ -46,6 +56,22 @@ find_package(Threads REQUIRED)
 
 target_include_directories(skywalker_engine PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
+
+# The native ABI headers are embedded in the engine: AOT-generated code and native modules
+# compile with nothing but a system compiler (no engine source tree needed at run time).
+set(_sky_native_inc)
+foreach(_hdr value aot sdk)
+    set(_in ${CMAKE_CURRENT_SOURCE_DIR}/include/skywalker/native/${_hdr}.h)
+    set(_out ${CMAKE_CURRENT_BINARY_DIR}/generated/native_${_hdr}_h.inc)
+    add_custom_command(
+        OUTPUT ${_out}
+        COMMAND ${CMAKE_COMMAND} -DINPUT=${_in} -DOUTPUT=${_out} -P ${PROJECT_SOURCE_DIR}/cmake/EmbedText.cmake
+        DEPENDS ${_in} ${PROJECT_SOURCE_DIR}/cmake/EmbedText.cmake
+        COMMENT "Embedding native ABI header ${_hdr}.h")
+    list(APPEND _sky_native_inc ${_out})
+endforeach()
+target_sources(skywalker_engine PRIVATE ${_sky_native_inc})
+target_include_directories(skywalker_engine PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/generated)
 target_link_libraries(skywalker_engine PUBLIC sky::options PRIVATE ZLIB::ZLIB CURL::libcurl Threads::Threads)
 # Definitions are C-family only (Swift consumers of the C API must not see them).
 target_compile_definitions(skywalker_engine PUBLIC

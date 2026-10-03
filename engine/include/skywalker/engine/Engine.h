@@ -35,6 +35,10 @@ namespace sky {
 
 class SocketServer;
 
+/// Registers the engine's Wander builtins (effects, water, and every subsystem's) in the
+/// global registry. Idempotent; the Engine constructor calls it.
+void registerEngineBuiltins();
+
 struct EngineConfig {
     RendererBackend renderer = RendererBackend::Auto;
     std::string projectDir = ".";
