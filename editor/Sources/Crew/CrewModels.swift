@@ -121,6 +121,7 @@ struct ToolCategory: Identifiable, Hashable, Sendable {
         ToolCategory(id: "view", title: "Viewport", symbol: "eye", detail: "captures, camera, selection"),
         ToolCategory(id: "history", title: "Files & History", symbol: "clock.arrow.circlepath", detail: "undo, save, load"),
         ToolCategory(id: "render", title: "Rendering", symbol: "paintbrush", detail: "shaders, perf stats"),
+        ToolCategory(id: "animation", title: "Animation", symbol: "figure.walk", detail: "animators, clips, bone attachments, cinematic sequences"),
         ToolCategory(id: "network", title: "Network", symbol: "arrow.down.circle", detail: "download licensed assets (asks by default)"),
     ]
 }
