@@ -45,8 +45,12 @@ interface the editor uses.
 - **Spatial tools.** Triangle-accurate `raycast`, `place_on_surface`, seeded `scatter`
   (forests in one undo step), four-view `viewport_multi`, and `sim_trace` to verify
   gameplay numerically.
-- **HDR rendering.** Linear HDR, bloom, ACES tone mapping, color grading, vignette and
-  frustum culling; emissive materials glow.
+- **Realistic or stylized, your call.** Metal/roughness PBR with normal, ORM and emissive
+  maps, triplanar projection, clearcoat and subsurface; image-based lighting from the sky,
+  4-cascade soft shadows, SSAO, an atmospheric sky with clouds and stars, height fog, bloom
+  and AgX/ACES/neutral tonemapping. Or flip a material to `toon` with outlines. Agents can
+  generate seamless PBR textures (`texture_generate`) and start from material presets.
+  → [docs/RENDERING.md](docs/RENDERING.md)
 - **Generative assets ready.** `asset_request` / `asset_complete` route 3D, texture,
   sprite, audio, music and video requests to generators and record what prompt made each file.
 - **Pro editor.** Outliner, details with reflected properties and scrubbable fields,
@@ -108,6 +112,7 @@ build/debug/bin/skywalker render examples/hello_sky/scenes/main.sky.json -o shot
 | [WANDER](docs/WANDER.md) | The behavior language and the ECPS model |
 | [AGENTS](docs/AGENTS.md) | MCP, the crew, Agent Designer, providers, generative assets |
 | [ASSETS](docs/ASSETS.md) | Asset database, glTF, materials, prefabs, spatial tools |
+| [RENDERING](docs/RENDERING.md) | PBR + toon surfaces, IBL, cascaded shadows, SSAO, sky, post, recipes |
 | [TOOLS](docs/TOOLS.md) | Generated reference of every tool |
 | [DEVELOPMENT](docs/DEVELOPMENT.md) | Building, testing, sanitizers, profiling, conventions |
 | [ROADMAP](docs/ROADMAP.md) | What's next |

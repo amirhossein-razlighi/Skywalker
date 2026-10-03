@@ -197,6 +197,7 @@ public:
 
 private:
     void ensureMeshUploaded(const std::string& meshKey);
+    void resolveTexturePaths(FrameData& f) const;
 
     EngineConfig config_;
     std::unique_ptr<Scene> scene_;

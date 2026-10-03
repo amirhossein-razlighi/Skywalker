@@ -185,7 +185,7 @@ TEST_CASE("assets: materials are created, assigned, updated and validated") {
     for (const auto& d : f.draws) {
         if (d.entity == e->scene().find("Cube")) {
             found = true;
-            CHECK(d.roughness == doctest::Approx(0.9));
+            CHECK(d.surface.roughness == doctest::Approx(0.9));
         }
     }
     CHECK(found);
@@ -307,4 +307,62 @@ TEST_CASE("assets: moving an asset rewrites scene references and keeps its GUID"
     call(*e, "asset_move", R"({"asset":"materials/lib/green.mat.json","to":"materials/green.png"})", false);  // type change
     Json list = call(*e, "asset_list", R"({"type":"material"})");
     CHECK(list.get("assets").size() == 1);
+}
+
+TEST_CASE("rendering: advanced surface fields reach the frame (inline and from materials)") {
+    TempProject p("surface");
+    auto e = makeEngine(p);
+    call(*e, "entity_update", R"({"entity":"Cube","components":{"mesh":{"shading":"toon","outline":2,"rim":0.5,"normalMap":"tex/n.png","triplanar":true,"tiling":3,"clearcoat":0.7}}})");
+    call(*e, "entity_update", R"({"entity":"Cube","components":{"mesh":{"shading":"cartoon"}}})", false);  // not an enum value
+    CaptureOptions o;
+    FrameData f = e->frame(o);
+    const DrawItem* cube = nullptr;
+    for (const auto& d : f.draws) {
+        if (d.entity == e->scene().find("Cube")) cube = &d;
+    }
+    REQUIRE(cube);
+    CHECK((cube->surface.shading == Shading::Toon));
+    CHECK(cube->surface.outline == doctest::Approx(2));
+    CHECK(cube->surface.triplanar);
+    CHECK(cube->surface.tiling.x == doctest::Approx(3));
+    CHECK(cube->surface.clearcoat == doctest::Approx(0.7));
+    CHECK(cube->surface.normalMap == (p.dir / "tex/n.png").string());  // resolved to an absolute path
+
+    call(*e, "material_create", R"({"path":"materials/paint.mat.json","preset":"car_paint","color":"#123456"})");
+    call(*e, "material_create", R"({"path":"materials/nope.mat.json","preset":"unobtainium"})", false);
+    const ResolvedMaterial* m = e->resolveMaterial("materials/paint.mat.json");
+    REQUIRE(m);
+    CHECK(m->clearcoat == doctest::Approx(1));       // from the preset
+    CHECK(m->color.x == doctest::Approx(0x12 / 255.0).epsilon(0.01));  // overridden
+    call(*e, "material_assign", R"({"entities":["Cube"],"material":"materials/paint.mat.json"})");
+    f = e->frame(o);
+    for (const auto& d : f.draws) {
+        if (d.entity == e->scene().find("Cube")) CHECK(d.surface.clearcoat == doctest::Approx(1));
+    }
+}
+
+TEST_CASE("rendering: texture_generate writes a PBR set and a ready material") {
+    TempProject p("texgen-tool");
+    auto e = makeEngine(p);
+    Json r = call(*e, "texture_generate", R"({"kind":"bricks","name":"textures/wall","size":64,"color1":"#884422"})");
+    for (const char* k : {"albedo", "normal", "orm"}) CHECK(fs::exists(p.dir / r.get(k).asString()));
+    REQUIRE(r.get("material").asString() == "materials/wall.mat.json");
+    const ResolvedMaterial* m = e->resolveMaterial("materials/wall.mat.json");
+    REQUIRE(m);
+    CHECK(m->triplanar);
+    CHECK(m->normalMap == "textures/wall_normal.png");
+    const AssetRecord* rec = e->assets().find("textures/wall_albedo.png");
+    REQUIRE(rec);
+    CHECK(rec->source.get("generator").asString() == "texgen");
+    call(*e, "texture_generate", R"({"kind":"lava-lamp","name":"textures/x"})", false);
+    call(*e, "texture_generate", R"({"kind":"noise","name":"textures/x","size":100})", false);
+}
+
+TEST_CASE("rendering: HDR emissive colors survive a save/load round trip") {
+    TempProject p("hdr");
+    auto e = makeEngine(p);
+    call(*e, "entity_update", R"({"entity":"Cube","components":{"mesh":{"emissive":[1,0.5,0.2,6]}}})");
+    call(*e, "scene_save", R"({"path":"scenes/hdr.sky.json"})");
+    call(*e, "scene_load", R"({"path":"scenes/hdr.sky.json"})");
+    CHECK(e->scene().get<MeshRenderer>(e->scene().find("Cube"))->emissive.w == doctest::Approx(6));
 }

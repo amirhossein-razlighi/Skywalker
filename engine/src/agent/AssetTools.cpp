@@ -5,6 +5,7 @@
 
 #include "ToolHelpers.h"
 #include "skywalker/core/Strings.h"
+#include "skywalker/render/TextureGen.h"
 
 namespace sky::tools {
 
@@ -39,6 +40,10 @@ Result<const AssetRecord*> findAsset(Engine& engine, const Json& ref) {
 Json materialSchema(bool requirePath) {
     Json s = reflect::schema(MaterialAsset::type());
     s["properties"]["path"] = string("Project-relative path ending in .mat.json, e.g. materials/stone.mat.json");
+    Json presets = Json::array();
+    for (const auto& p : materialPresets()) presets.push(p);
+    s["properties"]["preset"] = Json::object({{"type", "string"}, {"enum", presets},
+                                              {"description", "Start from a built-in material (other fields override it)"}});
     if (requirePath) s["required"] = Json::array({"path"});
     s.erase("description");
     return s;
@@ -224,8 +229,15 @@ void addAssetTools(Engine& engine, ToolRegistry& reg) {
                  }
                  Json fields = a;
                  fields.erase("path");
-                 auto m = materialFromJson(fields);
-                 if (!m) return ToolResult::error(m.error());
+                 fields.erase("preset");
+                 MaterialAsset base;
+                 if (a.contains("preset")) {
+                     auto p = materialPreset(a.get("preset").asString());
+                     if (!p) return ToolResult::error(p.error());
+                     base = *p;
+                 }
+                 Result<MaterialAsset> m = base;
+                 if (Status st = reflect::applyJson(&m.value(), MaterialAsset::type(), fields); !st) return fail(st);
                  std::string full = engine.resolvePath(path);
                  std::error_code ec;
                  if (fs::exists(full, ec)) {
@@ -246,11 +258,99 @@ void addAssetTools(Engine& engine, ToolRegistry& reg) {
                  Json fields = a;
                  fields.erase("path");
                  MaterialAsset updated = *m;
+                 if (a.contains("preset")) {
+                     auto p = materialPreset(a.get("preset").asString());
+                     if (!p) return ToolResult::error(p.error());
+                     updated = *p;
+                     fields.erase("preset");
+                 }
                  if (Status s = reflect::applyJson(&updated, MaterialAsset::type(), fields); !s) return fail(s);
                  if (Status s = saveMaterial(full, updated); !s) return fail(s);
                  engine.refreshAssets();
                  return ToolResult::json(materialToJson(updated), "updated " + a.get("path").asString());
              }});
+
+    {
+        Json kinds = Json::array();
+        for (const auto& k : texgen::kinds()) kinds.push(k);
+        reg.add({"texture_generate", "Generate PBR texture",
+                 "Procedurally generate a seamless PBR texture set — albedo, normal map and ORM (occlusion/roughness/"
+                 "metallic) — for realistic or stylized surfaces: bricks, planks, cobblestone, rock, rust, marble, "
+                 "fabric, scales, ... With create_material it also writes a ready material (triplanar by default, so it "
+                 "works on scaled primitives without stretching). Colors override the kind's defaults.",
+                 "asset",
+                 object({{"kind", Json::object({{"type", "string"}, {"enum", kinds}, {"description", "Pattern"}})},
+                         {"name", string("Base path without extension, e.g. textures/old_bricks")},
+                         {"size", integer("Pixels, power of two 64..2048 (default 512)")},
+                         {"seed", integer("Variation seed (default 1)")},
+                         {"scale", number("Feature count across the tile (kind default if omitted)")},
+                         {"color1", string("Primary color #rrggbb")},
+                         {"color2", string("Secondary color #rrggbb")},
+                         {"color3", string("Accent color (mortar, grout, veins, rust) #rrggbb")},
+                         {"roughness", number("Base roughness 0..1")},
+                         {"metallic", number("Metallic 0..1")},
+                         {"variation", number("Color / height variation 0..1")},
+                         {"bump", number("Normal strength (default 1)")},
+                         {"create_material", boolean("Also create materials/<name>.mat.json using the maps (default true)")},
+                         {"tiling", number("Material repeats per meter (triplanar) — default 0.5")}},
+                        {"kind", "name"}),
+                 true, false, [&engine](const Json& a, ToolContext& ctx) {
+                     texgen::Params p = texgen::defaults(a.get("kind").asString());
+                     p.kind = a.get("kind").asString();
+                     p.size = static_cast<int>(a.get("size").asInt(512));
+                     p.seed = static_cast<uint32_t>(a.get("seed").asInt(1));
+                     if (a.contains("scale")) p.scale = a.get("scale").asFloat();
+                     for (auto [key, dst] : {std::pair{"color1", &p.color1}, std::pair{"color2", &p.color2}, std::pair{"color3", &p.color3}}) {
+                         if (a.contains(key) && !reflect::jsonToColor(a.get(key), *dst)) {
+                             return ToolResult::error(Error::make("invalid_arguments", std::string(key) + " must be a color like #aa7744"));
+                         }
+                     }
+                     if (a.contains("roughness")) p.roughness = a.get("roughness").asFloat();
+                     if (a.contains("metallic")) p.metallic = a.get("metallic").asFloat();
+                     if (a.contains("variation")) p.variation = a.get("variation").asFloat();
+                     if (a.contains("bump")) p.bump = a.get("bump").asFloat();
+                     auto set = texgen::generate(p);
+                     if (!set) return ToolResult::error(set.error());
+                     std::string base = a.get("name").asString();
+                     for (const char* ext : {".png", ".jpg"}) {
+                         if (str::lower(base).size() > 4 && str::lower(base).rfind(ext) == base.size() - 4) base = base.substr(0, base.size() - 4);
+                     }
+                     std::string albedo = base + "_albedo.png", normal = base + "_normal.png", orm = base + "_orm.png";
+                     std::error_code ec;
+                     fs::create_directories(fs::path(engine.resolvePath(albedo)).parent_path(), ec);
+                     for (auto [path, img] : {std::pair{albedo, &set->albedo}, std::pair{normal, &set->normal}, std::pair{orm, &set->orm}}) {
+                         if (Status st = writePng(*img, engine.resolvePath(path)); !st) return fail(st);
+                     }
+                     engine.refreshAssets();
+                     Json source = Json::object({{"generator", "texgen"}, {"kind", p.kind}, {"seed", static_cast<int64_t>(p.seed)}, {"by", ctx.actor}});
+                     Json result = Json::object({{"albedo", albedo}, {"normal", normal}, {"orm", orm}});
+                     for (const auto& path : {albedo, normal, orm}) {
+                         if (auto rec = engine.assets().registerFile(engine.resolvePath(path))) {
+                             (void)engine.assets().updateMeta((*rec)->path, Json::object({{"source", source}, {"tags", Json::array({"generated", p.kind})}}));
+                         }
+                     }
+                     if (a.get("create_material").asBool(true)) {
+                         MaterialAsset m;
+                         m.color = {1, 1, 1, 1};
+                         m.texture = albedo;
+                         m.normalMap = normal;
+                         m.ormMap = orm;
+                         m.roughness = 1.f;
+                         m.metallic = 1.f;  // the ORM map carries the real values
+                         m.triplanar = true;
+                         m.tilingU = m.tilingV = a.get("tiling").asFloat(0.5f);
+                         std::string stem = fs::path(base).filename().string();
+                         std::string matPath = "materials/" + stem + ".mat.json";
+                         fs::create_directories(fs::path(engine.resolvePath(matPath)).parent_path(), ec);
+                         if (Status st = saveMaterial(engine.resolvePath(matPath), m); !st) return fail(st);
+                         engine.refreshAssets();
+                         (void)engine.assets().updateMeta(matPath, Json::object({{"source", source}, {"description", p.kind + " (procedural PBR)"}}));
+                         result["material"] = matPath;
+                     }
+                     return ToolResult::json(result, "generated " + p.kind + " texture set" +
+                                                         (result.contains("material") ? " and " + result.get("material").asString() : ""));
+                 }});
+    }
 
     reg.add({"material_assign", "Assign material",
              "Use a material asset on one or more entities (sets mesh.material; empty string clears it).", "asset",

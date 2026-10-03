@@ -106,6 +106,12 @@ bool sceneCamera(const Scene& scene, ViewCamera& out, EntityId preferred) {
     return true;
 }
 
+Shading shadingFromString(std::string_view s) {
+    if (s == "toon") return Shading::Toon;
+    if (s == "unlit") return Shading::Unlit;
+    return Shading::Pbr;
+}
+
 FrameData buildFrame(const Scene& scene, const ViewCamera& camera, int width, int height, const BuildOptions& opts) {
     FrameData f;
     f.width = std::max(width, 1);
@@ -124,40 +130,53 @@ FrameData buildFrame(const Scene& scene, const ViewCamera& camera, int width, in
             DrawItem d;
             d.entity = e;
             d.mesh = m->mesh;
-            d.texture = m->texture;
-            d.color = m->color;
-            d.emissive = m->emissive;
-            d.metallic = m->metallic;
-            d.roughness = m->roughness;
-            d.unlit = m->unlit;
+            d.castShadows = m->castShadows;
+            Surface& s = d.surface;
+            s.color = m->color;
+            s.emissive = m->emissive;
+            s.metallic = m->metallic;
+            s.roughness = m->roughness;
+            s.texture = m->texture;
+            s.normalMap = m->normalMap;
+            s.ormMap = m->ormMap;
+            s.emissiveMap = m->emissiveMap;
+            s.tiling = {m->tiling, m->tiling};
+            s.normalStrength = m->normalStrength;
+            s.triplanar = m->triplanar;
+            s.shading = m->unlit ? Shading::Unlit : shadingFromString(m->shading);
+            s.clearcoat = m->clearcoat;
+            s.subsurface = m->subsurface;
+            s.rim = m->rim;
+            s.outline = m->outline;
+            s.outlineColor = m->outlineColor;
+            s.doubleSided = m->doubleSided;
             if (!m->material.empty() && opts.material) {
                 if (const ResolvedMaterial* mat = opts.material(m->material)) {
-                    d.color = mat->color;
-                    d.metallic = mat->metallic;
-                    d.roughness = mat->roughness;
-                    d.emissive = mat->emissive;
-                    d.texture = mat->texture;
-                    d.tiling = mat->tiling;
-                    d.unlit = d.unlit || mat->unlit;
+                    s = *mat;
+                    if (m->unlit) s.shading = Shading::Unlit;
+                    if (m->outline > 0.f && s.outline <= 0.f) {
+                        s.outline = m->outline;
+                        s.outlineColor = m->outlineColor;
+                    }
                 }
             }
             d.model = world;
             if (m->billboard) {
                 Vec3 p = world.translation();
-                Vec3 s{length(world.transformDir({1, 0, 0})), length(world.transformDir({0, 1, 0})),
+                Vec3 sc{length(world.transformDir({1, 0, 0})), length(world.transformDir({0, 1, 0})),
                        length(world.transformDir({0, 0, 1}))};
                 Vec3 d2c = camera.eye - p;
                 float horiz = std::sqrt(d2c.x * d2c.x + d2c.z * d2c.z);
                 float yaw = degrees(std::atan2(d2c.x, d2c.z));
                 float pitch = degrees(std::atan2(d2c.y, horiz));
-                d.model = Mat4::trs(p, {-pitch, yaw, 0}, s);
+                d.model = Mat4::trs(p, {-pitch, yaw, 0}, sc);
             }
             d.selected = opts.editorOverlays &&
                          std::find(opts.selection.begin(), opts.selection.end(), e) != opts.selection.end();
             d.worldBounds = scene.localBounds(e).transformed(d.model);
             f.draws.push_back(std::move(d));
         }
-        if (const Light* l = scene.get<Light>(e); l && f.lights.size() < FrameData::kMaxLights) {
+        if (const Light* l = scene.get<Light>(e); l && l->intensity > 0.f) {
             LightItem li;
             li.kind = l->kind == "directional" ? LightItem::Kind::Directional
                       : l->kind == "spot"      ? LightItem::Kind::Spot
@@ -170,6 +189,18 @@ FrameData buildFrame(const Scene& scene, const ViewCamera& camera, int width, in
             li.cosCone = std::cos(radians(l->spotAngle));
             f.lights.push_back(li);
         }
+    }
+    // The GPU takes kMaxLights: keep directional lights, then the point/spot lights whose
+    // influence sphere is closest to what the camera looks at (stable order for ties).
+    if (f.lights.size() > FrameData::kMaxLights) {
+        auto score = [&](const LightItem& l) {
+            if (l.kind == LightItem::Kind::Directional) return -1e30f;
+            float d = std::min(distance(l.position, f.camera.target), distance(l.position, f.camera.eye));
+            return std::max(0.f, d - l.range) - l.range * 0.05f * std::min(l.intensity, 10.f);
+        };
+        std::stable_sort(f.lights.begin(), f.lights.end(),
+                         [&](const LightItem& a, const LightItem& b) { return score(a) < score(b); });
+        f.lights.resize(FrameData::kMaxLights);
     }
     return f;
 }

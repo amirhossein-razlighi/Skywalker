@@ -395,7 +395,8 @@ struct AssetField: View {
 
     static func kind(for field: String, schema: JSON) -> String? {
         guard schema["type"].string == "string" else { return nil }
-        return ["material": "material", "texture": "texture", "mesh": "mesh"][field]
+        return ["material": "material", "texture": "texture", "mesh": "mesh", "normalMap": "texture",
+                "ormMap": "texture", "emissiveMap": "texture"][field]
     }
 
     var body: some View {

@@ -16,6 +16,7 @@ set(SKY_ENGINE_SOURCES
     src/render/NullRenderer.cpp
     src/render/Annotate.cpp
     src/render/Gltf.cpp
+    src/render/TextureGen.cpp
     src/assets/AssetDatabase.cpp
     src/assets/Material.cpp
     src/assets/Prefab.cpp

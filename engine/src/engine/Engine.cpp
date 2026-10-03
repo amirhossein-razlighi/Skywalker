@@ -257,9 +257,7 @@ FrameData Engine::frame(const CaptureOptions& opts) {
     }
     FrameData f = buildFrame(*scene_, view, opts.width, opts.height, bo);
     if (!opts.fog) f.environment.fogDensity = 0;
-    for (auto& d : f.draws) {
-        if (!d.texture.empty()) d.texture = resolvePath(d.texture);
-    }
+    resolveTexturePaths(f);
     if (bo.editorOverlays && selection_.size() == 1 && scene_->exists(selection_[0]) && !opts.annotate) {
         GizmoFrame gf = Gizmo::frameFor(scene_->worldMatrix(selection_[0]), view, gizmo_.local);
         f.overlays = gizmo_.overlays(gf, gizmoHot_, gizmoDrag_ ? gizmoDrag_->axis : -1);
@@ -553,12 +551,24 @@ Result<Json> Engine::importMeshAsset(const std::string& path) {
         m.metallic = g->metallic;
         m.roughness = std::max(0.02f, g->roughness);
         m.emissive = g->emissive;
-        if (!g->textureBytes.empty()) {
-            std::string texPath = join(stem + (g->textureMime == "image/jpeg" ? "_albedo.jpg" : "_albedo.png"));
+        auto extract = [&](const std::vector<uint8_t>& bytes, const std::string& suffix) {
+            std::string texPath = join(stem + suffix);
             std::ofstream tf(resolvePath(texPath), std::ios::binary);
-            tf.write(reinterpret_cast<const char*>(g->textureBytes.data()), static_cast<std::streamsize>(g->textureBytes.size()));
-            m.texture = texPath;
+            tf.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
+            return texPath;
+        };
+        if (!g->textureBytes.empty()) {
+            m.texture = extract(g->textureBytes, g->textureMime == "image/jpeg" ? "_albedo.jpg" : "_albedo.png");
         }
+        if (!g->normalMap.empty()) {
+            m.normalMap = extract(g->normalMap.bytes, std::string("_normal") + g->normalMap.extension());
+            m.normalStrength = g->normalScale;
+        }
+        if (!g->metallicRoughnessMap.empty()) {
+            m.ormMap = extract(g->metallicRoughnessMap.bytes, std::string("_orm") + g->metallicRoughnessMap.extension());
+            m.occlusionStrength = g->occlusionStrength;
+        }
+        if (!g->emissiveMap.empty()) m.emissiveMap = extract(g->emissiveMap.bytes, std::string("_emissive") + g->emissiveMap.extension());
         if (g->materialCount > 0 || !g->textureBytes.empty()) {
             materialPath = join(stem + ".mat.json");
             if (Status st = saveMaterial(resolvePath(materialPath), m); !st) return st.error();
@@ -581,6 +591,14 @@ Result<Json> Engine::importMeshAsset(const std::string& path) {
     return result;
 }
 
+void Engine::resolveTexturePaths(FrameData& f) const {
+    for (auto& d : f.draws) {
+        for (std::string* p : {&d.surface.texture, &d.surface.normalMap, &d.surface.ormMap, &d.surface.emissiveMap}) {
+            if (!p->empty()) *p = resolvePath(*p);
+        }
+    }
+}
+
 const ResolvedMaterial* Engine::resolveMaterial(const std::string& path) {
     std::string rel = assets_->relative(resolvePath(stripAssetPrefix(path)));
     if (rel.empty()) rel = path;
@@ -593,8 +611,7 @@ const ResolvedMaterial* Engine::resolveMaterial(const std::string& path) {
         auto m = loadMaterial(resolvePath(rel));
         c.ok = m.ok();
         if (m) {
-            c.material = ResolvedMaterial{m->color, m->metallic, m->roughness, m->emissive, m->texture,
-                                          Vec2{m->tilingU, m->tilingV}, m->unlit};
+            c.material = toSurface(*m);
         } else if (mtime != -2) {
             log::warn("asset", "material " + rel + ": " + m.error().message);
         }
@@ -716,9 +733,7 @@ Result<Image> Engine::assetPreview(const std::string& ref, int size) {
     bo.editorOverlays = false;
     bo.material = [this](const std::string& p) { return resolveMaterial(p); };
     FrameData f = buildFrame(tmp, cam, size, size, bo);
-    for (auto& d : f.draws) {
-        if (!d.texture.empty()) d.texture = resolvePath(d.texture);
-    }
+    resolveTexturePaths(f);
     if (Status st = renderer_->render(f); !st) return st.error();
     return renderer_->readback();
 }

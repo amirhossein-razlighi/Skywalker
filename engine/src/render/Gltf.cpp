@@ -257,28 +257,51 @@ Result<GltfImport> parseGltf(const std::vector<uint8_t>& bytes, const std::strin
         out.roughness = pbr.get("roughnessFactor").asFloat(1.f);
         const Json& em = mats[0].get("emissiveFactor");
         if (em.size() == 3) out.emissive = {em[0].asFloat(), em[1].asFloat(), em[2].asFloat(), 1.f};
-        if (pbr.get("baseColorTexture").isObject()) {
-            const Json& tex = d.json.get("textures")[static_cast<size_t>(pbr.get("baseColorTexture").get("index").asInt())];
-            const Json& img = d.json.get("images")[static_cast<size_t>(tex.get("source").asInt())];
+        // Texture reference -> encoded image bytes (embedded bufferView, data URI or file).
+        auto image = [&](const Json& ref, int* sourceOut = nullptr) {
+            GltfImport::ImageData outImg;
+            if (!ref.isObject()) return outImg;
+            const Json& textures = d.json.get("textures");
+            auto ti = static_cast<size_t>(ref.get("index").asInt(-1));
+            if (ti >= textures.size()) return outImg;
+            int source = static_cast<int>(textures[ti].get("source").asInt(-1));
+            if (sourceOut) *sourceOut = source;
+            const Json& images = d.json.get("images");
+            if (source < 0 || static_cast<size_t>(source) >= images.size()) return outImg;
+            const Json& img = images[static_cast<size_t>(source)];
             if (img.contains("bufferView")) {
                 const Json& bv = d.json.get("bufferViews")[static_cast<size_t>(img.get("bufferView").asInt())];
                 size_t bi = static_cast<size_t>(bv.get("buffer").asInt());
                 size_t off = static_cast<size_t>(bv.get("byteOffset").asInt()), len = static_cast<size_t>(bv.get("byteLength").asInt());
                 if (bi < d.buffers.size() && off + len <= d.buffers[bi].size()) {
-                    out.textureBytes.assign(d.buffers[bi].begin() + static_cast<std::ptrdiff_t>(off),
-                                            d.buffers[bi].begin() + static_cast<std::ptrdiff_t>(off + len));
-                    out.textureMime = img.get("mimeType").asString("image/png");
+                    outImg.bytes.assign(d.buffers[bi].begin() + static_cast<std::ptrdiff_t>(off),
+                                        d.buffers[bi].begin() + static_cast<std::ptrdiff_t>(off + len));
+                    outImg.mime = img.get("mimeType").asString("image/png");
                 }
             } else if (img.contains("uri")) {
                 auto data = loadUri(img.get("uri").asString(), baseDir);
                 if (data) {
-                    out.textureBytes = std::move(data.value());
+                    outImg.bytes = std::move(data.value());
                     std::string u = str::lower(img.get("uri").asString());
-                    out.textureMime = (u.find(".jpg") != std::string::npos || u.find(".jpeg") != std::string::npos ||
-                                       u.find("image/jpeg") != std::string::npos) ? "image/jpeg" : "image/png";
+                    outImg.mime = (u.find(".jpg") != std::string::npos || u.find(".jpeg") != std::string::npos ||
+                                   u.find("image/jpeg") != std::string::npos) ? "image/jpeg" : "image/png";
                 }
             }
+            return outImg;
+        };
+        auto base = image(pbr.get("baseColorTexture"));
+        out.textureBytes = std::move(base.bytes);
+        out.textureMime = base.mime;
+        out.normalMap = image(mats[0].get("normalTexture"));
+        out.normalScale = mats[0].get("normalTexture").get("scale").asFloat(1.f);
+        int mrSource = -1, occSource = -2;
+        out.metallicRoughnessMap = image(pbr.get("metallicRoughnessTexture"), &mrSource);
+        (void)image(mats[0].get("occlusionTexture"), &occSource);
+        if (mrSource >= 0 && mrSource == occSource) {
+            out.occlusionStrength = mats[0].get("occlusionTexture").get("strength").asFloat(1.f);
         }
+        out.emissiveMap = image(mats[0].get("emissiveTexture"));
+        if (!out.emissiveMap.empty() && out.emissive.x + out.emissive.y + out.emissive.z <= 0.f) out.emissive = {1, 1, 1, 1};
     }
     return out;
 }

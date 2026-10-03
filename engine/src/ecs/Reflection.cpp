@@ -131,7 +131,8 @@ bool jsonToColor(const Json& j, Vec4& out) {
 
 Json colorToJson(Vec4 c) {
     // Hex is compact and natural for both people and models, but loses HDR values > 1.
-    if (c.x <= 1.f && c.y <= 1.f && c.z <= 1.f && c.x >= 0.f && c.y >= 0.f && c.z >= 0.f) return toHexColor(c);
+    auto unit = [](float v) { return v >= 0.f && v <= 1.f; };
+    if (unit(c.x) && unit(c.y) && unit(c.z) && unit(c.w)) return toHexColor(c);
     return Json::array({round4(c.x), round4(c.y), round4(c.z), round4(c.w)});
 }
 

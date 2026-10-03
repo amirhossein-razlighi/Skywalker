@@ -56,18 +56,40 @@ struct OrbitCamera {
     Json toJson() const;
 };
 
+enum class Shading : uint8_t { Pbr = 0, Toon = 1, Unlit = 2 };
+Shading shadingFromString(std::string_view s);
+
+/// How a surface looks: the inline MeshRenderer fields or a material asset, resolved.
+/// Texture paths are project-relative in materials and absolute once a frame is built.
+struct Surface {
+    Vec4 color{0.8f, 0.8f, 0.82f, 1.f};
+    Vec4 emissive{0.f, 0.f, 0.f, 1.f};
+    float metallic = 0.f;
+    float roughness = 0.55f;
+    std::string texture;      // base color (sRGB)
+    std::string normalMap;    // tangent space (linear)
+    std::string ormMap;       // occlusion / roughness / metallic (linear)
+    std::string emissiveMap;  // sRGB
+    Vec2 tiling{1, 1};
+    float normalStrength = 1.f;
+    bool triplanar = false;
+    Shading shading = Shading::Pbr;
+    float clearcoat = 0.f;
+    float subsurface = 0.f;
+    float rim = 0.f;
+    float outline = 0.f;  // pixels
+    Vec4 outlineColor{0.04f, 0.04f, 0.06f, 1.f};
+    bool doubleSided = false;
+    float occlusionStrength = 1.f;
+};
+
 struct DrawItem {
     EntityId entity = kNoEntity;
     std::string mesh;
-    std::string texture;
     Mat4 model;
-    Vec4 color;
-    Vec4 emissive;
-    float metallic = 0;
-    float roughness = 0.5f;
+    Surface surface;
     bool selected = false;
-    bool unlit = false;
-    Vec2 tiling{1, 1};
+    bool castShadows = true;
     Aabb worldBounds;
 };
 
@@ -105,15 +127,7 @@ struct FrameData {
     Mat4 viewProjection() const { return projection * view; }
 };
 
-struct ResolvedMaterial {
-    Vec4 color;
-    float metallic = 0;
-    float roughness = 0.5f;
-    Vec4 emissive;
-    std::string texture;
-    Vec2 tiling{1, 1};
-    bool unlit = false;
-};
+using ResolvedMaterial = Surface;
 
 struct BuildOptions {
     bool editorOverlays = true;  // grid, selection highlight

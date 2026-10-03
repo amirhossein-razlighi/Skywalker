@@ -35,6 +35,21 @@ struct MeshRenderer {
     bool billboard = false;  // always faces the camera (handy for 2D sprites)
     std::string material;    // optional material asset (*.mat.json); overrides the inline values
     bool unlit = false;      // flat shading without lighting (2D, UI, stylized)
+    // Advanced surface (PBR maps, stylization). The same fields exist on material assets.
+    std::string shading = "pbr";  // pbr | toon | unlit
+    std::string normalMap;        // tangent-space normal map (linear), project-relative
+    std::string ormMap;           // R = occlusion, G = roughness, B = metallic (glTF convention)
+    std::string emissiveMap;      // multiplied with `emissive`
+    float normalStrength = 1.f;
+    float tiling = 1.f;           // texture repeats (uniform)
+    bool triplanar = false;       // project textures in world space (no stretching on scaled shapes)
+    float clearcoat = 0.f;        // glossy lacquer layer (car paint, varnish)
+    float subsurface = 0.f;       // light bleeding through (skin, leaves, wax, snow)
+    float rim = 0.f;              // stylized rim light
+    float outline = 0.f;          // toon outline width in pixels
+    Vec4 outlineColor{0.04f, 0.04f, 0.06f, 1.f};
+    bool doubleSided = false;
+    bool castShadows = true;
 
     static const TypeInfo& type();
     static const std::vector<std::string>& primitives();
@@ -101,6 +116,19 @@ struct Environment {
     float saturation = 1.05f;
     float contrast = 1.05f;
     float vignette = 0.22f;
+    // Sky, atmosphere, lighting quality
+    std::string skyMode = "gradient";  // gradient | atmosphere
+    float clouds = 0.f;                // procedural cloud cover 0..1
+    float stars = 0.f;                 // night-sky stars 0..1
+    float sunSize = 1.f;               // sun/moon disc size multiplier
+    float fogHeight = 0.f;             // height falloff: > 0 makes fog pool near the ground
+    float reflections = 1.f;           // image-based (sky) reflections strength
+    float ao = 0.8f;                   // screen-space ambient occlusion strength
+    float aoRadius = 0.6f;             // meters
+    float shadowSoftness = 1.f;        // penumbra size multiplier
+    std::string tonemap = "aces";      // aces | agx | neutral | filmic | none
+    float temperature = 0.f;           // white balance: -1 cool .. +1 warm
+    float tint = 0.f;                  // -1 green .. +1 magenta
 
     Vec3 sunDirection() const;  // direction light travels (from sun towards ground)
     static const TypeInfo& type();

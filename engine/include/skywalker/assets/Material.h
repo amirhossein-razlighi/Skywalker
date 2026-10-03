@@ -4,6 +4,7 @@
 // uses it instead of its inline color/metallic/roughness/emissive/texture values.
 
 #include <string>
+#include <vector>
 
 #include "skywalker/core/Json.h"
 #include "skywalker/core/Result.h"
@@ -21,9 +22,29 @@ struct MaterialAsset {
     float tilingU = 1.f;
     float tilingV = 1.f;
     bool unlit = false;  // flat color/texture, no lighting (UI, 2D, stylized looks)
+    std::string shading = "pbr";  // pbr | toon | unlit
+    std::string normalMap;
+    std::string ormMap;
+    std::string emissiveMap;
+    float normalStrength = 1.f;
+    bool triplanar = false;
+    float clearcoat = 0.f;
+    float subsurface = 0.f;
+    float rim = 0.f;
+    float outline = 0.f;
+    Vec4 outlineColor{0.04f, 0.04f, 0.06f, 1.f};
+    bool doubleSided = false;
+    float occlusionStrength = 1.f;  // how much the ORM map's red channel darkens indirect light
 
     static const TypeInfo& type();
 };
+
+struct Surface;
+/// The renderer's view of a material (texture paths stay project-relative).
+Surface toSurface(const MaterialAsset& m);
+/// Built-in starting points for common materials ("gold", "car_paint", "glass", "toon", ...).
+const std::vector<std::string>& materialPresets();
+Result<MaterialAsset> materialPreset(const std::string& name);
 
 Json materialToJson(const MaterialAsset& m);
 Result<MaterialAsset> materialFromJson(const Json& j);

@@ -62,7 +62,7 @@ public:
             }
             if (!ok) continue;
             float shade = env.ambient + std::max(0.f, sun.y) * 0.6f;
-            Vec3 col = d->color.xyz() * shade + d->emissive.xyz() * d->emissive.w;
+            Vec3 col = d->surface.color.xyz() * shade + d->surface.emissive.xyz() * d->surface.emissive.w;
             int x0 = std::max(0, static_cast<int>(minX)), x1 = std::min(frame.width, static_cast<int>(maxX));
             int y0 = std::max(0, static_cast<int>(minY)), y1 = std::min(frame.height, static_cast<int>(maxY));
             for (int y = y0; y < y1; ++y) {

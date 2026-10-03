@@ -24,6 +24,17 @@ struct GltfImport {
     Vec4 emissive{0, 0, 0, 1};
     std::vector<uint8_t> textureBytes;  // base color texture, if any
     std::string textureMime;            // "image/png" | "image/jpeg"
+    struct ImageData {
+        std::vector<uint8_t> bytes;
+        std::string mime;
+        bool empty() const { return bytes.empty(); }
+        const char* extension() const { return mime == "image/jpeg" ? ".jpg" : ".png"; }
+    };
+    ImageData normalMap;            // tangent-space normals
+    ImageData metallicRoughnessMap;  // G = roughness, B = metallic (R = occlusion when packed)
+    ImageData emissiveMap;
+    float normalScale = 1.f;
+    float occlusionStrength = 0.f;  // > 0 when the occlusion map is packed into metallicRoughnessMap's R
     size_t primitiveCount = 0;
     size_t materialCount = 0;
 };
