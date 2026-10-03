@@ -50,6 +50,9 @@ add_subdirectory(engine)
 if(SKY_BUILD_CLI)
     add_subdirectory(tools/cli)
     add_subdirectory(tools/wander_bench)
+    if(APPLE)
+        add_subdirectory(tools/player)  # skywalker-player: the standalone game runtime
+    endif()
 endif()
 
 if(SKY_BUILD_TESTS)

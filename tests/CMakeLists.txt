@@ -43,11 +43,16 @@ set(SKY_TEST_SOURCES
     test_anim_engine.cpp
     test_sequencer.cpp
     test_integrations.cpp
+    test_game.cpp
 )
 
 add_executable(skywalker_tests ${SKY_TEST_SOURCES})
 target_link_libraries(skywalker_tests PRIVATE sky::engine sky::capi doctest::doctest)
 target_compile_definitions(skywalker_tests PRIVATE
     SKY_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
+if(TARGET skywalker-player)
+    add_dependencies(skywalker_tests skywalker-player)
+    target_compile_definitions(skywalker_tests PRIVATE SKY_PLAYER_PATH="$<TARGET_FILE:skywalker-player>")
+endif()
 
 add_test(NAME skywalker_tests COMMAND skywalker_tests)

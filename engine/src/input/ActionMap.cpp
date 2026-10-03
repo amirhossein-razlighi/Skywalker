@@ -135,6 +135,56 @@ const char* toString(ActionType t) {
     return "button";
 }
 
+void InputState::keyEvent(std::string_view key, bool down) {
+    std::string k = canonicalKey(key);
+    if (k.empty()) return;
+    if (down) {
+        if (!held.count(k)) pressed.insert(k);
+        held.insert(k);
+    } else if (held.erase(k)) {
+        released.insert(k);
+    }
+}
+
+void InputState::mouseMove(float x01, float y01, float dx, float dy) {
+    mouseX = std::clamp(x01, 0.f, 1.f);
+    mouseY = std::clamp(y01, 0.f, 1.f);
+    mouseDX += dx;
+    mouseDY -= dy;  // screen y points down; input y points up
+}
+
+void InputState::mouseButton(int button, bool down) {
+    if (button < 0 || button > 2) return;
+    static const char* const names[] = {"left", "right", "middle"};
+    const std::string name = names[button];
+    if (down) {
+        if (!mouseHeld.count(name)) mousePressed.insert(name);
+        mouseHeld.insert(name);
+    } else if (mouseHeld.erase(name)) {
+        mouseReleased.insert(name);
+    }
+}
+
+void InputState::gamepad(int index, bool connected, std::string_view name, float lx, float ly, float rx, float ry, float lt, float rt,
+                         uint32_t buttonBits) {
+    if (index < 0 || index >= kMaxGamepads) return;
+    GamepadState& pad = pads[static_cast<size_t>(index)];
+    pad.connected = connected;
+    if (!name.empty()) pad.name = std::string(name);
+    if (!connected) {
+        pad.lx = pad.ly = pad.rx = pad.ry = pad.lt = pad.rt = 0.f;
+        pad.buttons = 0;
+        return;
+    }
+    pad.lx = std::clamp(lx, -1.f, 1.f);
+    pad.ly = std::clamp(ly, -1.f, 1.f);
+    pad.rx = std::clamp(rx, -1.f, 1.f);
+    pad.ry = std::clamp(ry, -1.f, 1.f);
+    pad.lt = std::clamp(lt, 0.f, 1.f);
+    pad.rt = std::clamp(rt, 0.f, 1.f);
+    pad.buttons = buttonBits & ((1u << static_cast<unsigned>(PadButton::Count)) - 1u);
+}
+
 void InputState::endTick() {
     pressed.clear();
     released.clear();

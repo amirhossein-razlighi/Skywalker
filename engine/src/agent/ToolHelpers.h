@@ -54,5 +54,6 @@ void addPhysicsTools(Engine& engine, ToolRegistry& reg);
 void addNavTools(Engine& engine, ToolRegistry& reg);
 void addAnimationTools(Engine& engine, ToolRegistry& reg);  // AnimationTools.cpp (+ SequenceTools.cpp)
 void addHairTools(Engine& engine, ToolRegistry& reg);
+void addGameTools(Engine& engine, ToolRegistry& reg);  // GameTools.cpp: game_build, game_run, game_settings
 
 }  // namespace sky::tools

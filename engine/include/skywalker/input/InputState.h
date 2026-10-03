@@ -90,6 +90,21 @@ struct InputState {
     };
     std::map<std::string, VirtualValue> virtualActions;
 
+    // --- Platform feed (editor, player): turns device events into held / pressed / released sets ---------------
+    /// A key went down or up; `key` is any spelling canonicalKey() accepts. Repeats while held are ignored.
+    void keyEvent(std::string_view key, bool down);
+    /// Cursor position normalized to the viewport and movement in points since the last call (+dy DOWN as on screen).
+    void mouseMove(float x01, float y01, float dx, float dy);
+    /// button: 0 left, 1 right, 2 middle.
+    void mouseButton(int button, bool down);
+    void scrollBy(float dx, float dy) {
+        scrollX += dx;
+        scrollY += dy;
+    }
+    /// Sticks -1..1 (+y up), triggers 0..1, buttons as a PadButton bitmask. `connected` false clears the pad.
+    void gamepad(int index, bool connected, std::string_view name, float lx, float ly, float rx, float ry, float lt, float rt,
+                 uint32_t buttons);
+
     /// Clears everything that only lasts one tick and advances the virtual input timers.
     void endTick();
     /// Forgets all input (play stopped).
