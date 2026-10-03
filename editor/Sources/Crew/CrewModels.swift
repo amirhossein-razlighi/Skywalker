@@ -116,6 +116,7 @@ struct ToolCategory: Identifiable, Hashable, Sendable {
         ToolCategory(id: "animation", title: "Animation", symbol: "figure.walk", detail: "animators, clips, bone attachments, cinematic sequences"),
         ToolCategory(id: "network", title: "Network", symbol: "arrow.down.circle", detail: "download licensed assets (asks by default)"),
         ToolCategory(id: "dcc", title: "Design apps", symbol: "wand.and.stars", detail: "run Blender / Maya / Houdini scripts, convert and edit models (asks by default)"),
+        ToolCategory(id: "files", title: "Ship game", symbol: "shippingbox.and.arrow.backward", detail: "game.json settings, build the macOS app, try it in the player (build and run ask by default)"),
         ToolCategory(id: "studio", title: "Studio", symbol: "person.3", detail: "board, feedback, decisions, messages, playtests"),
     ]
 }

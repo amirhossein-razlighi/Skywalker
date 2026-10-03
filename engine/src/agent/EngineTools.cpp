@@ -1050,6 +1050,7 @@ void registerEngineTools(Engine& engine) {
     tools::addPhysicsTools(engine, reg);
     tools::addAnimationTools(engine, reg);
     tools::addHairTools(engine, reg);
+    tools::addGameTools(engine, reg);  // engine/src/agent/GameTools.cpp
 }
 
 }  // namespace sky

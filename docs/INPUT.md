@@ -147,6 +147,8 @@ Scripts never see which device was used; to react to a specific key use `key("sp
 - The mouse reaches the game while it plays: movement, the three buttons, the wheel and the
   normalized cursor position. Clicking an entity still fires `on click`.
 - Modifier keys (`shift`, `ctrl`, `alt`, `cmd`) are keys like any other.
+- `cursor_lock(true)` hides and captures the cursor for mouse look (the standalone player honors it; mouse
+  movement keeps arriving as `look`); `cursor_lock(false)` gives it back. `quit_game()` closes the player.
 
 ## Testing and playtest bots
 
@@ -232,4 +234,5 @@ The editor feeds keys, mouse and (through `GamepadBridge`, `editor/Sources/Engin
 controllers only while the game plays. At the start of each fixed tick the engine evaluates the
 action map once (`ActionMap::evaluate`), then runs Wander, then clears the per-tick values
 (`InputState::endTick`). When several ticks run in one frame, the first receives the mouse
-movement. A player build would use the same API from its own window and controller code.
+movement. The standalone player (`tools/player/`, see [SHIPPING](SHIPPING.md)) feeds the same `InputState` from its own window and
+controller code (`InputState::keyEvent`, `mouseMove`, `mouseButton`, `scrollBy`, `gamepad`; the C API calls them too).

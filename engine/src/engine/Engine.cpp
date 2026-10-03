@@ -321,6 +321,7 @@ void Engine::stop() {
     physics_->endPlay();
     nav_->endPlay();
     input_ = {};
+    cursorLocked_ = false;
     audio_->stopAll();
     std::erase_if(selection_, [&](EntityId id) { return !scene_->exists(id); });
     emitEvent(Json::object({{"type", "play_state"}, {"state", "editing"}}));

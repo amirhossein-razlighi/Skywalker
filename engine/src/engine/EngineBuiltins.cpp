@@ -112,6 +112,37 @@ void registerAnimationBuiltins(BuiltinRegistry& reg) {
         [](CallContext& c) { return animationCall(c, "play_sequence"); });
 }
 
+// Player/platform builtins (the standalone player; the editor ignores them).
+void registerPlatformBuiltins(BuiltinRegistry& reg) {
+    BuiltinDef lock;
+    lock.name = "cursor_lock";
+    lock.params = {{"on", kTBool}};
+    lock.returns = kTNone;
+    lock.category = "input";
+    lock.doc = "Hides and captures the mouse cursor (first-person look: read mouse movement with axis(\"look\")) or gives it "
+               "back. Honored by the standalone player; resets when the game stops.";
+    lock.example = "cursor_lock(true)";
+    lock.owner = "engine";
+    lock.fn = [](CallContext& c) -> Value {
+        if (Engine* engine = c.service<Engine>()) engine->setCursorLocked(c.boolean(0));
+        return Value();
+    };
+    reg.add(std::move(lock));
+
+    BuiltinDef quit;
+    quit.name = "quit_game";
+    quit.returns = kTNone;
+    quit.category = "input";
+    quit.doc = "Closes the game (a \"Quit\" menu button). The standalone player exits; the editor ignores it.";
+    quit.example = "quit_game()";
+    quit.owner = "engine";
+    quit.fn = [](CallContext& c) -> Value {
+        if (Engine* engine = c.service<Engine>()) engine->requestQuit();
+        return Value();
+    };
+    reg.add(std::move(quit));
+}
+
 }  // namespace
 
 void registerEngineBuiltins() {
@@ -121,6 +152,7 @@ void registerEngineBuiltins() {
         registerEffectsBuiltins(reg);
         registerAnimationBuiltins(reg);
         registerUiBuiltins(reg);  // 2D, UI, dialogue (World2D)
+        registerPlatformBuiltins(reg);
         // Subsystem builtins: one line each.
     });
 }

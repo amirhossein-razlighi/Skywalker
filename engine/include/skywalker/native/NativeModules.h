@@ -52,6 +52,10 @@ public:
     void unload();
     /// Builds if sources changed, then (re)loads. Called when play starts.
     Status reloadIfChanged();
+    /// Shipped games: use this precompiled library (built by `skywalker build`) and never invoke a compiler.
+    /// play() then just loads it; the sources need not exist.
+    Status usePrebuilt(const std::string& library);
+    bool prebuilt() const { return prebuiltOnly_; }
     /// Runs the per-tick systems registered by the loaded module.
     void tick(float dt);
     /// Status: sources, build, loaded module, its builtins and systems.
@@ -79,6 +83,7 @@ private:
     wander::BuiltinRegistry& registry_;
     std::unique_ptr<Impl> impl_;
     bool autoAot_ = false;
+    bool prebuiltOnly_ = false;
 };
 
 }  // namespace sky

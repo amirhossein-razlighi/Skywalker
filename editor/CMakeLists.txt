@@ -40,6 +40,13 @@ add_custom_command(TARGET SkywalkerEditor PRE_BUILD
 
 # Bundle the headless CLI (so "connect Claude Code" works out of the box) and the starter project.
 add_dependencies(SkywalkerEditor skywalker)
+# The standalone player rides along so the editor's game_build / "Build game" can package apps anywhere.
+if(TARGET skywalker-player)
+    add_dependencies(SkywalkerEditor skywalker-player)
+    add_custom_command(TARGET SkywalkerEditor POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:skywalker-player> $<TARGET_BUNDLE_CONTENT_DIR:SkywalkerEditor>/MacOS/skywalker-player
+        COMMENT "Bundling the player into Skywalker.app")
+endif()
 add_custom_command(TARGET SkywalkerEditor POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:skywalker> $<TARGET_BUNDLE_CONTENT_DIR:SkywalkerEditor>/MacOS/skywalker-cli
     COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_BUNDLE_CONTENT_DIR:SkywalkerEditor>/Resources/Templates

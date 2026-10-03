@@ -127,6 +127,11 @@ set(SKY_ENGINE_SOURCES
     # Integrations (workstream K): embedded docs/skills + MCP resources and prompts
     src/agent/Resources.cpp
     src/agent/Setup.cpp
+    # Shipping: game.json settings, asset collection, app packaging, game_build / game_run
+    src/game/GameSettings.cpp
+    src/game/GameFiles.cpp
+    src/game/Packager.cpp
+    src/agent/GameTools.cpp
 )
 
 # DCC bridge: the Python helper library and the Blender add-on are embedded so the engine can
