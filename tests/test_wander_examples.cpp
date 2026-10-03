@@ -106,3 +106,30 @@ TEST_CASE("examples: every shipped Wander script compiles, formats and round-tri
     }
     MESSAGE("checked " << unique << " unique scripts from " << scripts.size() << " behaviors");
 }
+
+TEST_CASE("docs: every ```wander code block in docs/ compiles") {
+    registerEngineBuiltins();
+    Scene scene;
+    Runtime rt(scene);
+    CompileOptions opts = rt.compileOptions();
+    size_t blocks = 0;
+    for (const auto& entry : fs::directory_iterator(fs::path(SKY_SOURCE_DIR) / "docs")) {
+        if (entry.path().extension() != ".md") continue;
+        std::ifstream f(entry.path());
+        std::stringstream ss;
+        ss << f.rdbuf();
+        std::string text = ss.str();
+        for (size_t at = text.find("```wander\n"); at != std::string::npos; at = text.find("```wander\n", at + 1)) {
+            size_t start = at + 10;
+            size_t end = text.find("```", start);
+            if (end == std::string::npos) break;
+            std::string block = text.substr(start, end - start);
+            ++blocks;
+            // Fragments (a few statements) are checked inside a handler.
+            bool ok = compile(block, opts).ok() || compile("on tick\n" + block + "\nend\n", opts).ok();
+            CAPTURE(entry.path().filename().string());
+            CHECK_MESSAGE(ok, block);
+        }
+    }
+    CHECK(blocks > 5);
+}

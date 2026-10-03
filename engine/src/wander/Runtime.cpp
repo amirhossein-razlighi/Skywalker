@@ -545,7 +545,17 @@ void setEntityMember(ExecState& st, EntityId id, const MemberRef& m, const Value
 Value getMember(ExecState& st, const Value& obj, const MemberRef& m, SourceLoc loc) {
     using K = MemberRef::Kind;
     switch (obj.type()) {
-        case VType::Entity: return getEntityMember(st, requireEntity(st.scene, obj, loc, "the property owner"), m, loc);
+        case VType::Entity: {
+            if (m.kind == K::Position || m.kind == K::Rotation || m.kind == K::Scale) {
+                // Hot path: one record lookup, then the transform by handle.
+                const EntityRecord* rec = st.scene.record(obj.e());
+                if (!rec) raise(loc, "the property owner refers to an entity that no longer exists");
+                const Transform* t = st.scene.registry().get<Transform>(rec->handle);
+                if (!t) return Value::vec(m.kind == K::Scale ? Vec3{1, 1, 1} : Vec3{0, 0, 0});
+                return Value::vec(m.kind == K::Position ? t->position : m.kind == K::Rotation ? t->rotation : t->scale);
+            }
+            return getEntityMember(st, requireEntity(st.scene, obj, loc, "the property owner"), m, loc);
+        }
         case VType::Vec:
             switch (m.kind) {
                 case K::X: return Value::number(obj.v().x);
@@ -805,10 +815,24 @@ bool interpret(ExecState& st, int protoIndex, Value* R, size_t& pc, Outcome& out
                     case Env::HitDistance: R[in.a] = st.lastHit ? Value::number(st.lastHit->distance) : Value(); break;
                 }
                 break;
-            case Op::GetVar: R[in.a] = varRef(st, in.b); break;
+            case Op::GetVar:
+                if (st.inst && st.inst->program.get() == st.prog) [[likely]] {
+                    R[in.a] = st.inst->vars->slots[st.inst->behaviors[st.behavior].varSlots[in.b]].value;
+                } else {
+                    R[in.a] = varRef(st, in.b);
+                }
+                break;
             case Op::SetVar:
-                varRef(st, in.a) = RK(in.b);
-                markVarDirty(st, in.a);
+                if (st.inst && st.inst->program.get() == st.prog) [[likely]] {
+                    VarTable& t = *st.inst->vars;
+                    VarSlot& slot = t.slots[st.inst->behaviors[st.behavior].varSlots[in.a]];
+                    slot.value = RK(in.b);
+                    slot.dirty = true;
+                    t.anyDirty = true;
+                } else {
+                    varRef(st, in.a) = RK(in.b);
+                    markVarDirty(st, in.a);
+                }
                 break;
             case Op::GetMember: R[in.a] = getMember(st, R[in.b], prog.members[in.c], LOC); break;
             case Op::SetMember: setMember(st, R[in.a], prog.members[in.b], RK(in.c), LOC); break;

@@ -64,6 +64,15 @@ void hidden(BuiltinRegistry& r, const char* name, std::vector<BuiltinParam> para
 
 Value num(double d) { return Value::number(d); }
 
+// The transform of entity argument i (added if missing), with a single record lookup.
+Transform& transformArg(CallContext& c, int i) {
+    const Value& v = c.arg(i);
+    EntityRecord* rec = v.isEntity() ? c.scene().record(v.e()) : nullptr;
+    if (!rec) (void)c.entity(i);  // reports the precise error
+    if (Transform* t = c.scene().registry().get<Transform>(rec->handle)) return *t;
+    return c.scene().add<Transform>(rec->id);
+}
+
 Vec3 entityDir(CallContext& c, int i, Vec3 local) {
     EntityRef id = c.entity(i);
     return normalize(c.scene().worldMatrix(id).transformDir(local));
@@ -687,9 +696,8 @@ void registerCoreBuiltins(BuiltinRegistry& r) {
 
     // --- statement helpers (move/rotate/look/emit/destroy/log and test input) ------------------------
     hidden(r, "__move_by", {{"entity", E}, {"offset", kTPoint}}, [](CallContext& c) {
-        EntityRef id = c.entity(0);
         Vec3 delta = c.point(1);
-        c.scene().add<Transform>(id).position += delta;
+        transformArg(c, 0).position += delta;
         c.scene().markDirty();
         return Value();
     });
@@ -707,9 +715,8 @@ void registerCoreBuiltins(BuiltinRegistry& r) {
         return Value();
     });
     hidden(r, "__rotate", {{"entity", E}, {"degrees", kTPoint}}, [](CallContext& c) {
-        EntityRef id = c.entity(0);
         Vec3 delta = c.point(1);
-        Transform& t = c.scene().add<Transform>(id);
+        Transform& t = transformArg(c, 0);
         t.rotation += delta;
         // Keep angles bounded so long sessions don't lose float precision.
         for (float* a : {&t.rotation.x, &t.rotation.y, &t.rotation.z}) *a = std::remainder(*a, 360.f);
