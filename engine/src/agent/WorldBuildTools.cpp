@@ -8,6 +8,7 @@
 #include <cmath>
 #include <deque>
 #include <filesystem>
+#include <fstream>
 #include <unordered_map>
 
 #include "ToolHelpers.h"
@@ -120,7 +121,29 @@ Status saveTerrain(Engine& engine, EntityId id, const std::shared_ptr<world::Ter
     fs::create_directories(fs::path(engine.resolvePath(path)).parent_path(), ec);
     if (Status st = data->save(engine.resolvePath(path)); !st) return st;
     engine.world().adopt(id, data, engine.world().sourceKey(s, id));
-    return {};
+    // Physics: a matching heightfield collider (16-bit heights next to the terrain file).
+    std::string r16 = fs::path(path).replace_extension(".r16").string();
+    const float lo = data->minHeight(), hi = data->maxHeight(), range = std::max(hi - lo, 0.01f);
+    {
+        const int n = data->resolution();
+        std::vector<uint8_t> raw(static_cast<size_t>(n) * n * 2);
+        for (size_t i = 0; i < static_cast<size_t>(n) * n; ++i) {
+            auto v = static_cast<uint16_t>(std::lround(std::clamp((data->heights()[i] - lo) / range, 0.f, 1.f) * 65535.f));
+            raw[i * 2] = static_cast<uint8_t>(v & 0xff);
+            raw[i * 2 + 1] = static_cast<uint8_t>(v >> 8);
+        }
+        std::ofstream f(engine.resolvePath(r16), std::ios::binary);
+        f.write(reinterpret_cast<const char*>(raw.data()), static_cast<std::streamsize>(raw.size()));
+        if (!f) return Error::make("io_error", "cannot write " + r16);
+    }
+    int res = 8;
+    while (res < data->resolution() - 1 && res < 1024) res *= 2;
+    Json collider = Json::object({{"shape", "heightfield"},
+                                  {"heightmap", r16},
+                                  {"size", Json::array({data->size(), range, data->size()})},
+                                  {"offset", Json::array({0.0, static_cast<double>(lo), 0.0})},
+                                  {"resolution", res}});
+    return engine.edit(actor, "Terrain collider", [&]() -> Status { return s.patchComponent(id, "collider", collider); });
 }
 
 Json terrainStats(const world::TerrainData& d) {
