@@ -16,7 +16,8 @@ the rubric below, change again. Do not set 30 fields at once: you cannot tell wh
 | Lights | `entity_create`/`entity_update` with `components.light` | `kind: directional\|point\|spot, color, intensity (0..1000), range (m), spotAngle` |
 | Camera lens | `components.camera` | `fov, aperture (f-stop, 0 = DOF off), focusDistance (m, 0 = autofocus), motionBlur (0..1, 0.5 film-like), primary` |
 | Surfaces | `material_create` / `material_update` / `texture_generate`, or `components.mesh` | `color, metallic, roughness, emissive (alpha = strength, HDR), normalMap, ormMap, clearcoat, subsurface, triplanar, shading: pbr\|toon\|unlit\|water` |
-| Judging | `viewport_capture` | `samples, debug_view, overlays:false, annotate:false, view:"scene"` |
+| Judging | `viewport_capture` | `samples, debug_view, overlays:false, annotate:false, view:"scene", quality` |
+| Live viewport tier | `viewport_quality` | `fast`, `balanced`, `full` (see below) |
 
 `environment_update {preset: noon|sunset|night|overcast|studio}` applies a preset first, then your overrides. Start
 from the closest preset, never from nothing.
@@ -65,6 +66,21 @@ Details and per-look numbers are in [references/recipes.md](references/recipes.m
 
 4. **Change one group, recapture, compare.** Keep what improved. Stop when the rubric passes, not when you run out of ideas.
 
+## Viewport quality tiers (editing speed vs. the final image)
+
+The live editor viewport renders at a **tier** so heavy worlds stay responsive while you edit. `viewport_quality {}` reads it, `viewport_quality {quality:"fast"|"balanced"|"full"}` sets it. Play mode and the game always render `full`.
+
+| Tier | What it does |
+|---|---|
+| `fast` (editor default) | Internal resolution 0.5 (MetalFX upscales), no screen-space GI, reflections or light shafts, no depth of field or motion blur, shadow distance capped at 150 m, far foliage culled sooner (x0.4), coarser LODs. Volumetric clouds stay on. |
+| `balanced` | Internal resolution 0.75, no depth of field or motion blur, everything else as authored |
+| `full` | Exactly what the game and captures show |
+
+- **`viewport_capture` and `perf_stats` take a `quality` argument** (`full` default, or `balanced`/`fast`): a capture with no `quality` is always `full`, whatever the editor tier. Pass `quality:"fast"` to preview what the human sees while editing,
+  or to benchmark it (`perf_stats {frames:30, quality:"fast"}`). The editor tier itself only changes what the human sees live.
+- **Never judge a look from a `fast` or `balanced` capture**: GI, reflections, god rays and DOF are missing, so everything looks flatter and darker. Judge at `quality:"full"` with `samples:16`. Use `fast` captures only for layout, speed and "will it run".
+- If the human says "it looks washed out / flat in the viewport" but your full capture looks right, the editor is on `fast`; suggest `viewport_quality {quality:"full"}` when they want to see the final look live (at a frame-rate cost).
+
 ## Common mistakes (each seen in practice)
 
 - **Monochrome orange**: warm sun + warm `fogColor` + `golden_hour` look at full strength + `sunset` preset stack on each other. Keep
@@ -91,7 +107,7 @@ most dielectrics, `metallic` 0 or 1 (rarely in between), `subsurface` for leaves
 
 ## Verification checklist before reporting done
 
-- Beauty shot at 16+ samples, overlays off, from the camera the game will use (`view:"scene"`).
+- Beauty shot at 16+ samples, `quality:"full"` (the default), overlays off, from the camera the game will use (`view:"scene"`).
 - At least one `debug_view` (`lighting` or `gi`) if you changed light terms.
 - `perf_stats` if you added many lights (16 punctual lights are used per frame; directional first) or volumetrics.
 - Report the final `environment_get` values so the look is reproducible.
