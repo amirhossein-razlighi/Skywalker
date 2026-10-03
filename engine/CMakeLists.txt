@@ -19,6 +19,8 @@ set(SKY_ENGINE_SOURCES
     src/render/Hdr.cpp
     src/fx/Particles.cpp
     src/fx/Ocean.cpp
+    src/fx/Groom.cpp
+    src/fx/GpuParticles.cpp
     src/render/MeshFormats.cpp
     src/assets/Fetch.cpp
     src/render/TextureGen.cpp
@@ -31,6 +33,7 @@ set(SKY_ENGINE_SOURCES
     src/agent/WorldTools.cpp
     src/agent/NetworkTools.cpp
     src/agent/FxTools.cpp
+    src/agent/HairTools.cpp
     src/agent/McpServer.cpp
     src/agent/SocketServer.cpp
     src/engine/Engine.cpp

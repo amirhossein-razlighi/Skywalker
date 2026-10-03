@@ -17,6 +17,7 @@
 #include "skywalker/core/Result.h"
 #include "skywalker/ecs/Components.h"
 #include "skywalker/math/Math.h"
+#include "skywalker/render/FxItems.h"
 #include "skywalker/render/Image.h"
 #include "skywalker/scene/Scene.h"
 
@@ -173,6 +174,8 @@ struct FrameData {
     std::vector<ParticleInstance> particles;  // sorted back to front
     std::vector<WaterItem> water;
     std::vector<VolumeItem> volumes;
+    std::vector<GpuEmitterItem> gpuEmitters;  // GPU-simulated particles (hair & VFX workstream)
+    std::vector<GroomItem> grooms;            // strand hair and fur
     bool drawGrid = true;
     float time = 0;
     /// Jittered sub-samples accumulated into this frame (stills and cinematics: supersampling,
@@ -251,6 +254,10 @@ public:
     /// Replaces the shader source at runtime; returns compiler diagnostics on failure.
     virtual Status reloadShaders(const std::string& source) = 0;
     virtual std::string shaderSource() const = 0;
+    /// Lights cast by GPU effects (glowing GPU particles), from a recent frame (no stall).
+    virtual std::vector<LightItem> effectLights() const { return {}; }
+    /// GPU statistics: frame and simulation times, GPU particle counts, groom sizes.
+    virtual Json stats() const { return Json::object(); }
 };
 
 enum class RendererBackend { Auto, Metal, Null };

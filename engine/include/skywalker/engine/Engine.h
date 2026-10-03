@@ -23,6 +23,7 @@
 #include "skywalker/assets/Prefab.h"
 #include "skywalker/core/Json.h"
 #include "skywalker/engine/Gizmo.h"
+#include "skywalker/fx/Groom.h"
 #include "skywalker/fx/Ocean.h"
 #include "skywalker/fx/Particles.h"
 #include "skywalker/render/MeshData.h"
@@ -193,6 +194,7 @@ public:
 
     // --- Effects: particles and water -----------------------------------------------
     fx::ParticleSystem& particles() { return particles_; }
+    fx::GroomSystem& grooms() { return grooms_; }  // hair & fur (generated grooms, cached)
     /// Seconds on the effects clock: simulation time while playing, a live preview clock while editing.
     double effectsTime() const;
     /// Height of the water surface at world (x, z), waves included. False if no water covers it.
@@ -243,6 +245,7 @@ private:
     Json playSnapshot_;
     double accumulator_ = 0;
     fx::ParticleSystem particles_;
+    fx::GroomSystem grooms_;
     std::unordered_map<EntityId, fx::Ocean> oceans_;
     double previewTime_ = 0;
     fx::Ocean& oceanFor(EntityId e, const Water& w);
