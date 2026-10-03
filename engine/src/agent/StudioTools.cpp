@@ -15,6 +15,7 @@
 #include "skywalker/core/Strings.h"
 #include "skywalker/studio/Catalog.h"
 #include "skywalker/studio/Playtest.h"
+#include "skywalker/studio/Runner.h"
 #include "skywalker/studio/Studio.h"
 
 namespace sky::tools {
@@ -222,6 +223,37 @@ void addStudioTools(Engine& engine, ToolRegistry& reg) {
                  return ToolResult::json(Json::object({{"agents", out}}), text);
              }});
 
+    reg.add({"studio_agent_brief", "Agent brief",
+             "Everything needed to *be* a roster member: its system prompt (role mission, focus, persona, standing "
+             "instructions, memory, the team, studio etiquette) and the engine tools it may use with their access "
+             "(allow | ask). Use it to run a studio agent in any harness: e.g. give a Claude Code / Codex subagent this "
+             "system prompt, let it call only the listed tools, and connect it as \"<client>/<agent id>\" (or pass "
+             "as: \"<agent id>\") so its work is attributed. loop_member=true withholds loop and roster control tools.",
+             "studio",
+             object({{"agent", string("Agent id or name")}, {"loop_member", boolean("Running inside a loop stage")}}, {"agent"}),
+             false, false, [&engine](const Json& a, ToolContext&) {
+                 Studio& s = S(engine);
+                 const studio::AgentProfile* p = s.agent(a.get("agent").asString());
+                 if (!p) return err(s.unknownAgent(a.get("agent").asString()));
+                 auto tools = studio::AgentRunner::toolsFor(*p, engine.tools(), a.get("loop_member").asBool());
+                 Json list = Json::array();
+                 int asks = 0;
+                 for (const auto& t : tools) {
+                     list.push(Json::object({{"name", t.spec.name}, {"category", t.category}, {"access", studio::toString(t.access)}}));
+                     asks += t.access == studio::Access::Ask;
+                 }
+                 std::string prompt = studio::AgentRunner::systemPrompt(*p, s.agents());
+                 Json out = Json::object({{"agent", p->id},
+                                          {"actor", p->actor()},
+                                          {"model", p->model},
+                                          {"provider", p->provider},
+                                          {"max_rounds", p->maxRounds},
+                                          {"system_prompt", prompt},
+                                          {"tools", list}});
+                 return ToolResult::json(out, "@" + p->id + ": " + std::to_string(tools.size()) + " tools (" + std::to_string(asks) +
+                                                  " need approval)\n\n" + prompt);
+             }});
+
     reg.add({"studio_agent_remove", "Remove agent",
              "Remove an agent from the studio (deletes agents/<id>.agent.json; its open tasks become unassigned).",
              "studio", object({{"agent", string("Agent id or name")}}, {"agent"}), true, true,
@@ -290,6 +322,31 @@ void addStudioTools(Engine& engine, ToolRegistry& reg) {
                      text += std::to_string(i++) + ". " + n + "\n";
                  }
                  return ToolResult::json(Json::object({{"agent", *id}, {"memory", notes}}), text.empty() ? "(no notes)" : text);
+             }});
+
+    reg.add({"studio_usage_report", "Report usage",
+             "Record tokens an agent spent with its own model, for studio budgets and cost tracking (runners that call "
+             "models outside the engine — the editor crew, custom scripts — report each request here). Tool calls are "
+             "counted automatically.",
+             "studio",
+             object({{"agent", string("Agent id (default: you)")},
+                     {"model", string("Model id (prices the tokens)")},
+                     {"input_tokens", integer("Uncached input tokens")},
+                     {"output_tokens", integer("Output tokens")},
+                     {"cache_read_tokens", integer("Cached input tokens read")},
+                     {"cache_write_tokens", integer("Input tokens written to the cache")},
+                     {"as", asArg()}}),
+             true, false, [&engine](const Json& a, ToolContext& ctx) {
+                 auto actor = actorFor(engine, a, ctx);
+                 if (!actor) return err(actor.error());
+                 auto id = memberFor(engine, a, *actor, true);
+                 if (!id) return err(id.error());
+                 Studio& s = S(engine);
+                 s.recordUsage(*id, a.get("model").asString(), std::max<int64_t>(0, a.get("input_tokens").asInt()),
+                               std::max<int64_t>(0, a.get("output_tokens").asInt()),
+                               std::max<int64_t>(0, a.get("cache_read_tokens").asInt()),
+                               std::max<int64_t>(0, a.get("cache_write_tokens").asInt()));
+                 return ToolResult::json(s.usage().at(*id).toJson(), "recorded usage for @" + *id);
              }});
 
     // ---------------------------------------------------------------- board
@@ -699,7 +756,7 @@ void addStudioTools(Engine& engine, ToolRegistry& reg) {
              "studio",
              object({{"agent", string("Whose inbox (default: you)")},
                      {"unread_only", boolean("Only unread (default true)")},
-                     {"channel", string("Read this channel instead")},
+                     {"channel", string("Read this channel instead (\"*\" = every channel)")},
                      {"limit", integer("Max messages (default 30)")},
                      {"as", asArg()}}),
              false, false, [&engine](const Json& a, ToolContext& ctx) {
@@ -717,7 +774,7 @@ void addStudioTools(Engine& engine, ToolRegistry& reg) {
                      if (!ch.empty() && ch[0] == '#') ch = ch.substr(1);
                      std::vector<const studio::Message*> msgs;
                      for (const auto& m : s.messages()) {
-                         if (m.channel == studio::slugify(ch)) msgs.push_back(&m);
+                         if (ch == "*" || m.channel == studio::slugify(ch)) msgs.push_back(&m);
                      }
                      size_t start = msgs.size() > limit ? msgs.size() - limit : 0;
                      for (size_t i = start; i < msgs.size(); ++i) {

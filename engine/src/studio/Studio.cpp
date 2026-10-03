@@ -256,6 +256,11 @@ Result<AgentProfile> AgentProfile::fromJson(const Json& j) {
     if (a.name.empty()) a.name = a.id;
     if (a.id.empty()) return Error::make("invalid_agent", "an agent needs a name", "pass {\"name\": \"Mira\", \"role\": ...}");
     a.role = j.get("role").asString();
+    // Version-1 files (the editor's early crew) used short role ids and camelCase keys.
+    static const std::map<std::string, std::string> legacyRoles = {
+        {"director", "creative_director"},     {"level", "level_designer"},          {"gameplay", "gameplay_programmer"},
+        {"lighting", "lighting_artist"},       {"artist", "environment_artist"},     {"qa", "qa_lead"}};
+    if (auto it = legacyRoles.find(a.role); it != legacyRoles.end()) a.role = it->second;
     a.discipline = j.get("discipline").asString();
     if (a.discipline.empty()) {
         if (const RoleInfo* r = findRole(a.role)) a.discipline = r->discipline;
@@ -273,7 +278,8 @@ Result<AgentProfile> AgentProfile::fromJson(const Json& j) {
         if (!au) return Error::make("invalid_agent", "autonomy must be observe, ask or autonomous");
         a.autonomy = *au;
     }
-    for (const auto& [k, v] : j.get("permissions").members()) {
+    const Json& perms = j.contains("permissions") ? j.get("permissions") : j.get("toolAccess");
+    for (const auto& [k, v] : perms.members()) {
         auto acc = parseAccess(v.asString());
         if (!acc) return Error::make("invalid_agent", "permission '" + k + "' must be inherit, allow, ask or off");
         if (*acc != Access::Inherit) a.permissions[k] = *acc;
@@ -281,7 +287,7 @@ Result<AgentProfile> AgentProfile::fromJson(const Json& j) {
     a.reportsTo = slugify(j.get("reports_to").asString());
     a.color = j.get("color").asString(a.color);
     a.face = j.get("face").asString(a.face);
-    a.maxRounds = static_cast<int>(std::clamp<int64_t>(j.get("max_rounds").asInt(40), 1, 200));
+    a.maxRounds = static_cast<int>(std::clamp<int64_t>(j.get("max_rounds").asInt(j.get("maxRounds").asInt(40)), 1, 200));
     a.memory = toStrings(j.get("memory"));
     if (j.get("playtest").isObject()) a.playtest = j.get("playtest");
     return a;
@@ -622,7 +628,11 @@ Json compareMetrics(const Json& before, const Json& after) {
             verdict = dir == 0 ? "changed" : ((dir < 0) == improved ? "better" : "worse");
         } else {
             double bv = b.asNumber(), av = a.asNumber(), delta = av - bv;
-            double tol = std::max(1e-9, std::fabs(bv) * 0.05);
+            // 5% relative tolerance; timing metrics also get an absolute noise floor.
+            double noise = str::startsWith(std::string_view(k).substr(k.size() >= 3 ? k.size() - 3 : 0), "_ms") ? 0.5
+                           : k == "est_fps"                                                                 ? 5.0
+                                                                                                             : 1e-9;
+            double tol = std::max(noise, std::fabs(bv) * 0.05);
             row["delta"] = std::round(delta * 1000) / 1000;
             row["change"] = bv != 0 ? std::round(delta / std::fabs(bv) * 1000) / 1000 : (delta == 0 ? 0.0 : (delta > 0 ? 1.0 : -1.0));
             if (std::fabs(delta) <= tol) verdict = "same";
