@@ -30,6 +30,7 @@ set(SKY_TEST_SOURCES
     test_2d.cpp
     test_ui.cpp
     test_dialogue.cpp
+    test_2d_tools.cpp
     test_world.cpp
     test_audio.cpp
     test_input.cpp
