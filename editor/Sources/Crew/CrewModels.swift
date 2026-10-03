@@ -122,6 +122,7 @@ struct ToolCategory: Identifiable, Hashable, Sendable {
         ToolCategory(id: "history", title: "Files & History", symbol: "clock.arrow.circlepath", detail: "undo, save, load"),
         ToolCategory(id: "render", title: "Rendering", symbol: "paintbrush", detail: "shaders, perf stats"),
         ToolCategory(id: "network", title: "Network", symbol: "arrow.down.circle", detail: "download licensed assets (asks by default)"),
+        ToolCategory(id: "dcc", title: "Design apps", symbol: "wand.and.stars", detail: "run Blender / Maya / Houdini scripts, convert and edit models (asks by default)"),
     ]
 }
 
@@ -166,8 +167,9 @@ struct Cloudling: Codable, Identifiable, Hashable, Sendable {
         if explicit == .off { return .off }
         if readOnly { return .allow }
         if explicit != .inherit { return explicit }
-        // Reaching outside the project (downloads) needs the human's OK unless explicitly allowed.
-        if category == "network" { return autonomy == .observe ? .off : .ask }
+        // Reaching outside the project (downloads, running design apps and their scripts) needs the
+        // human's OK unless explicitly allowed.
+        if category == "network" || category == "dcc" { return autonomy == .observe ? .off : .ask }
         switch autonomy {
         case .observe: return .off
         case .ask: return .ask

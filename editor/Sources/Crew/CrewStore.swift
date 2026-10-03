@@ -334,7 +334,8 @@ final class CrewStore {
             }
         }
 
-        let result = engine.call(call.name, call.arguments, actor: c.actorName)
+        // Slow tools (design apps) run off the main thread, so the editor stays responsive.
+        let result = await engine.callAsync(call.name, call.arguments, actor: c.actorName)
         log(c, ChatEntry(role: .tool, text: String(result.text.prefix(1200)), toolName: call.name,
                          imageBase64: result.imagesBase64.first, isError: result.isError))
         return ToolOutcome(callID: call.id, name: call.name, text: result.text, imagesBase64: result.imagesBase64,

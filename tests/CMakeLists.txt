@@ -30,6 +30,7 @@ set(SKY_TEST_SOURCES
     test_audio.cpp
     test_input.cpp
     test_capi_input.cpp
+    test_dcc.cpp
 )
 
 add_executable(skywalker_tests ${SKY_TEST_SOURCES})

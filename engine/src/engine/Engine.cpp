@@ -116,6 +116,33 @@ Engine::~Engine() {
 ToolResult Engine::callTool(std::string_view name, const Json& args, const std::string& actor) {
     ToolContext ctx{actor};
     ToolResult result = tools_.call(name, args, ctx);
+    recordToolEvent(name, result, actor);
+    return result;
+}
+
+Engine::PendingCall Engine::beginTool(std::string_view name, const Json& args, const std::string& actor) {
+    PendingCall call{std::string(name), actor, {}};
+    ToolContext ctx{actor};
+    call.result = tools_.invoke(name, args, ctx);
+    if (!call.result.deferred) recordToolEvent(name, call.result, actor);
+    return call;
+}
+
+ToolResult Engine::finishTool(PendingCall& call) {
+    if (call.result.deferred) {
+        std::shared_ptr<DeferredWork> work = std::move(call.result.deferred);
+        call.result = ToolResult();
+        try {
+            call.result = work->finish ? work->finish() : ToolResult::text("");
+        } catch (const std::exception& e) {
+            call.result = ToolResult::error(Error::make("internal_error", std::string("tool crashed: ") + e.what()));
+        }
+        recordToolEvent(call.tool, call.result, call.actor);
+    }
+    return std::move(call.result);
+}
+
+void Engine::recordToolEvent(std::string_view name, const ToolResult& result, const std::string& actor) {
     const ToolDef* def = tools_.find(name);
     std::string summary = result.content.empty() ? "" : result.content.front().text.substr(0, 160);
     emitEvent(Json::object({{"type", "tool"},
@@ -124,7 +151,6 @@ ToolResult Engine::callTool(std::string_view name, const Json& args, const std::
                             {"ok", !result.isError},
                             {"mutates", def && def->mutates},
                             {"summary", summary}}));
-    return result;
 }
 
 Status Engine::edit(const std::string& actor, const std::string& label, const std::function<Status()>& fn) {
@@ -1192,18 +1218,7 @@ Status Engine::startAgentServer(const std::string& socketPath) {
     fs::create_directories(fs::path(socketPath).parent_path(), ec);
     auto server = std::make_unique<SocketServer>(
         tools_, [this](const std::string& tool, const Json& args, const std::string& actor) {
-            // Called on a connection thread: hop to the main thread and wait. If we give up
-            // waiting, the job is marked abandoned so it can never apply changes later.
-            auto abandoned = std::make_shared<std::atomic<bool>>(false);
-            std::future<Json> f = post([this, tool, args, actor, abandoned] {
-                if (abandoned->load()) return ToolResult::error(Error::make("timeout", "request abandoned")).toMcp();
-                return callTool(tool, args, actor).toMcp();
-            });
-            if (f.wait_for(std::chrono::seconds(120)) != std::future_status::ready) {
-                abandoned->store(true);
-                return ToolResult::error(Error::make("timeout", "the editor did not respond in time")).toMcp();
-            }
-            return f.get();
+            return callToolFromConnection(tool, args, actor);
         });
     if (Status s = server->start(socketPath); !s) return s;
     server_ = std::move(server);
@@ -1220,6 +1235,13 @@ void Engine::stopAgentServer() {
         acceptingJobs_ = false;
         failQueuedJobsLocked("the agent server is stopping");
     }
+    // Slow tool work (design apps) runs on connection threads that stop() joins: ask it to end.
+    {
+        std::lock_guard lock(workMutex_);
+        for (auto& w : activeWork_) {
+            if (w->cancel) w->cancel();
+        }
+    }
     server_->stop();
     server_.reset();
     std::lock_guard lock(jobsMutex_);
@@ -1231,6 +1253,70 @@ void Engine::failQueuedJobsLocked(const std::string& why) {
         promise.set_value(ToolResult::error(Error::make("cancelled", why)).toMcp());
     }
     jobs_.clear();
+}
+
+// Called on a connection thread: hops to the main thread for the engine-touching parts and waits.
+// A tool with slow work (ToolResult::deferred) runs that part right here, so the main thread keeps
+// serving the editor and other agents. If we give up waiting, the job is marked abandoned so it can
+// never apply changes later.
+Json Engine::callToolFromConnection(const std::string& tool, const Json& args, const std::string& actor) {
+    constexpr auto kMainThreadWait = std::chrono::seconds(120);
+    auto abandoned = std::make_shared<std::atomic<bool>>(false);
+    auto pending = std::make_shared<ToolResult>();
+    std::future<Json> first = post([this, tool, args, actor, abandoned, pending]() -> Json {
+        if (abandoned->load()) return ToolResult::error(Error::make("timeout", "request abandoned")).toMcp();
+        ToolContext ctx{actor};
+        ToolResult r = tools_.invoke(tool, args, ctx);
+        if (r.deferred) {
+            *pending = std::move(r);
+            return Json::object({{"deferred", true}});
+        }
+        recordToolEvent(tool, r, actor);
+        return r.toMcp();
+    });
+    if (first.wait_for(kMainThreadWait) != std::future_status::ready) {
+        abandoned->store(true);
+        return ToolResult::error(Error::make("timeout", "the editor did not respond in time")).toMcp();
+    }
+    Json out = first.get();
+    if (!pending->deferred) return out;
+
+    std::shared_ptr<DeferredWork> work = std::move(pending->deferred);
+    {
+        std::lock_guard lock(workMutex_);
+        activeWork_.push_back(work);
+    }
+    {
+        std::lock_guard lock(jobsMutex_);
+        if (!acceptingJobs_ && work->cancel) work->cancel();  // the server started stopping meanwhile
+    }
+    auto retire = [this, &work] {
+        std::lock_guard lock(workMutex_);
+        std::erase(activeWork_, work);
+    };
+    try {
+        if (work->work) work->work();
+    } catch (const std::exception& e) {
+        retire();
+        return ToolResult::error(Error::make("internal_error", std::string("tool crashed: ") + e.what())).toMcp();
+    }
+    retire();
+    std::future<Json> second = post([this, tool, actor, work, abandoned]() -> Json {
+        if (abandoned->load()) return ToolResult::error(Error::make("timeout", "request abandoned")).toMcp();
+        ToolResult r;
+        try {
+            r = work->finish ? work->finish() : ToolResult::text("");
+        } catch (const std::exception& e) {
+            r = ToolResult::error(Error::make("internal_error", std::string("tool crashed: ") + e.what()));
+        }
+        recordToolEvent(tool, r, actor);
+        return r.toMcp();
+    });
+    if (second.wait_for(kMainThreadWait) != std::future_status::ready) {
+        abandoned->store(true);
+        return ToolResult::error(Error::make("timeout", "the editor did not respond in time")).toMcp();
+    }
+    return second.get();
 }
 
 bool Engine::agentServerRunning() const { return server_ != nullptr; }

@@ -32,6 +32,15 @@ void sky_string_free(char* str);
 /* Tools (same surface as MCP) --------------------------------------------- */
 /* Returns an MCP CallToolResult JSON: {"content":[...],"isError":bool,"structuredContent":{...}} */
 char* sky_call_tool(SkyEngine* engine, const char* name, const char* args_json, const char* actor);
+/* Non-blocking variant for tools that run slow external programs (design apps). Runs the quick part
+ * on the calling (engine) thread. Returns the final result JSON, or NULL when the tool deferred slow
+ * work: then *pending is set. Call sky_pending_run(pending) on ANY thread (it may take seconds), and
+ * afterwards sky_pending_finish on the engine thread, which returns the result JSON and frees it. */
+typedef struct SkyPendingCall SkyPendingCall;
+char* sky_call_tool_begin(SkyEngine* engine, const char* name, const char* args_json, const char* actor,
+                          SkyPendingCall** pending);
+void sky_pending_run(SkyPendingCall* pending);
+char* sky_pending_finish(SkyEngine* engine, SkyPendingCall* pending);
 /* Returns the MCP tools/list payload: {"tools":[{name,title,description,inputSchema,annotations}]} */
 char* sky_tools_list(SkyEngine* engine);
 

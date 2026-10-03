@@ -102,6 +102,18 @@ public:
     /// every client (MCP, in-editor agents, editor UI).
     ToolResult callTool(std::string_view name, const Json& args, const std::string& actor);
 
+    /// Non-blocking variant of callTool() for callers that must keep running while a slow tool
+    /// works (the editor's agents): beginTool() runs the quick part on the main thread. If the tool
+    /// deferred slow work (`call.result.deferred`), run `call.result.deferred->work()` on any thread
+    /// and then call finishTool() on the main thread; otherwise `call.result` is already final.
+    struct PendingCall {
+        std::string tool;
+        std::string actor;
+        ToolResult result;
+    };
+    PendingCall beginTool(std::string_view name, const Json& args, const std::string& actor);
+    ToolResult finishTool(PendingCall& call);
+
     /// Runs `fn` as one undoable, attributed transaction. Rolls back on failure. Nested
     /// calls join the outer transaction (used by `batch`).
     Status edit(const std::string& actor, const std::string& label, const std::function<Status()>& fn);
@@ -297,6 +309,10 @@ private:
     bool shuttingDown_ = false;   // guarded by jobsMutex_
     bool acceptingJobs_ = true;   // guarded by jobsMutex_
     void failQueuedJobsLocked(const std::string& why);
+    void recordToolEvent(std::string_view name, const ToolResult& result, const std::string& actor);
+    Json callToolFromConnection(const std::string& tool, const Json& args, const std::string& actor);
+    std::mutex workMutex_;
+    std::vector<std::shared_ptr<DeferredWork>> activeWork_;  // deferred tool work running on connection threads
     int editDepth_ = 0;
     std::deque<std::pair<std::function<Json()>, std::promise<Json>>> jobs_;
     std::unique_ptr<SocketServer> server_;
