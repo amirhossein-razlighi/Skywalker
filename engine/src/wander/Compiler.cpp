@@ -577,11 +577,22 @@ private:
         return at;
     }
     void patchHere(size_t at) {
-        P().code[at].setSbx(static_cast<int32_t>(pc()) - static_cast<int32_t>(at + 1));
+        patchTo(at, pc());
         fn_->labelPc = static_cast<int>(pc());
     }
     void patchTo(size_t at, size_t target) {
-        P().code[at].setSbx(static_cast<int32_t>(target) - static_cast<int32_t>(at + 1));
+        int32_t off = static_cast<int32_t>(target) - static_cast<int32_t>(at + 1);
+        Ins& in = P().code[at];
+        if (in.op == Op::JmpCmp) {
+            if (off < -32768 || off > 32767) {
+                error(P().locs[at], "too_complex", "this function is too large (a branch spans more than 32767 instructions)",
+                      "split it into smaller functions");
+                return;
+            }
+            in.c = static_cast<uint16_t>(static_cast<int16_t>(off));
+            return;
+        }
+        in.setSbx(off);
     }
     void emitJumpTo(Op op, int a, size_t target, SourceLoc loc) {
         size_t at = emit(op, a, 0, 0, loc);
@@ -994,11 +1005,11 @@ private:
                         block(body);
                         break;
                     }
-                    size_t skip = condJump(*cond, /*jumpIfTrue=*/false);
+                    Jumps skip = condJump(*cond, /*jumpIfTrue=*/false);
                     block(body);
                     bool last = i + 1 == s.branches.size();
                     if (!last) ends.push_back(emitJump(Op::Jmp, 0, s.loc));
-                    patchHere(skip);
+                    patchAllHere(skip);
                 }
                 for (size_t e : ends) patchHere(e);
                 return;
@@ -1007,12 +1018,12 @@ private:
                 if (!s.value) return;
                 size_t top = pc();
                 markLabel();
-                size_t exit = condJump(*s.value, false);
+                Jumps exit = condJump(*s.value, false);
                 fn_->loops.push_back({});
                 fn_->loops.back().continueTarget = top;
                 block(s.body);
                 emitJumpTo(Op::Jmp, 0, top, s.loc);
-                patchHere(exit);
+                patchAllHere(exit);
                 finishLoop(SIZE_MAX);
                 return;
             }
@@ -1086,10 +1097,10 @@ private:
                 if (s.waitKind == WaitKind::Until) {
                     size_t top = pc();
                     markLabel();
-                    size_t done = condJump(*s.value, true);
+                    Jumps done = condJump(*s.value, true);
                     emit(Op::Wait, 0, rk(Value::number(1), s.loc), 0, s.loc, 1);
                     emitJumpTo(Op::Jmp, 0, top, s.loc);
-                    patchHere(done);
+                    patchAllHere(done);
                     return;
                 }
                 Operand amount = operand(*s.value);
@@ -1691,13 +1702,48 @@ private:
         return nullptr;
     }
 
-    // Emits code for a condition and a jump taken when the condition is `jumpIfTrue`.
-    size_t condJump(const Expr& cond, bool jumpIfTrue) {
-        Operand o = operand(cond);
-        int r = toReg(o, cond.loc);
-        size_t j = emitJump(jumpIfTrue ? Op::JmpIf : Op::JmpIfNot, r, cond.loc);
+    using Jumps = std::vector<size_t>;
+
+    // Emits code for a condition; the returned jumps are taken when it equals `jumpIfTrue`.
+    // `and`/`or`/`not` become jump chains and comparisons fused compare-and-jumps, so no
+    // booleans are materialized.
+    Jumps condJump(const Expr& cond, bool jumpIfTrue) {
+        Jumps j = jumpIf(cond, jumpIfTrue);
         freeTemps();
         return j;
+    }
+
+    void patchAllHere(const Jumps& js) {
+        for (size_t j : js) patchHere(j);
+    }
+
+    Jumps jumpIf(const Expr& e, bool sense) {
+        if (e.kind == Expr::Kind::Unary && e.text == "not" && e.lhs) return jumpIf(*e.lhs, !sense);
+        if (e.kind == Expr::Kind::Binary && (e.text == "and" || e.text == "or") && e.lhs && e.rhs) {
+            bool isAnd = e.text == "and";
+            if (isAnd != sense) {  // (a and b) is false / (a or b) is true: either side decides
+                Jumps a = jumpIf(*e.lhs, sense);
+                Jumps b = jumpIf(*e.rhs, sense);
+                a.insert(a.end(), b.begin(), b.end());
+                return a;
+            }
+            Jumps skip = jumpIf(*e.lhs, !sense);  // the left side settles it the other way
+            Jumps b = jumpIf(*e.rhs, sense);
+            patchAllHere(skip);
+            return b;
+        }
+        if (e.kind == Expr::Kind::Binary && isComparison(e.text) && e.lhs && e.rhs) {
+            bool rhsMutates = containsMethodCall(e.rhs.get());
+            Operand a = operand(*e.lhs, rhsMutates);
+            Operand b = operand(*e.rhs);
+            checkBinary(e.text, a, b, e.loc);
+            static const std::unordered_map<std::string, int> kinds{{"<", 0}, {"<=", 1}, {">", 2}, {">=", 3}, {"==", 4}, {"!=", 5}};
+            int kind = kinds.at(e.text) | (sense ? 0 : 8);
+            return {emit(Op::JmpCmp, a.rk, b.rk, 0, e.loc, static_cast<uint8_t>(kind))};
+        }
+        Operand o = operand(e);
+        int r = toReg(o, e.loc);
+        return {emitJump(sense ? Op::JmpIf : Op::JmpIfNot, r, e.loc)};
     }
 
     TypeSet exprTo(const Expr& e, int dst) {
@@ -1814,7 +1860,21 @@ private:
     }
 
     TypeSet binaryOp(const std::string& op, Operand a, Operand b, int dst, SourceLoc loc) {
-        // Static check: report when no combination of the possible types is valid.
+        TypeSet result = checkBinary(op, a, b, loc);
+        static const std::unordered_map<std::string, Op> ops{
+            {"+", Op::Add}, {"-", Op::Sub}, {"*", Op::Mul}, {"/", Op::Div}, {"%", Op::Mod}, {"==", Op::Eq},
+            {"!=", Op::Ne}, {"<", Op::Lt},  {"<=", Op::Le}, {">", Op::Gt},  {">=", Op::Ge}, {"in", Op::In}};
+        auto it = ops.find(op);
+        if (it == ops.end()) {
+            error(loc, "internal", "unknown operator " + op);
+            return kTAny;
+        }
+        emit(it->second, dst, a.rk, b.rk, loc);
+        return result;
+    }
+
+    // Static check: reports when no combination of the possible types is valid.
+    TypeSet checkBinary(const std::string& op, Operand a, Operand b, SourceLoc loc) {
         TypeSet result = 0;
         bool anyValid = false;
         for (uint32_t i = 0; i < 9; ++i) {
@@ -1833,15 +1893,6 @@ private:
             error(loc, "type_mismatch", "cannot apply '" + op + "' to " + typeSetName(a.type) + " and " + typeSetName(b.type), hint);
             result = kTAny;
         }
-        static const std::unordered_map<std::string, Op> ops{
-            {"+", Op::Add}, {"-", Op::Sub}, {"*", Op::Mul}, {"/", Op::Div}, {"%", Op::Mod}, {"==", Op::Eq},
-            {"!=", Op::Ne}, {"<", Op::Lt},  {"<=", Op::Le}, {">", Op::Gt},  {">=", Op::Ge}, {"in", Op::In}};
-        auto it = ops.find(op);
-        if (it == ops.end()) {
-            error(loc, "internal", "unknown operator " + op);
-            return kTAny;
-        }
-        emit(it->second, dst, a.rk, b.rk, loc);
         return result ? result : kTAny;
     }
 
@@ -2166,7 +2217,7 @@ private:
         int argc = static_cast<int>(args.size());
         std::string sig = label + "(" + joinNames(f.params) + ")";
         checkArity(label + "()", argc, static_cast<int>(f.params.size()), static_cast<int>(f.params.size()), loc, sig);
-        int base = allocRegs(std::max(argc, 1), loc);
+        int base = callBase(dst, std::max(argc, 1), loc);
         auto types = argsTo(args, base);
         for (size_t i = 0; i < types.size() && i < f.paramTypes.size(); ++i) {
             if (args[i] && !(f.paramTypes[i] & types[i])) {
@@ -2177,6 +2228,16 @@ private:
         emit(Op::CallF, base, fnIndex, argc, loc);
         if (base != dst) emit(Op::Move, dst, base, 0, loc);
         return f.returns;
+    }
+
+    // Where a call's arguments go (the result lands in the first). When `dst` is the newest
+    // scratch register, the call is built right there and needs no final move.
+    int callBase(int dst, int n, SourceLoc loc) {
+        if (dst == fn_->freeReg - 1 && dst >= localsEnd()) {
+            allocRegs(n - 1, loc);
+            return dst;
+        }
+        return allocRegs(n, loc);
     }
 
     TypeSet callTo(const Expr& e, int dst) {
@@ -2204,7 +2265,7 @@ private:
         }
         int argc = static_cast<int>(e.args.size());
         checkArity(n + "()", argc, def->minArgs(), def->maxArgs(), e.loc, def->signature());
-        int base = allocRegs(std::max(argc, 1), e.loc);
+        int base = callBase(dst, std::max(argc, 1), e.loc);
         auto types = argsTo(e.args, base);
         checkBuiltinArgs(*def, types, e.args, n + "()");
         emit(Op::Call, base, builtinRef(def), argc, e.loc);

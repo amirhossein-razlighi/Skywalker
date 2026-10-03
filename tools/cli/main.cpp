@@ -4,7 +4,8 @@
 //   skywalker mcp --attach [SOCKET]                  MCP stdio bridge to a running editor
 //   skywalker render SCENE -o out.png [--width W --height H --annotate --scene-camera]
 //   skywalker run SCENE [--ticks N] [-o out.png]     simulate deterministically, print logs
-//   skywalker check FILE.wander                      compile Wander, print diagnostics
+//   skywalker check FILE.wander [--project DIR] [--disassemble] [--format]
+//                                                    compile Wander, print diagnostics
 //   skywalker call TOOL [JSON] [--scene FILE]        call one tool, print the result
 //   skywalker tools [--markdown]                     list tools
 //   skywalker version
@@ -27,6 +28,8 @@
 #include "skywalker/core/Strings.h"
 #include "skywalker/engine/Engine.h"
 #include "skywalker/wander/Compiler.h"
+#include "skywalker/wander/Parser.h"
+#include "skywalker/wander/Runtime.h"
 
 using namespace sky;
 
@@ -81,7 +84,7 @@ int usage() {
                  "  skywalker mcp --attach [SOCKET]                bridge to a running editor\n"
                  "  skywalker render SCENE -o out.png [--width W] [--height H] [--annotate] [--scene-camera]\n"
                  "  skywalker run SCENE [--ticks N] [-o out.png]\n"
-                 "  skywalker check FILE.wander\n"
+                 "  skywalker check FILE.wander [--project DIR] [--disassemble] [--format]\n"
                  "  skywalker call TOOL [JSON] [--scene FILE] [--project DIR] [-o image.png]\n"
                  "  skywalker call TOOL [JSON] --attach [--as NAME] [--socket PATH]   (on the running editor)\n"
                  "  skywalker tools [--markdown]\n"
@@ -199,13 +202,24 @@ int runCheck(const Args& args) {
         std::fprintf(stderr, "error: cannot read %s\n", args.positional[1].c_str());
         return 1;
     }
-    auto r = wander::compile(src, {"transform", "mesh", "light", "camera"});
+    // Compile exactly like the engine does: every component, engine builtins, and `use`
+    // modules from the project folder.
+    registerEngineBuiltins();
+    Scene scene;
+    wander::Runtime rt(scene);
+    rt.setProjectDir(args.get("--project", "."));
+    auto r = wander::compile(src, rt.compileOptions());
     for (const auto& d : r.diagnostics) {
-        std::printf("%s:%d:%d: %s: %s [%s]%s%s\n", args.positional[1].c_str(), d.loc.line, d.loc.column,
+        std::string file = d.file.empty() ? args.positional[1] : d.file;
+        std::printf("%s:%d:%d: %s: %s [%s]%s%s\n", file.c_str(), d.loc.line, d.loc.column,
                     d.severity == wander::Severity::Error ? "error" : "warning", d.message.c_str(), d.code.c_str(),
                     d.hint.empty() ? "" : "\n  hint: ", d.hint.c_str());
     }
-    if (r.ok()) std::printf("ok: %zu behavior(s)\n", r.program->behaviors.size());
+    if (args.has("--format") && r.module) std::printf("%s", wander::format(*r.module).c_str());
+    if (r.ok() && args.has("--disassemble")) std::printf("%s", r.program->disassemble().c_str());
+    if (r.ok()) {
+        std::printf("ok: %zu behavior(s), %zu instructions\n", r.program->behaviors.size(), r.program->instructionCount());
+    }
     return r.ok() ? 0 : 1;
 }
 

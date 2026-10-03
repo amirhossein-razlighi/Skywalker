@@ -116,6 +116,7 @@ void Scene::clear() {
     nextId_ = 1;
     environment_ = Environment{};
     ++revision_;
+    ++behaviorsRevision_;
 }
 
 EntityRecord* Scene::record(EntityId id) {
@@ -274,6 +275,7 @@ Status Scene::setBehaviors(EntityId id, const Json& behaviors) {
         scripts.push_back(std::move(s));
     }
     notify(id);
+    ++behaviorsRevision_;
     ecs::Entity h = handle(id);
     if (scripts.empty()) {
         registry_.remove<Behavior>(h);

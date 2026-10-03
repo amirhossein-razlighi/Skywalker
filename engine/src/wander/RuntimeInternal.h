@@ -30,8 +30,10 @@ struct Outcome {
 
 struct VarSlot {
     uint32_t sym = 0;
+    const std::string* name = nullptr;  // interned (stable) name
     Value value;
-    Json mirrored;  // what EntityRecord::vars holds for this name (detects outside edits)
+    bool inScene = false;  // EntityRecord::vars holds this name (we imported or mirrored it)
+    size_t sceneIndex = 0; // position hint inside EntityRecord::vars
     bool dirty = false;
 };
 
@@ -79,6 +81,14 @@ struct Instance {
     std::vector<BehaviorRun> behaviors;
     std::vector<Coroutine> coroutines;
     int transitionsThisTick = 0;
+    const NativeProgram* native = nullptr;  // AOT code for this program (refreshed every tick)
+    bool dead = false;  // script disabled or replaced during this tick: stop running handlers
+};
+
+struct InstanceKeyHash {
+    size_t operator()(const std::pair<EntityId, size_t>& k) const {
+        return std::hash<uint64_t>()(k.first * 1000003ULL + k.second);
+    }
 };
 
 struct PendingEvent {
@@ -111,7 +121,7 @@ struct ExecState {
 };
 
 struct Runtime::Impl {
-    std::map<std::pair<EntityId, size_t>, Instance> instances;
+    std::unordered_map<std::pair<EntityId, size_t>, Instance, InstanceKeyHash> instances;
     std::unordered_map<EntityId, VarTable> vars;
     std::vector<PendingEvent> pending;
     std::vector<PendingEvent> nextPending;
@@ -142,6 +152,8 @@ struct Runtime::Impl {
     };
     std::map<std::string, ModuleFile> modules;
     uint64_t moduleRevision = 1;
+    uint64_t scannedBehaviors = ~0ULL;  // Scene::behaviorsRevision() at the last compile scan
+    uint64_t scannedEpoch = 0;
 
     // Component field resolution cache ("light.intensity" -> kind + field).
     struct ResolvedField {
@@ -153,11 +165,23 @@ struct Runtime::Impl {
 
 // --- shared helpers (Runtime.cpp) --------------------------------------------------
 [[noreturn]] void raise(SourceLoc loc, std::string message);
-bool truthy(const Scene& scene, const Value& v);
+inline bool truthy(const Scene& scene, const Value& v) {
+    switch (v.type()) {
+        case VType::Bool: return v.b();
+        case VType::Number: return v.num() != 0;
+        case VType::None: return false;
+        case VType::Entity: return scene.exists(v.e());
+        default: return v.truthyData();
+    }
+}
 std::string displayValue(const Scene& scene, const Value& v);
 Vec3 worldPosition(const Scene& scene, EntityId id);
 
 VarTable& varTable(Runtime::Impl& impl, Scene& scene, EntityId id);
+VarSlot makeSlot(uint32_t sym);
+/// Instances of an entity (one per script), in script order.
+template <typename Fn>
+void forEachInstance(Runtime::Impl& impl, const Scene& scene, EntityId e, Fn&& fn);
 /// Entity var by name (none if unset); imports outside edits lazily.
 Value getEntityVar(Runtime::Impl& impl, Scene& scene, EntityId id, uint32_t sym);
 void setEntityVar(Runtime::Impl& impl, Scene& scene, EntityId id, uint32_t sym, Value v);
@@ -173,6 +197,16 @@ bool execOne(ExecState& st, int proto, Value* regs, size_t& pc, Outcome& out);
 bool aotRun(ExecState& st, int proto, Value* regs, size_t pc, Outcome& out);
 
 ExecState& CallContextAccess(CallContext& c);
+
+template <typename Fn>
+void forEachInstance(Runtime::Impl& impl, const Scene& scene, EntityId e, Fn&& fn) {
+    const Behavior* b = scene.get<Behavior>(e);
+    if (!b) return;
+    for (size_t si = 0; si < b->scripts.size(); ++si) {
+        auto it = impl.instances.find({e, si});
+        if (it != impl.instances.end()) fn(it->second);
+    }
+}
 
 /// Text for UTF-8 code points of a string (iteration, indexing, length).
 std::vector<std::string> utf8Chars(const std::string& s);

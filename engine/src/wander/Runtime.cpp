@@ -39,11 +39,6 @@ Json RuntimeMessage::toJson() const {
 
 void raise(SourceLoc loc, std::string message) { throw RuntimeError{loc, std::move(message), {}}; }
 
-bool truthy(const Scene& scene, const Value& v) {
-    if (v.isEntity()) return scene.exists(v.e());
-    return v.truthyData();
-}
-
 namespace {
 
 void appendDisplay(const Scene& scene, std::string& out, const Value& v, bool quoteStrings) {
@@ -120,6 +115,13 @@ size_t utf8Length(const std::string& s) {
     return n;
 }
 
+VarSlot makeSlot(uint32_t sym) {
+    VarSlot s;
+    s.sym = sym;
+    s.name = &symbolName(sym);
+    return s;
+}
+
 VarTable& varTable(Runtime::Impl& impl, Scene& scene, EntityId id) {
     auto it = impl.vars.find(id);
     if (it != impl.vars.end()) return it->second;
@@ -127,10 +129,9 @@ VarTable& varTable(Runtime::Impl& impl, Scene& scene, EntityId id) {
     t.entity = id;
     if (const EntityRecord* rec = scene.record(id)) {
         for (const auto& [k, v] : rec->vars.members()) {
-            VarSlot s;
-            s.sym = intern(k);
+            VarSlot s = makeSlot(intern(k));
             s.value = fromJson(v);
-            s.mirrored = v;
+            s.inScene = true;
             t.slots.push_back(std::move(s));
         }
     }
@@ -144,10 +145,9 @@ Value getEntityVar(Runtime::Impl& impl, Scene& scene, EntityId id, uint32_t sym)
     // Set from outside since the table was built (an agent or tool between ticks)?
     if (const EntityRecord* rec = scene.record(id)) {
         if (const Json* j = rec->vars.find(symbolName(sym))) {
-            VarSlot s;
-            s.sym = sym;
+            VarSlot s = makeSlot(sym);
             s.value = fromJson(*j);
-            s.mirrored = *j;
+            s.inScene = true;
             t.slots.push_back(s);
             return t.slots.back().value;
         }
@@ -159,9 +159,7 @@ void setEntityVar(Runtime::Impl& impl, Scene& scene, EntityId id, uint32_t sym, 
     VarTable& t = varTable(impl, scene, id);
     int i = t.find(sym);
     if (i < 0) {
-        VarSlot s;
-        s.sym = sym;
-        t.slots.push_back(std::move(s));
+        t.slots.push_back(makeSlot(sym));
         i = static_cast<int>(t.slots.size() - 1);
     }
     t.slots[i].value = std::move(v);
@@ -444,16 +442,19 @@ EntityId requireEntity(const Scene& scene, const Value& v, SourceLoc loc, const 
     return v.e();
 }
 
-std::string currentStateOf(const Runtime::Impl& impl, EntityId e) {
-    for (auto it = impl.instances.lower_bound({e, 0}); it != impl.instances.end() && it->first.first == e; ++it) {
-        const Instance& inst = it->second;
-        if (!inst.program) continue;
+std::string currentStateOf(Runtime::Impl& impl, const Scene& scene, EntityId e) {
+    std::string out;
+    forEachInstance(impl, scene, e, [&](const Instance& inst) {
+        if (!out.empty() || !inst.program) return;
         for (size_t b = 0; b < inst.behaviors.size() && b < inst.program->behaviors.size(); ++b) {
             int s = inst.behaviors[b].state;
-            if (s >= 0) return inst.program->behaviors[b].states[s].name;
+            if (s >= 0) {
+                out = inst.program->behaviors[b].states[s].name;
+                return;
+            }
         }
-    }
-    return {};
+    });
+    return out;
 }
 
 Value getEntityMember(ExecState& st, EntityId id, const MemberRef& m, SourceLoc loc) {
@@ -484,7 +485,7 @@ Value getEntityMember(ExecState& st, EntityId id, const MemberRef& m, SourceLoc 
             return p ? Value::entity(p) : Value();
         }
         case K::State: {
-            std::string s = currentStateOf(st.impl, id);
+            std::string s = currentStateOf(st.impl, scene, id);
             return s.empty() ? Value() : Value::string(s);
         }
         default: break;
@@ -704,12 +705,13 @@ const BehaviorRun* behaviorRunFor(ExecState& st) {
     if (st.behavior < 0) return nullptr;
     if (st.inst && st.inst->program.get() == st.prog) return &st.inst->behaviors[st.behavior];
     // Test drivers: the instance of this program on `self`.
-    for (auto it = st.impl.instances.lower_bound({st.self, 0}); it != st.impl.instances.end() && it->first.first == st.self; ++it) {
-        if (it->second.program.get() == st.prog && st.behavior < static_cast<int>(it->second.behaviors.size())) {
-            return &it->second.behaviors[st.behavior];
+    const BehaviorRun* found = nullptr;
+    forEachInstance(st.impl, st.scene, st.self, [&](Instance& inst) {
+        if (!found && inst.program.get() == st.prog && st.behavior < static_cast<int>(inst.behaviors.size())) {
+            found = &inst.behaviors[st.behavior];
         }
-    }
-    return nullptr;
+    });
+    return found;
 }
 
 Value& varRef(ExecState& st, int var) {
@@ -725,9 +727,7 @@ Value& varRef(ExecState& st, int var) {
         (void)getEntityVar(st.impl, st.scene, st.self, sym);
         i = t.find(sym);
         if (i < 0) {
-            VarSlot s;
-            s.sym = sym;
-            t.slots.push_back(std::move(s));
+            t.slots.push_back(makeSlot(sym));
             i = static_cast<int>(t.slots.size() - 1);
         }
     }
@@ -765,7 +765,10 @@ bool interpret(ExecState& st, int protoIndex, Value* R, size_t& pc, Outcome& out
         switch (in.op) {
             case Op::Nop: break;
             case Op::Move: R[in.a] = R[in.b]; break;
-            case Op::LoadK: R[in.a] = K[in.b]; break;
+            case Op::LoadK:
+                if (K[in.b].isNumber()) R[in.a].setNumber(K[in.b].num());
+                else R[in.a] = K[in.b];
+                break;
             case Op::LoadNone: R[in.a] = Value(); break;
             case Op::LoadBool: R[in.a] = Value::boolean(in.b != 0); break;
             case Op::LoadSelf: R[in.a] = Value::entity(st.self); break;
@@ -806,7 +809,7 @@ bool interpret(ExecState& st, int protoIndex, Value* R, size_t& pc, Outcome& out
                 const Value& b = RK(in.b);
                 const Value& c = RK(in.c);
                 if (b.isNumber() && c.isNumber()) {
-                    R[in.a] = Value::number(b.num() + c.num());
+                    R[in.a].setNumber(b.num() + c.num());
                 } else {
                     R[in.a] = arith(st.scene, Op::Add, b, c, LOC);
                 }
@@ -816,7 +819,7 @@ bool interpret(ExecState& st, int protoIndex, Value* R, size_t& pc, Outcome& out
                 const Value& b = RK(in.b);
                 const Value& c = RK(in.c);
                 if (b.isNumber() && c.isNumber()) {
-                    R[in.a] = Value::number(b.num() - c.num());
+                    R[in.a].setNumber(b.num() - c.num());
                 } else {
                     R[in.a] = arith(st.scene, Op::Sub, b, c, LOC);
                 }
@@ -826,7 +829,7 @@ bool interpret(ExecState& st, int protoIndex, Value* R, size_t& pc, Outcome& out
                 const Value& b = RK(in.b);
                 const Value& c = RK(in.c);
                 if (b.isNumber() && c.isNumber()) {
-                    R[in.a] = Value::number(b.num() * c.num());
+                    R[in.a].setNumber(b.num() * c.num());
                 } else {
                     R[in.a] = arith(st.scene, Op::Mul, b, c, LOC);
                 }
@@ -836,7 +839,7 @@ bool interpret(ExecState& st, int protoIndex, Value* R, size_t& pc, Outcome& out
                 const Value& b = RK(in.b);
                 const Value& c = RK(in.c);
                 if (b.isNumber() && c.isNumber() && c.num() != 0) {
-                    R[in.a] = Value::number(b.num() / c.num());
+                    R[in.a].setNumber(b.num() / c.num());
                 } else {
                     R[in.a] = arith(st.scene, Op::Div, b, c, LOC);
                 }
@@ -845,7 +848,7 @@ bool interpret(ExecState& st, int protoIndex, Value* R, size_t& pc, Outcome& out
             case Op::Mod: R[in.a] = arith(st.scene, Op::Mod, RK(in.b), RK(in.c), LOC); break;
             case Op::Neg: {
                 const Value& b = R[in.b];
-                if (b.isNumber()) R[in.a] = Value::number(-b.num());
+                if (b.isNumber()) R[in.a].setNumber(-b.num());
                 else if (b.isVec()) R[in.a] = Value::vec(-b.v());
                 else if (b.isBool()) R[in.a] = Value::number(b.b() ? -1 : 0);
                 else raise(LOC, std::string("cannot negate a ") + typeName(b.type()));
@@ -853,7 +856,7 @@ bool interpret(ExecState& st, int protoIndex, Value* R, size_t& pc, Outcome& out
             }
             case Op::Not: {
                 bool t = truthy(st.scene, R[in.b]);
-                R[in.a] = Value::boolean(in.x ? t : !t);
+                R[in.a].setBool(in.x ? t : !t);
                 break;
             }
             case Op::Eq: R[in.a] = Value::boolean(RK(in.b) == RK(in.c)); break;
@@ -871,7 +874,7 @@ bool interpret(ExecState& st, int protoIndex, Value* R, size_t& pc, Outcome& out
                 } else {
                     r = compare(in.op, b, c, LOC);
                 }
-                R[in.a] = Value::boolean(r);
+                R[in.a].setBool(r);
                 break;
             }
             case Op::In: R[in.a] = Value::boolean(contains(RK(in.b), RK(in.c), LOC)); break;
@@ -887,6 +890,34 @@ bool interpret(ExecState& st, int protoIndex, Value* R, size_t& pc, Outcome& out
             case Op::JmpIfNot:
                 if (!truthy(st.scene, R[in.a])) pc = static_cast<size_t>(static_cast<int64_t>(pc) + in.sbx());
                 break;
+            case Op::JmpCmp: {
+                const Value& b = RK(in.a);
+                const Value& c = RK(in.b);
+                int kind = in.x & 7;
+                bool r;
+                if (b.isNumber() && c.isNumber()) {
+                    double x = b.num(), y = c.num();
+                    switch (kind) {
+                        case 0: r = x < y; break;
+                        case 1: r = x <= y; break;
+                        case 2: r = x > y; break;
+                        case 3: r = x >= y; break;
+                        case 4: r = x == y; break;
+                        default: r = x != y; break;
+                    }
+                } else if (kind >= 4) {
+                    r = (b == c) == (kind == 4);
+                } else {
+                    static const Op ops[] = {Op::Lt, Op::Le, Op::Gt, Op::Ge};
+                    r = compare(ops[kind], b, c, LOC);
+                }
+                if (r != ((in.x & 8) != 0)) {
+                    auto off = static_cast<int16_t>(in.c);
+                    if (off < 0) charge(st, -off, LOC);
+                    pc = static_cast<size_t>(static_cast<int64_t>(pc) + off);
+                }
+                break;
+            }
             case Op::NewList: {
                 std::vector<Value> items;
                 items.reserve(in.c);
@@ -1023,8 +1054,8 @@ bool interpret(ExecState& st, int protoIndex, Value* R, size_t& pc, Outcome& out
                 double d = R[in.a + 2].num();
                 bool run = d > 0 ? (in.x ? v <= l : v < l) : (in.x ? v >= l : v > l);
                 if (run) {
-                    R[in.a] = Value::number(v);
-                    R[in.a + 3] = Value::number(v);
+                    R[in.a].setNumber(v);
+                    R[in.a + 3].setNumber(v);
                     int32_t off = in.sbx();
                     charge(st, -off, LOC);
                     pc = static_cast<size_t>(static_cast<int64_t>(pc) + off);
@@ -1207,6 +1238,9 @@ bool Runtime::refreshModules() {
 
 void Runtime::compileScripts() {
     uint64_t epoch = impl_->moduleRevision * 1000003ULL + registry_->generation();
+    if (impl_->scannedBehaviors == scene_.behaviorsRevision() && impl_->scannedEpoch == epoch) return;
+    impl_->scannedBehaviors = scene_.behaviorsRevision();
+    impl_->scannedEpoch = epoch;
     std::optional<CompileOptions> opts;
     for (EntityId id : scene_.entities()) {
         Behavior* b = scene_.get<Behavior>(id);
@@ -1260,7 +1294,7 @@ void Runtime::attachNative(uint64_t programHash, std::shared_ptr<const NativePro
 void Runtime::detachNative(uint64_t programHash) { native_.erase(programHash); }
 void Runtime::clearNative() { native_.clear(); }
 
-std::string Runtime::currentState(EntityId e) const { return currentStateOf(*impl_, e); }
+std::string Runtime::currentState(EntityId e) const { return currentStateOf(*impl_, scene_, e); }
 
 // --- scheduling ------------------------------------------------------------------------
 
@@ -1272,15 +1306,17 @@ struct Scheduler {
     Scene& scene;
     float dt;
     const InputState& input;
-    const std::unordered_map<uint64_t, std::shared_ptr<const NativeProgram>>& native;
 
     Script* script(const Instance& inst) {
         Behavior* b = scene.get<Behavior>(inst.entity);
         return b && inst.scriptIndex < b->scripts.size() ? &b->scripts[inst.scriptIndex] : nullptr;
     }
-    bool alive(const Instance& inst) {
+    // Scripts only change between ticks (tools) or when the runtime disables one after
+    // repeated errors, so the full check runs once per instance per tick.
+    bool alive(const Instance& inst) const { return !inst.dead; }
+    void checkAlive(Instance& inst) {
         Script* s = script(inst);
-        return s && s->enabled && s->program == inst.program;
+        inst.dead = !(s && s->enabled && s->program == inst.program);
     }
 
     void report(Instance& inst, const RuntimeError& err, const std::string& file) {
@@ -1288,6 +1324,7 @@ struct Scheduler {
         Script* s = script(inst);
         if (s && ++s->runtimeErrors >= kMaxErrorsBeforeDisable && s->enabled) {
             s->enabled = false;
+            inst.dead = true;
             impl.messages.push_back({RuntimeMessage::Kind::Error, inst.entity, inst.scriptName, err.loc.line,
                                      "script disabled after repeated runtime errors", file});
         }
@@ -1296,8 +1333,7 @@ struct Scheduler {
     ExecState state(Instance& inst, int behavior, EntityId other) {
         ExecState st(rt, impl, scene);
         st.prog = inst.program.get();
-        auto it = native.find(inst.program->hash);
-        st.native = it == native.end() ? nullptr : it->second.get();
+        st.native = inst.native;
         st.inst = &inst;
         st.scriptName = &inst.scriptName;
         st.behavior = behavior;
@@ -1498,6 +1534,8 @@ struct Scheduler {
 
     void tickInstance(Instance& inst) {
         inst.transitionsThisTick = 0;
+        checkAlive(inst);
+        if (!alive(inst)) return;
         if (!inst.started) start(inst);
         if (!alive(inst)) return;
         resumeCoroutines(inst);
@@ -1550,21 +1588,22 @@ void Runtime::tick(float dt, const InputState& input) {
             const EntityRecord* rec = scene_.record(id);
             if (!rec) continue;
             for (auto& slot : table.slots) {
-                const Json* j = rec->vars.find(symbolName(slot.sym));
+                // The scene holds what we last mirrored unless someone edited it since.
+                const Json* j = rec->vars.find(*slot.name);
                 if (!j) {
-                    if (!slot.mirrored.isNull()) {
+                    if (slot.inScene) {
                         slot.value = Value();
-                        slot.mirrored = Json();
+                        slot.inScene = false;
                     }
-                } else if (*j != slot.mirrored) {
+                } else if (!slot.inScene || *j != toJson(slot.value)) {
                     slot.value = fromJson(*j);
-                    slot.mirrored = *j;
+                    slot.inScene = true;
                 }
             }
         }
     }
 
-    Scheduler sched{*this, impl, scene_, dt, input, native_};
+    Scheduler sched{*this, impl, scene_, dt, input};
     // Snapshot the order: entities spawned this tick start running next tick.
     const std::vector<EntityId> order = scene_.entities();
     for (EntityId id : order) {
@@ -1575,13 +1614,21 @@ void Runtime::tick(float dt, const InputState& input) {
             if (!b || si >= b->scripts.size()) break;
             const Script& script = b->scripts[si];
             if (!script.enabled || !script.program) continue;
-            Instance& inst = impl.instances[{id, si}];
+            auto found = impl.instances.find({id, si});
+            if (found == impl.instances.end()) found = impl.instances.emplace(std::make_pair(id, si), Instance{}).first;
+            Instance& inst = found->second;
             if (inst.program != script.program) {  // behavior replaced (e.g. live edit): start fresh
                 inst = Instance{};
                 inst.program = script.program;
                 inst.entity = id;
                 inst.scriptIndex = si;
                 inst.scriptName = script.name;
+            }
+            if (native_.empty()) {
+                inst.native = nullptr;
+            } else {
+                auto nit = native_.find(inst.program->hash);
+                inst.native = nit == native_.end() ? nullptr : nit->second.get();
             }
             sched.tickInstance(inst);
         }
@@ -1607,9 +1654,16 @@ void Runtime::tick(float dt, const InputState& input) {
             if (!slot.dirty) continue;
             slot.dirty = false;
             if (!rec) continue;
-            Json j = toJson(slot.value);
-            rec->vars[symbolName(slot.sym)] = j;
-            slot.mirrored = std::move(j);
+            auto& members = rec->vars.members();
+            if (slot.sceneIndex < members.size() && members[slot.sceneIndex].first == *slot.name) {
+                members[slot.sceneIndex].second = toJson(slot.value);
+            } else {
+                rec->vars[*slot.name] = toJson(slot.value);
+                for (size_t k = 0; k < members.size(); ++k) {
+                    if (members[k].first == *slot.name) slot.sceneIndex = k;
+                }
+            }
+            slot.inScene = true;
         }
     }
     impl.lastRevision = scene_.revision();
@@ -1621,9 +1675,8 @@ void Runtime::tick(float dt, const InputState& input) {
 
 Json Runtime::inspect(EntityId e) const {
     Json out = Json::array();
-    for (auto it = impl_->instances.lower_bound({e, 0}); it != impl_->instances.end() && it->first.first == e; ++it) {
-        const Instance& inst = it->second;
-        if (!inst.program) continue;
+    forEachInstance(*impl_, scene_, e, [&](const Instance& inst) {
+        if (!inst.program) return;
         Json behaviors = Json::array();
         for (size_t b = 0; b < inst.program->behaviors.size(); ++b) {
             const BehaviorInfo& info = inst.program->behaviors[b];
@@ -1649,7 +1702,7 @@ Json Runtime::inspect(EntityId e) const {
             behaviors.push(j);
         }
         out.push(Json::object({{"script", inst.scriptName}, {"started", inst.started}, {"behaviors", behaviors}}));
-    }
+    });
     return out;
 }
 

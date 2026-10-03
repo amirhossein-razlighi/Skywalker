@@ -10,7 +10,7 @@ const char* opName(Op op) {
                                   "GETVAR",   "SETVAR",    "GETMEMBER", "SETMEMBER", "GETFIELD", "SETFIELD", "INDEX",
                                   "SETINDEX", "ADD",       "SUB",       "MUL",      "DIV",      "MOD",      "NEG",
                                   "NOT",      "EQ",        "NE",        "LT",       "LE",       "GT",       "GE",
-                                  "IN",       "JMP",       "JMPIF",     "JMPIFNOT", "NEWLIST",  "NEWMAP",   "MAKEVEC",
+                                  "IN",       "JMP",       "JMPIF",     "JMPIFNOT", "JMPCMP", "NEWLIST",  "NEWMAP",   "MAKEVEC",
                                   "CONCAT",   "CALL",      "CALLM",     "CALLF",    "RET",      "RETNONE",  "EVERY",
                                   "AFTER",    "FORPREP",   "FORLOOP",   "ITERPREP", "ITERNEXT", "WAIT",     "GOTO",
                                   "STOP",     "EXPECT"};
@@ -65,6 +65,12 @@ std::string Program::disassemble(bool withLines) const {
                 case Op::ForLoop:
                 case Op::IterPrep:
                 case Op::IterNext: os << "R" << in.a << " -> " << target(); break;
+                case Op::JmpCmp: {
+                    static const char* cmp[] = {"<", "<=", ">", ">=", "==", "!="};
+                    os << ((in.x & 8) ? "not " : "") << rk(*this, in.a) << " " << cmp[in.x & 7] << " " << rk(*this, in.b)
+                       << " -> " << static_cast<int64_t>(pc) + 1 + static_cast<int16_t>(in.c);
+                    break;
+                }
                 case Op::LoadK: os << "R" << in.a << " " << rk(*this, static_cast<uint16_t>(in.b | kConstBit)); break;
                 case Op::GetMember: os << "R" << in.a << " R" << in.b << " ." << members[in.c].name; break;
                 case Op::SetMember: os << "R" << in.a << " ." << members[in.b].name << " " << rk(*this, in.c); break;

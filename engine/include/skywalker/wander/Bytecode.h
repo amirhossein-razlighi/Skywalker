@@ -58,6 +58,7 @@ enum class Op : uint8_t {
     Jmp,        // pc += sbx
     JmpIf,      // if truthy(R[a]) pc += sbx
     JmpIfNot,   // if not truthy(R[a]) pc += sbx
+    JmpCmp,     // if (RK(a) <cmp x&7: < <= > >= == !=> RK(b)) != (x&8) pc += (int16)c
     NewList,    // R[a] = [R[b] .. R[b+c-1]]
     NewMap,     // R[a] = {R[b]: R[b+1], ...}  (c pairs; keys are strings)
     MakeVec,    // R[a] = (R[b] .. R[b+c-1])   (c = 2, 3: vector; 4: color)

@@ -349,6 +349,17 @@ private:
                 return std::string("    if (") + (in.op == Op::JmpIf ? "" : "!") + "sky_truthy(f, &" + A + ")) goto L" +
                        std::to_string(target(in.sbx())) + ";\n";
             }
+            case Op::JmpCmp: {
+                ++inlined_;
+                Operand b = rk(in.a), c = rk(in.b);
+                static const char* cmp[] = {"<", "<=", ">", ">=", "==", "!="};
+                auto off = static_cast<int16_t>(in.c);
+                size_t t = static_cast<size_t>(static_cast<int64_t>(pc) + 1 + off);
+                std::string cond = b.value + " " + cmp[in.x & 7] + " " + c.value;
+                std::string taken = (in.x & 8) ? "!(" + cond + ")" : "(" + cond + ")";
+                return "    if (" + both(b, c) + ") { if " + taken + " { " + chargeAndJump(pc, off < 0 ? -off : 0, t) +
+                       " } } else " + delegateBranch(pc, t).substr(4);
+            }
             case Op::ForPrep: {
                 ++inlined_;
                 std::string r0 = "R[" + std::to_string(in.a) + "]", r1 = "R[" + std::to_string(in.a + 1) + "]",

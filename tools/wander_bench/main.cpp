@@ -82,6 +82,27 @@ on tick
   self.out = acc
 end
 )"},
+    {"overhead", "scheduling cost: an empty on tick handler (5000 entities)", 5000, R"(
+on tick
+end
+)"},
+    {"w2_functions", "fn calls, lists and for loops (100 entities)", 100, R"(
+fn dist2(a, b)
+  let d = a - b
+  return d.x * d.x + d.y * d.y + d.z * d.z
+end
+on tick
+  let points = []
+  for i in 0..50
+    points.push((i, i * 0.5, 0))
+  end
+  let best = 1e9
+  for p in points
+    best = min(best, dist2(p, (10, 3, 0)))
+  end
+  self.out = best
+end
+)"},
 };
 
 double nowMs() {

@@ -136,6 +136,19 @@ public:
     static Value list(std::vector<Value> items = {});
     static Value map();
 
+    /// In-place setters for the VM's hot paths (no temporary Value).
+    void setNumber(double n) {
+        release();
+        t_ = VType::Number;
+        u_.n = n;
+    }
+    void setBool(bool b) {
+        release();
+        t_ = VType::Bool;
+        u_.n = 0;
+        u_.b = b ? 1u : 0u;
+    }
+
     VType type() const { return t_; }
     bool isNone() const { return t_ == VType::None; }
     bool isNumber() const { return t_ == VType::Number; }
