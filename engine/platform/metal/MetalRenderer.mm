@@ -1504,7 +1504,7 @@ private:
         u.origin = v4(item.origin, t.size());
         u.grid = simd_make_float4(static_cast<float>(t.resolution()), 1.f / t.resolution(), t.cell(),
                                   static_cast<float>(std::min<size_t>(item.layers.size(), 8)));
-        u.water = simd_make_float4(item.waterLevel, item.wetBand, item.selected ? 1.f : 0.f, 0);
+        u.water = simd_make_float4(item.waterLevel, item.wetBand, item.selected ? 1.f : 0.f, item.macroVariation);
         for (size_t i = 0; i < std::min<size_t>(item.layers.size(), 8); ++i) {
             const auto& l = item.layers[i];
             const Surface& s = l.surface;

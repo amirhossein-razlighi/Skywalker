@@ -22,6 +22,7 @@ struct Terrain {
     float waterLevel = -100000.f;     // world height of nearby water: sand and soil look wet below it + wetBand
     float wetBand = 1.2f;             // meters above the water line that stay damp (shorelines, wave run-up)
     float detail = 1.f;               // LOD quality multiplier (0.5 faster .. 2 sharper)
+    float macroVariation = 0.f;       // 0..1 large-scale tone/hue variation (breaks up layer tiling across a landscape)
     bool castShadows = true;
 
     static const TypeInfo& type();

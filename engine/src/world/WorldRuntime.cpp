@@ -151,6 +151,7 @@ void WorldRuntime::gather(const Scene& scene, const ViewCamera& view, FrameData&
         item.data = data;
         item.waterLevel = t->waterLevel;
         item.wetBand = t->wetBand;
+        item.macroVariation = t->macroVariation;
         item.detail = t->detail;
         item.castShadows = t->castShadows;
         size_t count = std::min<size_t>(t->layers.isArray() ? t->layers.size() : 0, TerrainData::kMaxLayers);

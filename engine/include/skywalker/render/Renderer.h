@@ -195,6 +195,7 @@ struct TerrainItem {
     std::vector<Layer> layers;
     float waterLevel = -100000.f;
     float wetBand = 1.2f;
+    float macroVariation = 0.f;
     float detail = 1.f;
     bool castShadows = true;
     bool selected = false;
