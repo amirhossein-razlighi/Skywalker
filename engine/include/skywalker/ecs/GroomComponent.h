@@ -47,7 +47,7 @@ struct Groom {
     float maskAngle = 180.f;         // degrees: grow where the normal is within this angle of maskDirection
     float maskSoftness = 12.f;       // degrees of soft hairline
     // --- Color & shading ----------------------------------------------------------------
-    float melanin = 0.4f;            // eumelanin+pheomelanin amount: 0 white .. 0.2 blond .. 0.5 brown .. 1 black
+    float melanin = 0.5f;            // pigment: 0 white .. 0.15 blond .. 0.5 light brown .. 0.8 brown .. 1 black
     float redness = 0.15f;           // pheomelanin fraction: auburn, ginger
     Vec4 dye{1.f, 1.f, 1.f, 1.f};    // dye tint (white = natural)
     Vec4 rootColor{1.f, 1.f, 1.f, 1.f};  // multiplier at the root (root-to-tip gradient)
@@ -58,7 +58,7 @@ struct Groom {
     float specular = 1.f;            // primary highlight strength
     float scatter = 1.f;             // multiple scattering (light hair glows through)
     float cuticleTilt = 3.f;         // degrees: separates the white and colored highlights
-    float density = 1.f;             // opacity per strand (shadows and coverage)
+    float density = 2.f;             // coverage multiplier per strand (2 ~ a full head of hair)
     // --- Motion -------------------------------------------------------------------------
     bool simulate = true;
     float stiffness = 0.45f;         // how strongly strands keep their groomed shape

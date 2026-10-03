@@ -7,6 +7,7 @@
 #include <filesystem>
 #include <fstream>
 #include <numeric>
+#include <thread>
 #include <unordered_map>
 
 #include "skywalker/core/Random.h"
@@ -62,7 +63,8 @@ const TypeInfo& Groom::type() {
             SKY_FIELD_RANGE(Groom, maskAngle, Float, "Degrees around maskDirection that grow hair (180 = everywhere)", 0.f, 180.f),
             SKY_FIELD_RANGE(Groom, maskSoftness, Float, "Soft hairline width in degrees", 0.f, 90.f),
             SKY_FIELD_RANGE(Groom, melanin, Float,
-                            "Pigment: 0 white, 0.15 platinum, 0.3 blond, 0.55 light brown, 0.8 brown, 0.95 dark brown, 1 black",
+                            "Pigment (physically based absorption): 0 white, 0.1 platinum, 0.2 blond, 0.35 dark blond, 0.5 light "
+                            "brown, 0.7 brown, 0.85 dark brown, 0.95+ black",
                             0.f, 1.f),
             SKY_FIELD_RANGE(Groom, redness, Float, "Red pigment (pheomelanin) fraction: 0.5 auburn, 0.9 ginger", 0.f, 1.f),
             SKY_FIELD(Groom, dye, Color, "Dye tint (white = natural)"),
@@ -74,7 +76,9 @@ const TypeInfo& Groom::type() {
             SKY_FIELD_RANGE(Groom, specular, Float, "Primary (white) highlight strength", 0.f, 4.f),
             SKY_FIELD_RANGE(Groom, scatter, Float, "Multiple scattering: light hair glows, dark hair stays rich", 0.f, 4.f),
             SKY_FIELD_RANGE(Groom, cuticleTilt, Float, "Cuticle tilt in degrees (separates the two highlights)", 0.f, 10.f),
-            SKY_FIELD_RANGE(Groom, density, Float, "Opacity per strand (coverage and self-shadowing)", 0.05f, 4.f),
+            SKY_FIELD_RANGE(Groom, density, Float,
+                            "Coverage per strand (2 = a full head of hair at typical strand counts; lower for wispy, "
+                            "higher for thick)", 0.05f, 8.f),
             SKY_FIELD(Groom, simulate, Bool, "Simulate on the GPU (gravity, wind, collisions)"),
             SKY_FIELD_RANGE(Groom, stiffness, Float, "How strongly strands keep their groomed shape", 0.f, 1.f),
             SKY_FIELD_RANGE(Groom, rootStiffness, Float, "Stiffness near the roots", 0.f, 1.f),
@@ -280,6 +284,27 @@ bool sampleRoot(const Surface& s, const Groom& g, Random& rng, Root& out) {
     return false;
 }
 
+// --- parallel loops (deterministic: every item is computed independently) -----------------
+
+template <typename F>
+void parallelFor(size_t n, F&& f) {
+    unsigned hw = std::max(1u, std::min(16u, std::thread::hardware_concurrency()));
+    if (n < 2048 || hw == 1) {
+        for (size_t i = 0; i < n; ++i) f(i);
+        return;
+    }
+    std::vector<std::thread> threads;
+    size_t chunk = (n + hw - 1) / hw;
+    for (unsigned t = 0; t < hw; ++t) {
+        size_t a = t * chunk, b = std::min(n, a + chunk);
+        if (a >= b) break;
+        threads.emplace_back([a, b, &f]() {
+            for (size_t i = a; i < b; ++i) f(i);
+        });
+    }
+    for (auto& th : threads) th.join();
+}
+
 // --- spatial grid for nearest-root queries ------------------------------------------------
 
 class RootGrid {
@@ -289,35 +314,43 @@ public:
     }
     /// Up to k nearest points (ascending distance).
     int nearest(Vec3 p, int k, uint32_t* idx, float* dist) const {
-        std::vector<std::pair<float, uint32_t>> best;
+        k = std::clamp(k, 1, 8);
+        float bd[8];
+        uint32_t bi[8];
+        int n = 0;
         int ring = 1;
         const int maxRing = 64;
+        const int want = std::min<int>(k, static_cast<int>(pts_.size()));
         while (true) {
-            best.clear();
+            n = 0;
             auto c = cellOf(p);
             for (int dz = -ring; dz <= ring; ++dz) {
                 for (int dy = -ring; dy <= ring; ++dy) {
                     for (int dx = -ring; dx <= ring; ++dx) {
                         auto it = cells_.find(key({c[0] + dx, c[1] + dy, c[2] + dz}));
                         if (it == cells_.end()) continue;
-                        for (uint32_t i : it->second) best.emplace_back(distance(p, pts_[i]), i);
+                        for (uint32_t i : it->second) {
+                            float d = distance(p, pts_[i]);
+                            if (n == k && d >= bd[k - 1]) continue;
+                            int j = n < k ? n++ : k - 1;  // insertion into the small sorted list
+                            while (j > 0 && (bd[j - 1] > d || (bd[j - 1] == d && bi[j - 1] > i))) {
+                                bd[j] = bd[j - 1];
+                                bi[j] = bi[j - 1];
+                                --j;
+                            }
+                            bd[j] = d;
+                            bi[j] = i;
+                        }
                     }
                 }
             }
-            std::sort(best.begin(), best.end());
-            bool enough = static_cast<int>(best.size()) >= std::min<int>(k, static_cast<int>(pts_.size()));
-            // Points within `ring` cells are exact up to distance ring * cell.
-            if ((enough && (best.empty() || best[static_cast<size_t>(std::min<int>(k, static_cast<int>(best.size())) - 1)].first <=
-                                                static_cast<float>(ring) * cell_)) ||
-                ring >= maxRing) {
-                break;
-            }
+            // Everything outside the searched block is at least ring * cell away.
+            if ((n >= want && (n == 0 || bd[n - 1] <= static_cast<float>(ring) * cell_)) || ring >= maxRing) break;
             ring *= 2;
         }
-        int n = std::min<int>(k, static_cast<int>(best.size()));
         for (int i = 0; i < n; ++i) {
-            idx[i] = best[static_cast<size_t>(i)].second;
-            dist[i] = best[static_cast<size_t>(i)].first;
+            idx[i] = bi[i];
+            dist[i] = bd[i];
         }
         return n;
     }
@@ -409,7 +442,8 @@ void baseCurve(const GroomData& d, const GroomData::Child& c, const Vec3* guides
 }
 
 void assignGuides(GroomData& d, const std::vector<Vec3>& guideRoots, const RootGrid& grid, float spacing) {
-    for (auto& c : d.children) {
+    parallelFor(d.children.size(), [&](size_t ci) {
+        GroomData::Child& c = d.children[ci];
         uint32_t idx[3];
         float dist[3];
         int n = grid.nearest(c.root, 3, idx, dist);
@@ -422,8 +456,8 @@ void assignGuides(GroomData& d, const std::vector<Vec3>& guideRoots, const RootG
         }
         for (float& w : c.weight) w = wsum > 0 ? w / wsum : 0.f;
         if (wsum <= 0) c.weight[0] = 1.f;
-        (void)guideRoots;
-    }
+    });
+    (void)guideRoots;
 }
 
 void computeBounds(GroomData& d) {
@@ -500,7 +534,12 @@ Result<GroomData> generateGroom(const Groom& g, const MeshData* mesh) {
     for (size_t gi = 0; gi < guideRoots.size(); ++gi) {
         const Root& r = guideRoots[gi];
         Vec3* out = &d.guideRest[gi * static_cast<size_t>(P)];
-        Vec3 dir = safeNormalize(lerp(r.n, comb, length(comb) > 0 ? g.directionBlend : 0.f), r.n);
+        // Combed hair lies along the scalp: blend from the normal toward the comb direction
+        // projected onto the tangent plane (falls back to "downhill" where they are parallel).
+        Vec3 combT = comb - r.n * dot(comb, r.n);
+        if (length(combT) < 0.15f) combT = down - r.n * dot(down, r.n);
+        combT = safeNormalize(combT, r.n);
+        Vec3 dir = safeNormalize(lerp(r.n, combT, length(comb) > 0 ? g.directionBlend : 0.f), r.n);
         float segLen = g.length / static_cast<float>(P - 1);
         Vec3 pos = r.p;
         out[0] = pos;
@@ -536,7 +575,7 @@ Result<GroomData> generateGroom(const Groom& g, const MeshData* mesh) {
 
     std::vector<Vec3> groots;
     for (const Root& r : guideRoots) groots.push_back(r.p);
-    RootGrid grid(groots, spacing);
+    RootGrid grid(groots, spacing * 2.f);
     assignGuides(d, groots, grid, spacing);
 
     // Clumps: the first `clumps` children (already in random order) are clump centers.
@@ -545,17 +584,14 @@ Result<GroomData> generateGroom(const Groom& g, const MeshData* mesh) {
     if (C > 0 && g.clumpStrength > 0.f) {
         std::vector<Vec3> croots(C);
         for (size_t i = 0; i < C; ++i) croots[i] = d.children[i].root;
-        RootGrid cgrid(croots, std::sqrt(surf.area / static_cast<float>(C)));
-        for (size_t i = 0; i < d.children.size(); ++i) {
+        RootGrid cgrid(croots, 2.f * std::sqrt(surf.area / static_cast<float>(C)));
+        parallelFor(d.children.size(), [&](size_t i) {
             uint32_t idx;
             float dist;
             if (cgrid.nearest(d.children[i].root, 1, &idx, &dist)) clumpOf[i] = idx;
-        }
+        });
     }
 
-    // Final shapes -> offsets in the base curve's frames.
-    d.offsets.resize(d.children.size() * static_cast<size_t>(P));
-    std::vector<Vec3> base(P), T(P), Nn(P), own(P), clumpBase(P), clumpCurled(P), cT(P), cN(P);
     const Vec3 ref{1, 0, 0};
     auto curled = [&](const Vec3* b, const Vec3* t, const Vec3* n, float phase, float rand, Vec3* out) {
         float s = 0;
@@ -577,7 +613,21 @@ Result<GroomData> generateGroom(const Groom& g, const MeshData* mesh) {
             out[k] = b[k] + o;
         }
     };
-    for (size_t i = 0; i < d.children.size(); ++i) {
+    // Each clump's (curled) target curve, computed once.
+    const size_t Pz = static_cast<size_t>(P);
+    std::vector<Vec3> clumpCurves(C * Pz);
+    parallelFor(C, [&](size_t ci) {
+        std::array<Vec3, 32> b, t, n;
+        const GroomData::Child& cc = d.children[ci];
+        baseCurve(d, cc, d.guideRest.data(), cc.root, b.data());
+        transportFrames(b.data(), P, ref, t.data(), n.data());
+        curled(b.data(), t.data(), n.data(), cc.random * 7.31f, cc.random, &clumpCurves[ci * Pz]);
+    });
+
+    // Final shapes -> offsets in the base curve's frames (children are independent: parallel).
+    d.offsets.resize(d.children.size() * Pz);
+    parallelFor(d.children.size(), [&](size_t i) {
+        std::array<Vec3, 32> base, T, Nn, own;
         const GroomData::Child& c = d.children[i];
         baseCurve(d, c, d.guideRest.data(), c.root, base.data());
         transportFrames(base.data(), P, ref, T.data(), Nn.data());
@@ -585,20 +635,16 @@ Result<GroomData> generateGroom(const Groom& g, const MeshData* mesh) {
         bool clumped = clumpOf[i] != UINT32_MAX && clumpOf[i] != i;
         float phase = ownPhase;
         if (clumped) {
-            const GroomData::Child& cc = d.children[clumpOf[i]];
-            float clumpPhase = cc.random * 7.31f;
+            float clumpPhase = d.children[clumpOf[i]].random * 7.31f;
             phase = clumpPhase + (ownPhase - clumpPhase) * 0.15f * (1.f - g.clumpStrength);
         }
         curled(base.data(), T.data(), Nn.data(), phase, c.random, own.data());
         if (clumped) {
-            const GroomData::Child& cc = d.children[clumpOf[i]];
-            baseCurve(d, cc, d.guideRest.data(), cc.root, clumpBase.data());
-            transportFrames(clumpBase.data(), P, ref, cT.data(), cN.data());
-            curled(clumpBase.data(), cT.data(), cN.data(), cc.random * 7.31f, cc.random, clumpCurled.data());
+            const Vec3* cc = &clumpCurves[clumpOf[i] * Pz];
             for (int k = 0; k < P; ++k) {
                 float tk = static_cast<float>(k) / static_cast<float>(P - 1);
                 float w = g.clumpStrength * std::pow(tk, g.clumpShape);
-                own[k] = lerp(own[k], clumpCurled[k], w);
+                own[k] = lerp(own[k], cc[k], w);
             }
         }
         if (g.frizz > 0.f) {
@@ -618,9 +664,9 @@ Result<GroomData> generateGroom(const Groom& g, const MeshData* mesh) {
         for (int k = 0; k < P; ++k) {
             Vec3 dv = own[k] - base[k];
             Vec3 bn = cross(T[k], Nn[k]);
-            d.offsets[i * static_cast<size_t>(P) + static_cast<size_t>(k)] = {dot(dv, T[k]), dot(dv, Nn[k]), dot(dv, bn)};
+            d.offsets[i * Pz + static_cast<size_t>(k)] = {dot(dv, T[k]), dot(dv, Nn[k]), dot(dv, bn)};
         }
-    }
+    });
     computeBounds(d);
     return d;
 }
@@ -697,12 +743,12 @@ Result<GroomData> groomFromStrands(const Groom& g, const StrandSet& strands, con
             c.width = std::clamp(strands.widths[s] / g.widthRoot, 0.05f, 20.f);
         }
     }
-    RootGrid grid(groots, spacing);
+    RootGrid grid(groots, spacing * 2.f);
     assignGuides(d, groots, grid, spacing);
     // Offsets: the strand's own shape relative to its interpolated base curve.
     d.offsets.resize(N * static_cast<size_t>(P));
-    std::vector<Vec3> base(P), T(P), Nn(P);
-    for (size_t i = 0; i < N; ++i) {
+    parallelFor(N, [&](size_t i) {
+        std::array<Vec3, 32> base, T, Nn;
         baseCurve(d, d.children[i], d.guideRest.data(), d.children[i].root, base.data());
         transportFrames(base.data(), P, Vec3{1, 0, 0}, T.data(), Nn.data());
         for (int k = 0; k < P; ++k) {
@@ -710,7 +756,7 @@ Result<GroomData> groomFromStrands(const Groom& g, const StrandSet& strands, con
             Vec3 bn = cross(T[k], Nn[k]);
             d.offsets[i * P + static_cast<size_t>(k)] = {dot(dv, T[k]), dot(dv, Nn[k]), dot(dv, bn)};
         }
-    }
+    });
     if (mesh && mesh->vertexCount() > 0) {
         d.proxy = proxyFromBounds(mesh->bounds);
         d.proxy.radius *= 0.97f;
@@ -740,8 +786,8 @@ void reconstructStrands(const GroomData& d, const std::vector<Vec3>& guides, con
     Vec3 ax = model.transformDir({1, 0, 0}), ay = model.transformDir({0, 1, 0}), az = model.transformDir({0, 0, 1});
     float scale = (length(ax) + length(ay) + length(az)) / 3.f;
     Vec3 ref = safeNormalize(ax, Vec3{1, 0, 0});
-    std::vector<Vec3> base(P), T(P), Nn(P);
-    for (size_t i = 0; i < d.children.size(); ++i) {
+    parallelFor(d.children.size(), [&](size_t i) {
+        std::array<Vec3, 32> base, T, Nn;
         const auto& c = d.children[i];
         baseCurve(d, c, guides.data(), model.transformPoint(c.root), base.data());
         transportFrames(base.data(), P, ref, T.data(), Nn.data());
@@ -750,7 +796,7 @@ void reconstructStrands(const GroomData& d, const std::vector<Vec3>& guides, con
             Vec3 bn = cross(T[k], Nn[k]);
             out[i * P + static_cast<size_t>(k)] = base[k] + (T[k] * o.x + Nn[k] * o.y + bn * o.z) * scale;
         }
-    }
+    });
 }
 
 StrandSet restStrands(const GroomData& d) {
@@ -1028,15 +1074,20 @@ Result<StrandSet> loadStrands(const std::string& path, float scale, bool zUp) {
 // ---------------------------------------------------------------------------------------
 
 Vec3 hairAbsorption(float melanin, float redness) {
-    // Concentration from a perceptual 0..1 control (as in Blender's Principled Hair), then
-    // the eumelanin / pheomelanin absorption spectra (Donner & Jensen / d'Eon et al.).
+    // Concentration from a perceptual 0..1 control, then the eumelanin / pheomelanin absorption
+    // spectra (as in Blender's Principled Hair and Unreal's hair shading).
     float m = std::clamp(melanin, 0.f, 0.9995f);
     float qty = -std::log(std::max(1.f - m, 1e-4f));
     float eu = qty * (1.f - std::clamp(redness, 0.f, 1.f)), pheo = qty * std::clamp(redness, 0.f, 1.f);
-    return Vec3{0.419f, 0.697f, 1.37f} * eu + Vec3{0.187f, 0.4f, 1.05f} * pheo;
+    return Vec3{0.506f, 0.841f, 1.653f} * eu + Vec3{0.343f, 0.733f, 1.924f} * pheo;
 }
 
-Vec3 hairColorFromAbsorption(Vec3 s) { return {std::exp(-2.f * s.x), std::exp(-2.f * s.y), std::exp(-2.f * s.z)}; }
+Vec3 hairColorFromAbsorption(Vec3 s) {
+    // Chiang et al. 2016 inverse mapping (azimuthal roughness 0.3).
+    const float D = 5.889f;
+    return {std::exp(-std::sqrt(std::max(s.x, 0.f)) * D), std::exp(-std::sqrt(std::max(s.y, 0.f)) * D),
+            std::exp(-std::sqrt(std::max(s.z, 0.f)) * D)};
+}
 
 // ---------------------------------------------------------------------------------------
 // Presets
@@ -1044,34 +1095,34 @@ Vec3 hairColorFromAbsorption(Vec3 s) { return {std::exp(-2.f * s.x), std::exp(-2
 
 Json groomPreset(const std::string& name) {
     static const std::pair<const char*, const char*> kPresets[] = {
-        {"hair_straight", R"({"strands":70000,"segments":20,"length":0.34,"lengthVariation":0.12,"widthRoot":0.075,
-            "widthTip":0.04,"direction":[0,-0.35,-1],"directionBlend":0.55,"gravity":0.95,"clumps":500,"clumpStrength":0.3,
-            "clumpShape":2.2,"frizz":0.0015,"frizzScale":25,"maskDirection":[0,0.75,-0.65],"maskAngle":72,"maskSoftness":14,
+        {"hair_straight", R"({"strands":110000,"segments":20,"length":0.34,"lengthVariation":0.12,"widthRoot":0.075,
+            "widthTip":0.04,"direction":[0,-0.35,-1],"directionBlend":0.9,"gravity":0.95,"clumps":500,"clumpStrength":0.3,
+            "clumpShape":2.2,"frizz":0.0015,"frizzScale":25,"maskDirection":[0,0.8,-0.6],"maskAngle":95,"maskSoftness":10,
             "melanin":0.82,"redness":0.25,"roughness":0.28,"radialRoughness":0.65,"stiffness":0.35})"},
-        {"hair_wavy", R"({"strands":80000,"segments":24,"length":0.38,"lengthVariation":0.18,"widthRoot":0.08,
-            "widthTip":0.04,"direction":[0,-0.35,-1],"directionBlend":0.55,"gravity":0.85,"wave":0.014,"waveFrequency":6.5,
-            "clumps":700,"clumpStrength":0.55,"clumpShape":1.4,"frizz":0.0025,"frizzScale":30,"maskDirection":[0,0.75,-0.65],
-            "maskAngle":72,"maskSoftness":14,"melanin":0.55,"redness":0.35,"roughness":0.33,"radialRoughness":0.7,
+        {"hair_wavy", R"({"strands":120000,"segments":24,"length":0.38,"lengthVariation":0.18,"widthRoot":0.08,
+            "widthTip":0.04,"direction":[0,-0.35,-1],"directionBlend":0.9,"gravity":0.85,"wave":0.014,"waveFrequency":6.5,
+            "clumps":700,"clumpStrength":0.55,"clumpShape":1.4,"frizz":0.0025,"frizzScale":30,"maskDirection":[0,0.8,-0.6],
+            "maskAngle":95,"maskSoftness":10,"melanin":0.55,"redness":0.35,"roughness":0.33,"radialRoughness":0.7,
             "stiffness":0.4})"},
-        {"hair_curly", R"({"strands":60000,"segments":31,"length":0.24,"lengthVariation":0.25,"widthRoot":0.09,
-            "widthTip":0.05,"direction":[0,0.2,-1],"directionBlend":0.3,"gravity":0.35,"curlRadius":0.011,"curlFrequency":16,
-            "clumps":1100,"clumpStrength":0.8,"clumpShape":0.7,"frizz":0.0035,"frizzScale":40,"maskDirection":[0,0.75,-0.65],
-            "maskAngle":75,"maskSoftness":12,"melanin":0.93,"redness":0.15,"roughness":0.42,"radialRoughness":0.8,
+        {"hair_curly", R"({"strands":90000,"segments":31,"length":0.24,"lengthVariation":0.25,"widthRoot":0.09,
+            "widthTip":0.05,"direction":[0,0.2,-1],"directionBlend":0.6,"gravity":0.35,"curlRadius":0.011,"curlFrequency":16,
+            "clumps":1100,"clumpStrength":0.8,"clumpShape":0.7,"frizz":0.0035,"frizzScale":40,"maskDirection":[0,0.8,-0.6],
+            "maskAngle":95,"maskSoftness":10,"melanin":0.93,"redness":0.15,"roughness":0.42,"radialRoughness":0.8,
             "stiffness":0.6})"},
-        {"hair_ponytail", R"({"strands":60000,"segments":24,"length":0.42,"lengthVariation":0.1,"widthRoot":0.075,
-            "widthTip":0.04,"direction":[0,0.15,-1],"directionBlend":0.85,"gravity":1.1,"clumps":1,"clumpStrength":0.92,
-            "clumpShape":0.35,"frizz":0.001,"maskDirection":[0,0.75,-0.65],"maskAngle":72,"maskSoftness":10,"melanin":0.35,
+        {"hair_ponytail", R"({"strands":90000,"segments":24,"length":0.42,"lengthVariation":0.1,"widthRoot":0.075,
+            "widthTip":0.04,"direction":[0,0.15,-1],"directionBlend":0.95,"gravity":1.1,"clumps":1,"clumpStrength":0.92,
+            "clumpShape":0.35,"frizz":0.001,"maskDirection":[0,0.8,-0.6],"maskAngle":95,"maskSoftness":10,"melanin":0.35,
             "redness":0.4,"roughness":0.3,"stiffness":0.5})"},
         {"hair_short", R"({"strands":90000,"segments":5,"length":0.035,"lengthVariation":0.3,"widthRoot":0.07,
-            "widthTip":0.03,"direction":[0,0.1,-1],"directionBlend":0.65,"gravity":0.2,"clumps":2500,"clumpStrength":0.25,
-            "frizz":0.0012,"maskDirection":[0,0.75,-0.65],"maskAngle":75,"maskSoftness":10,"melanin":0.88,"redness":0.1,
+            "widthTip":0.03,"direction":[0,0.1,-1],"directionBlend":0.85,"gravity":0.2,"clumps":2500,"clumpStrength":0.25,
+            "frizz":0.0012,"maskDirection":[0,0.8,-0.6],"maskAngle":95,"maskSoftness":10,"melanin":0.88,"redness":0.1,
             "roughness":0.4,"stiffness":0.9,"simulate":false})"},
         {"fur_short", R"({"strands":160000,"segments":4,"length":0.014,"lengthVariation":0.4,"widthRoot":0.035,
-            "widthTip":0.006,"direction":[0,-0.3,-1],"directionBlend":0.55,"gravity":0.15,"clumps":0,"frizz":0.0006,
+            "widthTip":0.006,"direction":[0,-0.3,-1],"directionBlend":0.8,"gravity":0.15,"clumps":0,"frizz":0.0006,
             "frizzScale":120,"maskAngle":180,"melanin":0.5,"redness":0.65,"colorVariation":0.25,"roughness":0.5,
             "radialRoughness":0.85,"scatter":1.2,"stiffness":0.9,"rootStiffness":1,"cardsBelow":60,"simulate":false})"},
         {"fur_long", R"({"strands":90000,"segments":8,"length":0.07,"lengthVariation":0.35,"widthRoot":0.05,
-            "widthTip":0.01,"direction":[0,-0.6,-1],"directionBlend":0.5,"gravity":0.45,"clumps":3000,"clumpStrength":0.45,
+            "widthTip":0.01,"direction":[0,-0.6,-1],"directionBlend":0.75,"gravity":0.45,"clumps":3000,"clumpStrength":0.45,
             "clumpShape":1.6,"frizz":0.0025,"frizzScale":60,"maskAngle":180,"melanin":0.25,"redness":0.3,
             "colorVariation":0.3,"roughness":0.45,"radialRoughness":0.85,"scatter":1.3,"stiffness":0.6})"},
     };
@@ -1156,6 +1207,35 @@ std::vector<FxCollider> collidersFromNames(const Scene& scene, EntityId self, co
     return out;
 }
 
+namespace {
+
+Vec3 axisScale(const Mat4& m) {
+    return {length(m.transformDir({1, 0, 0})), length(m.transformDir({0, 1, 0})), length(m.transformDir({0, 0, 1}))};
+}
+
+/// The entity's world transform without scale: grooms are generated in meters on the scaled
+/// mesh, so lengths and widths are physical whatever the entity's scale.
+Mat4 rigidPart(const Mat4& m) {
+    Vec3 s = axisScale(m);
+    return m * Mat4::scale({1.f / std::max(s.x, 1e-8f), 1.f / std::max(s.y, 1e-8f), 1.f / std::max(s.z, 1e-8f)});
+}
+
+MeshData scaledMesh(const MeshData& m, Vec3 s) {
+    MeshData out = m;
+    const size_t n = out.vertexCount();
+    for (size_t i = 0; i < n; ++i) {
+        float* v = &out.vertices[i * MeshData::kFloatsPerVertex];
+        v[0] *= s.x, v[1] *= s.y, v[2] *= s.z;
+        Vec3 nn = safeNormalize(Vec3{v[3] / std::max(s.x, 1e-8f), v[4] / std::max(s.y, 1e-8f), v[5] / std::max(s.z, 1e-8f)},
+                                Vec3{0, 1, 0});
+        v[3] = nn.x, v[4] = nn.y, v[5] = nn.z;
+    }
+    out.bounds = {m.bounds.min * s, m.bounds.max * s};
+    return out;
+}
+
+}  // namespace
+
 std::shared_ptr<const GroomData> GroomSystem::groomFor(const Scene& scene, EntityId e, const MeshProvider& meshes,
                                                        const PathResolver& resolve, std::string* error) {
     const Groom* g = scene.get<Groom>(e);
@@ -1167,6 +1247,7 @@ std::shared_ptr<const GroomData> GroomSystem::groomFor(const Scene& scene, Entit
     const MeshRenderer* mr = scene.get<MeshRenderer>(meshEnt);
     std::string meshKey = mr ? mr->mesh : "";
     const MeshData* mesh = meshKey.empty() || !meshes ? nullptr : meshes(meshKey);
+    const Vec3 scale = axisScale(scene.worldMatrix(meshEnt));
     std::string sourcePath;
     int64_t stamp = 0;
     if (!g->source.empty()) {
@@ -1176,12 +1257,18 @@ std::shared_ptr<const GroomData> GroomSystem::groomFor(const Scene& scene, Entit
         if (!ec) stamp = static_cast<int64_t>(t.time_since_epoch().count());
     }
     uint64_t h = groomHash(*g, meshKey, mesh, stamp);
+    for (float v : {scale.x, scale.y, scale.z}) h = fnvv(h, std::round(v * 1e4f));
     Entry& entry = cache_[e];
     if (entry.hash == h && (entry.data || !entry.error.empty())) {
         if (error) *error = entry.error;
         return entry.data;
     }
     auto start = std::chrono::steady_clock::now();
+    MeshData scaled;
+    if (mesh) {
+        scaled = scaledMesh(*mesh, scale);
+        mesh = &scaled;
+    }
     Result<GroomData> r = Error::make("no_mesh", "no mesh");
     if (!g->source.empty()) {
         auto strands = loadStrands(sourcePath, g->importScale, g->importZUp);
@@ -1222,7 +1309,7 @@ void GroomSystem::gather(const Scene& scene, const MeshProvider& meshes, const P
         if (!data || data->children.empty()) continue;
         GroomItem item;
         item.entity = e;
-        item.model = scene.worldMatrix(groomMeshEntity(scene, e));
+        item.model = rigidPart(scene.worldMatrix(groomMeshEntity(scene, e)));
         item.data = data;
         item.params = *g;
         item.wind = wind * g->wind;

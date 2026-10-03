@@ -143,7 +143,7 @@ static float3 sampleCatmullRom(texture2d<float> tex, float2 uv, float2 texel) {
 fragment float4 temporalFragment(FullscreenOut in [[stage_in]], constant FrameUniforms& f [[buffer(0)]],
                                  constant TemporalUniforms& t [[buffer(1)]], texture2d<float> lit [[texture(0)]],
                                  texture2d<float> vol [[texture(1)]], texture2d<float> history [[texture(2)]],
-                                 depth2d<float> depthTex [[texture(3)]]) {
+                                 depth2d<float> depthTex [[texture(3)]], texture2d<float> reactive [[texture(4)]]) {
     float2 uv = uvOf(in);
     float3 cur = sceneAt(lit, vol, t, uv);
     int mode = int(t.params.x + 0.5);
@@ -193,6 +193,9 @@ fragment float4 temporalFragment(FullscreenOut in [[stage_in]], constant FrameUn
     float3 c = toYCoCg(cur);
     // Luma-weighted blend: fireflies cannot dominate the history.
     float feedback = t.params.z;
+    // Reactive mask (GPU particles): trust the current frame where effects move over the scene,
+    // so sparks and rain don't leave ghost trails.
+    feedback *= 1.0 - saturate(reactive.sample(linearClamp, uv).r) * 0.85;
     float wc = (1.0 - feedback) / (1.0 + c.x), wh = feedback / (1.0 + h.x);
     float3 outC = (c * wc + h * wh) / (wc + wh);
     return float4(max(fromYCoCg(outC), 0.0), 1.0);

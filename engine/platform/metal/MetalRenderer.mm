@@ -33,6 +33,7 @@
 #include <unordered_map>
 #include <unordered_set>
 
+#include "MetalFx.h"  // [hair+vfx] GPU particles and strand hair
 #include "skywalker/core/Log.h"
 #include "skywalker/render/Hdr.h"
 #include "skywalker/render/MeshData.h"
@@ -276,6 +277,13 @@ public:
         if (!device_) return false;
         queue_ = [device_ newCommandQueue];
         textureLoader_ = [[MTKTextureLoader alloc] initWithDevice:device_];
+        fx_ = std::make_unique<MetalFx>(  // [hair+vfx]
+            device_, queue_,
+            [this](const std::string& key) {
+                const GpuMesh* m = mesh(key);
+                return m ? FxMesh{m->vertices, m->indices, m->indexCount} : FxMesh{};
+            },
+            [this](const std::string& path, bool srgb) { return texture(path, srgb); });
         Status s = buildPipelines(kDefaultShaderSource);
         if (!s) {
             log::error("render", "built-in shaders failed to compile: " + s.error().message);
@@ -332,6 +340,8 @@ public:
     RendererInfo info() const override { return {"metal", device_ ? std::string(device_.name.UTF8String) : ""}; }
 
     std::string shaderSource() const override { return source_; }
+    std::vector<LightItem> effectLights() const override { return fx_->effectLights(); }  // [hair+vfx]
+    Json stats() const override { return fx_->stats(); }                                // [hair+vfx]
 
     Status reloadShaders(const std::string& source) override {
         @autoreleasepool {
@@ -377,6 +387,7 @@ public:
             id<MTLCommandBuffer> cmd = [queue_ commandBuffer];
             cmd.label = @"Skywalker Frame";
             encodeEnvironment(cmd, frame, base);
+            fx_->simulate(frame, depthPrev_, gbufB_, prevViewProj_, historyValid_);  // [hair+vfx]
             encodeShadows(cmd, frame, base, cascades);
             for (int i = 0; i < samples; ++i) {
                 // Sub-pixel jitter (Halton 2,3): TAA spreads it over frames, stills over sub-samples.
@@ -413,6 +424,7 @@ public:
                            &pu, sizeof(pu), false, @"Debug view");
             }
             encodeOverlays(cmd, frame, base);
+            fx_->trackFrame(cmd);  // [hair+vfx] GPU frame time
             [cmd commit];
             lastCommand_ = cmd;
             prevViewProj_ = vp;
@@ -652,6 +664,7 @@ private:
         resolvePipeline_ = lightResolve;
         temporalPipeline_ = temporal;
         debugViewPipeline_ = debugView;
+        if (fx_) fx_->build(lib, FxFormats{kHDRFormat, kGbufAFormat, kGbufBFormat, kDepthFormat, kSamples, kShadowAtlas / 2});  // [hair+vfx]
         return {};
     }
 
@@ -986,6 +999,7 @@ private:
                                    indexBuffer:m->indices
                              indexBufferOffset:0];
                 }
+                fx_->encodeShadowCaster(enc, frame, lvp);  // [hair+vfx] hair and mesh particles
             }
         }
         [enc endEncoding];
@@ -1101,6 +1115,7 @@ private:
             }
             drawMesh(enc, d);
         }
+        fx_->encodeOpaque(enc, frame);  // [hair+vfx] strand hair, lit mesh particles
 
         // Toon outlines (inverted hulls; depth-tested so they only show at silhouettes)
         if (!outlined.empty()) {
@@ -1473,7 +1488,7 @@ private:
                        const std::vector<GPULight>& lights, bool simulate) {
         bool anyWater = false;
         for (const auto& w : frame.water) anyWater = anyWater || (w.ocean && w.ocean->resolution > 0);
-        if (!anyWater && frame.particles.empty() && frame.volumes.empty()) {
+        if (!anyWater && frame.particles.empty() && frame.volumes.empty() && !fx_->hasTransparent(frame)) {  // [hair+vfx]
             oceans_.clear();
             fluids_.clear();
             return;
@@ -1574,6 +1589,9 @@ private:
                   instanceCount:frame.particles.size()];
             [enc endEncoding];
         }
+        fx_->encodeTransparent(cmd, frame,  // [hair+vfx] GPU particles
+                               FxSceneInputs{shadowMap_, envCube_, depthCopy_, lit_, &fu, sizeof(fu), lights.data(),
+                                             lights.size() * sizeof(GPULight)});
     }
 
     void encodeVolumetrics(id<MTLCommandBuffer> cmd, const FrameData& frame, const FrameUniforms& fu,
@@ -1673,7 +1691,7 @@ private:
         t.params = simd_make_float4(static_cast<float>(mode), weight, 0.9f, volumetricActive_ ? 1.f : 0.f);
         t.texel = simd_make_float4(1.f / hdr_.width, 1.f / hdr_.height, 1.f / volumetric_.width, 1.f / volumetric_.height);
         id<MTLTexture> dst = taa_[taaCurrent_ ^ 1];
-        fullscreenFU(cmd, temporalPipeline_, dst, {lit_, volumetric_, taa_[taaCurrent_], depthResolved_}, fu, &t, sizeof(t),
+        fullscreenFU(cmd, temporalPipeline_, dst, {lit_, volumetric_, taa_[taaCurrent_], depthResolved_, fx_->reactiveMask()}, fu, &t, sizeof(t),  // [hair+vfx] reactive
                      mode == 1 ? @"TAA" : (mode == 2 ? @"Accumulate" : @"Scene resolve"));
         taaCurrent_ ^= 1;
         (void)frame;
@@ -1817,6 +1835,7 @@ private:
     uint64_t frameIndex_ = 0;
     bool aoActive_ = false;
     bool volumetricActive_ = false;
+    std::unique_ptr<MetalFx> fx_;  // [hair+vfx]
 };
 
 }  // namespace
