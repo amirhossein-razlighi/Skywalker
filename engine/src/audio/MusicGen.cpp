@@ -163,7 +163,10 @@ Result<std::vector<Chord>> parseProgression(const std::string& progression, int 
         }
         bool upper = std::isupper(static_cast<unsigned char>(rest[0])) != 0;
         std::string suffix = lowered.substr(len);
-        int root = baseMidi + tonic + scale[static_cast<size_t>(degree)] + accidental;
+        // Plain numerals are diatonic to the mode; b/# numerals are measured from the major scale (bVII = a
+        // whole tone below the octave in any mode, bII = a semitone above the tonic).
+        static const int major[7] = {0, 2, 4, 5, 7, 9, 11};
+        int root = baseMidi + tonic + (accidental != 0 ? major[degree] + accidental : scale[static_cast<size_t>(degree)]);
         int third = upper ? 4 : 3, fifth = 7;
         Chord c;
         if (suffix == "dim" || suffix == "o" || suffix == "°") {
@@ -343,7 +346,7 @@ void kick(Stem& s, int sr, size_t start, float gain) {
         float f = 44.f + 90.f * std::exp(-t / 0.035f);
         phase += f / fs;
         float env = std::exp(-t / 0.11f) * std::min(1.f, t / 0.0015f);
-        float click = i < 60 ? (0.5f - static_cast<float>(i) / 120.f) : 0.f;
+        float click = i < 60 ? (0.5f - static_cast<float>(i) / 120.f) * std::min(1.f, static_cast<float>(i) / 8.f) : 0.f;
         float out = (std::sin(kTwoPi * phase) * env + click * 0.3f) * gain;
         s.add(start + i, out, out);
     }
@@ -361,7 +364,7 @@ void snare(Stem& s, int sr, size_t start, float gain, Random& rng) {
         float tone = std::sin(kTwoPi * phase) * std::exp(-t / 0.05f) * 0.55f;
         hp.process(rng.range(-1.f, 1.f));
         float noise = hp.highpass() * std::exp(-t / 0.09f) * 0.8f;
-        float out = (tone + noise) * gain;
+        float out = (tone + noise) * gain * std::min(1.f, static_cast<float>(i) / 40.f);
         s.add(start + i, out * 0.9f, out * 1.1f);
     }
 }
@@ -375,7 +378,7 @@ void hat(Stem& s, int sr, size_t start, float gain, bool open, Random& rng, floa
     for (size_t i = 0; i < total; ++i) {
         float t = static_cast<float>(i) / fs;
         hp.process(rng.range(-1.f, 1.f));
-        float out = hp.highpass() * std::exp(-t / (open ? 0.08f : 0.016f)) * gain;
+        float out = hp.highpass() * std::exp(-t / (open ? 0.08f : 0.016f)) * gain * std::min(1.f, static_cast<float>(i) / 24.f);
         s.add(start + i, out * gl, out * gr);
     }
 }
@@ -744,9 +747,33 @@ Result<Pcm> renderMusic(const MusicParams& p) {
             out.samples[2 * i + 1] = dry.r[i] + wet.r[i] * wetDry + rr[i] * send;
         }
     }
-    // Gentle saturation keeps peaks musical, then level to a consistent loudness.
-    for (float& s : out.samples) s = std::tanh(s * 0.9f);
-    normalize(out, 0.85f);
+    // Gentle saturation keeps peaks musical; a DC blocker removes drum/bass offsets.
+    {
+        float x1[2] = {0, 0}, y1[2] = {0, 0};
+        // Two passes so the filter state at the loop point matches its state at the start.
+        for (int pass = 0; pass < 2; ++pass) {
+            for (size_t i = 0; i < total; ++i) {
+                for (size_t c = 0; c < 2; ++c) {
+                    float x = std::tanh(out.samples[2 * i + c] * 0.9f);
+                    float y = x - x1[c] + 0.9995f * y1[c];
+                    x1[c] = x;
+                    y1[c] = y;
+                    if (pass == 1) out.samples[2 * i + c] = y;
+                }
+            }
+        }
+    }
+    // Level to a consistent, comfortable loudness (about -18 LUFS) without exceeding -1 dBFS.
+    {
+        double lufs = analyze(out).loudnessLufs;
+        if (lufs > -100.0) {
+            float gain = static_cast<float>(std::pow(10.0, (-18.0 - lufs) / 20.0));
+            float peak = 0.f;
+            for (float v : out.samples) peak = std::max(peak, std::fabs(v));
+            if (peak * gain > 0.89f) gain = 0.89f / peak;
+            for (float& v : out.samples) v *= gain;
+        }
+    }
     return out;
 }
 

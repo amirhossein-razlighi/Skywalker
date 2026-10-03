@@ -360,7 +360,6 @@ void addAudioTools(Engine& engine, ToolRegistry& reg) {
                  else if (st.loudnessLufs > -8) warnings.push("very loud (" + std::to_string(static_cast<int>(st.loudnessLufs)) + " LUFS); lower it or the bus volume");
                  else if (st.loudnessLufs < -40 && st.loudnessLufs > -119) warnings.push("very quiet (" + std::to_string(static_cast<int>(st.loudnessLufs)) + " LUFS)");
                  if (std::fabs(st.dcOffset) > 0.02) warnings.push("DC offset " + std::to_string(st.dcOffset) + " (wastes headroom, can click)");
-                 if (st.startLevelDb > -45 && st.duration < 30) warnings.push("starts abruptly at " + std::to_string(static_cast<int>(st.startLevelDb)) + " dB (may click)");
                  // Loop seam: the step from the last to the first frame compared with the typical step.
                  Json loop = Json::object();
                  const size_t ch = static_cast<size_t>(pcm->channels), n = pcm->frames();
@@ -384,6 +383,12 @@ void addAudioTools(Engine& engine, ToolRegistry& reg) {
                      if (ratio >= 6.0 && seam >= 0.01 && st.duration > 2.0) {
                          warnings.push("loop point jumps (" + std::to_string(seam).substr(0, 5) + "): a looping clip would click; use *_loop presets or crossfade");
                      }
+                 }
+                 // A non-zero first/last sample only matters when the wrap is not smooth (a smooth wrap is a loop).
+                 const bool smoothWrap = loop.contains("seamVsTypicalStep") && loop.get("seamVsTypicalStep").asNumber() < 3.0;
+                 if (!smoothWrap) {
+                    if (st.firstSample > 0.05 * std::max(st.peak, 1e-3)) warnings.push("first sample is not near zero (" + std::to_string(st.firstSample).substr(0, 5) + "): playback starts with a click unless it is a seamless loop");
+                    if (st.lastSample > 0.05 * std::max(st.peak, 1e-3) && st.duration < 30) warnings.push("last sample is not near zero (" + std::to_string(st.lastSample).substr(0, 5) + "): ends with a click unless it is a seamless loop");
                  }
                  Json out = Json::object({{"path", path}, {"stats", st.toJson()}, {"loop", loop}, {"warnings", warnings}});
                  if (const AssetRecord* rec = engine.assets().find(path)) {

@@ -46,6 +46,8 @@ struct Stats {
     double silenceRatio = 0;  // fraction of 10 ms windows below -60 dBFS
     double startLevelDb = -120;  // level of the first/last 5 ms: louder than about -50 dB clicks when played
     double endLevelDb = -120;
+    double firstSample = 0;   // |first frame|: a non-zero start clicks
+    double lastSample = 0;    // |last frame|
     Json toJson() const;
 };
 Stats analyze(const Pcm& pcm);

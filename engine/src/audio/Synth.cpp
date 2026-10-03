@@ -342,6 +342,20 @@ Result<Pcm> renderSfx(const SfxParams& p) {
         }
     }
 
+    // Safety: a filter blow-up must never leave NaNs in a file.
+    for (float& s : mix) {
+        if (!std::isfinite(s)) s = 0.f;
+    }
+    // DC blocker (~14 Hz): asymmetric pulses and drive leave an offset that wastes headroom and clicks.
+    {
+        float x1 = 0.f, y1 = 0.f;
+        for (float& s : mix) {
+            float y = s - x1 + 0.998f * y1;
+            x1 = s;
+            y1 = y;
+            s = y;
+        }
+    }
     Pcm pcm;
     pcm.sampleRate = sr;
     pcm.channels = 1;
@@ -349,13 +363,30 @@ Result<Pcm> renderSfx(const SfxParams& p) {
     if (loop) {
         pcm = makeSeamlessLoop(pcm, loopFrames);
     } else {
-        fadeEdges(pcm, 0.0f, 0.004f);  // never end on a click
+        if (p.duration <= 0.f) {
+            // Cut the inaudible tail (reverb/echo ring-out below about -58 dB of the peak).
+            float peak = 0.f;
+            for (float s : pcm.samples) peak = std::max(peak, std::fabs(s));
+            size_t keep = pcm.samples.size();
+            while (keep > 1 && std::fabs(pcm.samples[keep - 1]) < peak * 0.0012f) --keep;
+            keep = std::min(pcm.samples.size(), keep + static_cast<size_t>(0.02 * sr));
+            pcm.samples.resize(std::max<size_t>(keep, 16));
+        }
+        fadeEdges(pcm, 0.0f, 0.006f);  // never end on a click
     }
-    // Safety: a filter blow-up must never leave NaNs in a file.
-    for (float& s : pcm.samples) {
-        if (!std::isfinite(s)) s = 0.f;
+    if (p.normalize > 0.f) {
+        normalize(pcm, p.normalize);
+        // Dense, buzzy sounds (square waves, noise walls) are far louder than their peak suggests:
+        // keep the average level in a comfortable range as well.
+        double sumSq = 0;
+        for (float s : pcm.samples) sumSq += static_cast<double>(s) * s;
+        double rms = std::sqrt(sumSq / std::max<size_t>(1, pcm.samples.size()));
+        const double maxRms = std::pow(10.0, -15.0 / 20.0);
+        if (rms > maxRms) {
+            float g = static_cast<float>(maxRms / rms);
+            for (float& s : pcm.samples) s *= g;
+        }
     }
-    if (p.normalize > 0.f) normalize(pcm, p.normalize);
     for (float& s : pcm.samples) s *= p.volume;
     return pcm;
 }

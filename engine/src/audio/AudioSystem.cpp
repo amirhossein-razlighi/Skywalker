@@ -585,6 +585,10 @@ void AudioSystem::update(Scene& scene, Phase phase, double dt, const std::option
     }
     for (Impl::Voice* d : dead) s.removeVoice(d);
     s.advance(dt);
+    // Clips that ended during this advance are released now (one update can span many ticks).
+    s.stopMatching([](const Impl::Voice& v) {
+        return v.releaseAt < 0 && !v.loop && v.kind != Impl::Kind::Music && ma_sound_at_end(v.sound.get());
+    });
 }
 
 std::string AudioSystem::playEntity(Scene& scene, EntityId entity) {

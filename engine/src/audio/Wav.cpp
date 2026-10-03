@@ -157,7 +157,9 @@ Json Stats::toJson() const {
                          {"clippedSamples", clipped},
                          {"silenceRatio", r(silenceRatio, 1000.0)},
                          {"startLevelDb", r(startLevelDb)},
-                         {"endLevelDb", r(endLevelDb)}});
+                         {"endLevelDb", r(endLevelDb)},
+                         {"firstSample", r(firstSample, 10000.0)},
+                         {"lastSample", r(lastSample, 10000.0)}});
 }
 
 namespace {
@@ -295,6 +297,10 @@ Stats analyze(const Pcm& pcm) {
     const size_t edge = std::max<size_t>(1, static_cast<size_t>(pcm.sampleRate * 0.005));
     s.startLevelDb = toDb(windowRms(0, edge));
     s.endLevelDb = toDb(windowRms(frames > edge ? frames - edge : 0, edge));
+    for (size_t c = 0; c < ch; ++c) {
+        s.firstSample = std::max(s.firstSample, std::fabs(static_cast<double>(pcm.samples[c])));
+        s.lastSample = std::max(s.lastSample, std::fabs(static_cast<double>(pcm.samples[(frames - 1) * ch + c])));
+    }
     return s;
 }
 
