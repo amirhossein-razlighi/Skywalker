@@ -21,10 +21,12 @@
 #include "skywalker/assets/AssetDatabase.h"
 #include "skywalker/assets/Material.h"
 #include "skywalker/assets/Prefab.h"
+#include "skywalker/audio/AudioSystem.h"
 #include "skywalker/core/Json.h"
 #include "skywalker/engine/Gizmo.h"
 #include "skywalker/fx/Ocean.h"
 #include "skywalker/fx/Particles.h"
+#include "skywalker/input/ActionMap.h"
 #include "skywalker/render/MeshData.h"
 #include "skywalker/render/Renderer.h"
 #include "skywalker/scene/History.h"
@@ -39,6 +41,7 @@ class SocketServer;
 struct EngineConfig {
     RendererBackend renderer = RendererBackend::Auto;
     std::string projectDir = ".";
+    audio::AudioMode audio = audio::AudioMode::Auto;  // Null for tests/CI; SKYWALKER_AUDIO overrides Auto
 };
 
 enum class PlayState { Editing, Playing, Paused };
@@ -201,6 +204,15 @@ public:
 
     // --- World building: terrain and foliage ----------------------------------------
     world::WorldRuntime& world() { return *world_; }
+    // --- Audio & input (workstream S) -------------------------------------------------------
+    audio::AudioSystem& audio() { return *audio_; }
+    /// Project mixer settings (`audio.json`): bus volumes and mutes.
+    Status setAudioMix(const audio::MixSettings& mix);
+    /// The project's input actions (`input.json`, defaults when the file does not exist).
+    const input::ActionMap& actionMap() const { return actionMap_; }
+    Status setActionMap(input::ActionMap map);
+    /// Re-reads input.json / audio.json if they changed on disk (called periodically).
+    void reloadProjectSettings(bool force = false);
 
     // --- Events (activity feed) -----------------------------------------------------
     void emitEvent(Json event);
@@ -219,6 +231,7 @@ public:
 
 private:
     void ensureMeshUploaded(const std::string& meshKey);
+    std::optional<audio::ListenerPose> listenerPose();
     void resolveTexturePaths(FrameData& f) const;
 
     EngineConfig config_;
@@ -252,6 +265,10 @@ private:
     double previewTime_ = 0;
     fx::Ocean& oceanFor(EntityId e, const Water& w);
     wander::InputState input_;
+    input::ActionMap actionMap_ = input::ActionMap::defaults();
+    std::unique_ptr<audio::AudioSystem> audio_;
+    int64_t inputFileTime_ = -1, audioFileTime_ = -1;
+    double settingsTimer_ = 0;
     std::deque<Json> messages_;
 
     std::vector<EntityId> selection_;

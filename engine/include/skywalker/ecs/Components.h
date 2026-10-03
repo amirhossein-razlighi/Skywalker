@@ -261,3 +261,5 @@ struct Environment {
 }  // namespace sky
 
 #include "skywalker/ecs/WorldComponents.h"  // Terrain, Foliage
+// Components of other subsystems (each in its own header).
+#include "skywalker/ecs/AudioComponents.h"

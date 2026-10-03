@@ -702,6 +702,64 @@ private:
             }
             return Value::number(rt_.waterHeight ? rt_.waterHeight(x, z) : 0.0);
         }
+        // --- audio builtins -------------------------------------------------------------------
+        if (f == "play" || f == "stop_sound") {
+            EntityId target = entity(a[0], e.args[0]->loc, f + "() argument 1");
+            if (f == "stop_sound") {
+                if (rt_.stopAudio) rt_.stopAudio(target);
+                return {};
+            }
+            if (rt_.playAudio) {
+                std::string err = rt_.playAudio(target);
+                if (!err.empty()) fail(e.loc, "play(): " + err);
+            }
+            return {};
+        }
+        if (f == "play_sound") {
+            if (rt_.playSound) {
+                std::string err = rt_.playSound(s(0), a.size() > 1 ? static_cast<float>(n(1)) : 1.f, self_);
+                if (!err.empty()) fail(e.loc, "play_sound(): " + err);
+            }
+            return {};
+        }
+        if (f == "music") {
+            if (rt_.playMusic) {
+                std::string err = rt_.playMusic(s(0), a.size() > 1 ? static_cast<float>(n(1)) : -1.f);
+                if (!err.empty()) fail(e.loc, "music(): " + err);
+            }
+            return {};
+        }
+        if (f == "set_volume") {
+            const std::string bus = str::lower(s(0));
+            static const std::vector<std::string> buses{"master", "music", "sfx", "ambience", "voice", "ui"};
+            if (std::find(buses.begin(), buses.end(), bus) == buses.end()) {
+                std::string guess = str::closest(bus, buses, 3);
+                fail(e.loc, "set_volume(): unknown bus '" + bus + "' (buses: master, music, sfx, ambience, voice, ui)" +
+                                (guess.empty() ? "" : " - did you mean '" + guess + "'?"));
+            }
+            if (rt_.setBusVolume) rt_.setBusVolume(bus, static_cast<float>(n(1)));
+            return {};
+        }
+        // --- input builtins ----------------------------------------------------------------------
+        if (f == "action" || f == "pressed" || f == "released" || f == "axis") {
+            const std::string name = s(0);
+            auto it = input_.actions.find(name);
+            if (it == input_.actions.end()) {
+                std::vector<std::string> names;
+                for (const auto& entry : input_.actions) names.push_back(entry.first);
+                std::string guess = str::closest(name, names, 3);
+                std::string list;
+                for (const auto& k : names) list += (list.empty() ? "" : ", ") + k;
+                fail(e.loc, f + "(): unknown input action '" + name + "'" + (guess.empty() ? "" : " - did you mean '" + guess + "'?") +
+                                (list.empty() ? " (no actions are defined; see the input_map tool)" : " (actions: " + list + ")"));
+            }
+            const input::ActionState& st = it->second;
+            if (f == "action") return Value::boolean(st.held);
+            if (f == "pressed") return Value::boolean(st.pressed);
+            if (f == "released") return Value::boolean(st.released);
+            if (st.vec2) return Value::vec({st.x, st.y, 0.f});
+            return Value::number(st.x);
+        }
         if (f == "str") return Value::string(toText(a[0]));
         if (f == "spawn") {
             if (++rt_.spawnedThisTick_ > 256) fail(e.loc, "too many spawns in one tick (limit 256)");
@@ -824,6 +882,9 @@ void Runtime::tick(float dt, const InputState& input) {
                 if (ev.target == kNoEntity || ev.target == id) runAll(Trigger::Event, ev.name);
             }
             for (const auto& key : input.pressed) runAll(Trigger::Key, key);
+            for (const auto& [name, st] : input.actions) {
+                if (st.pressed) runAll(Trigger::Action, name);  // input actions (jump, fire, ...)
+            }
             for (EntityId clicked : input.clicked) {
                 if (clicked == id) runAll(Trigger::Click, "");
             }

@@ -182,6 +182,8 @@ struct OutlinerRow: View {
         if c.contains("water") { return "water.waves" }
         if c.contains("light") { return "lightbulb" }
         if c.contains("mesh") { return "cube" }
+        if c.contains("audio") { return "speaker.wave.2" }
+        if c.contains("listener") { return "ear" }
         return "circle.dotted"
     }
 

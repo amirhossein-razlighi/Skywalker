@@ -27,7 +27,7 @@ target_compile_options(SkywalkerEditor PRIVATE
     $<$<COMPILE_LANGUAGE:Swift>:-parse-as-library>
     $<$<AND:$<COMPILE_LANGUAGE:Swift>,$<CONFIG:Debug>>:-Onone>)
 target_link_libraries(SkywalkerEditor PRIVATE sky::capi
-    "-framework AppKit" "-framework SwiftUI" "-framework Security")
+    "-framework AppKit" "-framework SwiftUI" "-framework Security" "-framework GameController")
 
 if(EXISTS ${SKY_ICON})
     target_sources(SkywalkerEditor PRIVATE ${SKY_ICON})

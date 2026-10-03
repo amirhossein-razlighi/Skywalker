@@ -34,5 +34,9 @@ void addWorldTools(Engine& engine, ToolRegistry& reg);
 void addNetworkTools(Engine& engine, ToolRegistry& reg);
 void addFxTools(Engine& engine, ToolRegistry& reg);
 void addWorldBuildTools(Engine& engine, ToolRegistry& reg);
+void addAudioTools(Engine& engine, ToolRegistry& reg);
+void addInputTools(Engine& engine, ToolRegistry& reg);
+/// Applies the action / axis / gamepad / mouse parts of a sim_input call (InputTools.cpp).
+Status applySimInput(Engine& engine, const Json& args);
 
 }  // namespace sky::tools

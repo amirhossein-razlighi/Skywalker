@@ -40,10 +40,36 @@ set(SKY_ENGINE_SOURCES
     src/agent/SocketServer.cpp
     src/engine/Engine.cpp
     src/engine/Gizmo.cpp
+    # audio + input (workstream S)
+    src/audio/AudioComponents.cpp
+    src/audio/Wav.cpp
+    src/audio/Synth.cpp
+    src/audio/SynthJson.cpp
+    src/audio/SfxPresets.cpp
+    src/audio/MusicGen.cpp
+    src/audio/AudioSystem.cpp
+    src/audio/Miniaudio.cpp
+    src/input/ActionMap.cpp
+    src/agent/AudioTools.cpp
+    src/agent/InputTools.cpp
 )
 
 add_library(skywalker_engine STATIC ${SKY_ENGINE_SOURCES})
 add_library(sky::engine ALIAS skywalker_engine)
+
+# miniaudio (public domain / MIT-0): single-header audio engine (mixing, spatialization, decoding).
+include(FetchContent)
+FetchContent_Declare(miniaudio
+    GIT_REPOSITORY https://github.com/mackron/miniaudio.git
+    GIT_TAG 0.11.22
+    GIT_SHALLOW TRUE)
+if(POLICY CMP0169)
+    cmake_policy(SET CMP0169 OLD)  # we only want the sources, not miniaudio's own CMake project
+endif()
+FetchContent_GetProperties(miniaudio)
+if(NOT miniaudio_POPULATED)
+    FetchContent_Populate(miniaudio)
+endif()
 
 find_package(ZLIB REQUIRED)
 find_package(CURL REQUIRED)
@@ -51,7 +77,11 @@ find_package(Threads REQUIRED)
 
 target_include_directories(skywalker_engine PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
-target_link_libraries(skywalker_engine PUBLIC sky::options PRIVATE ZLIB::ZLIB CURL::libcurl Threads::Threads)
+target_link_libraries(skywalker_engine PUBLIC sky::options PRIVATE ZLIB::ZLIB CURL::libcurl Threads::Threads ${CMAKE_DL_LIBS})
+# Third-party header: included as a system path and compiled without our warning set.
+target_include_directories(skywalker_engine SYSTEM PRIVATE ${miniaudio_SOURCE_DIR})
+# (miniaudio does unsigned pointer-offset arithmetic that UBSan flags; ASan still checks it.)
+set_source_files_properties(src/audio/Miniaudio.cpp PROPERTIES COMPILE_OPTIONS "-w;-fno-sanitize=undefined")
 # Definitions are C-family only (Swift consumers of the C API must not see them).
 target_compile_definitions(skywalker_engine PUBLIC
     $<$<COMPILE_LANGUAGE:C,CXX,OBJCXX>:SKY_VERSION_STRING="${PROJECT_VERSION}">)
