@@ -28,13 +28,16 @@ ctest --preset debug
 Editor-only (macOS):
 
 ```bash
-open build/debug/bin/Skywalker.app --env SKY_PROJECT="$PWD/examples/hello_sky"
+open build/release/bin/Skywalker.app --args --project "$PWD/examples/hello_sky"
 ```
+
+Use the `release` preset for day-to-day editing: debug builds are several times slower on the CPU.
+File › Open Project… (⌘O) switches projects; the editor reopens the last one.
 
 > **Folder-access prompts:** debug builds are ad-hoc signed, and macOS asks again for
 > access to `~/Documents` (or Desktop, Downloads) after each rebuild. To avoid it, sign
-> with a stable identity (`codesign -s "Apple Development: …" build/debug/bin/Skywalker.app`),
-> or keep projects outside protected folders.
+> with a stable identity: configure with `-DSKY_CODESIGN_IDENTITY="Apple Development"` and
+> every build is signed with it; or keep projects outside protected folders.
 
 ## Tests
 

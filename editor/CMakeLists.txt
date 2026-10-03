@@ -52,3 +52,14 @@ add_custom_command(TARGET SkywalkerEditor POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_BUNDLE_CONTENT_DIR:SkywalkerEditor>/Resources/Templates
     COMMAND ${CMAKE_COMMAND} -E copy_directory ${SKY_TEMPLATE_DIR} $<TARGET_BUNDLE_CONTENT_DIR:SkywalkerEditor>/Resources/Templates/hello_sky
     COMMENT "Bundling CLI and templates into Skywalker.app")
+
+# Optional stable signature (e.g. -DSKY_CODESIGN_IDENTITY="Apple Development"). Ad-hoc signatures
+# change with every build, so macOS asks again for Documents/Desktop access after each rebuild;
+# a real identity keeps the privacy grants.
+set(SKY_CODESIGN_IDENTITY "" CACHE STRING "Code signing identity for Skywalker.app (empty = ad-hoc)")
+if(SKY_CODESIGN_IDENTITY)
+    add_custom_command(TARGET SkywalkerEditor POST_BUILD
+        COMMAND xattr -cr $<TARGET_BUNDLE_DIR:SkywalkerEditor>  # iCloud/Finder metadata breaks signing
+        COMMAND codesign --force --deep --timestamp=none -s "${SKY_CODESIGN_IDENTITY}" $<TARGET_BUNDLE_DIR:SkywalkerEditor>
+        COMMENT "Signing Skywalker.app with ${SKY_CODESIGN_IDENTITY}")
+endif()
