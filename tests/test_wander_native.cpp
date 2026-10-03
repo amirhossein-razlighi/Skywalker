@@ -388,3 +388,45 @@ end)";
     CHECK(rej.isError);
     CHECK(engine.scene().entityToJson(e)["behaviors"][size_t{0}]["source"].asString() == saved);
 }
+
+TEST_CASE("wander in the engine: play/stop resets coroutines and states; modules hot-reload") {
+    TempDir dir("modules");
+    writeFile(dir.path / "scripts" / "tuning.wander", "const STEP = 1\nfn bump(x)\n  return x + STEP\nend\n");
+    EngineConfig cfg;
+    cfg.renderer = RendererBackend::Null;
+    cfg.projectDir = dir.path.string();
+    Engine engine(cfg);
+    (void)engine.newScene("T", false);
+    Scene& s = engine.scene();
+    EntityId e = s.create("Counter");
+    (void)s.setBehaviors(e, Json::array({Json::object({{"name", "C"},
+                                                       {"source", R"(
+use "scripts/tuning"
+var n = 0
+state A
+  on enter
+    wait 1
+    go to B
+  end
+end
+state B
+  on tick
+    n = tuning.bump(n)
+  end
+end)"}})}));
+    engine.step(30);  // half a second: still waiting in A
+    CHECK(engine.runtime().currentState(e) == "A");
+    CHECK(s.record(e)->vars["n"].asNumber() == 0);
+    engine.step(40);
+    CHECK(engine.runtime().currentState(e) == "B");
+    CHECK(s.record(e)->vars["n"].asNumber() > 0);
+    engine.stop();
+    CHECK_FALSE(s.record(e)->vars.contains("n"));  // the pre-play scene is restored
+    CHECK(engine.runtime().currentState(e).empty());
+
+    // Edit the module on disk: the next play uses the new code.
+    writeFile(dir.path / "scripts" / "tuning.wander", "const STEP = 100\nfn bump(x)\n  return x + STEP\nend\n");
+    engine.step(62);
+    CHECK(s.record(e)->vars["n"].asNumber() >= 100);
+    engine.stop();
+}
