@@ -1,33 +1,64 @@
-# Demo video pipeline
+# Demo video pipelines
 
-Everything in the Skywalker demo video comes from the engine, the editor, or real agents:
+## Showcase video (12 games) — `out/skywalker-showcase.mp4`
+
+Everything in the video comes from the engine, the live editor, or the agents' own tool calls.
 
 | Footage | Source |
 |---|---|
-| Sky Village | Built **live in the editor** by Claude agents connected over MCP: Cirro (level design), Aurora (lighting) and Stratus (Wander behaviors), working in parallel, with Nimbus (director) laying the foundation. The scene is `examples/sky_village`, with 69 attributed undo steps. |
-| Timelapse | `record_session.py` connects to the editor's MCP socket as `recorder` and captures the viewport every 0.5 s, plus which entities exist at each frame. History attribution comes from the engine's history. |
-| Engine shots | `render_footage.py` loads the scene headlessly, plays the simulation (the agents' behaviors), and captures frames along camera paths. |
-| Sky Dash (2D) | `build_sky_dash.py` builds the level entirely through engine tools and Wander (`examples/sky_dash`). |
-| Editor UI | Real screenshots of the running editor. |
-| Voice | [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M), voice `af_heart`, script in `narration.json`. |
-| Music | Procedural (`music.py`), royalty-free by construction. |
+| The 12 games | `games/<id>.py`. Each is built by the crew through engine tools only. The kit (`kit.py`) gives each crew member their own MCP connection, so every edit is attributed (`mcp:Cirro`, `mcp:Aurora`, …). Results live in `examples/<id>`. |
+| Live builds (timelapse grid) | `record_all.py` launches the editor on each example, starts `record_session.py`, which captures the editor viewport over its MCP socket every 0.25 s, and runs `showcase.py build <id> --attach --pace 1.0 --log edits.jsonl`. The compositor aligns frames and edits by wall clock. |
+| Game shots | `showcase.py footage <id>`: the headless engine plays each game's Wander behaviors while cameras follow `shots()`. |
+| Feature shots | `render_features.py`: a look-dev scene (presets + `texture_generate`), toon vs PBR on Cloudhopper, a time-of-day sweep on Harvest Fair, texture swatches, a `viewport_multi` capture. |
+| Asset previews | `asset_preview` on the games' prefabs. |
+| Voice | Kokoro-82M (`tts.py narration2.json vo/`), voice `af_heart`. |
+| Music | Procedural (`music.py`). |
+| Branding | `assets/brand` (icon and wordmark). |
 
-## Rebuild
+### Rebuild
 
 ```bash
-python3 media/demo/render_footage.py VILLAGE_PROJECT DASH_PROJECT WORK/footage
+export SKY_CLI=$PWD/../../build/release/bin/skywalker
 ```
 
 ```bash
-python compose.py WORK out/skywalker-demo.mp4
+for g in $(python3 showcase.py list); do python3 showcase.py build $g && python3 showcase.py footage $g WORK/footage/$g; done
 ```
-
-Then normalize loudness for social platforms, **forcing 48 kHz**. `loudnorm` silently upsamples to 96–192 kHz, which QuickTime and most apps play as silence:
 
 ```bash
-ffmpeg -i raw.mp4 -c:v copy -af "loudnorm=I=-14:TP=-1.5:LRA=11" -ar 48000 -c:a aac -b:a 192k -movflags +faststart skywalker-demo.mp4
+python3 render_features.py WORK
 ```
 
-`WORK` must contain `footage/`, `rec_village/` (frames, `events*.jsonl`, `history.json`), `assets/` (avatars, editor screenshots, `behaviors.json`) and `vo/` (one WAV per narration id). Use `--preview` to write stills instead of a video.
+Record the live builds into `WORK/rec/<game>/`. The editor must be the release build, and the screen can be locked: capture goes through MCP, not the screen.
 
-Kokoro needs `pip install kokoro soundfile` in a venv on a **short path**: espeak-ng truncates long data paths.
+```bash
+python3 record_all.py WORK
+```
+
+Then generate the voiceover with the Kokoro venv, on a **short path** (espeak-ng truncates long data paths):
+
+```bash
+/path/to/kokoro-venv/bin/python tts.py narration2.json WORK/vo
+```
+
+Compose (`--preview` writes stills instead of a video; `--only id,id` limits it to some segments):
+
+```bash
+python compose2.py WORK WORK/raw.mp4
+```
+
+Normalize loudness for social platforms, **forcing 48 kHz**. `loudnorm` silently upsamples to 96–192 kHz, which QuickTime and most apps play as silence:
+
+```bash
+ffmpeg -i WORK/raw.mp4 -c:v copy -af "loudnorm=I=-14:TP=-1.5:LRA=11" -ar 48000 -c:a aac -b:a 192k -movflags +faststart out/skywalker-showcase.mp4
+```
+
+Look-dev a single game quickly (one still per shot):
+
+```bash
+python3 showcase.py build abyss && python3 showcase.py stills abyss /tmp/look
+```
+
+## v0.0.1 demo video — `out/skywalker-demo.mp4`
+
+The original Sky Village / Sky Dash video: `compose.py`, `render_footage.py`, `build_sky_dash.py`, `narration.json`. Sky Village was built live by Claude agents over MCP (69 attributed undo steps).

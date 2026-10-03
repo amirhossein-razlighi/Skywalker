@@ -7,7 +7,7 @@
   ],
   "description": "Swaying kelp stalk (has a Sway behavior)",
   "source": {
-    "by": "mcp:director",
+    "by": "mcp:Pixel",
     "fromEntity": "Kelp"
   },
   "import": {}

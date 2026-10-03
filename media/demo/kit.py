@@ -21,9 +21,10 @@ CREW_ROLES = {
 
 
 class Studio:
-    def __init__(self, project, attach=False, pace=0.0, style=None):
+    def __init__(self, project, attach=False, pace=0.0, style=None, log=None):
         self.project = os.path.abspath(project)
         self.style = style or {}
+        self.log = open(log, "a") if log else None  # edit log (wall clock) for the timelapse
         self.attach = attach
         self.pace = pace  # seconds to pause after each step (so a timelapse can see progress)
         self._agents = {}
@@ -36,7 +37,15 @@ class Studio:
             self._agents[name] = Sky(attach=True, name=name)
         return Builder(self._agents[name], name, self)
 
+    def record(self, who, label, kind):
+        if self.log:
+            import json
+            self.log.write(json.dumps({"ts": time.time(), "actor": who, "label": label, "kind": kind}) + "\n")
+            self.log.flush()
+
     def close(self):
+        if self.log:
+            self.log.close()
         for s in self._agents.values():
             s.close()
         if self._shared:
@@ -107,12 +116,19 @@ class Builder:
         ops, self.ops = self.ops, []
         r = self.sky.call("batch", label=f"{self.who}: {label}",
                           operations=[{"tool": t, "args": a} for t, a in ops])
+        self.studio.record(self.who, label, "batch")
         if self.studio.pace:
             time.sleep(self.studio.pace)
         return r
 
     def call(self, tool, **args):
         r = self.sky.call(tool, **args)
+        if tool not in ("entity_get", "scene_query", "asset_list", "raycast", "viewport_multi"):
+            label = {"scene_new": "New scene", "scatter": f"Scatter {args.get('group', '')}".strip(),
+                     "texture_generate": f"Texture: {args.get('kind', '')}", "material_create": "Material",
+                     "prefab_create": f"Prefab {os.path.basename(args.get('path', ''))}", "environment_update": "Lighting & sky",
+                     "scene_save": "Save scene"}.get(tool, tool)
+            self.studio.record(self.who, label, tool)
         if self.studio.pace and tool not in ("entity_get", "scene_query", "asset_list", "raycast"):
             time.sleep(self.studio.pace * 0.5)
         return r

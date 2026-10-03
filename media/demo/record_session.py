@@ -49,7 +49,7 @@ while not os.path.exists(os.path.join(out, "STOP")):
     # Read-only: which entities exist at this frame (mapped to attributed history later).
     ov = rpc("tools/call", {"name": "scene_overview", "arguments": {"max_entities": 5000}})
     ids = [e["id"] for e in ov.get("structuredContent", {}).get("entities", [])]
-    log.write(json.dumps({"t": round(start - t0, 2), "frame": frame, "ids": ids}) + "\n")
+    log.write(json.dumps({"t": round(start - t0, 2), "ts": start, "frame": frame, "ids": ids}) + "\n")
     log.flush()
     frame += 1
     time.sleep(max(0.0, interval - (time.time() - start)))

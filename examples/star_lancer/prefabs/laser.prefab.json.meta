@@ -7,7 +7,7 @@
   ],
   "description": "Red laser bolt",
   "source": {
-    "by": "mcp:director",
+    "by": "mcp:Pixel",
     "fromEntity": "Laser"
   },
   "import": {}

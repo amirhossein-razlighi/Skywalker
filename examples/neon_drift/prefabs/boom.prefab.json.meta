@@ -7,7 +7,7 @@
   ],
   "description": "Neon explosion burst",
   "source": {
-    "by": "mcp:director",
+    "by": "mcp:Pixel",
     "fromEntity": "Boom"
   },
   "import": {}

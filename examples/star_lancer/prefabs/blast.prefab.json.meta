@@ -7,7 +7,7 @@
   ],
   "description": "Space explosion",
   "source": {
-    "by": "mcp:director",
+    "by": "mcp:Pixel",
     "fromEntity": "Blast"
   },
   "import": {}

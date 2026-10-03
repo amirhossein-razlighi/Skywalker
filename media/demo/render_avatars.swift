@@ -47,7 +47,7 @@ struct Avatar: View {
 
 let crew: [(String, String, String)] = [
     ("nimbus", "#8b73fa", "determined"), ("cirro", "#5c8fed", "happy"), ("stratus", "#54ccad", "focused"),
-    ("aurora", "#ffb873", "dreamy"), ("haze", "#ed6b7a", "wink"),
+    ("aurora", "#ffb873", "dreamy"), ("haze", "#ed6b7a", "wink"), ("pixel", "#e86bd6", "curious"),
 ]
 
 func color(_ hex: String) -> Color {

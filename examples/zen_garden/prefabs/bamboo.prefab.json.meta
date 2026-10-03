@@ -7,7 +7,7 @@
   ],
   "description": "Swaying bamboo cluster",
   "source": {
-    "by": "mcp:director",
+    "by": "mcp:Pixel",
     "fromEntity": "Bamboo"
   },
   "import": {}

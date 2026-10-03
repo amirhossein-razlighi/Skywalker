@@ -7,7 +7,7 @@
   ],
   "description": "Gold firework burst",
   "source": {
-    "by": "mcp:director",
+    "by": "mcp:Pixel",
     "fromEntity": "Firework Gold"
   },
   "import": {}

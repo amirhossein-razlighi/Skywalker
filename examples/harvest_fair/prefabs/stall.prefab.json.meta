@@ -7,7 +7,7 @@
   ],
   "description": "Striped carnival food stall",
   "source": {
-    "by": "mcp:director",
+    "by": "mcp:Pixel",
     "fromEntity": "Stall"
   },
   "import": {}

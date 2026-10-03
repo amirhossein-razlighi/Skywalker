@@ -7,7 +7,7 @@
   ],
   "description": "Red spotted mushroom",
   "source": {
-    "by": "mcp:director",
+    "by": "mcp:Pixel",
     "fromEntity": "Mushroom"
   },
   "import": {}

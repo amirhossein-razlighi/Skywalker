@@ -33,12 +33,12 @@ def project_dir(game):
     return os.path.join(ROOT, "examples", game)
 
 
-def build(game, attach=False, pace=0.0):
+def build(game, attach=False, pace=0.0, log=None):
     m = module(game)
     d = project_dir(game)
     os.makedirs(os.path.join(d, "scenes"), exist_ok=True)
     t0 = time.time()
-    studio = Studio(d, attach=attach, pace=pace, style=getattr(m, "STYLE", None))
+    studio = Studio(d, attach=attach, pace=pace, style=getattr(m, "STYLE", None), log=log)
     try:
         m.build(studio)
     finally:
@@ -94,7 +94,8 @@ if __name__ == "__main__":
         print("\n".join(GAMES))
     elif cmd == "build":
         pace = float(sys.argv[sys.argv.index("--pace") + 1]) if "--pace" in sys.argv else 0.0
-        build(sys.argv[2], attach="--attach" in sys.argv, pace=pace)
+        log = sys.argv[sys.argv.index("--log") + 1] if "--log" in sys.argv else None
+        build(sys.argv[2], attach="--attach" in sys.argv, pace=pace, log=log)
     elif cmd == "stills":
         render(sys.argv[2], sys.argv[3], stills=True, width=1280, height=720)
     elif cmd == "footage":

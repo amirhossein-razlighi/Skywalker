@@ -7,7 +7,7 @@
   ],
   "description": "Homing enemy drone (2 HP, explodes)",
   "source": {
-    "by": "mcp:director",
+    "by": "mcp:Pixel",
     "fromEntity": "Drone"
   },
   "import": {}

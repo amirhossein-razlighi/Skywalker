@@ -7,7 +7,7 @@
   ],
   "description": "Weathered gravestone",
   "source": {
-    "by": "mcp:director",
+    "by": "mcp:Pixel",
     "fromEntity": "Gravestone"
   },
   "import": {}

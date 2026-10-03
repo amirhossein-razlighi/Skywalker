@@ -7,7 +7,7 @@
   ],
   "description": "Player plasma bolt (flies forward, hits enemies)",
   "source": {
-    "by": "mcp:director",
+    "by": "mcp:Pixel",
     "fromEntity": "Bolt"
   },
   "import": {}

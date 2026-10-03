@@ -7,7 +7,7 @@
   ],
   "description": "Enemy raider (sine-wave attacker)",
   "source": {
-    "by": "mcp:director",
+    "by": "mcp:Pixel",
     "fromEntity": "Raider"
   },
   "import": {}
