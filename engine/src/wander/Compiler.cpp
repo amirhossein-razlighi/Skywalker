@@ -18,6 +18,10 @@ const char* toString(Trigger t) {
         case Trigger::Event: return "event";
         case Trigger::Key: return "key";
         case Trigger::Click: return "click";
+        case Trigger::Action: return "action";
+        case Trigger::Collide: return "collide";
+        case Trigger::TriggerEnter: return "trigger_enter";
+        case Trigger::TriggerExit: return "trigger_exit";
     }
     return "?";
 }
@@ -186,11 +190,20 @@ const std::unordered_map<std::string, FnSig>& functions() {
         {"round", {1, 1}},    {"sign", {1, 1}},      {"min", {2, 2}},       {"max", {2, 2}},
         {"clamp", {3, 3}},    {"lerp", {3, 3}},      {"random", {0, 2}},    {"chance", {1, 1}},
         {"burst", {1, 2}},    {"water_height", {1, 2}},
+        // audio builtins
+        {"play", {1, 1}},     {"play_sound", {1, 2}}, {"stop_sound", {1, 1}}, {"music", {1, 2}}, {"set_volume", {2, 2}},
+        // input builtins
+        {"action", {1, 1}},   {"pressed", {1, 1}},    {"released", {1, 1}},   {"axis", {1, 1}},
         // animation builtins
         {"set_param", {3, 3}}, {"trigger", {2, 2}}, {"play_animation", {2, 4}}, {"anim_state", {1, 1}}, {"play_sequence", {1, 2}},
         {"vec", {3, 3}},      {"color", {3, 4}},     {"length", {1, 1}},    {"normalize", {1, 1}},
         {"dot", {2, 2}},      {"cross", {2, 2}},     {"key", {1, 1}},       {"exists", {1, 1}},
         {"str", {1, 1}},      {"spawn", {1, 3}},     {"tagged", {2, 2}},    {"forward", {1, 1}},
+        // physics builtins
+        {"push", {2, 2}},     {"impulse", {2, 2}},   {"torque", {2, 2}},    {"velocity", {1, 1}},
+        {"raycast", {2, 3}},  {"overlap_sphere", {2, 3}},
+        {"walk", {2, 2}},     {"jump", {1, 2}},      {"grounded", {1, 1}},
+        {"navigate", {2, 2}}, {"stop_navigation", {1, 1}}, {"arrived", {1, 1}}, {"path_length", {2, 2}},
     };
     return fns;
 }
@@ -204,7 +217,11 @@ const std::unordered_set<std::string>& reservedWords() {
 }
 
 const std::vector<std::string>& builtinNames() {
-    static const std::vector<std::string> names{"self", "dt", "time", "frame", "pi"};
+    static const std::vector<std::string> names{"self", "dt", "time", "frame", "pi",
+                                                // physics builtins: contact details (collide/trigger handlers)
+                                                // and the most recent raycast() hit in this handler
+                                                "other", "contact_point", "contact_normal", "impact",
+                                                "hit_point", "hit_normal", "hit_distance"};
     return names;
 }
 
@@ -348,16 +365,17 @@ private:
         Handler h;
         h.loc = next().loc;  // 'on'
         const Token& t = next();
-        static const std::vector<std::string> triggers{"start", "tick", "event", "key", "click", "anim"};
+        static const std::vector<std::string> triggers{"start", "tick",    "event",         "key",         "click",
+                                                       "action", "collide", "trigger_enter", "trigger_exit", "anim"};
         if (t.text == "start") {
             h.trigger = Trigger::Start;
         } else if (t.text == "tick" || t.text == "update") {
             h.trigger = Trigger::Tick;
-        } else if (t.text == "event" || t.text == "key") {
-            h.trigger = t.text == "event" ? Trigger::Event : Trigger::Key;
+        } else if (t.text == "event" || t.text == "key" || t.text == "action") {
+            h.trigger = t.text == "event" ? Trigger::Event : t.text == "key" ? Trigger::Key : Trigger::Action;
             if (peek().kind != Tok::String) {
                 error(peek().loc, "expected_string", "'on " + t.text + "' needs a quoted name, e.g. on " + t.text +
-                                                         (t.text == "key" ? " \"space\"" : " \"door_opened\""));
+                                                         (t.text == "key" ? " \"space\"" : t.text == "action" ? " \"jump\"" : " \"door_opened\""));
             } else {
                 h.argument = next().text;
             }
@@ -372,9 +390,17 @@ private:
             } else {
                 h.argument = "anim:" + next().text;
             }
+        } else if (t.text == "collide" || t.text == "trigger_enter" || t.text == "trigger_exit") {
+            // physics triggers, optionally filtered by the other entity's name or tag
+            h.trigger = t.text == "collide"         ? Trigger::Collide
+                        : t.text == "trigger_enter" ? Trigger::TriggerEnter
+                                                    : Trigger::TriggerExit;
+            if (peek().kind == Tok::String) h.argument = next().text;
         } else {
             std::string guess = str::closest(t.text, triggers);
-            error(t.loc, "unknown_trigger", "unknown trigger '" + t.text + "' (use start, tick, event, key, click, anim)",
+            error(t.loc, "unknown_trigger",
+                  "unknown trigger '" + t.text +
+                      "' (use start, tick, event, key, click, action, collide, trigger_enter, trigger_exit, anim)",
                   guess.empty() ? "" : "did you mean '" + guess + "'?");
         }
         scopes_.clear();
@@ -746,11 +772,13 @@ private:
         auto e = mk(Expr::Kind::Ident, loc);
         e->text = name;
         const auto& builtins = builtinNames();
-        bool known = isLocal(name) || std::find(builtins.begin(), builtins.end(), name) != builtins.end();
+        // Locals shadow vars, vars shadow built-in names (so adding a builtin never breaks a script).
+        bool local = isLocal(name);
         bool isVar = false;
-        if (!known && behavior_) {
+        if (!local && behavior_) {
             for (const auto& v : behavior_->vars) isVar = isVar || v.name == name;
         }
+        bool known = local || isVar || std::find(builtins.begin(), builtins.end(), name) != builtins.end();
         if (isVar) {
             // Bare var name is sugar for self.<var>.
             auto self = mk(Expr::Kind::Ident, loc);
@@ -932,7 +960,9 @@ behavior Patrol
   end
 end
 
-Triggers:   on start | on tick | on event "name" | on key "space" | on click | on anim "footstep" (animation event)
+Triggers:   on start | on tick | on event "name" | on key "space" | on click | on action "jump"
+            on collide ("name or tag")? | on trigger_enter ("name or tag")? | on trigger_exit (...)?
+            on anim "footstep" (an animation event on this entity)
 Statements: let x = v | target = v | set target to v | if c then .. elif c then .. else .. end
             every <sec> .. end | after <sec> .. end | repeat <n> times .. end   (n <= 1000)
             move <e> by <vec> | move <e> toward <point|entity> at <speed> | rotate <e> by <deg vec>
@@ -947,11 +977,24 @@ Functions:  find(name) nearest(tag) count(tag) tagged(e, tag) exists(e) spawn(me
             distance(a, b) direction(a, b) forward(e) length(v) normalize(v) dot(a, b) cross(a, b)
             vec(x, y, z) color(r, g, b, a?) sin cos tan abs sqrt floor ceil round sign min max
             clamp(x, lo, hi) lerp(a, b, t) random() random(hi) random(lo, hi) chance(p) key(name) str(v)
+Input:      action("jump") held? pressed("jump") this tick? released("jump") axis("move") -> number, or vec (x, y, 0)
+            for 2D actions (x right, y forward/up); `on action "jump"` fires when it is pressed. Actions come from
+            input.json (see the input_map tool): keyboard, mouse and gamepad share the same names.
+Audio:      play(e) starts e's audio component; play_sound("audio/hit.wav", volume?) one-shot at self; stop_sound(e)
+            music("audio/theme.wav", fade?) crossfades the music (music("") fades out); set_volume("music", 0.5)
 Effects:    burst(n) / burst(e, n) emits n particles now (particles component; explosions, muzzle flashes)
             water_height(x, z) / water_height(pos): the animated water surface height (boats, buoyancy)
 Animation:  set_param(e, "speed", v) trigger(e, "jump") play_animation(e, "wave", fade?, loop?) anim_state(e)
             play_sequence(e, from?)  (animator / sequencer components; see animation_list)
             e.particles.rate / .emitting / .colorStart ... and e.water.windSpeed ... like any component
+Physics:    push(e, force) (continuous, N) impulse(e, vec) (instant kick, N s) torque(e, vec) velocity(e)
+            e.body.velocity = (0, 5, 0) sets it; e.body.mass / .gravityScale ... like any component
+            raycast(origin, direction, max?) -> entity or none; then hit_point, hit_normal, hit_distance
+            overlap_sphere(center, radius, tag?) -> nearest overlapping entity (not self) or none
+            In collide/trigger handlers: other, contact_point, contact_normal, impact (approach speed m/s)
+Character:  walk(self, dir) every tick (|dir| 1 = moveSpeed), jump(self) / jump(self, speed), grounded(self)
+Navigation: navigate(self, point | entity) arrived(self) stop_navigation(self) path_length(a, b) (none if unreachable)
+            `on event "arrived"` fires when a nav agent reaches its destination
 Comments:   -- comment   // comment   # comment (a '#' followed by a space)
 Rules:      no while-loops (every handler always terminates); randomness is seeded (replayable);
             entities are -Z forward; rotations are Euler degrees (pitch X, yaw Y, roll Z).

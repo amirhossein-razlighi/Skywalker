@@ -127,8 +127,18 @@ final class ViewportNSView: NSView {
 
     private var editing: Bool { engine.playState == "editing" }
 
+    /// Forwards the cursor to the running game: normalized position and movement in points.
+    private func forwardMouse(_ event: NSEvent) {
+        let p = convert(event.locationInWindow, from: nil)
+        let w = max(bounds.width, 1), h = max(bounds.height, 1)
+        engine.mouseMove(x: Float(p.x / w), y: Float(p.y / h), dx: Float(event.deltaX), dy: Float(event.deltaY))
+    }
+
     override func mouseMoved(with event: NSEvent) {
-        guard editing else { return }
+        if !editing {
+            forwardMouse(event)
+            return
+        }
         let p = pixel(event)
         let (w, h) = pixelSize
         engine.gizmoHover(x: Float(p.x), y: Float(p.y), width: w, height: h)
@@ -150,7 +160,8 @@ final class ViewportNSView: NSView {
         let hit = engine.pick(x: Float(p.x), y: Float(p.y), width: w, height: h)
         if !editing {
             if hit != 0 { engine.click(entity: hit) }
-            dragMode = .orbit
+            engine.mouseButton(0, down: true)
+            dragMode = .none
             return
         }
         if hit == 0 {
@@ -173,6 +184,10 @@ final class ViewportNSView: NSView {
     }
 
     override func mouseDragged(with event: NSEvent) {
+        if !editing {
+            forwardMouse(event)
+            return
+        }
         let p = pixel(event)
         defer { lastPoint = p }
         let (w, h) = pixelSize
@@ -187,6 +202,7 @@ final class ViewportNSView: NSView {
     }
 
     override func mouseUp(with event: NSEvent) {
+        if !editing { engine.mouseButton(0, down: false) }
         switch dragMode {
         case .moveEntity: engine.dragEnd()
         case .gizmo: engine.gizmoEnd()
@@ -196,20 +212,38 @@ final class ViewportNSView: NSView {
     }
 
     override func rightMouseDown(with event: NSEvent) {
+        if !editing {
+            engine.mouseButton(1, down: true)
+            return
+        }
         lastPoint = pixel(event)
         dragMode = .orbit
     }
     override func rightMouseDragged(with event: NSEvent) { mouseDragged(with: event) }
-    override func rightMouseUp(with event: NSEvent) { dragMode = .none }
+    override func rightMouseUp(with event: NSEvent) {
+        if !editing { engine.mouseButton(1, down: false) }
+        dragMode = .none
+    }
 
     override func otherMouseDown(with event: NSEvent) {
+        if !editing {
+            engine.mouseButton(2, down: true)
+            return
+        }
         lastPoint = pixel(event)
         dragMode = .pan
     }
     override func otherMouseDragged(with event: NSEvent) { mouseDragged(with: event) }
-    override func otherMouseUp(with event: NSEvent) { dragMode = .none }
+    override func otherMouseUp(with event: NSEvent) {
+        if !editing { engine.mouseButton(2, down: false) }
+        dragMode = .none
+    }
 
     override func scrollWheel(with event: NSEvent) {
+        if !editing {
+            engine.scroll(dx: Float(event.scrollingDeltaX), dy: Float(event.scrollingDeltaY))
+            return
+        }
         if event.hasPreciseScrollingDeltas {
             if event.modifierFlags.contains(.shift) {
                 let h = max(bounds.height, 1)
@@ -278,6 +312,19 @@ final class ViewportNSView: NSView {
         let r = engine.call("batch", ["operations": .array(ops), "label": "Duplicate selection"])
         let created = r.structured["results"].array.flatMap { $0["created"].array.compactMap(\.number) }
         if !created.isEmpty { engine.selection = Set(created.map { UInt64($0) }) }
+    }
+
+    private var heldModifiers: NSEvent.ModifierFlags = []
+
+    /// Shift / control / option / command are not key events: derive their presses from flag changes.
+    override func flagsChanged(with event: NSEvent) {
+        let now = event.modifierFlags.intersection([.shift, .control, .option, .command])
+        if !editing {
+            for (flag, name) in [(NSEvent.ModifierFlags.shift, "shift"), (.control, "ctrl"), (.option, "alt"), (.command, "cmd")] {
+                if now.contains(flag) != heldModifiers.contains(flag) { engine.key(name, down: now.contains(flag)) }
+            }
+        }
+        heldModifiers = now
     }
 
     override func keyUp(with event: NSEvent) {

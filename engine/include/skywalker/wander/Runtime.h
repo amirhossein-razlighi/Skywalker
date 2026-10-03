@@ -18,16 +18,15 @@
 
 #include "skywalker/core/Json.h"
 #include "skywalker/core/Random.h"
+#include "skywalker/input/InputState.h"
 #include "skywalker/scene/Scene.h"
 #include "skywalker/wander/Ast.h"
+#include "skywalker/wander/PhysicsHooks.h"
 
 namespace sky::wander {
 
-struct InputState {
-    std::set<std::string> held;     // keys currently held ("w", "space", "left", ...)
-    std::set<std::string> pressed;  // keys pressed since last tick
-    std::vector<EntityId> clicked;  // entities clicked since last tick
-};
+/// Raw devices plus the evaluated input actions (see skywalker/input/InputState.h).
+using InputState = input::InputState;
 
 struct RuntimeMessage {
     enum class Kind { Log, Error, Compile } kind = Kind::Log;
@@ -69,6 +68,33 @@ public:
     std::function<void(EntityId emitter, int count)> burst;
     /// Water surface height for water_height(); set by the engine (ocean simulation).
     std::function<float(float x, float z)> waterHeight;
+    // Studio builtins/hooks: observes every emitted event (scripts and external emit())
+    // so playtest bots can record deaths, objectives and damage. Optional.
+    std::function<void(const std::string& name, EntityId target, EntityId source)> onEmit;
+
+    // audio builtins: set by the engine (audio system). Each returns an error message, "" on success.
+    std::function<std::string(EntityId entity)> playAudio;                                    // play(e)
+    std::function<void(EntityId entity)> stopAudio;                                           // stop_sound(e)
+    std::function<std::string(const std::string& clip, float volume, EntityId at)> playSound;  // play_sound(path, volume?) at an entity
+    std::function<std::string(const std::string& clip, float fadeSeconds)> playMusic;         // music(path, fade?)
+    std::function<void(const std::string& bus, float volume)> setBusVolume;                   // set_volume(bus, v)
+
+    // --- physics builtins ---------------------------------------------------------------
+    /// Physics, character and navigation services behind push(), raycast(), walk(),
+    /// navigate()...; installed by the engine (null = those builtins report an error).
+    PhysicsHooks* physics = nullptr;
+    /// A contact from the physics step. Delivered on the next tick to `self`'s
+    /// `on collide` / `on trigger_enter` / `on trigger_exit` handlers whose filter matches
+    /// `other` (name or tag); `other`, `contact_point`, `contact_normal` and `impact` describe it.
+    struct Contact {
+        Trigger trigger = Trigger::Collide;
+        EntityId self = kNoEntity;
+        EntityId other = kNoEntity;
+        Vec3 point;
+        Vec3 normal;      // pointing away from `other`, toward `self`
+        float speed = 0;  // approach speed along the normal (m/s)
+    };
+    void queueContact(const Contact& contact) { nextContacts_.push_back(contact); }
     // animation builtins: set_param, trigger, play_animation, anim_state, play_sequence.
     // Set by the engine (AnimationSystem); args exclude the entity. Returns the value.
     std::function<Result<Json>(const std::string& fn, EntityId entity, const std::vector<Json>& args)> animation;
@@ -98,6 +124,9 @@ private:
     uint64_t frame_ = 0;
     std::vector<Event> pending_;
     std::vector<Event> nextPending_;
+    bool matchesContactFilter(EntityId other, const std::string& filter) const;  // physics builtins
+    std::vector<Contact> contacts_;      // physics builtins: delivered this tick
+    std::vector<Contact> nextContacts_;  // physics builtins: queued for the next tick
     std::map<std::pair<EntityId, size_t>, Instance> instances_;
     std::vector<RuntimeMessage> messages_;
     std::vector<EntityId> toDestroy_;

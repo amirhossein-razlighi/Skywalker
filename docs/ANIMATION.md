@@ -115,8 +115,10 @@ Runtime rules worth knowing:
 - Animation events reach Wander as `on anim "footstep"` on the animator's entity (the same
   as `on event "anim:footstep"`), on the next tick.
 - Root motion is the hips' horizontal movement (relative to the model's up axis); vertical
-  motion stays in the pose. The delta goes to the physics hook
-  (`AnimationSystem::hooks.rootMotion`, for a character controller) or moves the Transform.
+  motion stays in the pose. On an entity with a physics `character` controller it becomes
+  the controller's desired velocity for that tick (so the character collides, climbs steps
+  and falls; animators update before the physics step); otherwise it moves the Transform.
+  The hook is `AnimationSystem::hooks.rootMotion`.
 
 ## Bone attachments
 

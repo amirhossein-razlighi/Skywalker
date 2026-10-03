@@ -19,6 +19,8 @@
 #include "skywalker/math/Math.h"
 #include "skywalker/render/Image.h"
 #include "skywalker/scene/Scene.h"
+#include "skywalker/world/Foliage.h"
+#include "skywalker/world/Terrain.h"
 
 namespace sky {
 
@@ -32,6 +34,9 @@ struct ViewCamera {
     float farPlane = 1000.f;
     bool orthographic = false;
     float orthoSize = 5.f;
+    float aperture = 0.f;       // f-stop (0 = no depth of field)
+    float focusDistance = 0.f;  // 0 = autofocus
+    float motionBlur = 0.f;     // shutter fraction
 
     Mat4 view() const { return Mat4::lookAt(eye, target, up); }
     Mat4 projection(float aspect) const;
@@ -176,6 +181,38 @@ struct VolumeItem {
     Vec3 wind{0, 0, 0};   // environment wind in world space (m/s), already scaled by params.wind
 };
 
+/// A heightfield terrain to draw (continuous LOD from its height texture).
+struct TerrainItem {
+    EntityId entity = kNoEntity;
+    Vec3 origin;  // world position of the terrain center
+    std::shared_ptr<const world::TerrainData> data;
+    struct Layer {
+        Surface surface;  // color, roughness, metallic, texture / normalMap / ormMap (absolute paths)
+        float tiling = 0.25f;  // texture repeats per meter
+        bool triplanar = false;
+    };
+    std::vector<Layer> layers;
+    float waterLevel = -100000.f;
+    float wetBand = 1.2f;
+    float detail = 1.f;
+    bool castShadows = true;
+    bool selected = false;
+};
+
+/// A chunk of GPU-instanced foliage (one mesh + surface, many transforms).
+struct InstanceBatch {
+    EntityId entity = kNoEntity;
+    uint64_t id = 0;  // stable while the instance data is unchanged (GPU buffer caching)
+    std::string mesh;
+    Surface surface;
+    std::shared_ptr<const std::vector<world::FoliageInstance>> instances;
+    Aabb bounds;
+    bool castShadows = true;
+    float wind = 1.f;           // bend strength
+    float cullDistance = 100.f;
+    float meshHeight = 1.f;     // height of the mesh (m) for wind bending
+};
+
 struct FrameData {
     int width = 0;
     int height = 0;
@@ -189,11 +226,22 @@ struct FrameData {
     std::vector<ParticleInstance> particles;  // sorted back to front
     std::vector<WaterItem> water;
     std::vector<VolumeItem> volumes;
+    std::vector<TerrainItem> terrains;
+    std::vector<InstanceBatch> instances;
     std::vector<SkinItem> skins;  // animation: skinned draws (see SkinItem)
     bool drawGrid = true;
     float time = 0;
+    /// Jittered sub-samples accumulated into this frame (stills and cinematics: supersampling,
+    /// noise-free GI). 1 = real-time (temporal anti-aliasing across frames).
+    int samples = 1;
+    /// Discards temporal history (camera cuts). Large camera jumps are detected automatically.
+    bool resetHistory = false;
+    /// Buffer visualization instead of the final image: 0 off, 1 albedo, 2 normals,
+    /// 3 roughness/metallic, 4 GI, 5 reflections, 6 AO, 7 depth, 8 lighting before GI.
+    int debugView = 0;
 
-    static constexpr size_t kMaxLights = 16;
+    static constexpr size_t kMaxLights = 1024;       // clustered lighting on surfaces
+    static constexpr size_t kMaxEffectLights = 16;   // the most important ones also light water, particles, fog
     Mat4 viewProjection() const { return projection * view; }
 };
 
@@ -209,8 +257,8 @@ struct BuildOptions {
     std::function<const SkinPose*(EntityId entity, const std::string& mesh)> skin;
 };
 
-/// Keeps the kMaxLights lights that matter most for this view (directional first, then the
-/// point/spot lights nearest to what the camera looks at).
+/// Orders lights by importance for this view (directional first, then the point/spot lights
+/// nearest to what the camera looks at) and keeps at most kMaxLights.
 void prioritizeLights(FrameData& f);
 
 /// Converts the scene into a renderer-agnostic frame description.

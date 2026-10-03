@@ -211,6 +211,13 @@ Result<MeshData> primitive(const std::string& name) {
     if (name == "cone") return cone();
     if (name == "capsule") return capsule();
     if (name == "torus") return torus();
+    if (name == "grass") return grass();
+    if (name == "grass_tall") return grassTall();
+    if (name == "fern") return fern();
+    if (name == "flowers") return flowers();
+    if (name == "pebbles") return pebbles();
+    if (name == "shell") return shell();
+    if (name == "rock") return rock();
     if (name == "gizmo_ring") return torus(96, 8, 0.5f, 0.012f);  // internal: rotate-gizmo ring
     return Error::make("unknown_mesh", "unknown primitive '" + name + "'");
 }

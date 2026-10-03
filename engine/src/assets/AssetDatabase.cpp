@@ -113,6 +113,7 @@ std::string pathGuid(std::string_view path) {
 
 bool skippedDir(const fs::path& p) {
     std::string name = p.filename().string();
+    if (name == "playtests" && p.parent_path().filename() == "studio") return true;  // Studio reports, not assets
     return name.empty() || name[0] == '.' || name == "build" || name == "node_modules" || name == "DerivedData";
 }
 

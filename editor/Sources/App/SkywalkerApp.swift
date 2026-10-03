@@ -5,18 +5,22 @@ import SwiftUI
 struct SkywalkerApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var engine: EngineStore
+    @State private var studio: StudioStore
     @State private var crew: CrewStore
 
     init() {
         let engine = EngineStore(projectDirectory: Self.projectDirectory())
+        let studio = StudioStore(engine: engine)
         _engine = State(initialValue: engine)
-        _crew = State(initialValue: CrewStore(engine: engine))
+        _studio = State(initialValue: studio)
+        _crew = State(initialValue: CrewStore(engine: engine, studio: studio))
     }
 
     var body: some Scene {
         Window("Skywalker", id: "main") {
             EditorView()
                 .environment(engine)
+                .environment(studio)
                 .environment(crew)
                 .frame(minWidth: 1100, minHeight: 680)
                 .preferredColorScheme(.dark)
@@ -62,6 +66,7 @@ struct SkywalkerApp: App {
         Settings {
             SettingsView()
                 .environment(engine)
+                .environment(studio)
                 .environment(crew)
                 .preferredColorScheme(.dark)
         }

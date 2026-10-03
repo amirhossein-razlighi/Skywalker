@@ -162,6 +162,31 @@ TEST_CASE("anim play: root motion moves the entity; stop resets; replays are ide
     CHECK(std::memcmp(bone1.m, bone2.m, sizeof(bone1.m)) == 0);
 }
 
+TEST_CASE("anim play: root motion drives a physics character controller (it collides)") {
+    Project p;
+    EntityId hero = p.character();
+    EntityId ground = p.scene().create("Ground");
+    p.patch(ground, "transform", R"({"position": [0, -0.5, 0], "scale": [20, 1, 20]})");
+    p.patch(ground, "mesh", R"({"mesh": "cube"})");
+    p.patch(ground, "collider", "{}");
+    EntityId wall = p.scene().create("Wall");
+    p.patch(wall, "transform", R"({"position": [0, 1, -1.5], "scale": [4, 2, 0.5]})");
+    p.patch(wall, "mesh", R"({"mesh": "cube"})");
+    p.patch(wall, "collider", "{}");
+    p.patch(hero, "transform", R"({"position": [0, 0.9, 0]})");
+    p.patch(hero, "character", R"({"height": 1.8, "radius": 0.35})");
+    p.patch(hero, "animator", R"({"clip": "Walk", "rootMotion": true})");
+    p.engine->play();
+    p.engine->step(30);
+    float early = worldPos(p.scene(), hero).z;
+    CHECK(early < -0.3f);  // walking toward -Z at the clip's speed through the controller
+    p.engine->step(150);   // 3 s more would be 4.5 m: the wall stops it
+    Vec3 pos = worldPos(p.scene(), hero);
+    CHECK(pos.z > -1.25f);
+    CHECK(pos.z < -0.6f);
+    p.engine->stop();
+}
+
 TEST_CASE("anim attachments: an entity follows a bone (preview per frame, live while playing)") {
     Project p;
     EntityId hero = p.character();

@@ -57,7 +57,18 @@ void Scene::registerKinds() {
     kinds_.push_back(makeReflectedKind<Camera>());
     kinds_.push_back(makeReflectedKind<ParticleEmitter>());
     kinds_.push_back(makeReflectedKind<Water>());
+    kinds_.push_back(makeReflectedKind<Terrain>());
+    kinds_.push_back(makeReflectedKind<Foliage>());
     kinds_.push_back(makeReflectedKind<FluidVolume>());
+    kinds_.push_back(makeReflectedKind<AudioSource>());
+    kinds_.push_back(makeReflectedKind<AudioListener>());
+    kinds_.push_back(makeReflectedKind<RigidBody>());
+    kinds_.push_back(makeReflectedKind<Collider>());
+    kinds_.push_back(makeReflectedKind<CharacterController>());
+    kinds_.push_back(makeReflectedKind<Joint>());
+    kinds_.push_back(makeReflectedKind<PhysicsSettings>());
+    kinds_.push_back(makeReflectedKind<NavAgent>());
+    kinds_.push_back(makeReflectedKind<NavMeshSurface>());
     kinds_.push_back(makeReflectedKind<Animator>());
     kinds_.push_back(makeReflectedKind<BoneAttachment>());
     kinds_.push_back(makeReflectedKind<SequencePlayer>());
