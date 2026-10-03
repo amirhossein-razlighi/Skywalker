@@ -710,15 +710,30 @@ Result<PlaytestResult> runPlaytest(Engine& source, const PlaytestConfig& cfg) {
             o.hasCustomView = true;
             o.customView.eye = at + Vec3{0, 7, 9};
             o.customView.target = at + Vec3{0, 0.5f, 0};
-            auto t0 = std::chrono::steady_clock::now();
             auto cap = sim.capture(o);
-            renderMs.push_back(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count());
             if (!cap) return;
             char name[64];
             std::snprintf(name, sizeof(name), "shot_%02zu_r%d_%s.png", shots.size(), run, reason.c_str());
             result.shots.emplace_back(name, std::move(cap->image));
             shots.push_back({name, run, t, reason});
         };
+
+        // Frame cost: render a 960x540 follow-cam frame every 2 s of game time (after one
+        // untimed warm-up frame that pays for pipeline compilation). Includes readback.
+        auto sampleFrame = [&](Vec3 at, bool timed) {
+            if (!cfg.screenshots) return;
+            CaptureOptions o;
+            o.width = 960;
+            o.height = 540;
+            o.editorOverlays = false;
+            o.hasCustomView = true;
+            o.customView.eye = at + Vec3{0, 7, 9};
+            o.customView.target = at + Vec3{0, 0.5f, 0};
+            auto t0 = std::chrono::steady_clock::now();
+            (void)sim.capture(o);
+            if (timed) renderMs.push_back(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count());
+        };
+        if (run == 0) sampleFrame(start, false);
 
         int tick = 0;
         for (; tick < totalTicks; ++tick) {
@@ -861,6 +876,7 @@ Result<PlaytestResult> runPlaytest(Engine& source, const PlaytestConfig& cfg) {
                 }
             }
             if (alive && t >= 0.25 * static_cast<double>(rec.trajectory.size())) rec.trajectory.push_back({now, cur});
+            if ((tick + 1) % 120 == 0) sampleFrame(cur, true);
             if (now >= nextPeriodic) {
                 takeShot(now, "periodic", cur);
                 nextPeriodic += cfg.shotInterval;
@@ -1009,6 +1025,7 @@ Result<PlaytestResult> runPlaytest(Engine& source, const PlaytestConfig& cfg) {
         summary += " — deaths: " + c;
     }
     if (errors) summary += " — " + std::to_string(errors) + " script error(s)";
+    for (const auto& w : warnings) summary += " — note: " + w;
 
     result.report = Json::object({{"scene", sceneName},
                                   {"config", cfg.toJson()},

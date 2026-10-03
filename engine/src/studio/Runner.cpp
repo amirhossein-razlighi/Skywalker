@@ -169,7 +169,8 @@ AgentRunResult AgentRunner::run(const std::string& prompt) {
     cfg.model = profile_.model.empty() ? provider_.defaultModel() : profile_.model;
     cfg.system = systemPrompt(profile_, roster);
     for (const auto& t : tools) cfg.tools.push_back(t.spec);
-    emit("agent_start", firstLine(prompt), Json::object({{"model", cfg.model}, {"tools", static_cast<int64_t>(tools.size())}}));
+    emit("agent_start", firstLine(prompt),
+         Json::object({{"model", cfg.model}, {"tools", static_cast<int64_t>(tools.size())}, {"prompt", prompt}}));
 
     std::unique_ptr<llm::Session> session = provider_.open(cfg);
     std::vector<llm::ToolOutcome> outcomes;

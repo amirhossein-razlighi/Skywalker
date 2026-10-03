@@ -2274,6 +2274,9 @@ std::string Studio::renderPrompt(const Loop& L, const LoopStage& stage, const Ag
         roster += "- " + a.id + " — " + a.name + " (" + a.role + (a.focus.empty() ? "" : "; " + a.focus) + ")\n";
     }
     vars["roster"] = roster;
+    for (auto& [k, v] : vars) {
+        while (!v.empty() && v.back() == '\n') v.pop_back();  // templates add their own spacing
+    }
 
     std::string body;
     const std::string& tpl = stage.instruction;
@@ -2468,6 +2471,8 @@ Json Studio::enterStages(Loop& L, const std::string& actor) {
         if (shouldSkip(L, stage, skipWhy)) {
             (*rec)["status"] = "skipped";
             (*rec)["summary"] = "skipped: " + skipWhy;
+            emit("loop", "stage_skipped", L.name, actor, L.name + " · " + stage.title + " — skipped: " + skipWhy,
+                 Json::object({{"stage", stage.id}}));
             st["stage_index"] = static_cast<int64_t>(idx + 1);
             continue;
         }
@@ -2497,6 +2502,8 @@ Json Studio::enterStages(Loop& L, const std::string& actor) {
             (*rec)["status"] = "skipped";
             (*rec)["summary"] = stage.onlyWithTasks ? "skipped: no " + refs + " agent holds open tasks"
                                                     : "skipped: no roster member matches " + refs;
+            emit("loop", "stage_skipped", L.name, actor, L.name + " · " + stage.title + " — " + rec->get("summary").asString(),
+                 Json::object({{"stage", stage.id}}));
             st["stage_index"] = static_cast<int64_t>(idx + 1);
             continue;
         }

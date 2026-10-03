@@ -200,6 +200,7 @@ void printEvent(const Json& e, const Style& st) {
         if (action == "started") std::printf("%s▶ %s%s\n", st.bold().c_str(), summary.c_str(), st.reset().c_str());
         else if (action == "iteration_started") std::printf("%s— %s%s\n", st.bold().c_str(), summary.c_str(), st.reset().c_str());
         else if (action == "stage_started") std::printf("%s◆ %s%s\n", st.cyan().c_str(), summary.c_str(), st.reset().c_str());
+        else if (action == "stage_skipped") std::printf("%s◇ %s%s\n", st.dim().c_str(), summary.c_str(), st.reset().c_str());
         else if (action == "finished") std::printf("%s■ %s%s\n", st.bold().c_str(), summary.c_str(), st.reset().c_str());
         else if (action == "awaiting_approval") std::printf("%s⏸ %s%s\n", st.yellow().c_str(), summary.c_str(), st.reset().c_str());
     }
@@ -278,8 +279,18 @@ int runLoop(Engine& engine, const Flags& f, const Style& st) {
         std::lock_guard lock(out);
         std::string who = "@" + e.agent;
         if (e.kind == "agent_start") {
-            std::printf("  %s▸ %s%s %s%s%s\n", st.bold().c_str(), who.c_str(), st.reset().c_str(), st.dim().c_str(),
-                        e.data.get("model").asString().c_str(), st.reset().c_str());
+            std::printf("  %s▸ %s%s %s%s · %lld tools%s\n", st.bold().c_str(), who.c_str(), st.reset().c_str(), st.dim().c_str(),
+                        e.data.get("model").asString().c_str(), static_cast<long long>(e.data.get("tools").asInt()), st.reset().c_str());
+            if (verbose) {
+                int n = 0;
+                for (const auto& line : str::split(e.data.get("prompt").asString(), '\n')) {
+                    if (++n > 30) {
+                        std::printf("      %s…%s\n", st.dim().c_str(), st.reset().c_str());
+                        break;
+                    }
+                    std::printf("      %s│ %s%s\n", st.dim().c_str(), line.c_str(), st.reset().c_str());
+                }
+            }
         } else if (e.kind == "text") {
             std::printf("    %s ✎ %s\n", who.c_str(), clip(e.text, verbose ? 600 : 220).c_str());
         } else if (e.kind == "tool") {
