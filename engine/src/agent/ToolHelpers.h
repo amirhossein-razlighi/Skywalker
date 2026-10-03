@@ -38,6 +38,8 @@ void addAssetTools(Engine& engine, ToolRegistry& reg);
 void addWorldTools(Engine& engine, ToolRegistry& reg);
 void addNetworkTools(Engine& engine, ToolRegistry& reg);
 void addFxTools(Engine& engine, ToolRegistry& reg);
+void addWanderTools(Engine& engine, ToolRegistry& reg);  // Wander 2: check, test, spec, graph, AOT
+void addNativeTools(Engine& engine, ToolRegistry& reg);  // native C++ modules
 void addWorldBuildTools(Engine& engine, ToolRegistry& reg);
 void addAudioTools(Engine& engine, ToolRegistry& reg);
 void addInputTools(Engine& engine, ToolRegistry& reg);

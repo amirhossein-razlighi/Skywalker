@@ -22,6 +22,7 @@ set(SKY_ENGINE_SOURCES
     src/wander/Aot.cpp
     src/wander/TestRunner.cpp
     src/native/Process.cpp
+    src/native/NativeModules.cpp
     src/render/Png.cpp
     src/render/MeshData.cpp
     src/render/FrameBuilder.cpp
@@ -49,6 +50,8 @@ set(SKY_ENGINE_SOURCES
     src/agent/WorldTools.cpp
     src/agent/NetworkTools.cpp
     src/agent/FxTools.cpp
+    src/agent/WanderTools.cpp
+    src/agent/NativeTools.cpp
     src/agent/WorldBuildTools.cpp
     src/agent/DccTools.cpp
     src/dcc/Process.cpp

@@ -14,6 +14,7 @@
 #include "skywalker/agent/SocketServer.h"
 #include "skywalker/core/Log.h"
 #include "skywalker/core/Strings.h"
+#include "skywalker/native/NativeModules.h"
 #include "skywalker/assets/Prefab.h"
 #include "skywalker/render/Gltf.h"
 #include "skywalker/render/MeshData.h"
@@ -49,7 +50,9 @@ Engine::Engine(EngineConfig config)
     : config_(std::move(config)),
       scene_(std::make_unique<Scene>()),
       history_(std::make_unique<History>(*scene_)),
-      runtime_(std::make_unique<wander::Runtime>(*scene_)),
+      builtins_(std::make_unique<wander::BuiltinRegistry>(&wander::BuiltinRegistry::global())),
+      runtime_(std::make_unique<wander::Runtime>(*scene_, builtins_.get())),
+      native_(std::make_unique<NativeModules>(*this, *builtins_)),
       renderer_(createRenderer(config_.renderer)),
       assets_(std::make_unique<AssetDatabase>(config_.projectDir)) {
     assets_->refresh();
@@ -214,6 +217,7 @@ void Engine::play() {
     if (playState_ == PlayState::Editing) {
         playSnapshot_ = scene_->toJson();
         runtime_->refreshModules();  // hot reload of `use`d Wander modules
+        native_->onPlay();           // native modules (rebuilt if changed) and AOT behaviors
         runtime_->reset(/*keepQueuedEvents=*/true);
         accumulator_ = 0;
         particles_.reset();  // play sessions replay exactly
@@ -255,6 +259,7 @@ void Engine::step(int ticks) {
     for (int i = 0; i < ticks; ++i) {
         actionMap_.evaluate(input_);  // device state + agent input -> actions for this tick
         runtime_->tick(kFixedDt, input_);
+        native_->tick(kFixedDt);  // per-tick systems of native modules
         physics_->step(static_cast<float>(kFixedDt), *runtime_);  // nav steering, bodies, characters, contacts
         particles_.update(*scene_, static_cast<float>(kFixedDt));
         input_.endTick();

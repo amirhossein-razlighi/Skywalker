@@ -39,6 +39,7 @@
 namespace sky {
 
 class SocketServer;
+class NativeModules;
 namespace studio {
 class Studio;
 }
@@ -102,6 +103,10 @@ public:
     Scene& scene() { return *scene_; }
     History& history() { return *history_; }
     wander::Runtime& runtime() { return *runtime_; }
+    /// Wander builtins of this engine: the global registry plus native-module builtins.
+    wander::BuiltinRegistry& builtins() { return *builtins_; }
+    /// Native C++ modules and AOT-compiled behaviors (skywalker/native/NativeModules.h).
+    NativeModules& native() { return *native_; }
     Renderer& renderer() { return *renderer_; }
     ToolRegistry& tools() { return tools_; }
     OrbitCamera& camera() { return camera_; }
@@ -265,7 +270,9 @@ private:
     EngineConfig config_;
     std::unique_ptr<Scene> scene_;
     std::unique_ptr<History> history_;
+    std::unique_ptr<wander::BuiltinRegistry> builtins_;  // before runtime_ (it compiles against it)
     std::unique_ptr<wander::Runtime> runtime_;
+    std::unique_ptr<NativeModules> native_;  // after builtins_/runtime_: unloads its builtins first
     std::unique_ptr<Renderer> renderer_;
     std::unique_ptr<AssetDatabase> assets_;
     struct CachedMaterial {
