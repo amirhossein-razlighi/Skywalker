@@ -30,11 +30,24 @@ struct Animator {
 
 /// Keeps this entity on a bone of an animated character (weapons in hands, hats, lanterns).
 struct BoneAttachment {
-    std::string target;  // entity with the Animator; "" = the nearest ancestor that has one
-    std::string bone;    // bone name ("RightHand", "mixamorig:Head"...)
+    std::string character;  // entity with the Animator; "" = the nearest ancestor that has one
+    std::string bone;       // bone name ("RightHand", "mixamorig:Head"...)
     Vec3 offset{0.f};    // position in the bone's space (meters)
     Vec3 rotation{0.f};  // Euler degrees in the bone's space
     bool followScale = false;  // inherit the bone's scale (off: keep this entity's own scale)
+
+    static const TypeInfo& type();
+};
+
+/// Two-bone IK effector: a character's hand or foot (with its elbow or knee) reaches this
+/// entity — a hand on a door handle, rail or lever, a foot planted on a step. The end bone's
+/// parent and grandparent bend; bone lengths never change.
+struct IkTarget {
+    std::string character;  // entity with the Animator; "" = the nearest ancestor that has one
+    std::string bone;       // end bone: LeftHand, RightFoot, ...
+    float weight = 1.f;     // 0 = animation only, 1 = fully on the target
+    Vec3 pole{0.f};         // bend direction in the character's space (knees: [0,0,-1] forward); 0 = keep the animated bend
+    bool matchRotation = false;  // also orient the end bone like this entity
 
     static const TypeInfo& type();
 };

@@ -61,6 +61,7 @@ void Scene::registerKinds() {
     kinds_.push_back(makeReflectedKind<Animator>());
     kinds_.push_back(makeReflectedKind<BoneAttachment>());
     kinds_.push_back(makeReflectedKind<SequencePlayer>());
+    kinds_.push_back(makeReflectedKind<IkTarget>());
 }
 
 const ComponentKind* Scene::componentKind(std::string_view n) const {

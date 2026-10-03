@@ -461,9 +461,67 @@ void AnimationSystem::applyLookAt(Instance& inst, EntityId e, const Animator& a)
     }
 }
 
+const std::vector<EntityId>* AnimationSystem::ikEffectors(EntityId e) {
+    if (!scene_.registry().count<IkTarget>()) return nullptr;
+    if (ikRevision_ != scene_.revision()) {
+        ikRevision_ = scene_.revision();
+        ikIndex_.clear();
+        for (EntityId id : scene_.entities()) {
+            const IkTarget* ik = scene_.get<IkTarget>(id);
+            if (!ik || ik->bone.empty()) continue;
+            EntityId owner = kNoEntity;
+            if (!ik->character.empty()) {
+                owner = scene_.find(ik->character);
+            } else if (const EntityRecord* rec = scene_.record(id); rec && rec->parent) {
+                owner = animatorFor(rec->parent);
+            }
+            if (owner && owner != id) ikIndex_[owner].push_back(id);
+        }
+    }
+    auto it = ikIndex_.find(e);
+    return it == ikIndex_.end() ? nullptr : &it->second;
+}
+
+void AnimationSystem::applyIk(Instance& inst, EntityId e) {
+    const std::vector<EntityId>* effectors = ikEffectors(e);
+    if (!effectors) return;
+    const Skeleton& sk = inst.lib->skeleton;
+    computeGlobals(sk, inst.pose, inst.globals);
+    const Mat4 toModel = modelToWorld(inst, e).inverse();
+    const Mat4 characterWorld = scene_.worldMatrix(e);
+    for (EntityId id : *effectors) {
+        const IkTarget* ik = scene_.get<IkTarget>(id);
+        if (!ik || !scene_.isActive(id) || ik->weight <= 0.f) continue;
+        int bone = sk.find(ik->bone);
+        if (bone < 0) {
+            warnOnce("ik:" + std::to_string(id) + ik->bone, "ik on " + formatEntityRef(id) + ": no bone "" + ik->bone + """);
+            continue;
+        }
+        Mat4 effector = scene_.worldMatrix(id);
+        Vec3 target = toModel.transformPoint(effector.translation());
+        Vec3 pole = length(ik->pole) > 1e-6f ? toModel.transformDir(characterWorld.transformDir(ik->pole)) : Vec3{0, 0, 0};
+        float w = std::clamp(ik->weight, 0.f, 1.f);
+        if (!solveTwoBoneIk(sk, inst.pose, inst.globals, bone, target, pole, w)) {
+            warnOnce("ikchain:" + std::to_string(id), "ik on " + formatEntityRef(id) + ": "" + ik->bone + "" needs a parent and grandparent with length");
+            continue;
+        }
+        if (ik->matchRotation) {
+            // Same convention as bone attachments: the bone's world rotation becomes the entity's.
+            Quat want = rotationOf(toModel) * rotationOf(effector);
+            int parent = sk.bones[static_cast<size_t>(bone)].parent;
+            Quat parentQ = parent >= 0 ? rotationOf(inst.globals[static_cast<size_t>(parent)]) : Quat{};
+            Quat local = (parentQ.conjugate() * want).normalized();
+            Trs& t = inst.pose[static_cast<size_t>(bone)];
+            t.r = w >= 1.f ? local : slerp(t.r, local, w);
+            computeGlobals(sk, inst.pose, inst.globals);
+        }
+    }
+}
+
 void AnimationSystem::finishPose(Instance& inst, EntityId e, const Animator& a) {
     inst.rt.evaluate(inst.pose);
     applyLookAt(inst, e, a);
+    applyIk(inst, e);
     computeGlobals(inst.lib->skeleton, inst.pose, inst.globals);
     inst.posed = true;
     ++inst.version;
@@ -483,6 +541,13 @@ void AnimationSystem::poseEditing(Instance& inst, EntityId e, const Animator& a)
         }
         Vec3 me = scene_.worldMatrix(e).translation();
         key += "|" + std::to_string(me.x) + "," + std::to_string(me.y) + "," + std::to_string(me.z);
+    }
+    if (const std::vector<EntityId>* effectors = ikEffectors(e)) {  // moving an IK target re-poses
+        for (EntityId id : *effectors) {
+            Mat4 m = scene_.worldMatrix(id);
+            for (float f : m.m) key += "," + std::to_string(f);
+            if (const IkTarget* ik = scene_.get<IkTarget>(id)) key += "|" + std::to_string(ik->weight) + ik->bone;
+        }
     }
     if (inst.posed && key == inst.editKey) return;
     inst.editKey = key;
@@ -728,8 +793,8 @@ void AnimationSystem::updateAttachments(FrameOverrides* ov) {
         const BoneAttachment* at = scene_.get<BoneAttachment>(e);
         if (!at || at->bone.empty() || !scene_.isActive(e)) continue;
         EntityId target = kNoEntity;
-        if (!at->target.empty()) {
-            target = scene_.find(at->target);
+        if (!at->character.empty()) {
+            target = scene_.find(at->character);
         } else if (const EntityRecord* rec = scene_.record(e); rec && rec->parent) {
             target = animatorFor(rec->parent);
         }

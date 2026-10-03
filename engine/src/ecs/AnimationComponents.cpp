@@ -7,6 +7,7 @@ namespace sky {
 static_assert(std::is_standard_layout_v<Animator>);
 static_assert(std::is_standard_layout_v<BoneAttachment>);
 static_assert(std::is_standard_layout_v<SequencePlayer>);
+static_assert(std::is_standard_layout_v<IkTarget>);
 
 const TypeInfo& Animator::type() {
     static const TypeInfo info{
@@ -35,11 +36,25 @@ const TypeInfo& BoneAttachment::type() {
         "attach",
         "Keeps this entity on a bone of an animated character (weapon in a hand, hat on a head, lantern on a belt).",
         {
-            SKY_FIELD(BoneAttachment, target, String, "Entity with the animator; empty = nearest ancestor that has one"),
+            SKY_FIELD(BoneAttachment, character, String, "Entity with the animator; empty = nearest ancestor that has one"),
             SKY_FIELD(BoneAttachment, bone, String, "Bone name, e.g. RightHand or mixamorig:Head (animation_list shows them)"),
             SKY_FIELD(BoneAttachment, offset, Vec3, "Position offset in the bone's space (meters)"),
             SKY_FIELD(BoneAttachment, rotation, Vec3, "Rotation offset in the bone's space (Euler degrees)"),
             SKY_FIELD(BoneAttachment, followScale, Bool, "Inherit the bone's scale (off keeps this entity's scale)"),
+        }};
+    return info;
+}
+
+const TypeInfo& IkTarget::type() {
+    static const TypeInfo info{
+        "ik",
+        "Two-bone IK effector: the character's hand or foot (and elbow or knee) reaches this entity's position.",
+        {
+            SKY_FIELD(IkTarget, character, String, "Entity with the animator; empty = nearest ancestor that has one"),
+            SKY_FIELD(IkTarget, bone, String, "End bone that reaches here: LeftHand, RightFoot... (animation_list lists bones)"),
+            SKY_FIELD_RANGE(IkTarget, weight, Float, "Blend between the animation (0) and the target (1)", 0.f, 1.f),
+            SKY_FIELD(IkTarget, pole, Vec3, "Bend direction in the character's space (e.g. [0,0,-1] knees forward); [0,0,0] keeps the animated bend"),
+            SKY_FIELD(IkTarget, matchRotation, Bool, "Also orient the end bone like this entity"),
         }};
     return info;
 }

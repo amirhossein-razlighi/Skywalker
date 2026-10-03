@@ -113,6 +113,8 @@ private:
     void poseEditing(Instance& inst, EntityId e, const Animator& a);
     void finishPose(Instance& inst, EntityId e, const Animator& a);
     void applyLookAt(Instance& inst, EntityId e, const Animator& a);
+    void applyIk(Instance& inst, EntityId e);
+    const std::vector<EntityId>* ikEffectors(EntityId animatorEntity);
     Mat4 modelToWorld(const Instance& inst, EntityId animatorEntity) const;
     void updateAttachments(FrameOverrides* overrides);
     SeqInstance* seqInstance(EntityId e);
@@ -129,6 +131,8 @@ private:
     std::unordered_map<std::string, std::shared_ptr<const Clip>> retargeted_;
     std::unordered_map<EntityId, float> scrubs_;
     std::unordered_map<std::string, bool> warned_;
+    std::unordered_map<EntityId, std::vector<EntityId>> ikIndex_;  // animator -> IK effectors (rebuilt per scene revision)
+    uint64_t ikRevision_ = ~0ull;
     uint64_t assetGeneration_ = 1;  // bumps on invalidate(): instances re-bind
     bool playing_ = false;
 };

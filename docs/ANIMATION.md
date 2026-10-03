@@ -11,6 +11,7 @@ component plus a set of tools, so agents and the editor drive it the same way.
 | Controller | `*.animctl.json`: parameters, layers, states, blend spaces, transitions | `anim/Controller.h` |
 | `animator` component | Plays a library on the entity's rigged meshes, through a controller or one clip | `ecs/AnimationComponents.h` |
 | `attach` component | Keeps an entity on a bone (weapons, hats, lanterns) | same |
+| `ik` component | Two-bone IK effector: a hand or foot reaches this entity | same |
 | Sequence | `*.sequence.json`: a cinematic timeline | `anim/Sequence.h` |
 | `sequencer` component | Plays a sequence during the simulation; previews it while editing | same |
 | AnimationSystem | Runs all of the above, deterministically, in the fixed tick | `anim/AnimationSystem.h` |
@@ -120,10 +121,25 @@ Runtime rules worth knowing:
 ## Bone attachments
 
 `bone_attach {"entity": "Sword", "to": "Hero", "bone": "RightHand", "offset": [0, 0.08, 0]}`
-adds an `attach` component (`target`, `bone`, `offset`, `rotation`, `followScale`) and parents
+adds an `attach` component (`character`, `bone`, `offset`, `rotation`, `followScale`) and parents
 the prop under the character. Attachments follow the bone every tick while playing and in
 the editor preview (applied per frame, never saved). Bone names match fuzzily
 (`righthand`, `mixamorig:RightHand`); `animation_list bones=true` lists them.
+
+## IK
+
+**Look-at** (animator fields `lookAt`, `lookAtWeight`, `lookAtLimit`): the head, neck and up
+to two spine bones share the turn toward an entity (another character's head, else the
+middle of a mesh), clamped to a cone around the body's facing, smoothed while playing.
+
+**Two-bone IK** (`ik` component on an *effector* entity: `character`, `bone`, `weight`,
+`pole`, `matchRotation`): the end bone (hand, foot) reaches the effector; its parent and
+grandparent (elbow and shoulder, knee and hip) bend analytically and keep their lengths;
+out-of-reach targets straighten the limb toward them. `pole` is the bend direction in the
+character's space (knees `[0, 0, -1]`); zero keeps the animated bend plane. `bone_ik` creates
+an effector (or turns an existing object into one). Move or keyframe effectors like any
+entity — a reach in a cutscene is a `transform.position` track on the effector. IK runs
+after the state machine and look-at, every tick while playing and in editor previews.
 
 ## Sequences (`*.sequence.json`)
 
@@ -182,6 +198,7 @@ saved.
 | `animation_preview` | Render a character at clip/state times (contact sheets); auto-framed |
 | `animator_set` | Set parameters / triggers, play states or clips (live while playing, preview while editing), look-at, preview mode |
 | `bone_attach` | Attach a prop to a bone |
+| `bone_ik` | Make a hand or foot reach an object or point (two-bone IK effector) |
 | `sequence_create` | New sequence asset + an entity that plays it |
 | `sequence_key` | Add/replace many keys at once: properties, camera cuts, events, animation keys |
 | `sequence_camera_shot` | Add an orbit/dolly/crane/track/pan/static/path shot (creates the camera, adds the cut) |
@@ -264,7 +281,8 @@ did-you-mean hints. The `animator` fields are also properties: `self.animator.sp
 ## Limits (v0.1)
 
 - No morph targets (blend shapes), no sparse accessors, no `KHR_animation_pointer`.
-- Look-at only (head, neck, up to two spine bones); no two-bone (feet/hand) IK yet.
+- IK: look-at and two-bone effectors; no automatic foot planting on terrain (place foot
+  effectors from gameplay raycasts), no full-body IK.
 - Root motion is translation only (no root yaw).
 - Retargeting is by bone name with hips-translation scaling (no pose-space retargeting).
 

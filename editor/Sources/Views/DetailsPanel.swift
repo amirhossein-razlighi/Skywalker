@@ -31,7 +31,7 @@ struct EntityDetails: View {
     @State private var schemas: JSON = .null
 
     private var selectedID: UInt64? { engine.selection.count == 1 ? engine.selection.first : nil }
-    private static let componentOrder = ["transform", "mesh", "light", "camera", "particles", "water", "animator", "attach", "sequencer"]
+    private static let componentOrder = ["transform", "mesh", "light", "camera", "particles", "water", "animator", "attach", "ik", "sequencer"]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -83,6 +83,7 @@ struct EntityDetails: View {
         case "water": "water.waves"
         case "animator": "figure.walk"
         case "attach": "link"
+        case "ik": "hand.point.up.left"
         case "sequencer": "film.stack"
         default: "puzzlepiece"
         }
@@ -125,7 +126,7 @@ struct EntityDetails: View {
 
     private func addComponent(id: UInt64) -> some View {
         Menu {
-            ForEach(["mesh", "light", "camera", "particles", "water", "animator", "attach", "sequencer"].filter { doc["components"][$0].isNull },
+            ForEach(["mesh", "light", "camera", "particles", "water", "animator", "attach", "ik", "sequencer"].filter { doc["components"][$0].isNull },
                     id: \.self) { comp in
                 Button(comp.capitalized) { update(id, ["components": .object([(comp, [:])])]) }
             }

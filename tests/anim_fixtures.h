@@ -190,6 +190,57 @@ inline std::string makeStripGltf(const StripOptions& o = {}) {
     return doc.dump();
 }
 
+/// "Arm": Shoulder at (0, 1.5, 0) -> Elbow (+0.5 X) -> Hand (+0.5 X); a thin strip along +X
+/// skinned to the three joints, and one constant clip ("Hold"). For IK tests.
+inline std::string makeArmGltf() {
+    GltfBuilder b;
+    std::vector<float> pos, nrm, weights;
+    std::vector<uint16_t> joints, idx;
+    for (int i = 0; i <= 4; ++i) {
+        float x = 0.25f * static_cast<float>(i);
+        uint16_t j = x < 0.49f ? 0 : x < 0.99f ? 1 : 2;
+        for (float y : {1.45f, 1.55f}) {
+            pos.insert(pos.end(), {x, y, 0.f});
+            nrm.insert(nrm.end(), {0.f, 0.f, 1.f});
+            joints.insert(joints.end(), {j, 0, 0, 0});
+            weights.insert(weights.end(), {1.f, 0.f, 0.f, 0.f});
+        }
+    }
+    for (uint16_t i = 0; i < 4; ++i) {
+        uint16_t a = static_cast<uint16_t>(i * 2);
+        idx.insert(idx.end(), {a, static_cast<uint16_t>(a + 2), static_cast<uint16_t>(a + 1), static_cast<uint16_t>(a + 1),
+                               static_cast<uint16_t>(a + 2), static_cast<uint16_t>(a + 3)});
+    }
+    int aPos = b.floats(pos, "VEC3"), aNrm = b.floats(nrm, "VEC3"), aJ = b.u16(joints, "VEC4"), aW = b.floats(weights, "VEC4");
+    int aIdx = b.u16(idx, "SCALAR");
+    std::vector<float> ibm{1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, -1.5f, 0, 1,
+                           1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, -0.5f, -1.5f, 0, 1,
+                           1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, -1.f, -1.5f, 0, 1};
+    int aIbm = b.floats(ibm, "MAT4");
+    int aT = b.floats({0.f, 1.f}, "SCALAR", true);
+    int aR = b.floats({0, 0, 0, 1, 0, 0, 0, 1}, "VEC4");
+    sky::Json doc = sky::Json::object(
+        {{"asset", sky::Json::object({{"version", "2.0"}})},
+         {"scene", 0},
+         {"scenes", sky::Json::array({sky::Json::object({{"nodes", sky::Json::array({0, 3})}})})},
+         {"nodes", sky::Json::array({sky::Json::object({{"name", "Shoulder"}, {"translation", sky::Json::array({0, 1.5, 0})}, {"children", sky::Json::array({1})}}),
+                                     sky::Json::object({{"name", "Elbow"}, {"translation", sky::Json::array({0.5, 0, 0})}, {"children", sky::Json::array({2})}}),
+                                     sky::Json::object({{"name", "Hand"}, {"translation", sky::Json::array({0.5, 0, 0})}}),
+                                     sky::Json::object({{"name", "ArmMesh"}, {"mesh", 0}, {"skin", 0}})})},
+         {"meshes", sky::Json::array({sky::Json::object({{"primitives", sky::Json::array({sky::Json::object(
+                        {{"attributes", sky::Json::object({{"POSITION", aPos}, {"NORMAL", aNrm}, {"JOINTS_0", aJ}, {"WEIGHTS_0", aW}})},
+                         {"indices", aIdx}})})}})})},
+         {"skins", sky::Json::array({sky::Json::object({{"joints", sky::Json::array({0, 1, 2})}, {"inverseBindMatrices", aIbm}})})},
+         {"animations", sky::Json::array({sky::Json::object(
+                            {{"name", "Hold"},
+                             {"samplers", sky::Json::array({sky::Json::object({{"input", aT}, {"output", aR}})})},
+                             {"channels", sky::Json::array({sky::Json::object({{"sampler", 0}, {"target", sky::Json::object({{"node", 1}, {"path", "rotation"}})}})})}})})}});
+    doc["accessors"] = b.accessors;
+    doc["bufferViews"] = b.views;
+    doc["buffers"] = sky::Json::array({sky::Json::object({{"byteLength", b.bin.size()}, {"uri", b.uri()}})});
+    return doc.dump();
+}
+
 inline std::vector<uint8_t> bytesOfString(const std::string& s) { return {s.begin(), s.end()}; }
 
 }  // namespace skytest

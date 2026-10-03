@@ -260,3 +260,37 @@ TEST_CASE("gltf skins: animation-only files and node-animated rigid parts") {
     skinMesh(r->mesh, palette, posed);
     CHECK(near(vpos(posed, 0), {0, 1, -1}));  // (1,0,0) turned 90 degrees about +Y
 }
+
+TEST_CASE("two-bone IK: reaches the target, keeps bone lengths, honours the pole") {
+    // Shoulder at the origin, elbow 1 m along +X, hand 1 m further; slightly bent.
+    Skeleton sk;
+    sk.bones.push_back({"Shoulder", -1, {}});
+    sk.bones.push_back({"Elbow", 0, {{1, 0, 0}, Quat::axisAngle({0, 1, 0}, 0.2f), {1, 1, 1}}});
+    sk.bones.push_back({"Hand", 1, {{1, 0, 0}, {}, {1, 1, 1}}});
+    auto run = [&](Vec3 target, Vec3 pole, float weight = 1.f) {
+        Pose pose = restPose(sk);
+        std::vector<Mat4> g;
+        computeGlobals(sk, pose, g);
+        REQUIRE(solveTwoBoneIk(sk, pose, g, 2, target, pole, weight));
+        std::vector<Mat4> check;
+        computeGlobals(sk, pose, check);
+        CHECK(distance(check[1].translation(), check[0].translation()) == doctest::Approx(1.f).epsilon(1e-4));
+        CHECK(distance(check[2].translation(), check[1].translation()) == doctest::Approx(1.f).epsilon(1e-4));
+        return check;
+    };
+    for (Vec3 t : {Vec3{1, 1, 0}, Vec3{0.5f, -1.2f, 0.3f}, Vec3{-0.4f, 0.2f, 1.1f}, Vec3{1.2f, 0.4f, -0.9f}}) {
+        auto g = run(t, {});
+        CHECK(distance(g[2].translation(), t) < 1e-3f);
+    }
+    // Out of reach: the arm straightens toward the target.
+    auto far = run({5, 0, 0}, {});
+    CHECK(distance(far[2].translation(), Vec3{2, 0, 0}) < 1e-2f);
+    // The pole decides which way the elbow bends.
+    auto up = run({1.2f, 0, 0}, {0, 1, 0});
+    CHECK(up[1].translation().y > 0.5f);
+    auto down = run({1.2f, 0, 0}, {0, -1, 0});
+    CHECK(down[1].translation().y < -0.5f);
+    // Half weight: between the input pose and the solution.
+    auto half = run({1, 1, 0}, {}, 0.5f);
+    CHECK(distance(half[2].translation(), Vec3{1, 1, 0}) > 0.05f);
+}

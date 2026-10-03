@@ -478,7 +478,7 @@ void addAnimationTools(Engine& engine, ToolRegistry& reg) {
                      if (parent) {
                          if (Status r = s.setParent(*prop, *ae); !r) return r;
                      }
-                     Json c = Json::object({{"target", targetRef}, {"bone", a.get("bone")}});
+                     Json c = Json::object({{"character", targetRef}, {"bone", a.get("bone")}});
                      if (a.contains("offset")) c["offset"] = a.get("offset");
                      if (a.contains("rotation")) c["rotation"] = a.get("rotation");
                      if (a.contains("follow_scale")) c["followScale"] = a.get("follow_scale");
@@ -488,6 +488,65 @@ void addAnimationTools(Engine& engine, ToolRegistry& reg) {
                  Vec3 p = bw->translation();
                  return ToolResult::json(Json::object({{"entity", *prop}, {"animator", *ae}, {"bone", a.get("bone")}, {"boneWorld", reflect::vec3ToJson(p)}}),
                                          "attached " + s.record(*prop)->name + " to " + a.get("bone").asString());
+             }});
+
+    reg.add({"bone_ik", "Reach with IK",
+             "Make a character's hand or foot reach a point with two-bone IK (the elbow/knee and shoulder/hip bend; "
+             "bone lengths are kept): a hand on a door handle, rail or lever, a foot planted on a step. Either give "
+             "`entity` (an existing object becomes the effector — the bone reaches it) or a `position` (a new effector "
+             "entity is created under the character; default: where the bone is now). Move or keyframe the effector "
+             "(sequence_key transform.position) to animate the reach; `weight` blends with the animation. "
+             "pole = bend direction in the character's space ([0,0,-1] knees forward; elbows usually [0,0,1]). "
+             "Example: {\"character\": \"Hero\", \"bone\": \"RightHand\", \"entity\": \"Door Handle\"}.",
+             "animation",
+             object({{"character", entity("The character (entity with the animator)")},
+                     {"bone", string("End bone: LeftHand, RightHand, LeftFoot, RightFoot...")},
+                     {"entity", entity("Existing entity to reach (it gets the ik component)")},
+                     {"position", vec3("World position for a new effector entity")},
+                     {"name", string("Name of the new effector (default \"<bone> IK\")")},
+                     {"weight", number("0..1 (default 1)")},
+                     {"pole", vec3("Bend direction in the character's space (default: keep the animated bend)")},
+                     {"match_rotation", boolean("Also orient the bone like the effector (default false)")}},
+                    {"character", "bone"}),
+             true, false, [&engine](const Json& a, ToolContext& ctx) {
+                 auto ae = animatorOf(engine, a.get("character"));
+                 if (!ae) return ToolResult::error(ae.error());
+                 std::string bone = a.get("bone").asString();
+                 auto bw = engine.animation().boneWorld(*ae, bone);
+                 if (!bw) return ToolResult::error(bw.error());
+                 auto lib = engine.animation().libraryOf(*ae);
+                 if (!lib) return ToolResult::error(lib.error());
+                 int b = (*lib)->skeleton.find(bone);
+                 int mid = b >= 0 ? (*lib)->skeleton.bones[static_cast<size_t>(b)].parent : -1;
+                 if (mid < 0 || (*lib)->skeleton.bones[static_cast<size_t>(mid)].parent < 0) {
+                     return ToolResult::error(Error::make("invalid_bone", "\"" + bone + "\" needs a parent and a grandparent bone (e.g. a hand or a foot)"));
+                 }
+                 Scene& s = engine.scene();
+                 EntityId effector = kNoEntity;
+                 Status st = engine.edit(ctx.actor, "IK " + bone, [&]() -> Status {
+                     Json c = Json::object({{"bone", bone}});
+                     if (a.contains("entity")) {
+                         auto id = resolve(engine, a.get("entity"));
+                         if (!id) return id.error();
+                         if (*id == *ae) return Error::make("invalid_arguments", "the character cannot be its own IK target");
+                         effector = *id;
+                         c["character"] = s.find(s.record(*ae)->name) == *ae ? s.record(*ae)->name : formatEntityRef(*ae);
+                     } else {
+                         effector = s.create(a.get("name").asString(bone + " IK"), *ae);
+                         Vec3 world = bw->translation();
+                         reflect::jsonToVec3(a.get("position"), world);
+                         Vec3 local = s.worldMatrix(*ae).inverse().transformPoint(world);
+                         if (Status r = s.patchComponent(effector, "transform", Json::object({{"position", reflect::vec3ToJson(local)}})); !r) return r;
+                     }
+                     if (a.contains("weight")) c["weight"] = a.get("weight");
+                     if (a.contains("pole")) c["pole"] = a.get("pole");
+                     if (a.contains("match_rotation")) c["matchRotation"] = a.get("match_rotation");
+                     return s.patchComponent(effector, "ik", c);
+                 });
+                 if (!st) return fail(st);
+                 return ToolResult::json(Json::object({{"effector", effector}, {"animator", *ae}, {"bone", bone},
+                                                       {"effectorWorld", reflect::vec3ToJson(s.worldMatrix(effector).translation())}}),
+                                         bone + " reaches " + formatEntityRef(effector) + " (" + s.record(effector)->name + ")");
              }});
 
     addSequenceTools(engine, reg);

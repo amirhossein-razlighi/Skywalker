@@ -225,6 +225,42 @@ TEST_CASE("anim wander: set_param / trigger / play_animation / anim_state and on
     p.engine->stop();
 }
 
+TEST_CASE("anim ik: a hand reaches an effector (tool, edit preview, play), bones keep their length") {
+    Project p;
+    p.write("chars/arm.gltf", skytest::makeArmGltf());
+    Json r = p.call("asset_import", Json::object({{"path", "chars/arm.gltf"}, {"create_entity", "Arm"}}));
+    EntityId arm = static_cast<EntityId>(r.get("entity").asInt());
+    REQUIRE(arm);
+    anim::AnimationSystem& as = p.engine->animation();
+    // The arm points along -X once turned to face -Z; the shoulder is at (0, 1.5, 0).
+    CHECK(distance(as.boneWorld(arm, "Hand").value().translation(), Vec3{-1.f, 1.5f, 0.f}) < 1e-3f);
+    p.call("bone_ik", Json::object({{"character", "Arm"}, {"bone", "Hand"}, {"position", Json::array({-0.6, 1.9, 0.2})}}));
+    EntityId effector = p.scene().find("Hand IK");
+    REQUIRE(effector);
+    CHECK(p.scene().get<IkTarget>(effector));
+    auto check = [&](Vec3 want) {
+        Vec3 s = as.boneWorld(arm, "Shoulder").value().translation();
+        Vec3 e = as.boneWorld(arm, "Elbow").value().translation();
+        Vec3 h = as.boneWorld(arm, "Hand").value().translation();
+        CHECK(distance(h, want) < 2e-3f);
+        CHECK(distance(s, e) == doctest::Approx(0.5f).epsilon(1e-3));
+        CHECK(distance(e, h) == doctest::Approx(0.5f).epsilon(1e-3));
+    };
+    check({-0.6f, 1.9f, 0.2f});
+    // Moving the effector moves the reach (editor preview re-poses).
+    p.patch(effector, "transform", R"({"position": [-0.3, 1.6, -0.5]})");  // the arm root is at the origin
+    check({-0.3f, 1.6f, -0.5f});
+    // Playing: solved every tick; weight 0 leaves the animation alone.
+    p.engine->play();
+    p.engine->step(2);
+    check({-0.3f, 1.6f, -0.5f});
+    p.patch(effector, "ik", R"({"weight": 0})");
+    p.engine->step(1);
+    CHECK(distance(as.boneWorld(arm, "Hand").value().translation(), Vec3{-1.f, 1.5f, 0.f}) < 1e-3f);
+    p.engine->stop();
+    p.call("bone_ik", Json::object({{"character", "Arm"}, {"bone", "Shoulder"}}), false);  // no parent chain
+}
+
 TEST_CASE("anim look-at: the head turns toward a target, within the angle limit") {
     Project p({.humanNames = true});
     EntityId hero = p.character();

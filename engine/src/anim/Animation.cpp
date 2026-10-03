@@ -204,6 +204,48 @@ void computeGlobals(const Skeleton& skeleton, const Pose& pose, std::vector<Mat4
     }
 }
 
+bool solveTwoBoneIk(const Skeleton& sk, Pose& pose, std::vector<Mat4>& globals, int end, Vec3 t, Vec3 pole, float weight) {
+    if (end < 0 || static_cast<size_t>(end) >= sk.bones.size() || weight <= 0.f) return false;
+    const int mid = sk.bones[static_cast<size_t>(end)].parent;
+    const int root = mid >= 0 ? sk.bones[static_cast<size_t>(mid)].parent : -1;
+    if (root < 0 || globals.size() != sk.bones.size() || pose.size() != sk.bones.size()) return false;
+    const Vec3 a = globals[static_cast<size_t>(root)].translation();
+    const Vec3 b = globals[static_cast<size_t>(mid)].translation();
+    const Vec3 c = globals[static_cast<size_t>(end)].translation();
+    const float lab = length(b - a), lcb = length(c - b);
+    if (lab < 1e-5f || lcb < 1e-5f) return false;
+    constexpr float eps = 1e-4f;
+    const float lat = std::clamp(length(t - a), eps, lab + lcb - eps);
+    auto angle = [](Vec3 u, Vec3 v) { return std::acos(std::clamp(dot(normalize(u), normalize(v)), -1.f, 1.f)); };
+    const float acab0 = angle(c - a, b - a);
+    const float babc0 = angle(a - b, c - b);
+    const float acat0 = angle(c - a, t - a);
+    const float acab1 = std::acos(std::clamp((lcb * lcb - lab * lab - lat * lat) / (-2.f * lab * lat), -1.f, 1.f));
+    const float babc1 = std::acos(std::clamp((lat * lat - lab * lab - lcb * lcb) / (-2.f * lab * lcb), -1.f, 1.f));
+    // Bend plane: the pole hint, else the current elbow/knee direction.
+    Vec3 bend = length(pole) > 1e-6f ? pole : b - a;
+    Vec3 axis0 = cross(c - a, bend);
+    if (length(axis0) < 1e-6f) axis0 = cross(c - a, Vec3{0, 0, 1});
+    if (length(axis0) < 1e-6f) axis0 = cross(c - a, Vec3{1, 0, 0});
+    axis0 = normalize(axis0);
+    Vec3 axis1 = cross(c - a, t - a);
+    const bool aligned = length(axis1) < 1e-6f;
+    axis1 = aligned ? axis0 : normalize(axis1);
+    const Quat aGr = rotationOf(globals[static_cast<size_t>(root)]);
+    const Quat bGr = rotationOf(globals[static_cast<size_t>(mid)]);
+    const Quat r0 = Quat::axisAngle(aGr.conjugate().rotate(axis0), acab1 - acab0);
+    const Quat r1 = Quat::axisAngle(bGr.conjugate().rotate(axis0), babc1 - babc0);
+    const Quat r2 = aligned ? Quat{} : Quat::axisAngle(aGr.conjugate().rotate(axis1), acat0);
+    Trs& ra = pose[static_cast<size_t>(root)];
+    Trs& rb = pose[static_cast<size_t>(mid)];
+    const Quat newA = (ra.r * (r2 * r0)).normalized();  // world: bend (r0) first, then swing (r2)
+    const Quat newB = (rb.r * r1).normalized();
+    ra.r = weight >= 1.f ? newA : slerp(ra.r, newA, weight);
+    rb.r = weight >= 1.f ? newB : slerp(rb.r, newB, weight);
+    computeGlobals(sk, pose, globals);
+    return true;
+}
+
 float rootSpeed(const Library& lib, const Clip& clip, Vec3 up) {
     if (lib.rootBone < 0 || clip.duration <= 1e-4f) return 0.f;
     const Bone& root = lib.skeleton.bones[static_cast<size_t>(lib.rootBone)];

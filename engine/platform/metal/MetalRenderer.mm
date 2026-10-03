@@ -667,11 +667,10 @@ private:
     /// Writes each skinned draw's posed vertices into a per-instance buffer registered as a
     /// mesh under the SkinItem key, so every pass draws it like any other mesh.
     void encodeSkinning(id<MTLCommandBuffer> cmd, const FrameData& frame) {
-        std::unordered_set<std::string> live;
         id<MTLComputeCommandEncoder> enc = nil;
         std::unordered_map<const void*, id<MTLBuffer>> palettes;  // parts of one character share a pose
         for (const SkinItem& s : frame.skins) {
-            live.insert(s.key);
+            skinnedKeys_[s.key] = frameIndex_;
             const GpuMesh* base = mesh(s.mesh);
             if (!base) continue;
             GpuMesh& out = meshes_[s.key];
@@ -708,15 +707,15 @@ private:
             [enc dispatchThreads:MTLSizeMake(base->vertexCount, 1, 1) threadsPerThreadgroup:MTLSizeMake(group, 1, 1)];
         }
         if (enc) [enc endEncoding];
-        for (auto it = skinnedKeys_.begin(); it != skinnedKeys_.end();) {  // drop instances no longer drawn
-            if (!live.count(*it)) {
-                meshes_.erase(*it);
+        // Drop instances not drawn for a while (kept briefly: thumbnails render in between frames).
+        for (auto it = skinnedKeys_.begin(); it != skinnedKeys_.end();) {
+            if (frameIndex_ - it->second > 120) {
+                meshes_.erase(it->first);
                 it = skinnedKeys_.erase(it);
             } else {
                 ++it;
             }
         }
-        skinnedKeys_.insert(live.begin(), live.end());
     }
     // -----------------------------------------------------------------------------------------
 
@@ -1715,7 +1714,7 @@ private:
     id<MTLTexture> hdri_;
     std::unordered_set<std::string> warnedMeshes_;
     id<MTLComputePipelineState> skinPipeline_;      // animation: GPU skinning
-    std::unordered_set<std::string> skinnedKeys_;   // animation: per-instance skinned meshes alive
+    std::unordered_map<std::string, uint64_t> skinnedKeys_;  // animation: per-instance skinned meshes -> last frame drawn
     std::string source_;
     size_t culled_ = 0;
     uint64_t frameIndex_ = 0;
