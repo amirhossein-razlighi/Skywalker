@@ -7,6 +7,7 @@
 //   skywalker check FILE.wander                      compile Wander, print diagnostics
 //   skywalker call TOOL [JSON] [--scene FILE]        call one tool, print the result
 //   skywalker tools [--markdown]                     list tools
+//   skywalker studio status|agents|board|feedback|loops|run --project DIR ...   (StudioCommand.cpp)
 //   skywalker version
 
 #include <sys/socket.h>
@@ -29,6 +30,8 @@
 #include "skywalker/wander/Compiler.h"
 
 using namespace sky;
+
+int runStudio(const std::vector<std::string>& raw);  // StudioCommand.cpp
 
 namespace {
 
@@ -85,6 +88,8 @@ int usage() {
                  "  skywalker call TOOL [JSON] [--scene FILE] [--project DIR] [-o image.png]\n"
                  "  skywalker call TOOL [JSON] --attach [--as NAME] [--socket PATH]   (on the running editor)\n"
                  "  skywalker tools [--markdown]\n"
+                 "  skywalker studio status|agents|board|feedback|loops --project DIR\n"
+                 "  skywalker studio run --project DIR --loop NAME [--iterations N] [--dry-run] [--yes]\n"
                  "  skywalker version\n",
                  SKY_VERSION_STRING);
     return 2;
@@ -325,6 +330,7 @@ int main(int argc, char** argv) {
     if (cmd == "check") return runCheck(args);
     if (cmd == "call") return runCall(args);
     if (cmd == "tools") return runTools(args);
+    if (cmd == "studio") return runStudio(args.raw);
     if (cmd == "version" || cmd == "--version") {
         std::printf("skywalker %s\n", SKY_VERSION_STRING);
         return 0;

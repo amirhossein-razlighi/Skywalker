@@ -1644,7 +1644,8 @@ Result<Json> Studio::recordEffect(std::string_view feedbackId, const Json& befor
     Json comparison = compareMetrics(before, after);
     Json targets = d ? d->targets : Json::object();
     std::vector<std::string> metrics = metricsForCategory(f->category);
-    std::string verdict = effectVerdict(comparison, metrics, targets);
+    // Categories without metrics (visuals, audio, narrative) need a human or critic to verify.
+    std::string verdict = metrics.empty() && targets.members().empty() ? "unmeasured" : effectVerdict(comparison, metrics, targets);
     Json relevant = Json::object();
     for (const auto& [k, row] : comparison.members()) {
         if (contains(metrics, k) || targets.contains(k)) relevant[k] = row;
@@ -1937,6 +1938,9 @@ Result<Loop> Studio::defineLoop(const Json& specIn, const std::string& actor) {
                                              : "did you mean '" + guess + "'?");
         }
         if (!spec.contains("name")) spec["name"] = tmpl;
+    } else if (const Loop* existing = loop(spec.get("name").asString())) {
+        doc = existing->toJson();  // partial update of an existing loop
+        doc.erase("state");
     }
     // Stages replace wholesale; stop conditions merge.
     Json stop = doc.get("stop");

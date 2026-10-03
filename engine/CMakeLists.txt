@@ -39,6 +39,8 @@ set(SKY_ENGINE_SOURCES
     src/studio/Catalog.cpp
     src/studio/Studio.cpp
     src/studio/Playtest.cpp
+    src/studio/Llm.cpp
+    src/studio/Runner.cpp
     src/agent/StudioTools.cpp
 )
 
