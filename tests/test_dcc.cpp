@@ -583,7 +583,7 @@ private:
                     resp["ok"] = false;
                     resp["error"] = Json::object({{"type", "ValueError"}, {"message", "nope"}, {"trace", "Traceback...\nValueError: nope\n"}});
                 } else if (method == "slow") {
-                    std::this_thread::sleep_for(1500ms);
+                    std::this_thread::sleep_for(700ms);
                     resp["ok"] = true;
                     resp["result"] = Json::object();
                 } else if (method == "close") {
@@ -646,7 +646,7 @@ TEST_CASE("dcc session: protocol client, token, errors, timeouts") {
     auto slow = m.sessionCall(*s, "slow", Json::object(), 300ms);
     REQUIRE_FALSE(slow.ok());
     CHECK(slow.error().code == "timeout");
-    CHECK(std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count() < 1.4);
+    CHECK(std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count() < 0.65);
 
     auto closed = m.sessionCall(*s, "close", Json::object(), 5s);
     REQUIRE_FALSE(closed.ok());
@@ -1076,28 +1076,56 @@ TEST_CASE("dcc blender: every procedural recipe builds a sane model") {
         const char* params;
         float minHeight, maxHeight;
     };
-    const Case cases[] = {{"building", R"({"floors":2,"wall_style":"brick"})", 5.5f, 11.f},
-                          {"tower", R"({"height":10,"ruin":0.5,"seed":2})", 3.f, 11.5f},
-                          {"wall", R"({"length":6,"height":2})", 1.0f, 2.2f},
-                          {"rock", R"({"radius":1})", 0.5f, 2.5f},
-                          {"stairs", R"({"steps":8})", 1.2f, 1.6f},
-                          {"arch", R"({"height":3.5})", 3.0f, 4.0f},
-                          {"fence", R"({"length":4})", 0.9f, 1.4f},
-                          {"column", R"({"height":3})", 2.9f, 3.1f},
+    const Case cases[] = {{"building", R"J({"floors":2,"wall_style":"brick"})J", 5.5f, 11.f},
+                          {"tower", R"J({"height":10,"ruin":0.5,"seed":2})J", 3.f, 11.5f},
+                          {"wall", R"J({"length":6,"height":2})J", 1.0f, 2.2f},
+                          {"rock", R"J({"radius":1})J", 0.5f, 2.5f},
+                          {"stairs", R"J({"steps":8})J", 1.2f, 1.6f},
+                          {"arch", R"J({"height":3.5})J", 3.0f, 4.0f},
+                          {"fence", R"J({"length":4})J", 0.9f, 1.4f},
+                          {"column", R"J({"height":3})J", 2.9f, 3.1f},
                           {"barrel", "{}", 0.9f, 1.0f},
-                          {"terrain_chunk", R"({"size":12,"resolution":16,"height":2})", 0.5f, 6.f}};
-    for (const auto& c : cases) {
-        ToolResult r = p.call("dcc_generate", std::string(R"({"recipe":")") + c.recipe + R"(","params":)" + c.params + R"(,"name":"T_)" + c.recipe + R"("})");
-        INFO(c.recipe << ": " << r.content.front().text);
-        REQUIRE_FALSE(r.isError);
-        const Json& file = r.structured.get("result").get("files").elements()[0];
-        float height = file.get("size_m").elements()[1].asFloat();
+                          {"terrain_chunk", R"J({"size":12,"resolution":16,"height":2})J", 0.5f, 6.f}};
+    // One Blender launch builds them all (the python names must match the tool's recipe list).
+    Json list = Json::array();
+    for (const auto& c : cases) list.push(Json::object({{"recipe", c.recipe}, {"params", Json::parse(c.params).value()}}));
+    const char* script =
+        "import json\n"
+        "from skywalker_dcc import blender as B, procedural as P\n"
+        "out = []\n"
+        "for case in json.loads(sky.ARGS[0]):\n"
+        "    B.reset_scene()\n"
+        "    P.generate(case['recipe'], **case['params'])\n"
+        "    st = B.stats()\n"
+        "    B.export_glb(sky.out_path(case['recipe'] + '.glb'))\n"
+        "    st['recipe'] = case['recipe']\n"
+        "    out.append(st)\n"
+        "sky.result(models=out, recipes=[r['name'] for r in P.describe()])\n";
+    ToolResult r = p.engine->callTool("dcc_run_script", Json::object({{"script", script}, {"args", Json::array({list.dump()})}, {"name", "recipes"}}), "test");
+    INFO(r.content.front().text);
+    REQUIRE_FALSE(r.isError);
+    const Json& models = r.structured.get("result").get("models");
+    REQUIRE(models.size() == std::size(cases));
+    for (size_t i = 0; i < std::size(cases); ++i) {
+        const Json& m = models.elements()[i];
+        const Case& c = cases[i];
+        float height = m.get("size_m").elements()[1].asFloat();
         CHECK_MESSAGE(height >= c.minHeight, c.recipe);
         CHECK_MESSAGE(height <= c.maxHeight, c.recipe);
-        CHECK_MESSAGE(file.get("triangles").asInt() > 8, c.recipe);
-        // Everything stands on the ground (origin at the feet, within rubble/terrain tolerance).
-        CHECK_MESSAGE(file.get("min_m").elements()[1].asFloat() >= -0.05f, c.recipe);
+        CHECK_MESSAGE(m.get("triangles").asInt() > 8, c.recipe);
+        // Everything stands on the ground (origin at the feet).
+        CHECK_MESSAGE(m.get("min_m").elements()[1].asFloat() >= -0.05f, c.recipe);
     }
+    // The tool's recipe list and the python library agree.
+    ToolResult list2 = p.call("dcc_list", "{}");
+    std::set<std::string> cpp, py;
+    for (const auto& n : list2.structured.get("recipes").elements()) cpp.insert(n.asString());
+    for (const auto& n : r.structured.get("result").get("recipes").elements()) py.insert(n.asString());
+    CHECK(cpp == py);
+    // And the tool path works for a custom script on top of a recipe.
+    ToolResult g = p.call("dcc_generate", R"J({"recipe":"fence","script":"for o in objects:\n    o.location.x += 5\n","name":"Moved"})J");
+    INFO(g.content.front().text);
+    REQUIRE_FALSE(g.isError);
 }
 
 TEST_CASE("dcc blender: export collections of a .blend, collection-per-asset") {

@@ -570,7 +570,12 @@ Result<Manager::SessionInfo> Manager::startSession(const AppInfo& blender, bool 
                                "see " + log + " for Blender's output");
         }
         if (auto s = session(); s) {
-            if (sessionCall(*s, "ping", Json::object(), std::chrono::seconds(5))) return *s;
+            // The socket answers as soon as the add-on starts; wait until Blender's main thread
+            // (busy loading its UI and the model) runs requests, so the first tool call works.
+            if (sessionCall(*s, "ping", Json::object(), std::chrono::seconds(5))) {
+                auto left = std::chrono::duration_cast<std::chrono::milliseconds>(deadline - Clock::now());
+                if (sessionCall(*s, "status", Json::object({{"timeout", 60}}), std::max(left, std::chrono::milliseconds(2000)))) return *s;
+            }
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(150));
     }
@@ -581,7 +586,9 @@ Status Manager::stopSession() {
     auto s = session();
     if (!s) return s.error();
     (void)sessionCall(*s, "shutdown", Json::object(), std::chrono::seconds(5));
-    for (int i = 0; i < 30 && processAlive(s->pid) && s->mode == "headless"; ++i) {
+    // A window only stops its bridge (the session file disappears); a headless Blender exits.
+    for (int i = 0; i < 40; ++i) {
+        if (s->mode == "headless" ? !processAlive(s->pid) : !session().ok()) break;
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
     bool ours = false;
