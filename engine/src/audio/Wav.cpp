@@ -205,28 +205,28 @@ double integratedLoudness(const Pcm& pcm) {
     const double fs = pcm.sampleRate;
     const auto block = static_cast<size_t>(0.4 * fs), hop = static_cast<size_t>(0.1 * fs);
     if (frames == 0) return -120.0;
-    // Per-channel K-weighted power, with prefix sums so each 400 ms block is O(1).
-    std::vector<std::vector<double>> prefix(static_cast<size_t>(pcm.channels), std::vector<double>(frames + 1, 0.0));
+    // K-weighted power summed over channels per 100 ms hop; a 400 ms block is four hops (75% overlap).
+    const size_t hops = hop > 0 ? frames / hop : 0;
+    std::vector<double> hopPower(hops, 0.0);
+    double totalPower = 0;
     for (int c = 0; c < pcm.channels; ++c) {
         Biquad shelf, hp;
         kWeighting(fs, shelf, hp);
-        auto& pre = prefix[static_cast<size_t>(c)];
         for (size_t i = 0; i < frames; ++i) {
             double x = pcm.samples[i * static_cast<size_t>(pcm.channels) + static_cast<size_t>(c)];
             double y = hp.process(shelf.process(x));
-            pre[i + 1] = pre[i] + y * y;
+            totalPower += y * y;
+            if (hop > 0 && i / hop < hops) hopPower[i / hop] += y * y;
         }
     }
-    auto meanPower = [&](size_t from, size_t count) {
-        double sum = 0;
-        for (auto& pre : prefix) sum += (pre[from + count] - pre[from]) / static_cast<double>(count);
-        return sum;
-    };
     std::vector<double> blocks;
-    if (frames < block || hop == 0) {
-        blocks.push_back(meanPower(0, frames));
+    if (frames < block || hops < 4) {
+        blocks.push_back(totalPower / static_cast<double>(frames));  // shorter than one block: whole file
     } else {
-        for (size_t start = 0; start + block <= frames; start += hop) blocks.push_back(meanPower(start, block));
+        const double blockFrames = static_cast<double>(hop * 4);
+        for (size_t h = 0; h + 4 <= hops; ++h) {
+            blocks.push_back((hopPower[h] + hopPower[h + 1] + hopPower[h + 2] + hopPower[h + 3]) / blockFrames);
+        }
     }
     auto lufs = [](double z) { return -0.691 + 10.0 * std::log10(std::max(z, 1e-12)); };
     double sum = 0;
