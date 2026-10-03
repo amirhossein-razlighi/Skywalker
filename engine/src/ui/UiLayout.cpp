@@ -191,12 +191,15 @@ struct Builder {
         return n.el.widget == "scroll" ? "column" : "none";
     }
 
-    /// Preferred size. `width` > 0 is the width the parent will give (text wraps to it).
-    Vec2 pref(int i, float width = -1.f) {
+    /// Preferred size. `width` > 0 is the width the parent will give (text wraps to it); `force`
+    /// imposes it even on fit-width elements (stretched column children, like CSS align: stretch).
+    Vec2 pref(int i, float width = -1.f, bool force = false) {
         Node& n = out.nodes[static_cast<size_t>(i)];
         Vec2 size = n.el.size;
+        force = force && width > 0.f;
+        if (force) size.x = width;
         if (!fitW(n) && !fitH(n)) return size;
-        if (fitW(n)) width = -1.f;
+        if (fitW(n) && !force) width = -1.f;
         else if (width <= 0.f) width = size.x;
         Vec4 pad = contentPadding(n);
         Vec2 content = ownContent(n, width);
@@ -216,10 +219,9 @@ struct Builder {
                 kidsSize = {wsum, hmax};
             } else if (flow == "column") {
                 float wmax = 0, hsum = 0;
+                const bool stretch = n.el.align == "stretch";
                 for (int k : kids) {
-                    const Node& kn = out.nodes[static_cast<size_t>(k)];
-                    bool stretch = n.el.align == "stretch" && !fitW(kn);
-                    Vec2 s = pref(k, stretch && innerW > 0.f ? innerW : -1.f);
+                    Vec2 s = pref(k, stretch && innerW > 0.f ? innerW : -1.f, stretch);
                     wmax = std::max(wmax, s.x);
                     hsum += s.y;
                 }
@@ -257,7 +259,7 @@ struct Builder {
             kidsSize = {kidsSize.x + pad.y + pad.w, kidsSize.y + pad.x + pad.z};
         }
         Vec2 fit{std::max(content.x, kidsSize.x), std::max(content.y, kidsSize.y)};
-        if (fitW(n)) size.x = fit.x;
+        if (fitW(n) && !force) size.x = fit.x;
         if (fitH(n)) size.y = fit.y;
         return size;
     }
@@ -324,11 +326,11 @@ struct Builder {
             float used = 0, flexTotal = 0;
             for (int k : kids) {
                 const Node& kn = out.nodes[static_cast<size_t>(k)];
+                // align: stretch fills the cross axis even for fit-to-content children (text then wraps to it).
                 bool stretchCross = n.el.align == "stretch";
-                float crossHint = !row && stretchCross && !fitW(kn) ? crossSize : -1.f;
-                Vec2 s = pref(k, crossHint);
-                if (!row && stretchCross && !fitW(kn)) s.x = crossSize;
-                if (row && stretchCross && !fitH(kn)) s.y = crossSize;
+                Vec2 s = pref(k, !row && stretchCross ? crossSize : -1.f, !row && stretchCross);
+                if (!row && stretchCross) s.x = crossSize;
+                if (row && stretchCross) s.y = crossSize;
                 sizes.push_back(s);
                 used += row ? s.x : s.y;
                 flexTotal += kn.el.flex;

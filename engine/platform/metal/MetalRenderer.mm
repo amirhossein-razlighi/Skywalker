@@ -31,6 +31,7 @@
 #include "skywalker/render/Hdr.h"
 #include "skywalker/render/MeshData.h"
 #include "skywalker/render/Renderer.h"
+#include "MetalRenderer2D.h"  // 2D world quads + UI (Frame2D)
 
 namespace sky {
 
@@ -303,6 +304,8 @@ public:
         bd.storageMode = MTLStorageModePrivate;
         brdfLut_ = [device_ newTextureWithDescriptor:bd];
         bakeBrdf();
+        r2d_ = std::make_unique<MetalRenderer2D>(device_);  // 2D + UI
+        if (!r2d_->init()) r2d_.reset();
         return true;
     }
 
@@ -334,6 +337,7 @@ public:
         meshes_.erase(key);
         textures_.erase(key + "#srgb");
         textures_.erase(key + "#linear");
+        if (r2d_) r2d_->invalidate(key);  // 2D
     }
 
     Status render(const FrameData& frame) override {
@@ -348,11 +352,13 @@ public:
             cmd.label = @"Skywalker Frame";
             encodeEnvironment(cmd, frame, fu);
             encodeShadows(cmd, frame, fu, cascades);
+            if (r2d_) r2d_->encodeOccluders(cmd, frame);  // 2D shadow casters
             encodeMain(cmd, frame, fu, lights);
             encodeAO(cmd, frame);
             encodeEffects(cmd, frame, fu, lights);
             encodeVolumetrics(cmd, frame, fu, lights);
             encodePost(cmd, frame);
+            if (r2d_) r2d_->encodeUI(cmd, frame, resolve_, depthResolved_);  // UI at output resolution
             encodeOverlays(cmd, frame, fu);
             [cmd commit];
             lastCommand_ = cmd;
@@ -1026,6 +1032,7 @@ private:
             [enc drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:6];
         }
 
+        if (r2d_) r2d_->encodeWorld(enc, rp, frame);  // 2D: sprites, tiles, world text (depth-tested)
         [enc endEncoding];
     }
 
@@ -1619,6 +1626,7 @@ private:
     uint64_t frameIndex_ = 0;
     bool aoActive_ = false;
     bool volumetricActive_ = false;
+    std::unique_ptr<MetalRenderer2D> r2d_;  // 2D world quads + UI
 };
 
 }  // namespace

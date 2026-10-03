@@ -222,8 +222,9 @@ void drawWorld(Image& image, const FrameData& frame, render2d::ImageCache& cache
                               }
                               if (mode == static_cast<int>(SpriteMode::Sdf)) {
                                   if (!tex.valid()) return;
-                                  float d = tex.sample(tu, tv, false).x + s.params[3];
-                                  float w = std::clamp(0.7f * texelsPerPixel / (2.f * static_cast<float>(text::Font::kSpread)), 0.02f, 0.5f);
+                                  float fw = texelsPerPixel / (2.f * static_cast<float>(text::Font::kSpread));
+                                  float d = tex.sample(tu, tv, false).x + s.params[3] + std::min(0.06f, fw * 0.3f);
+                                  float w = std::clamp(0.55f * fw, 0.02f, 0.5f);
                                   float fill = smoothstep(0.5f - w, 0.5f + w, d);
                                   float outline = s.emission[3];
                                   Vec3 c = tint.xyz();
@@ -354,9 +355,11 @@ void drawUI(Image& image, const FrameData& frame, render2d::ImageCache& cache) {
                         float gx = lx - shear * (1.f - ly / rh);  // undo the italic slant
                         float us = gx / rw;
                         if (us < -0.05f || us > 1.05f || t < 0.f || t > 1.f) return;
-                        float d = tex.sample(q.uv[0] + (q.uv[2] - q.uv[0]) * us, q.uv[1] + (q.uv[3] - q.uv[1]) * t, false).x + q.params2[0];
                         float texelsPerPixel = std::fabs(q.uv[2] - q.uv[0]) * static_cast<float>(tex.w) / std::max(1e-3f, rw * pixelsPerUnit);
-                        float w = std::clamp(0.7f * texelsPerPixel / (2.f * static_cast<float>(text::Font::kSpread)), 0.02f, 0.5f);
+                        float fw = texelsPerPixel / (2.f * static_cast<float>(text::Font::kSpread));
+                        float d = tex.sample(q.uv[0] + (q.uv[2] - q.uv[0]) * us, q.uv[1] + (q.uv[3] - q.uv[1]) * t, false).x + q.params2[0] +
+                                  std::min(0.06f, fw * 0.3f);
+                        float w = std::clamp(0.55f * fw, 0.02f, 0.5f);
                         float fill = smoothstep(0.5f - w, 0.5f + w, d);
                         float outline = q.params2[1];
                         if (outline > 0.f) {
