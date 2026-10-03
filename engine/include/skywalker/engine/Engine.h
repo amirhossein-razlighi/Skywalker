@@ -14,6 +14,7 @@
 #include <mutex>
 #include <optional>
 #include <unordered_map>
+#include <unordered_set>
 #include <string>
 #include <vector>
 
@@ -88,7 +89,12 @@ struct CaptureOptions {
     int samples = 4;
     int debugView = 0;  // see FrameData::debugView
     bool clay = false;  // every surface matte white clay (look-dev of form and light; "sketch to fill" films)
+    int quality = 0;    // FrameData::quality: 0 full, 1 balanced, 2 fast
 };
+
+/// How the live editor viewport trades quality for responsiveness while editing. Play mode
+/// and captures always render at full quality.
+enum class ViewportQuality { Full = 0, Balanced = 1, Fast = 2 };
 
 struct Capture {
     Image image;
@@ -165,6 +171,8 @@ public:
     Gizmo& gizmo() { return gizmo_; }
     /// Editor viewport looks through the scene's primary camera instead of the orbit camera.
     void setViewThroughSceneCamera(bool on) { viewSceneCamera_ = on; }
+    void setViewportQuality(ViewportQuality q) { editQuality_ = q; }
+    ViewportQuality viewportQuality() const { return editQuality_; }
     bool viewThroughSceneCamera() const { return viewSceneCamera_; }
     /// Highlights the handle under the cursor. Returns the axis or -1.
     int gizmoHover(float x, float y, int width, int height);
@@ -270,6 +278,11 @@ public:
 
 private:
     void ensureMeshUploaded(const std::string& meshKey);
+    void frameSceneView();
+    /// Real-time frames stream asset meshes: parsing and LOD building run on background
+    /// threads and the mesh appears once uploaded (captures still load synchronously).
+    void requestMeshAsync(const std::string& meshKey);
+    void drainStreamedMeshes();
     std::optional<audio::ListenerPose> listenerPose();
     void resolveTexturePaths(FrameData& f) const;
 
@@ -284,16 +297,22 @@ private:
     std::unique_ptr<anim::AnimationSystem> animation_;
     struct CachedMaterial {
         int64_t mtime = -1;
+        double checkedAt = -1e9;  // material/prefab files are re-stat'ed at most once a second
         bool ok = false;
         ResolvedMaterial material;
     };
     std::unordered_map<std::string, CachedMaterial> materials_;
     struct CachedPrefab {
         int64_t mtime = -1;
+        double checkedAt = -1e9;
         Json prefab;
     };
     std::unordered_map<std::string, CachedPrefab> prefabs_;
     std::unordered_map<std::string, std::shared_ptr<MeshData>> cpuMeshes_;
+    struct MeshStream;                      // results handed back from loader threads
+    std::shared_ptr<MeshStream> meshStream_;
+    std::unordered_set<std::string> pendingMeshes_;
+    bool streamMeshes_ = false;
     double assetScanTimer_ = 0;
     ToolRegistry tools_;
     OrbitCamera camera_;
@@ -326,6 +345,7 @@ private:
 
     Gizmo gizmo_;
     bool viewSceneCamera_ = false;
+    ViewportQuality editQuality_ = ViewportQuality::Fast;
     int gizmoHot_ = -1;
     std::optional<Gizmo::DragStart> gizmoDrag_;
     EntityId gizmoEntity_ = kNoEntity;

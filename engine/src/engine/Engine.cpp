@@ -6,6 +6,8 @@
 #include <cstdlib>
 #include <filesystem>
 #include <cstring>
+#include <dispatch/dispatch.h>
+#include <mutex>
 #include <fstream>
 #include <set>
 #include <sstream>
@@ -109,9 +111,14 @@ Engine::Engine(EngineConfig config)
     hooks.material = [this](const std::string& p) { return resolveMaterial(p); };
     hooks.meshBounds = [this](const std::string& key) -> std::optional<Aabb> {
         ensureMeshUploaded(key);
+        if (pendingMeshes_.count(key)) return std::nullopt;
         const MeshData* m = cpuMesh(key);
         if (!m) return std::nullopt;
         return m->bounds;
+    };
+    hooks.meshReady = [this](const std::string& key) {
+        ensureMeshUploaded(key);
+        return !pendingMeshes_.count(key);
     };
     hooks.sceneSurface = [this](float x, float z, float top, float bottom, float& y, Vec3& n) {
         auto hit = raycast(Ray{{x, top, z}, {0, -1, 0}});
@@ -415,8 +422,75 @@ void Engine::setSelection(std::vector<EntityId> ids, const std::string& actor) {
 // Rendering
 // ---------------------------------------------------------------------------
 
+struct Engine::MeshStream {
+    std::mutex mutex;
+    struct Done {
+        std::string key;
+        std::shared_ptr<MeshData> mesh;
+        std::string error;
+    };
+    std::vector<Done> done;
+};
+
+void Engine::requestMeshAsync(const std::string& key) {
+    if (!pendingMeshes_.insert(key).second) return;
+    if (!meshStream_) meshStream_ = std::make_shared<MeshStream>();
+    mesh::LoadOptions lo;
+    auto [file, part] = mesh::splitPart(key.substr(6));
+    lo.part = part;
+    if (const AssetRecord* rec = assets_->find(file)) {
+        lo.normalize = rec->importSettings.get("normalize").asBool(true);
+        lo.zUp = rec->importSettings.get("zUp").asBool(false);
+        lo.turnAround = rec->importSettings.get("turnAround").asBool(false);
+    }
+    struct Job {
+        std::shared_ptr<MeshStream> stream;
+        std::string key, path;
+        mesh::LoadOptions lo;
+    };
+    auto* job = new Job{meshStream_, key, resolvePath(file), lo};
+    dispatch_async_f(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), job, [](void* ctx) {
+        std::unique_ptr<Job> j(static_cast<Job*>(ctx));
+        MeshStream::Done d{j->key, nullptr, {}};
+        auto data = mesh::loadMeshFile(j->path, j->lo);
+        if (data) {
+            d.mesh = std::make_shared<MeshData>(std::move(data.value()));
+            if (d.mesh->lods.empty() && d.mesh->indices.size() / 3 >= 3000) mesh::buildLods(*d.mesh);
+        } else {
+            d.error = data.error().message;
+        }
+        std::lock_guard lock(j->stream->mutex);
+        j->stream->done.push_back(std::move(d));
+    });
+}
+
+void Engine::drainStreamedMeshes() {
+    if (!meshStream_ || pendingMeshes_.empty()) return;
+    std::vector<MeshStream::Done> done;
+    {
+        std::lock_guard lock(meshStream_->mutex);
+        done.swap(meshStream_->done);
+    }
+    for (auto& d : done) {
+        if (!pendingMeshes_.erase(d.key) || scene_->assetBounds.count(d.key)) continue;  // stale or loaded meanwhile
+        if (!d.mesh) {
+            log::warn("asset", d.error);
+            cpuMeshes_[d.key] = nullptr;
+            scene_->assetBounds[d.key] = {Vec3(-0.5f), Vec3(0.5f)};
+            continue;
+        }
+        cpuMeshes_[d.key] = d.mesh;
+        (void)renderer_->uploadMesh(d.key, *d.mesh);
+        scene_->assetBounds[d.key] = d.mesh->bounds;
+    }
+}
+
 void Engine::ensureMeshUploaded(const std::string& meshKey) {
     if (meshKey.rfind("asset:", 0) != 0 || scene_->assetBounds.count(meshKey)) return;
+    if (streamMeshes_ && !cpuMeshes_.count(meshKey)) {
+        requestMeshAsync(meshKey);
+        return;
+    }
     const MeshData* mesh = cpuMesh(meshKey);
     if (!mesh) {
         scene_->assetBounds[meshKey] = {Vec3(-0.5f), Vec3(0.5f)};  // don't retry every frame
@@ -430,6 +504,29 @@ void Engine::ensureMeshUploaded(const std::string& meshKey) {
     (void)renderer_->uploadMesh(meshKey, *mesh);
     scene_->assetBounds[meshKey] = mesh->bounds;
 }
+
+namespace {
+/// Interactive tiers: the expensive, slowly converging parts of the frame (screen-space GI and
+/// reflections, volumetric clouds and light shafts, depth of field, far foliage and its
+/// shadows) are trimmed and the frame renders at a lower internal resolution (MetalFX
+/// upscales it). Full quality is untouched.
+void applyViewportQuality(FrameData& f, int quality) {
+    f.quality = quality;
+    if (quality <= 0) return;
+    Environment& env = f.environment;
+    bool fast = quality >= 2;
+    env.renderScale = std::min(env.renderScale, fast ? 0.5f : 0.75f);
+    f.camera.aperture = 0.f;
+    f.camera.motionBlur = 0.f;
+    if (!fast) return;
+    env.gi = 0.f;
+    env.ssr = 0.f;
+    env.godRays = 0.f;
+    if (env.cloudMode == "volumetric") env.cloudMode = "flat";
+    env.shadowDistance = env.shadowDistance > 0.f ? std::min(env.shadowDistance, 150.f) : 150.f;
+    for (auto& b : f.instances) b.cullDistance *= 0.4f;
+}
+}  // namespace
 
 FrameData Engine::frame(const CaptureOptions& opts) {
     // Animation previews while editing (sequencer scrub, bone attachments) hold for this frame only.
@@ -509,6 +606,7 @@ FrameData Engine::frame(const CaptureOptions& opts) {
             t.selected = bo.editorOverlays && std::find(selection_.begin(), selection_.end(), t.entity) != selection_.end();
         }
     }
+    applyViewportQuality(f, opts.quality);
     if (opts.clay) {
         auto clay = [](Surface& s) {
             s.color = {0.82f, 0.81f, 0.79f, s.color.w};
@@ -528,6 +626,10 @@ FrameData Engine::frame(const CaptureOptions& opts) {
         for (auto& t : f.terrains) {
             for (auto& l : t.layers) clay(l.surface);
         }
+    }
+    if (!pendingMeshes_.empty()) {  // not streamed in yet: draw nothing rather than a placeholder cube
+        std::erase_if(f.draws, [&](const DrawItem& d) { return pendingMeshes_.count(d.mesh) > 0; });
+        std::erase_if(f.instances, [&](const InstanceBatch& b) { return pendingMeshes_.count(b.mesh) > 0; });
     }
     resolveTexturePaths(f);
     if (bo.editorOverlays && selection_.size() == 1 && scene_->exists(selection_[0]) && !opts.annotate) {
@@ -555,7 +657,11 @@ Status Engine::renderToSurface(void* surface, int width, int height) {
     opts.width = width;
     opts.height = height;
     opts.samples = 1;  // real time: temporal anti-aliasing across frames
+    opts.quality = playState_ == PlayState::Editing ? static_cast<int>(editQuality_) : 0;
+    drainStreamedMeshes();
+    streamMeshes_ = true;
     FrameData f = frame(opts);
+    streamMeshes_ = false;
     Status s = renderer_->render(f);
     if (s) s = renderer_->present(surface);
     double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
@@ -804,8 +910,30 @@ Status Engine::loadScene(const std::string& path) {
     selection_.clear();
     animation_->reset();
     scenePath_ = path;
+    if (s) frameSceneView();
     emitEvent(Json::object({{"type", "scene"}, {"action", "load"}, {"name", scene_->name}, {"path", path}}));
     return s;
+}
+
+void Engine::frameSceneView() {
+    // Open where the scene is meant to be seen: its gameplay camera, else above the terrain
+    // looking across it (the default orbit would start inside large worlds).
+    ViewCamera sc;
+    if (sceneCamera(*scene_, sc)) {
+        Vec3 dir = normalize(sc.target - sc.eye);
+        camera_.lookAt(sc.eye, sc.eye + dir * 12.f);
+        return;
+    }
+    for (EntityId e : scene_->entities()) {
+        const Terrain* t = scene_->get<Terrain>(e);
+        if (!t) continue;
+        Vec3 c = scene_->worldMatrix(e).translation();
+        float y = c.y;
+        world_->terrainHeight(*scene_, c.x, c.z, y);
+        Vec3 target{c.x, y, c.z};
+        camera_.lookAt(target + Vec3{t->size * 0.18f, t->size * 0.09f, t->size * 0.18f}, target);
+        return;
+    }
 }
 
 Status Engine::saveScene(const std::string& path) {
@@ -1164,13 +1292,22 @@ void Engine::resolveTexturePaths(FrameData& f) const {
     }
 }
 
+namespace {
+double monotonicSeconds() {
+    return std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+}
+}  // namespace
+
 const ResolvedMaterial* Engine::resolveMaterial(const std::string& path) {
     std::string rel = assets_->relative(resolvePath(stripAssetPrefix(path)));
     if (rel.empty()) rel = path;
+    CachedMaterial& c = materials_[rel];
+    double now = monotonicSeconds();
+    if (now - c.checkedAt < 1.0) return c.ok ? &c.material : nullptr;  // hot path: many lookups per frame
+    c.checkedAt = now;
     std::error_code ec;
     auto t = fs::last_write_time(resolvePath(rel), ec);
     int64_t mtime = ec ? -2 : std::chrono::duration_cast<std::chrono::nanoseconds>(t.time_since_epoch()).count();
-    CachedMaterial& c = materials_[rel];
     if (c.mtime != mtime) {
         c.mtime = mtime;
         auto m = loadMaterial(resolvePath(rel));
@@ -1187,11 +1324,16 @@ const ResolvedMaterial* Engine::resolveMaterial(const std::string& path) {
 Result<Json> Engine::loadPrefabAsset(const std::string& path) {
     std::string rel = assets_->relative(resolvePath(stripAssetPrefix(path)));
     if (rel.empty()) rel = stripAssetPrefix(path);
+    double now = monotonicSeconds();
+    if (auto it = prefabs_.find(rel); it != prefabs_.end() && it->second.mtime >= 0 && now - it->second.checkedAt < 1.0) {
+        return it->second.prefab;
+    }
     std::error_code ec;
     auto t = fs::last_write_time(resolvePath(rel), ec);
     if (ec) return Error::make("not_found", "no prefab " + rel, "use asset_list type=prefab to see prefabs");
     int64_t mtime = std::chrono::duration_cast<std::chrono::nanoseconds>(t.time_since_epoch()).count();
     CachedPrefab& c = prefabs_[rel];
+    c.checkedAt = now;
     if (c.mtime != mtime) {
         auto p = loadPrefab(resolvePath(rel));
         if (!p) return p.error();

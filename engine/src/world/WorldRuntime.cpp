@@ -262,6 +262,10 @@ void WorldRuntime::gather(const Scene& scene, const ViewCamera& view, FrameData&
                 for (auto& p : hooks_.prefabParts(layer.prefab)) parts.push_back({p.mesh, p.material, p.local});
             }
             if (parts.empty()) parts.push_back({layer.mesh, layer.material, Mat4{}});
+            if (hooks_.meshReady &&
+                std::any_of(parts.begin(), parts.end(), [&](const DrawPart& p) { return !hooks_.meshReady(p.mesh); })) {
+                continue;  // streaming in: chunk bounds need the real mesh size
+            }
             float meshHeight = hooks_.meshBounds ? 0.02f : 1.f;
             for (const auto& p : parts) {
                 if (!hooks_.meshBounds) break;
