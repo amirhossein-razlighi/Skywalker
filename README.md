@@ -36,12 +36,14 @@ interface the editor uses.
   change (you, `agent:Nimbus`, `mcp:claude-code`); `batch` makes many edits atomic.
 - **Deterministic simulation** with fixed 60 Hz ticks: agents test gameplay with
   `sim_control step` + `sim_input`, then `stop` restores the scene.
-- **Your crew of Cloudlings.** Specialized agents (director, level designer, gameplay
-  programmer, lighting artist, writer, …), each designed in the **Agent Designer**: model,
-  mission and standing instructions, per-category tool permissions (allow / ask / off),
-  long-term memory, token usage, and sharing as `agents/*.agent.json`. Delegation and
-  pipelines with parallel stages. Bring Anthropic, any
-  OpenAI-compatible API, or local models (Ollama, LM Studio, vLLM).
+- **A studio of agents.** A roster of specialists (directors, producers, designers,
+  programmers, artists, audio, writers, playtesters, critics — each with a role and a focus),
+  a task board, feedback with the director's verdicts and their measured effect, playtest
+  bots that actually play, and user-defined loops (playtest → triage → fix → verify) that run
+  in the editor, headless (`skywalker studio run`) or driven by Claude Code / Codex. Agents
+  are designed in the **Agent Designer** (model, mission, instructions, per-category
+  permissions, memory, usage) and shared as `agents/*.agent.json`. Bring Anthropic, any
+  OpenAI-compatible API, or local models (Ollama, LM Studio, vLLM). → [docs/STUDIO.md](docs/STUDIO.md)
 - **An asset system agents can use.** Stable GUIDs, tags, descriptions and generator
   provenance in `.meta` sidecars; glTF/GLB, OBJ+MTL, PLY (vertex colors) and STL import;
   `asset_download` fetches openly licensed models from the web (with your approval, license
