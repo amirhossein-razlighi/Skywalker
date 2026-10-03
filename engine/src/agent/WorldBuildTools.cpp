@@ -23,15 +23,33 @@ namespace {
 namespace fs = std::filesystem;
 using namespace schema;
 
-std::unordered_map<EntityId, std::deque<world::TerrainData>>& undoStacks() {
-    static std::unordered_map<EntityId, std::deque<world::TerrainData>> stacks;
+/// A terrain undo step: the data plus the recorded edits and generator it was made from.
+struct TerrainUndo {
+    world::TerrainData data;
+    Json edits;
+    Json generator;
+};
+
+std::unordered_map<EntityId, std::deque<TerrainUndo>>& undoStacks() {
+    static std::unordered_map<EntityId, std::deque<TerrainUndo>> stacks;
     return stacks;
 }
 
-void pushUndo(EntityId e, const world::TerrainData& d) {
+void pushUndo(Engine& engine, EntityId e, const world::TerrainData& d) {
+    const Terrain* t = engine.scene().get<Terrain>(e);
     auto& st = undoStacks()[e];
-    st.push_back(d);
+    st.push_back({d, t ? t->edits : Json::array(), t ? t->generator : Json::object()});
     while (st.size() > 12) st.pop_front();
+}
+
+/// Records a hand edit on the component so a rebuilt cache replays it (see world::applyEdits).
+Status recordEdit(Engine& engine, EntityId e, Json edit, const std::string& actor) {
+    Json edits = engine.scene().get<Terrain>(e)->edits;
+    if (!edits.isArray()) edits = Json::array();
+    edits.push(std::move(edit));
+    return engine.edit(actor, "Terrain edit", [&]() -> Status {
+        return engine.scene().patchComponent(e, "terrain", Json::object({{"edits", edits}}));
+    });
 }
 
 std::string slug(const std::string& name) {
@@ -229,12 +247,12 @@ void addWorldBuildTools(Engine& engine, ToolRegistry& reg) {
                  const Terrain* comp = engine.scene().get<Terrain>(t->id);
                  world::TerrainGenParams p = world::genParamsFromJson(a.get("generator"), world::genParamsFromJson(comp->generator));
                  if (a.contains("seed")) p.seed = static_cast<uint32_t>(a.get("seed").asInt());
-                 pushUndo(t->id, *t->data);
+                 pushUndo(engine, t->id, *t->data);
                  auto data = std::make_shared<world::TerrainData>(t->data->resolution(), t->data->size());
                  world::generate(*data, p);
                  world::autoPaint(*data, comp->layers, p.seed);
                  Status st = engine.edit(ctx.actor, "Terrain generator", [&]() -> Status {
-                     return engine.scene().patchComponent(t->id, "terrain", Json::object({{"generator", world::toJson(p)}}));
+                     return engine.scene().patchComponent(t->id, "terrain", Json::object({{"generator", world::toJson(p)}, {"edits", Json::array()}}));
                  });
                  if (!st) return fail(st);
                  if (Status s = saveTerrain(engine, t->id, data, ctx.actor); !s) return fail(s);
@@ -257,23 +275,24 @@ void addWorldBuildTools(Engine& engine, ToolRegistry& reg) {
                  auto t = terrainOf(engine, a.get("entity"));
                  if (!t) return ToolResult::error(t.error());
                  Vec3 o = engine.scene().worldMatrix(t->id).translation();
-                 pushUndo(t->id, *t->data);
+                 pushUndo(engine, t->id, *t->data);
                  auto data = std::make_shared<world::TerrainData>(*t->data);
-                 int applied = 0;
+                 // Strokes in terrain-local meters: applied now and recorded for cache rebuilds.
+                 Json strokes = Json::array();
                  for (const auto& st : a.get("strokes").elements()) {
-                     std::string m = st.get("mode").asString("raise");
-                     world::SculptMode mode = m == "lower" ? world::SculptMode::Lower
-                                              : m == "flatten" ? world::SculptMode::Flatten
-                                              : m == "smooth" ? world::SculptMode::Smooth
-                                              : m == "noise" ? world::SculptMode::Noise
-                                              : m == "set" ? world::SculptMode::Set
-                                                           : world::SculptMode::Raise;
-                     world::sculpt(*data, {st.get("x").asFloat() - o.x, st.get("z").asFloat() - o.z}, st.get("radius").asFloat(10.f),
-                                   st.get("strength").asFloat(1.f), mode, st.get("target").asFloat(o.y) - o.y,
-                                   st.get("falloff").asFloat(0.5f), static_cast<uint32_t>(applied + 1));
-                     ++applied;
+                     strokes.push(Json::object({{"x", st.get("x").asFloat() - o.x},
+                                                {"z", st.get("z").asFloat() - o.z},
+                                                {"radius", st.get("radius").asFloat(10.f)},
+                                                {"strength", st.get("strength").asFloat(1.f)},
+                                                {"mode", st.get("mode").asString("raise")},
+                                                {"target", st.get("target").asFloat(o.y) - o.y},
+                                                {"falloff", st.get("falloff").asFloat(0.5f)}}));
                  }
-                 data->touch();
+                 const int applied = static_cast<int>(strokes.size());
+                 Json edit = Json::object({{"op", "sculpt"}, {"strokes", strokes}});
+                 const Terrain* comp = engine.scene().get<Terrain>(t->id);
+                 world::applyEdit(*data, edit, comp->layers, world::genParamsFromJson(comp->generator).seed);
+                 if (Status s = recordEdit(engine, t->id, std::move(edit), ctx.actor); !s) return fail(s);
                  if (Status s = saveTerrain(engine, t->id, data, ctx.actor); !s) return fail(s);
                  return ToolResult::json(Json::object({{"entity", t->id}, {"strokes", applied}, {"stats", terrainStats(*data)}}),
                                          "sculpted " + std::to_string(applied) + " stroke(s)");
@@ -311,14 +330,20 @@ void addWorldBuildTools(Engine& engine, ToolRegistry& reg) {
                      return ToolResult::error(Error::make("invalid_layer", "layer index out of range"));
                  }
                  Vec3 o = engine.scene().worldMatrix(t->id).translation();
-                 pushUndo(t->id, *t->data);
+                 pushUndo(engine, t->id, *t->data);
                  auto data = std::make_shared<world::TerrainData>(*t->data);
-                 int n = 0;
+                 Json strokes = Json::array();
                  for (const auto& st : a.get("strokes").elements()) {
-                     world::paint(*data, {st.get("x").asFloat() - o.x, st.get("z").asFloat() - o.z}, st.get("radius").asFloat(8.f), layer,
-                                  st.get("strength").asFloat(0.8f), st.get("falloff").asFloat(0.5f));
-                     ++n;
+                     strokes.push(Json::object({{"x", st.get("x").asFloat() - o.x},
+                                                {"z", st.get("z").asFloat() - o.z},
+                                                {"radius", st.get("radius").asFloat(8.f)},
+                                                {"strength", st.get("strength").asFloat(0.8f)},
+                                                {"falloff", st.get("falloff").asFloat(0.5f)}}));
                  }
+                 const int n = static_cast<int>(strokes.size());
+                 Json edit = Json::object({{"op", "paint"}, {"layer", layer}, {"strokes", strokes}});
+                 world::applyEdit(*data, edit, comp->layers, 0);
+                 if (Status s = recordEdit(engine, t->id, std::move(edit), ctx.actor); !s) return fail(s);
                  if (Status s = saveTerrain(engine, t->id, data, ctx.actor); !s) return fail(s);
                  return ToolResult::json(Json::object({{"entity", t->id}, {"layer", layer}, {"strokes", n}}), "painted");
              }});
@@ -347,8 +372,18 @@ void addWorldBuildTools(Engine& engine, ToolRegistry& reg) {
                  if (!st) return fail(st);
                  auto data = std::make_shared<world::TerrainData>(*t->data);
                  if (a.get("auto_paint").asBool(true)) {
-                     pushUndo(t->id, *t->data);
+                     pushUndo(engine, t->id, *t->data);
                      world::autoPaint(*data, layers, world::genParamsFromJson(engine.scene().get<Terrain>(t->id)->generator).seed);
+                     // Repainting replaces every earlier paint: keep only the sculpting, then mark the repaint.
+                     Json kept = Json::array();
+                     for (const auto& e : engine.scene().get<Terrain>(t->id)->edits.elements()) {
+                         if (e.get("op").asString() == "sculpt") kept.push(e);
+                     }
+                     kept.push(Json::object({{"op", "autopaint"}}));
+                     Status rs = engine.edit(ctx.actor, "Terrain edit", [&]() -> Status {
+                         return engine.scene().patchComponent(t->id, "terrain", Json::object({{"edits", kept}}));
+                     });
+                     if (!rs) return fail(rs);
                  }
                  if (Status s = saveTerrain(engine, t->id, data, ctx.actor); !s) return fail(s);
                  return ToolResult::json(Json::object({{"entity", t->id}, {"layers", static_cast<int64_t>(layers.size())}}), "layers updated");
@@ -363,9 +398,15 @@ void addWorldBuildTools(Engine& engine, ToolRegistry& reg) {
                  if (!t) return ToolResult::error(t.error());
                  auto& st = undoStacks()[t->id];
                  if (st.empty()) return ToolResult::error(Error::make("nothing_to_undo", "no terrain edits to undo"));
-                 auto data = std::make_shared<world::TerrainData>(std::move(st.back()));
+                 TerrainUndo step = std::move(st.back());
                  st.pop_back();
+                 auto data = std::make_shared<world::TerrainData>(std::move(step.data));
                  data->touch();
+                 Status rs = engine.edit(ctx.actor, "Terrain edit", [&]() -> Status {
+                     return engine.scene().patchComponent(t->id, "terrain",
+                                                          Json::object({{"edits", step.edits}, {"generator", step.generator}}));
+                 });
+                 if (!rs) return fail(rs);
                  if (Status s = saveTerrain(engine, t->id, data, ctx.actor); !s) return fail(s);
                  return ToolResult::json(Json::object({{"entity", t->id}, {"remaining", static_cast<int64_t>(st.size())}}), "terrain edit undone");
              }});

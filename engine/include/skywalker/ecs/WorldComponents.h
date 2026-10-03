@@ -19,6 +19,7 @@ struct Terrain {
     int resolution = 513;        // height samples per side (2^n + 1)
     Json generator = Json::object();  // generation params used for (re)generation (shape, seed, heights, erosion...)
     Json layers = Json::array();      // material layers: [{name, texture, normalMap, ormMap, color, roughness, tiling, rules...}]
+    Json edits = Json::array();       // hand edits (sculpt / paint / autopaint), replayed over the generator when the cache is rebuilt
     float waterLevel = -100000.f;     // world height of nearby water: sand and soil look wet below it + wetBand
     float wetBand = 1.2f;             // meters above the water line that stay damp (shorelines, wave run-up)
     float detail = 1.f;               // LOD quality multiplier (0.5 faster .. 2 sharper)

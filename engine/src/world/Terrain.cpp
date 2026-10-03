@@ -626,4 +626,39 @@ void paint(TerrainData& t, Vec2 c, float radius, int layer, float strength, floa
     t.touch();
 }
 
+SculptMode sculptModeFromString(const std::string& m) {
+    return m == "lower"     ? SculptMode::Lower
+           : m == "flatten" ? SculptMode::Flatten
+           : m == "smooth"  ? SculptMode::Smooth
+           : m == "noise"   ? SculptMode::Noise
+           : m == "set"     ? SculptMode::Set
+                            : SculptMode::Raise;
+}
+
+void applyEdit(TerrainData& t, const Json& edit, const Json& layers, uint32_t seed) {
+    std::string op = edit.get("op").asString();
+    if (op == "autopaint") {
+        autoPaint(t, layers, seed);
+        return;
+    }
+    uint32_t i = 0;
+    for (const auto& st : edit.get("strokes").elements()) {
+        Vec2 c{st.get("x").asFloat(), st.get("z").asFloat()};
+        if (op == "sculpt") {
+            sculpt(t, c, st.get("radius").asFloat(10.f), st.get("strength").asFloat(1.f),
+                   sculptModeFromString(st.get("mode").asString("raise")), st.get("target").asFloat(0.f), st.get("falloff").asFloat(0.5f),
+                   ++i);
+        } else if (op == "paint") {
+            paint(t, c, st.get("radius").asFloat(8.f), static_cast<int>(edit.get("layer").asInt(0)), st.get("strength").asFloat(0.8f),
+                  st.get("falloff").asFloat(0.5f));
+        }
+    }
+    t.touch();
+}
+
+void applyEdits(TerrainData& t, const Json& edits, const Json& layers, uint32_t seed) {
+    if (!edits.isArray()) return;
+    for (const auto& e : edits.elements()) applyEdit(t, e, layers, seed);
+}
+
 }  // namespace sky::world

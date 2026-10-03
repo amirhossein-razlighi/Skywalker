@@ -133,4 +133,4 @@ viewport_multi {}        # top view confirms spacing; side view confirms contact
 - Re-running `terrain_generate` repaints layers and discards hand-painted weights; sculpt and paint last.
 - `scatter` needs `surface` (exact name or id of the terrain) to land only on it; verify a few copies with `scene_overview` afterwards.
 - High `resolution` + high `size` is slow to generate; start at 257/513 and raise only if silhouettes are faceted.
-- The terrain data lives in a `.terrain` file under the project; commit it with the scene.
+- The terrain data lives in a `.terrain` file under the project. It is a cache: the generator plus the component's recorded `edits` (every sculpt, paint and repaint) rebuild it when it is missing, so it need not be committed.
