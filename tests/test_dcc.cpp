@@ -723,9 +723,24 @@ TEST_CASE("deferred tools: inline completion, and the agent server keeps the mai
     CHECK_FALSE(inline1.isError);
     CHECK(inline1.content.front().text == "finished after work");
     CHECK_FALSE(workOnOtherThread);  // inline: the same thread runs both halves
+    CHECK(workRan);
     ToolResult crashed = e.callTool("test_crash", Json::object(), "test");
     CHECK(crashed.isError);
     CHECK(crashed.content.front().text.find("boom") != std::string::npos);
+
+    // 1b. The editor's non-blocking path: begin on the main thread, run the work anywhere, finish on the main thread.
+    workRan = false;
+    Engine::PendingCall pending = e.beginTool("test_slow", Json::object(), "test");
+    REQUIRE(pending.result.deferred);
+    std::thread worker([&] { pending.result.deferred->work(); });
+    worker.join();
+    CHECK(workRan);
+    ToolResult done = e.finishTool(pending);
+    CHECK(done.content.front().text == "finished after work");
+    CHECK(finishOnMain);
+    Engine::PendingCall quick = e.beginTool("scene_overview", Json::object(), "test");
+    CHECK_FALSE(quick.result.deferred);  // ordinary tools complete in begin
+    CHECK_FALSE(quick.result.isError);
 
     // 2. Through the agent socket: work on the connection thread, main thread stays responsive.
     workRan = false;
@@ -1327,4 +1342,47 @@ TEST_CASE("dcc blender: stopping the agent server cancels running design-app job
     CHECK(took < 10.0);
     ToolResult after = p.engine->callTool("dcc_list", Json::object(), "test");
     CHECK(after.structured.get("jobs").size() == 0);
+}
+
+TEST_CASE("dcc blender: the add-on hands a model to the running editor over the agent socket") {
+    REQUIRE_BLENDER();
+    Project p;
+    std::string sock = (fs::temp_directory_path() / ("sky-dcc-link-" + std::to_string(::getpid()) + ".sock")).string();
+    REQUIRE(p.engine->startAgentServer(sock).ok());
+    REQUIRE_FALSE(p.call("dcc_session_start", "{}").isError);
+
+    // What the "Send Selection" button does, minus the UI: export, then call dcc_receive on the editor.
+    Json code = Json::object({{"code",
+        "import bpy, os, tempfile\n"
+        "from skywalker_bridge import engine_link\n"
+        "bpy.ops.mesh.primitive_cone_add(radius1=0.5, depth=1.5, location=(0,0,0.75))\n"
+        "bpy.context.active_object.name = 'Pushed'\n"
+        "path = os.path.join(tempfile.mkdtemp(), 'Pushed.glb')\n"
+        "B.export_glb(path, [bpy.context.active_object])\n"
+        "engine_link.call_tool('dcc_receive', {'file': path, 'name': 'Pushed'}, socket_path=" + Json(sock).dump() + ")\n"}});
+    auto fd = connectUnixSocket(sock);
+    REQUIRE(fd.ok());
+    std::string resp;
+    std::atomic<bool> done{false};
+    std::thread client([&] {
+        Json req = Json::object({{"jsonrpc", "2.0"}, {"id", 1}, {"method", "tools/call"},
+                                 {"params", Json::object({{"name", "dcc_session_exec"}, {"arguments", code}})}});
+        writeAll(fd->get(), req.dump() + "\n");
+        LineReader r(fd->get());
+        r.next(resp);
+        done = true;
+    });
+    for (int i = 0; i < 6000 && !done; ++i) {  // the editor's frame loop: serves Blender's dcc_receive call
+        p.engine->update(0.0);
+        std::this_thread::sleep_for(2ms);
+    }
+    client.join();
+    p.engine->stopAgentServer();
+    auto j = Json::parse(resp);
+    REQUIRE(j.ok());
+    INFO(resp);
+    CHECK_FALSE(j->get("result").get("isError").asBool());
+    CHECK(fs::exists(p.dir.dir / "dcc/live/Pushed.glb"));
+    CHECK(p.engine->scene().find("Pushed") != kNoEntity);
+    REQUIRE_FALSE(p.call("dcc_session_stop", "{}").isError);
 }

@@ -59,6 +59,12 @@ struct ActivityItem: Identifiable, Sendable {
     var ok: Bool
 }
 
+/// A deferred tool call (`SkyPendingCall`) handed to a background task. The engine documents
+/// `sky_pending_run` as safe to call from any thread while the main thread stays free.
+private struct PendingCallBox: @unchecked Sendable {
+    let pointer: OpaquePointer
+}
+
 /// The Swift-side owner of the C++ engine. Main-actor isolated, matching the engine's
 /// single-threaded model; agents and UI both call tools through `call(_:_:actor:)`.
 @MainActor
@@ -133,6 +139,38 @@ final class EngineStore {
         guard let handle else { return ToolCallResult(text: "engine not running", imagesBase64: [], structured: .null, isError: true, raw: .null) }
         let raw = sky_call_tool(handle, tool, args.serialized(), actor)
         defer { sky_string_free(raw) }
+        let result = Self.decode(raw)
+        refresh(force: false)
+        return result
+    }
+
+    /// Like `call`, but a tool that runs something slow (a design app such as Blender) does it off
+    /// the main thread while the editor keeps drawing and handling input. Use this from async
+    /// contexts (the crew, buttons); `call` stays for the quick synchronous paths.
+    @discardableResult
+    func callAsync(_ tool: String, _ args: JSON = [:], actor: String = "user") async -> ToolCallResult {
+        guard let handle else { return ToolCallResult(text: "engine not running", imagesBase64: [], structured: .null, isError: true, raw: .null) }
+        var pending: OpaquePointer?
+        let first = sky_call_tool_begin(handle, tool, args.serialized(), actor, &pending)
+        if let first {
+            defer { sky_string_free(first) }
+            let result = Self.decode(first)
+            refresh(force: false)
+            return result
+        }
+        guard let pending else {
+            return ToolCallResult(text: "the tool did not start", imagesBase64: [], structured: .null, isError: true, raw: .null)
+        }
+        let box = PendingCallBox(pointer: pending)
+        await Task.detached(priority: .userInitiated) { sky_pending_run(box.pointer) }.value
+        let raw = sky_pending_finish(handle, pending)
+        defer { sky_string_free(raw) }
+        let result = Self.decode(raw)
+        refresh(force: false)
+        return result
+    }
+
+    private static func decode(_ raw: UnsafeMutablePointer<CChar>?) -> ToolCallResult {
         let json = raw.flatMap { JSON.parse(String(cString: $0)) } ?? .null
         var texts: [String] = []
         var images: [String] = []
@@ -140,7 +178,6 @@ final class EngineStore {
             if block["type"].string == "text", let t = block["text"].string { texts.append(t) }
             if block["type"].string == "image", let d = block["data"].string { images.append(d) }
         }
-        refresh(force: false)
         return ToolCallResult(text: texts.joined(separator: "\n"), imagesBase64: images,
                               structured: json["structuredContent"], isError: json["isError"].bool ?? false, raw: json)
     }

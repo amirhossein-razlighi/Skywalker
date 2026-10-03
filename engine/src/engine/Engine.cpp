@@ -90,6 +90,28 @@ ToolResult Engine::callTool(std::string_view name, const Json& args, const std::
     return result;
 }
 
+Engine::PendingCall Engine::beginTool(std::string_view name, const Json& args, const std::string& actor) {
+    PendingCall call{std::string(name), actor, {}};
+    ToolContext ctx{actor};
+    call.result = tools_.invoke(name, args, ctx);
+    if (!call.result.deferred) recordToolEvent(name, call.result, actor);
+    return call;
+}
+
+ToolResult Engine::finishTool(PendingCall& call) {
+    if (call.result.deferred) {
+        std::shared_ptr<DeferredWork> work = std::move(call.result.deferred);
+        call.result = ToolResult();
+        try {
+            call.result = work->finish ? work->finish() : ToolResult::text("");
+        } catch (const std::exception& e) {
+            call.result = ToolResult::error(Error::make("internal_error", std::string("tool crashed: ") + e.what()));
+        }
+        recordToolEvent(call.tool, call.result, call.actor);
+    }
+    return std::move(call.result);
+}
+
 void Engine::recordToolEvent(std::string_view name, const ToolResult& result, const std::string& actor) {
     const ToolDef* def = tools_.find(name);
     std::string summary = result.content.empty() ? "" : result.content.front().text.substr(0, 160);

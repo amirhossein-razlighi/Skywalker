@@ -154,12 +154,10 @@ private struct DesignAppSettings: View {
         .onAppear { refresh(rescan: false) }
     }
 
-    /// The engine runs design apps synchronously for in-editor callers, so give the UI a frame to
-    /// show the spinner before the call.
     private func run(_ tool: String) {
         busy = true
-        DispatchQueue.main.async {
-            let r = engine.call(tool, [:], actor: "editor")
+        Task {
+            let r = await engine.callAsync(tool, [:], actor: "editor")
             message = r.text.components(separatedBy: "\n").first ?? ""
             busy = false
             refresh(rescan: false)
@@ -168,10 +166,10 @@ private struct DesignAppSettings: View {
 
     private func refresh(rescan: Bool) {
         busy = true
-        DispatchQueue.main.async {
-            let list = engine.call("dcc_list", rescan ? ["refresh": true] : [:], actor: "editor")
+        Task {
+            let list = await engine.callAsync("dcc_list", rescan ? ["refresh": true] : [:], actor: "editor")
             apps = list.structured["apps"].array
-            session = engine.call("dcc_session_status", [:], actor: "editor").structured
+            session = await engine.callAsync("dcc_session_status", [:], actor: "editor").structured
             busy = false
         }
     }

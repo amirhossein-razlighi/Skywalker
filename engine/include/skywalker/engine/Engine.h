@@ -94,6 +94,18 @@ public:
     /// every client (MCP, in-editor agents, editor UI).
     ToolResult callTool(std::string_view name, const Json& args, const std::string& actor);
 
+    /// Non-blocking variant of callTool() for callers that must keep running while a slow tool
+    /// works (the editor's agents): beginTool() runs the quick part on the main thread. If the tool
+    /// deferred slow work (`call.result.deferred`), run `call.result.deferred->work()` on any thread
+    /// and then call finishTool() on the main thread; otherwise `call.result` is already final.
+    struct PendingCall {
+        std::string tool;
+        std::string actor;
+        ToolResult result;
+    };
+    PendingCall beginTool(std::string_view name, const Json& args, const std::string& actor);
+    ToolResult finishTool(PendingCall& call);
+
     /// Runs `fn` as one undoable, attributed transaction. Rolls back on failure. Nested
     /// calls join the outer transaction (used by `batch`).
     Status edit(const std::string& actor, const std::string& label, const std::function<Status()>& fn);

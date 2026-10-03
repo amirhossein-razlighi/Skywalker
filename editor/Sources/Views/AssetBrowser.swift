@@ -205,8 +205,8 @@ struct AssetBrowser: View {
     /// Opens the asset in a Blender window with the bridge running (dcc_session_start). Bring edits
     /// back with the Send Selection button in Blender's Skywalker tab, or let an agent pull them.
     private func openInBlender(_ item: AssetItem) {
-        DispatchQueue.main.async {
-            let r = engine.call("dcc_session_start", ["headless": false, "open": .string(item.path)], actor: "editor")
+        Task {
+            let r = await engine.callAsync("dcc_session_start", ["headless": false, "open": .string(item.path)], actor: "editor")
             if r.isError { NSSound.beep() }
         }
     }

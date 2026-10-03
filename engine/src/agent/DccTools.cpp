@@ -404,25 +404,31 @@ std::shared_ptr<dcc::Manager> addDccTools(Engine& engine, ToolRegistry& reg, std
              "SKY_BLENDER / SKY_MAYAPY / SKY_HOUDINI_HYTHON / SKY_3DSMAX_BATCH, ~/.skywalker/dcc/paths.json, the "
              "standard install folders and PATH. Call this first to know what you can use. Example: {}.",
              "dcc", object({{"refresh", boolean("Rescan the machine instead of using the cached result")}}),
-             false, false, [mgr](const Json& a, ToolContext&) {
-                 std::vector<dcc::AppInfo> apps = mgr->apps(a.get("refresh").asBool(false));
-                 Json list = Json::array();
-                 std::string text;
-                 for (const auto& app : apps) {
-                     list.push(app.toJson());
-                     text += app.name + " " + app.version + " — " + app.executable + (app.tested ? "" : " [untested adapter]") + "\n";
-                 }
-                 if (apps.empty()) {
-                     text = "no design apps found. Install Blender (free), or set SKY_BLENDER to its executable.\n";
-                 }
-                 Json recipes = Json::array();
-                 for (const auto& r : recipeNames()) recipes.push(r);
-                 Json out = Json::object({{"apps", list}, {"jobs", mgr->runningJobs()}, {"recipes", recipes}});
-                 if (auto s = mgr->session(); s) {
-                     out["session"] = Json::object({{"port", s->port}, {"pid", static_cast<double>(s->pid)}, {"version", s->version}, {"mode", s->mode}});
-                     text += "live Blender session: " + s->mode + " (pid " + std::to_string(s->pid) + ")\n";
-                 }
-                 return ToolResult::json(out, str::trim(text));
+             false, false, [mgr](const Json& a, ToolContext&) -> ToolResult {
+                 // Detection may start Blender once to read its version: do it off the main thread.
+                 auto apps = std::make_shared<std::vector<dcc::AppInfo>>();
+                 bool refresh = a.get("refresh").asBool(false);
+                 return ToolResult::defer(
+                     [mgr, apps, refresh] { *apps = mgr->apps(refresh); },
+                     [mgr, apps]() -> ToolResult {
+                         Json list = Json::array();
+                         std::string text;
+                         for (const auto& app : *apps) {
+                             list.push(app.toJson());
+                             text += app.name + " " + app.version + " — " + app.executable + (app.tested ? "" : " [untested adapter]") + "\n";
+                         }
+                         if (apps->empty()) {
+                             text = "no design apps found. Install Blender (free), or set SKY_BLENDER to its executable.\n";
+                         }
+                         Json recipes = Json::array();
+                         for (const auto& r : recipeNames()) recipes.push(r);
+                         Json out = Json::object({{"apps", list}, {"jobs", mgr->runningJobs()}, {"recipes", recipes}});
+                         if (auto s = mgr->session(); s) {
+                             out["session"] = Json::object({{"port", s->port}, {"pid", static_cast<double>(s->pid)}, {"version", s->version}, {"mode", s->mode}});
+                             text += "live Blender session: " + s->mode + " (pid " + std::to_string(s->pid) + ")\n";
+                         }
+                         return ToolResult::json(out, str::trim(text));
+                     });
              }});
 
     // --- dcc_run_script -------------------------------------------------------------------------

@@ -55,6 +55,43 @@ char* sky_call_tool(SkyEngine* h, const char* name, const char* args_json, const
     return dup(e->callTool(name, args, actor ? actor : "user").toMcp().dump());
 }
 
+struct SkyPendingCall {
+    Engine::PendingCall call;
+};
+
+char* sky_call_tool_begin(SkyEngine* h, const char* name, const char* args_json, const char* actor, SkyPendingCall** pending) {
+    if (pending) *pending = nullptr;
+    Engine* e = E(h);
+    if (!e || !name) return dup(R"({"content":[{"type":"text","text":"invalid engine or tool name"}],"isError":true})");
+    Json args = Json::object();
+    if (args_json && *args_json) {
+        auto parsed = Json::parse(args_json);
+        if (!parsed) return dup(ToolResult::error(parsed.error()).toMcp().dump());
+        args = std::move(parsed.value());
+    }
+    Engine::PendingCall call = e->beginTool(name, args, actor ? actor : "user");
+    if (!call.result.deferred || !pending) return dup(e->finishTool(call).toMcp().dump());
+    *pending = new SkyPendingCall{std::move(call)};  // NOLINT(cppcoreguidelines-owning-memory)
+    return nullptr;
+}
+
+void sky_pending_run(SkyPendingCall* p) {
+    if (!p || !p->call.result.deferred || !p->call.result.deferred->work) return;
+    try {
+        p->call.result.deferred->work();
+    } catch (...) {
+        // The failure surfaces in finish(): the tool's own handling decides what to report.
+    }
+}
+
+char* sky_pending_finish(SkyEngine* h, SkyPendingCall* p) {
+    Engine* e = E(h);
+    if (!p) return dup(R"({"content":[{"type":"text","text":"no pending call"}],"isError":true})");
+    std::unique_ptr<SkyPendingCall> owner(p);
+    if (!e) return dup(R"({"content":[{"type":"text","text":"invalid engine"}],"isError":true})");
+    return dup(e->finishTool(owner->call).toMcp().dump());
+}
+
 char* sky_tools_list(SkyEngine* h) {
     Engine* e = E(h);
     return dup(e ? e->tools().listJson().dump() : "{\"tools\":[]}");

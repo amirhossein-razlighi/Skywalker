@@ -277,9 +277,11 @@ dcc_run_script {app: "maya", script: "from skywalker_dcc import maya as M\nM.exp
 
 ## Limitations
 
-* The in-editor crew and editor buttons call tools synchronously, so the editor UI waits while a
-  design app runs (agents over the socket do not block it). Keep in-editor jobs short or use the
-  external-agent path for long ones.
+* Design apps run off the main thread for agents on the socket, the editor's crew and its buttons
+  (the C API's `sky_call_tool_begin` / `sky_pending_run` / `sky_pending_finish`, Swift
+  `EngineStore.callAsync`). In-process synchronous callers (the CLI, a `batch` containing a `dcc_*`
+  tool, tests) wait for the app to finish.
+* Files a script writes outside `SKY_OUT` are not reported or imported (use `sky.out_path`).
 * Windows process execution is not implemented yet (detection and command lines are).
 * Textures: glTF export embeds images; procedural node textures are not baked unless you bake them.
 * One live session per user; Alembic/skeletal animation and shape keys are not carried through `dcc_edit_asset`.
