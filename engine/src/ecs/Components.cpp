@@ -289,7 +289,7 @@ const TypeInfo& Terrain::type() {
             SKY_FIELD_RANGE(Terrain, size, Float, "Square extent in meters", 8.f, 32768.f),
             SKY_FIELD_RANGE(Terrain, resolution, Int, "Height samples per side (2^n+1: 257, 513, 1025, 2049)", 17, 4097),
             SKY_FIELD_JSON(Terrain, generator, "Generation parameters (shape, seed, minHeight, maxHeight, featureSize, ridges, "
-                                               "warp, erosion, thermal, terraces, beachWidth, seaLevel)",
+                                               "warp, erosion, thermal, terraces, beachWidth, seaLevel; shape heightmap: heightmap image, detailNoise)",
                            R"({"type":"object"})"),
             SKY_FIELD_JSON(Terrain, layers,
                            "Material layers, base first. Each: {name, texture, normalMap, ormMap, color, roughness, tiling (m), "
@@ -299,6 +299,12 @@ const TypeInfo& Terrain::type() {
             SKY_FIELD_RANGE(Terrain, wetBand, Float, "Meters above the water line that stay damp", 0.f, 20.f),
             SKY_FIELD_RANGE(Terrain, detail, Float, "Level-of-detail quality multiplier", 0.25f, 4.f),
             SKY_FIELD(Terrain, castShadows, Bool, "Cast sun shadows"),
+            SKY_FIELD(Terrain, overlay, String,
+                      "Image draped over the whole terrain (row 0 = -Z edge): political/region maps, borders, paper maps. "
+                      "Alpha masks it; swap it at run time for map modes"),
+            SKY_FIELD_RANGE(Terrain, overlayOpacity, Float, "Overlay strength (times the image alpha)", 0.f, 1.f),
+            SKY_FIELD_ENUM(Terrain, overlayBlend, "mix paints over the ground (matte, keeps the relief shading), multiply tints it, "
+                           "glow adds the color unlit (highlights, borders that read at night)", "mix", "multiply", "glow"),
         }};
     return info;
 }

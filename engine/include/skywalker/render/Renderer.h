@@ -200,6 +200,9 @@ struct TerrainItem {
     float detail = 1.f;
     bool castShadows = true;
     bool selected = false;
+    std::string overlay;          // absolute path of the draped map image (empty = none)
+    float overlayOpacity = 1.f;
+    int overlayBlend = 0;         // 0 = mix, 1 = multiply, 2 = glow
 };
 
 /// A chunk of GPU-instanced foliage (one mesh + surface, many transforms).

@@ -9,6 +9,7 @@
 
 #include <array>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
@@ -66,9 +67,22 @@ private:
     uint64_t version_ = 1;
 };
 
+/// A grayscale heightmap (values 0..1, row 0 = the terrain's -Z edge, column 0 = its -X edge).
+struct HeightImage {
+    int width = 0;
+    int height = 0;
+    std::vector<float> values;  // width * height, 0..1
+    /// Bilinear sample at normalized coordinates (u along +X, v along +Z), clamped to the edges.
+    float sample(float u, float v) const;
+};
+
+/// Loads a heightmap: 16-bit or 8-bit grayscale PNG (the red channel of color images), or a
+/// square little-endian 16-bit .r16/.raw file.
+Result<HeightImage> loadHeightImage(const std::string& path);
+
 /// Procedural shapes. Every shape is deterministic for a seed.
 struct TerrainGenParams {
-    std::string shape = "hills";  // hills | mountains | island | coast | canyon | dunes | plains | valley
+    std::string shape = "hills";  // hills | mountains | island | coast | canyon | dunes | plains | valley | heightmap
     uint32_t seed = 1;
     float minHeight = 0.f;        // meters (negative = below the entity, e.g. sea floor)
     float maxHeight = 60.f;
@@ -82,7 +96,15 @@ struct TerrainGenParams {
     float terraces = 0.f;         // 0..1 stepped strata (mesas, rice terraces)
     float beachWidth = 30.f;      // island/coast: gentle shelf near sea level (meters)
     float seaLevel = 0.f;         // island/coast: height of the shoreline
+    std::string heightmap;        // shape "heightmap": project-relative image mapped to minHeight..maxHeight
+    float detailNoise = 0.f;      // shape "heightmap": meters of fBm detail added on top (featureSize scale)
+    /// Shape "heightmap": the decoded image (not serialized; filled by resolveHeightmap).
+    std::shared_ptr<const HeightImage> image;
 };
+
+/// For shape "heightmap", loads `p.heightmap` (resolved to an absolute path by `resolve`) into
+/// `p.image`; other shapes are left alone. Errors name the missing or unreadable file.
+Status resolveHeightmap(TerrainGenParams& p, const std::function<std::string(const std::string&)>& resolve);
 
 /// Fills heights from the params (erosion included).
 void generate(TerrainData& t, const TerrainGenParams& p);

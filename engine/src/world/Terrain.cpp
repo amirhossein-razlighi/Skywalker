@@ -9,6 +9,7 @@
 #include <iterator>
 
 #include "skywalker/core/Strings.h"
+#include "stb_image.h"
 
 namespace sky::world {
 
@@ -305,6 +306,9 @@ void generate(TerrainData& t, const TerrainGenParams& p) {
                 height = p.minHeight + range * smoothN * 0.35f;
             } else if (p.shape == "mountains") {
                 height = p.minHeight + range * std::pow(0.15f * smoothN + 0.85f * ridgeN, 1.35f);
+            } else if (p.shape == "heightmap") {
+                float img = p.image ? p.image->sample(static_cast<float>(x) / (n - 1), static_cast<float>(z) / (n - 1)) : 0.f;
+                height = p.minHeight + range * img + (v * 2.f - 1.f) * p.detailNoise;
             }
             if (p.terraces > 0.f) {
                 float steps = 8.f + 10.f * (1.f - p.terraces);
@@ -342,19 +346,98 @@ TerrainGenParams genParamsFromJson(const Json& j, TerrainGenParams p) {
     f("terraces", p.terraces);
     f("beachWidth", p.beachWidth);
     f("seaLevel", p.seaLevel);
+    f("detailNoise", p.detailNoise);
+    if (j.contains("heightmap") && j.get("heightmap").asString() != p.heightmap) {
+        p.heightmap = j.get("heightmap").asString();
+        p.image.reset();
+    }
     if (j.contains("octaves")) p.octaves = static_cast<int>(std::clamp<int64_t>(j.get("octaves").asInt(), 1, 12));
     p.roughness = std::clamp(p.roughness, 0.1f, 0.9f);
     return p;
 }
 
 Json toJson(const TerrainGenParams& p) {
-    return Json::object({{"shape", p.shape},           {"seed", static_cast<int64_t>(p.seed)},
-                         {"minHeight", p.minHeight},   {"maxHeight", p.maxHeight},
-                         {"featureSize", p.featureSize}, {"octaves", p.octaves},
-                         {"roughness", p.roughness},   {"ridges", p.ridges},
-                         {"warp", p.warp},             {"erosion", p.erosion},
-                         {"thermal", p.thermal},       {"terraces", p.terraces},
-                         {"beachWidth", p.beachWidth}, {"seaLevel", p.seaLevel}});
+    Json j = Json::object({{"shape", p.shape},           {"seed", static_cast<int64_t>(p.seed)},
+                           {"minHeight", p.minHeight},   {"maxHeight", p.maxHeight},
+                           {"featureSize", p.featureSize}, {"octaves", p.octaves},
+                           {"roughness", p.roughness},   {"ridges", p.ridges},
+                           {"warp", p.warp},             {"erosion", p.erosion},
+                           {"thermal", p.thermal},       {"terraces", p.terraces},
+                           {"beachWidth", p.beachWidth}, {"seaLevel", p.seaLevel}});
+    if (!p.heightmap.empty()) j["heightmap"] = p.heightmap;
+    if (p.detailNoise != 0.f) j["detailNoise"] = p.detailNoise;
+    return j;
+}
+
+// ---------------------------------------------------------------------------
+// Heightmap images
+// ---------------------------------------------------------------------------
+
+float HeightImage::sample(float u, float v) const {
+    if (width <= 0 || height <= 0 || values.empty()) return 0.f;
+    float x = std::clamp(u, 0.f, 1.f) * static_cast<float>(width - 1);
+    float y = std::clamp(v, 0.f, 1.f) * static_cast<float>(height - 1);
+    int x0 = std::min(static_cast<int>(x), std::max(width - 2, 0)), y0 = std::min(static_cast<int>(y), std::max(height - 2, 0));
+    int x1 = std::min(x0 + 1, width - 1), y1 = std::min(y0 + 1, height - 1);
+    float tx = x - static_cast<float>(x0), ty = y - static_cast<float>(y0);
+    auto at = [&](int xi, int yi) { return values[static_cast<size_t>(yi) * width + xi]; };
+    float a = at(x0, y0) + (at(x1, y0) - at(x0, y0)) * tx;
+    float b = at(x0, y1) + (at(x1, y1) - at(x0, y1)) * tx;
+    return a + (b - a) * ty;
+}
+
+Result<HeightImage> loadHeightImage(const std::string& path) {
+    std::ifstream f(path, std::ios::binary);
+    if (!f) return Error::make("not_found", "heightmap not found: " + path, "paths are project-relative, e.g. maps/height.png");
+    std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+    HeightImage img;
+    std::string ext = path.size() >= 4 ? str::lower(path.substr(path.size() - 4)) : "";
+    if (ext == ".r16" || ext == ".raw") {
+        size_t count = bytes.size() / 2;
+        int side = static_cast<int>(std::lround(std::sqrt(static_cast<double>(count))));
+        if (side < 2 || static_cast<size_t>(side) * side * 2 != bytes.size()) {
+            return Error::make("invalid_heightmap", "raw heightmap " + path + " is not a square 16-bit grid",
+                               "write width*width little-endian uint16 values");
+        }
+        img.width = img.height = side;
+        img.values.resize(count);
+        for (size_t i = 0; i < count; ++i) img.values[i] = static_cast<float>(bytes[i * 2] | (bytes[i * 2 + 1] << 8)) / 65535.f;
+        return img;
+    }
+    int w = 0, h = 0, n = 0;
+    const int len = static_cast<int>(std::min<size_t>(bytes.size(), INT32_MAX));
+    if (stbi_is_16_bit_from_memory(bytes.data(), len)) {
+        stbi_us* px = stbi_load_16_from_memory(bytes.data(), len, &w, &h, &n, 1);
+        if (px) {
+            img.width = w, img.height = h;
+            img.values.resize(static_cast<size_t>(w) * h);
+            for (size_t i = 0; i < img.values.size(); ++i) img.values[i] = static_cast<float>(px[i]) / 65535.f;
+            stbi_image_free(px);
+        }
+    } else if (stbi_uc* px = stbi_load_from_memory(bytes.data(), len, &w, &h, &n, 1)) {
+        img.width = w, img.height = h;
+        img.values.resize(static_cast<size_t>(w) * h);
+        for (size_t i = 0; i < img.values.size(); ++i) img.values[i] = static_cast<float>(px[i]) / 255.f;
+        stbi_image_free(px);
+    }
+    if (img.values.empty() || img.width < 2 || img.height < 2) {
+        const char* why = stbi_failure_reason();
+        return Error::make("invalid_heightmap", "cannot decode heightmap " + path + (why ? std::string(": ") + why : ""),
+                           "use a grayscale PNG (16-bit for smooth slopes) or a square .r16 file");
+    }
+    return img;
+}
+
+Status resolveHeightmap(TerrainGenParams& p, const std::function<std::string(const std::string&)>& resolve) {
+    if (p.shape != "heightmap" || p.image) return {};
+    if (p.heightmap.empty()) {
+        return Error::make("missing_heightmap", "shape \"heightmap\" needs generator.heightmap",
+                           "pass a project-relative grayscale PNG, e.g. {\"heightmap\": \"maps/height.png\"}");
+    }
+    auto img = loadHeightImage(resolve ? resolve(p.heightmap) : p.heightmap);
+    if (!img) return img.error();
+    p.image = std::make_shared<const HeightImage>(std::move(img.value()));
+    return {};
 }
 
 const std::vector<std::string>& terrainPresets() {

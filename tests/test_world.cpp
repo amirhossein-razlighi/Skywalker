@@ -1,8 +1,11 @@
 #include <doctest/doctest.h>
 
+#include <cmath>
+#include <cstdio>
 #include <filesystem>
 
 #include "skywalker/engine/Engine.h"
+#include "skywalker/render/Image.h"
 #include "skywalker/world/Foliage.h"
 #include "skywalker/world/Terrain.h"
 
@@ -252,4 +255,100 @@ TEST_CASE("mesh: automatic LODs shrink heavy meshes with bounded error") {
     MeshData small = mesh::cube();
     mesh::buildLods(small);
     CHECK(small.lods.empty());
+}
+
+TEST_CASE("world: terrains from heightmap images, regenerated from the generator; map overlays") {
+    EngineConfig cfg;
+    cfg.renderer = RendererBackend::Null;
+    cfg.projectDir = (fs::temp_directory_path() / ("skywalker-world-hmap-" + AssetDatabase::newGuid().substr(0, 8))).string();
+    fs::create_directories(cfg.projectDir + "/maps");
+    // An 8-bit ramp: black on the -X edge, white on the +X edge (rows are identical).
+    Image ramp(65, 33);
+    for (int y = 0; y < ramp.height; ++y) {
+        for (int x = 0; x < ramp.width; ++x) {
+            uint8_t* p = ramp.at(x, y);
+            p[0] = p[1] = p[2] = static_cast<uint8_t>(std::lround(x * 255.0 / (ramp.width - 1)));
+            p[3] = 255;
+        }
+    }
+    REQUIRE(writePng(ramp, cfg.projectDir + "/maps/ramp.png"));
+    auto img = world::loadHeightImage(cfg.projectDir + "/maps/ramp.png");
+    REQUIRE(img);
+    CHECK(img->width == 65);
+    CHECK(img->height == 33);
+    CHECK(img->sample(0.f, 0.5f) == doctest::Approx(0.f));
+    CHECK(img->sample(1.f, 0.2f) == doctest::Approx(1.f));
+    CHECK(img->sample(0.5f, 0.9f) == doctest::Approx(0.5f).epsilon(0.01));
+    {  // A raw 16-bit grid: one bright sample in the middle of 3x3.
+        std::vector<uint8_t> raw(9 * 2, 0);
+        raw[8] = 0xff, raw[9] = 0xff;
+        FILE* f = std::fopen((cfg.projectDir + "/maps/peak.r16").c_str(), "wb");
+        REQUIRE(f);
+        std::fwrite(raw.data(), 1, raw.size(), f);
+        std::fclose(f);
+        auto r16 = world::loadHeightImage(cfg.projectDir + "/maps/peak.r16");
+        REQUIRE(r16);
+        CHECK(r16->width == 3);
+        CHECK(r16->sample(0.5f, 0.5f) == doctest::Approx(1.f));
+        CHECK(r16->sample(0.f, 0.f) == doctest::Approx(0.f));
+    }
+    CHECK(!world::loadHeightImage(cfg.projectDir + "/maps/none.png"));
+
+    Engine e(cfg);
+    (void)e.newScene("World", false);
+    ToolResult r = e.callTool("terrain_create", Json::parse(R"({"heightmap":"maps/ramp.png","size":128,"resolution":65,
+        "generator":{"minHeight":-10,"maxHeight":40,"erosion":0,"thermal":0}})").value(), "agent:test");
+    INFO(r.content.front().text);
+    REQUIRE(!r.isError);
+    EntityId terrain = static_cast<EntityId>(r.structured.get("entity").asInt());
+    const Terrain* t = e.scene().get<Terrain>(terrain);
+    REQUIRE(t);
+    CHECK(t->generator.get("shape").asString() == "heightmap");
+    CHECK(t->generator.get("heightmap").asString() == "maps/ramp.png");
+    float y = 0;
+    REQUIRE(e.world().terrainHeight(e.scene(), -63.9f, 0, y));
+    CHECK(y == doctest::Approx(-10).epsilon(0.02));
+    REQUIRE(e.world().terrainHeight(e.scene(), 63.9f, 0, y));
+    CHECK(y == doctest::Approx(40).epsilon(0.02));
+    REQUIRE(e.world().terrainHeight(e.scene(), 0, 30, y));
+    CHECK(y == doctest::Approx(15).epsilon(0.03));
+
+    // The .terrain file is a cache: without it the terrain is rebuilt from the image.
+    fs::remove(e.resolvePath(t->data));
+    e.world().forget(terrain);
+    REQUIRE(e.world().terrainHeight(e.scene(), 63.9f, 0, y));
+    CHECK(y == doctest::Approx(40).epsilon(0.02));
+
+    r = e.callTool("terrain_create", Json::parse(R"({"heightmap":"maps/missing.png"})").value(), "agent:test");
+    CHECK(r.isError);
+    r = e.callTool("terrain_create", Json::parse(R"({"size":64})").value(), "agent:test");
+    CHECK(r.isError);
+
+    // Map overlay: draped image, opacity and blend reach the renderer; bad blends are rejected.
+    r = e.callTool("entity_update", Json::parse(R"({"entity":"Terrain","components":{"terrain":{"overlay":"maps/ramp.png",
+        "overlayOpacity":0.6,"overlayBlend":"glow"}}})").value(), "agent:test");
+    INFO(r.content.front().text);
+    REQUIRE(!r.isError);
+    r = e.callTool("entity_update", Json::parse(R"({"entity":"Terrain","components":{"terrain":{"overlayBlend":"screen"}}})").value(),
+                   "agent:test");
+    CHECK(r.isError);
+    CaptureOptions o;
+    o.width = 32;
+    o.height = 18;
+    o.hasCustomView = true;
+    o.customView.eye = {0, 120, 60};
+    o.customView.target = {0, 0, 0};
+    auto cap = e.capture(o);
+    REQUIRE(cap);
+    REQUIRE(cap->frame.terrains.size() == 1);
+    const TerrainItem& item = cap->frame.terrains[0];
+    CHECK(item.overlay == e.resolvePath("maps/ramp.png"));
+    CHECK(item.overlayOpacity == doctest::Approx(0.6f));
+    CHECK(item.overlayBlend == 2);
+    r = e.callTool("entity_update", Json::parse(R"({"entity":"Terrain","components":{"terrain":{"overlayOpacity":0}}})").value(),
+                   "agent:test");
+    REQUIRE(!r.isError);
+    cap = e.capture(o);
+    REQUIRE(cap);
+    CHECK(cap->frame.terrains[0].overlay.empty());  // a fully transparent overlay is skipped
 }

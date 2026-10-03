@@ -70,6 +70,7 @@ std::shared_ptr<TerrainData> WorldRuntime::terrain(const Scene& scene, EntityId 
         int res = std::clamp(t->resolution, 17, 4097);
         data = std::make_shared<TerrainData>(res, t->size);
         TerrainGenParams p = genParamsFromJson(t->generator);
+        if (Status st = resolveHeightmap(p, hooks_.resolvePath); !st) log::warn("terrain", st.error().message);
         generate(*data, p);
         autoPaint(*data, t->layers, p.seed);
         // The data file is a cache of the (deterministic) generator: rebuild a missing one, with
@@ -153,6 +154,11 @@ void WorldRuntime::gather(const Scene& scene, const ViewCamera& view, FrameData&
         item.wetBand = t->wetBand;
         item.detail = t->detail;
         item.castShadows = t->castShadows;
+        if (!t->overlay.empty() && t->overlayOpacity > 0.f) {
+            item.overlay = hooks_.resolvePath ? hooks_.resolvePath(t->overlay) : t->overlay;
+            item.overlayOpacity = std::clamp(t->overlayOpacity, 0.f, 1.f);
+            item.overlayBlend = t->overlayBlend == "multiply" ? 1 : t->overlayBlend == "glow" ? 2 : 0;
+        }
         size_t count = std::min<size_t>(t->layers.isArray() ? t->layers.size() : 0, TerrainData::kMaxLayers);
         for (size_t i = 0; i < count; ++i) {
             const Json& l = t->layers[i];

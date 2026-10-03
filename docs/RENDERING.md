@@ -63,6 +63,18 @@ See the `terrain_*` and `foliage_add` tools.
   shorelines (`waterLevel`, `wetBand`) and a matching physics heightfield. Rendering uses
   CDLOD: a quadtree selects 32×32 patches displaced from the height texture, morphing
   between LODs with no cracks or popping.
+- **Your own relief:** `terrain_create {"heightmap": "maps/continent.png"}` builds the
+  terrain from a grayscale image (16-bit PNG for smooth slopes, 8-bit PNG or a square
+  `.r16`). Values 0..1 map to `generator.minHeight..maxHeight`; row 0 is the −Z edge.
+  `detailNoise` (meters) adds fBm detail; `erosion`/`thermal` still apply. The generator
+  keeps the image path, so the gitignored `.terrain` cache is rebuilt from it.
+- **Map overlay:** the terrain's `overlay` drapes one image over the whole terrain (row 0
+  = −Z edge, column 0 = −X edge; alpha masks it) for political maps, region tints,
+  borders or a parchment map. `overlayBlend`: `mix` paints over the ground (matte, the
+  relief still shades it), `multiply` tints it, `glow` adds the color unlit.
+  `overlayOpacity` fades it. Swap the image or the opacity at run time for map modes,
+  e.g. `find("Continent").terrain.overlay = "maps/supply.png"` in Wander. List images
+  that scripts pick at run time under `include` in `game.json`.
 - **Foliage:** GPU-instanced and wind-animated, generated in chunks around the camera
   (about 256 instances per chunk) and thinned toward the cull distance. Multi-part models
   (trunk + alpha-cut leaves) share instances.
