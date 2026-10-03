@@ -468,9 +468,11 @@ final class CrewStore {
         await send("""
             Write the Wander behavior "\(behavior)" for entity #\(entity) (\(entityName)).
             Intent: \(intent)
-            Steps: read wander_reference if you have not yet, write the code, check it with wander_check, then save it \
-            with behavior_set (entity \(entity), name "\(behavior)", intent exactly as given). Then step the simulation \
-            to verify it does what the intent says, and stop the simulation.
+            Steps: read wander_reference if you have not yet. Derive a spec from the intent: short rules, each one \
+            verifiable. Write the code (use `param` for tunable numbers, states for modes, `wait` for sequences) with one \
+            `test "..."` block per rule, and check it with wander_check. Save it with behavior_set (entity \(entity), \
+            name "\(behavior)", intent exactly as given, spec {rules: [{text, tests: [test names]}]}). Run wander_test and \
+            fix the code until every test passes; behavior_spec shows rules that still lack tests.
             """, to: coder, depth: 1)
     }
 }

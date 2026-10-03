@@ -11,6 +11,7 @@
 #include <Jolt/Physics/Collision/Shape/StaticCompoundShape.h>
 
 #include <algorithm>
+#include <filesystem>
 #include <cmath>
 #include <cstdio>
 #include <fstream>
@@ -340,6 +341,11 @@ JPH::RefConst<JPH::Shape> heightfieldShape(const ShapeContext& ctx, const ShapeP
     Hasher hk;
     hk.mat(m);
     hk.str(c.heightmap);
+    if (!c.heightmap.empty()) {  // edits rewrite the file: its timestamp is part of the key
+        std::error_code ec;
+        auto t = std::filesystem::last_write_time(ctx.paths(c.heightmap), ec);
+        if (!ec) hk.pod(static_cast<long long>(t.time_since_epoch().count()));
+    }
     hk.pod(n);
     hk.pod(c.size);
     hk.pod(mat);

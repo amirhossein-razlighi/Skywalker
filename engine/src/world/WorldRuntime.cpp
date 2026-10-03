@@ -72,6 +72,21 @@ std::shared_ptr<TerrainData> WorldRuntime::terrain(const Scene& scene, EntityId 
         TerrainGenParams p = genParamsFromJson(t->generator);
         generate(*data, p);
         autoPaint(*data, t->layers, p.seed);
+        // The data file is a cache of the (deterministic) generator: rebuild a missing one, with
+        // its physics heightmap, so projects can leave large terrain binaries out of git.
+        if (!t->data.empty() && hooks_.resolvePath) {
+            std::string abs = hooks_.resolvePath(t->data);
+            std::error_code ec;
+            if (!fs::exists(abs, ec)) {
+                fs::create_directories(fs::path(abs).parent_path(), ec);
+                float lo = 0, hi = 0;
+                if (data->save(abs) && data->saveHeightmap16(fs::path(abs).replace_extension(".r16").string(), lo, hi)) {
+                    key = sourceKey(scene, e);
+                } else {
+                    log::warn("terrain", "could not write the terrain cache " + abs);
+                }
+            }
+        }
     }
     entry.data = data;
     entry.key = key;
@@ -237,45 +252,66 @@ void WorldRuntime::gather(const Scene& scene, const ViewCamera& view, FrameData&
         for (size_t li = 0; li < entry.layers.size(); ++li) {
             FoliageLayer layer = entry.layers[li];
             layer.density *= fo->density;
-            float meshHeight = 1.f;
-            if (hooks_.meshBounds) {
-                if (auto b = hooks_.meshBounds(layer.mesh)) meshHeight = std::max(b->max.y - std::min(b->min.y, 0.f), 0.02f);
+            // The drawable parts: one mesh, or every part of a prefab sharing the instances.
+            struct DrawPart {
+                std::string mesh, material;
+                Mat4 local;
+            };
+            std::vector<DrawPart> parts;
+            if (!layer.prefab.empty() && hooks_.prefabParts) {
+                for (auto& p : hooks_.prefabParts(layer.prefab)) parts.push_back({p.mesh, p.material, p.local});
+            }
+            if (parts.empty()) parts.push_back({layer.mesh, layer.material, Mat4{}});
+            float meshHeight = hooks_.meshBounds ? 0.02f : 1.f;
+            for (const auto& p : parts) {
+                if (!hooks_.meshBounds) break;
+                if (auto bb = hooks_.meshBounds(p.mesh)) {
+                    Aabb wb = bb->transformed(p.local);
+                    meshHeight = std::max(meshHeight, wb.max.y - std::min(wb.min.y, 0.f));
+                }
             }
             auto chunks = entry.cache.visibleChunks(layer, static_cast<int>(li), static_cast<uint32_t>(fo->seed), view.eye, areaMin,
                                                     areaMax, surface, meshHeight, budget);
-            Surface surf;
-            if (!layer.material.empty() && hooks_.material) {
-                if (const Surface* s = hooks_.material(layer.material)) surf = *s;
-            } else {
-                surf.color = layer.color;
-                surf.roughness = layer.roughness;
-                surf.subsurface = layer.subsurface;
-                surf.texture = layer.texture;
-                surf.normalMap = layer.normalMap;
-                surf.ormMap = layer.ormMap;
-                surf.triplanar = layer.triplanar;
-                surf.tiling = {layer.tiling, layer.tiling};
-            }
-            surf.doubleSided = surf.doubleSided || isGrassLike(layer.mesh);
-            if (hooks_.resolvePath) {
-                for (std::string* p : {&surf.texture, &surf.normalMap, &surf.ormMap, &surf.emissiveMap}) {
-                    if (!p->empty()) *p = hooks_.resolvePath(*p);
+            for (size_t pi = 0; pi < parts.size(); ++pi) {
+                const DrawPart& part = parts[pi];
+                Surface surf;
+                std::string material = !part.material.empty() ? part.material : layer.material;
+                if (!material.empty() && hooks_.material) {
+                    if (const Surface* sm = hooks_.material(material)) surf = *sm;
+                } else {
+                    surf.color = layer.color;
+                    surf.roughness = layer.roughness;
+                    surf.subsurface = layer.subsurface;
+                    surf.texture = layer.texture;
+                    surf.normalMap = layer.normalMap;
+                    surf.ormMap = layer.ormMap;
+                    surf.triplanar = layer.triplanar;
+                    surf.tiling = {layer.tiling, layer.tiling};
                 }
-            }
-            for (const auto& c : chunks) {
-                InstanceBatch b;
-                b.entity = e;
-                b.id = c.id ^ (static_cast<uint64_t>(e) << 40);
-                b.mesh = layer.mesh;
-                b.surface = surf;
-                b.instances = c.instances;
-                b.bounds = c.bounds;
-                b.castShadows = layer.castShadows;
-                b.wind = layer.wind;
-                b.cullDistance = layer.cullDistance;
-                b.meshHeight = meshHeight;
-                stats_.foliageInstances += c.instances->size();
-                frame.instances.push_back(std::move(b));
+                // Leaves and blades let light through.
+                if (layer.subsurface > 0.f && surf.subsurface <= 0.f && surf.alphaCutoff > 0.f) surf.subsurface = layer.subsurface;
+                surf.doubleSided = surf.doubleSided || isGrassLike(part.mesh);
+                if (hooks_.resolvePath) {
+                    for (std::string* p : {&surf.texture, &surf.normalMap, &surf.ormMap, &surf.emissiveMap}) {
+                        if (!p->empty()) *p = hooks_.resolvePath(*p);
+                    }
+                }
+                for (const auto& c : chunks) {
+                    InstanceBatch b;
+                    b.entity = e;
+                    b.id = c.id ^ (static_cast<uint64_t>(e) << 40);  // parts share the chunk's instance buffer
+                    b.mesh = part.mesh;
+                    b.surface = surf;
+                    b.instances = c.instances;
+                    b.bounds = c.bounds;
+                    b.castShadows = layer.castShadows;
+                    b.wind = layer.wind;
+                    b.cullDistance = layer.cullDistance;
+                    b.meshHeight = meshHeight;
+                    b.part = part.local;
+                    if (pi == 0) stats_.foliageInstances += c.instances->size();
+                    frame.instances.push_back(std::move(b));
+                }
             }
         }
         stats_.foliageChunks += entry.cache.chunkCount();

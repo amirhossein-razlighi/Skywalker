@@ -1,0 +1,14 @@
+{
+  "name": "skywalker",
+  "marketplace": "skywalker",
+  "version": "0.1.0",
+  "description": "Skills, subagents and commands for building games with the Skywalker engine over MCP: world building, look development, assets, DCC, audio and a multi-agent studio.",
+  "author": {"name": "Skywalker"},
+  "license": "CC0-1.0",
+  "keywords": ["game-engine", "mcp", "skywalker", "gamedev", "agents"],
+  "mcp": {
+    "server": "skywalker",
+    "command": "skywalker",
+    "args": ["mcp", "--auto"]
+  }
+}

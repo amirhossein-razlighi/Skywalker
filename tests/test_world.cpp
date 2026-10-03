@@ -209,3 +209,47 @@ TEST_CASE("render: light clusters list exactly the lights that can reach them") 
     for (uint32_t k = 0; k < g.cells[static_cast<size_t>(c) * 2 + 1]; ++k) found = found || g.indices[g.cells[static_cast<size_t>(c) * 2] + k] == 105;
     CHECK(found);
 }
+
+TEST_CASE("world: terrains are solid for physics") {
+    EngineConfig cfg;
+    cfg.renderer = RendererBackend::Null;
+    cfg.projectDir = (fs::temp_directory_path() / ("skywalker-world-phys-" + AssetDatabase::newGuid().substr(0, 8))).string();
+    fs::create_directories(cfg.projectDir);
+    Engine e(cfg);
+    (void)e.newScene("World", false);
+    ToolResult r = e.callTool("terrain_create", Json::parse(R"({"preset":"rolling_hills","size":128,"resolution":129})").value(), "agent:test");
+    REQUIRE(!r.isError);
+    REQUIRE(e.scene().get<Collider>(static_cast<EntityId>(r.structured.get("entity").asInt())));
+    float ground = 0;
+    REQUIRE(e.world().terrainHeight(e.scene(), 5, 5, ground));
+    r = e.callTool("entity_create", Json::parse(R"({"name":"Ball","position":[5,80,5],"components":{"mesh":{"mesh":"sphere"}}})").value(), "agent:test");
+    REQUIRE(!r.isError);
+    r = e.callTool("physics_add", Json::parse(R"({"entities":["Ball"],"preset":"prop"})").value(), "agent:test");
+    INFO(r.content.front().text);
+    REQUIRE(!r.isError);
+    e.play();
+    e.step(60 * 6);
+    float y = e.scene().get<Transform>(e.scene().find("Ball"))->position.y;
+    e.stop();
+    CHECK(y > ground - 0.5f);  // landed on the hills, not through them
+    CHECK(y < ground + 3.f);
+}
+
+TEST_CASE("mesh: automatic LODs shrink heavy meshes with bounded error") {
+    MeshData m = mesh::sphere(256, 128);  // ~65k triangles
+    size_t tris = m.indices.size() / 3;
+    mesh::buildLods(m);
+    REQUIRE(m.lods.size() >= 2);
+    CHECK(m.lods.size() == m.lodErrors.size());
+    size_t prev = tris;
+    for (size_t i = 0; i < m.lods.size(); ++i) {
+        size_t t = m.lods[i].size() / 3;
+        CHECK(t < prev);
+        prev = t;
+        for (uint32_t idx : m.lods[i]) REQUIRE(idx < m.vertexCount());
+    }
+    CHECK(m.lodErrors.back() < 0.2f);
+    MeshData small = mesh::cube();
+    mesh::buildLods(small);
+    CHECK(small.lods.empty());
+}

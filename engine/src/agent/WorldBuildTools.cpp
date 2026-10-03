@@ -8,6 +8,7 @@
 #include <cmath>
 #include <deque>
 #include <filesystem>
+#include <fstream>
 #include <unordered_map>
 
 #include "ToolHelpers.h"
@@ -120,7 +121,19 @@ Status saveTerrain(Engine& engine, EntityId id, const std::shared_ptr<world::Ter
     fs::create_directories(fs::path(engine.resolvePath(path)).parent_path(), ec);
     if (Status st = data->save(engine.resolvePath(path)); !st) return st;
     engine.world().adopt(id, data, engine.world().sourceKey(s, id));
-    return {};
+    // Physics: a matching heightfield collider (16-bit heights next to the terrain file).
+    std::string r16 = fs::path(path).replace_extension(".r16").string();
+    float lo = 0, hi = 0;
+    if (Status st = data->saveHeightmap16(engine.resolvePath(r16), lo, hi); !st) return st;
+    const float range = std::max(hi - lo, 0.01f);
+    int res = 8;
+    while (res < data->resolution() - 1 && res < 1024) res *= 2;
+    Json collider = Json::object({{"shape", "heightfield"},
+                                  {"heightmap", r16},
+                                  {"size", Json::array({data->size(), range, data->size()})},
+                                  {"offset", Json::array({0.0, static_cast<double>(lo), 0.0})},
+                                  {"resolution", res}});
+    return engine.edit(actor, "Terrain collider", [&]() -> Status { return s.patchComponent(id, "collider", collider); });
 }
 
 Json terrainStats(const world::TerrainData& d) {

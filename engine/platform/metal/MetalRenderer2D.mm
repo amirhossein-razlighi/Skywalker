@@ -304,8 +304,11 @@ void MetalRenderer2D::encodeWorld(id<MTLRenderCommandEncoder> enc, MTLRenderPass
     if (lights.empty()) lights.push_back(GPULight2D{});  // a valid buffer even with no lights
     u.params = simd_make_float4(f.lights.empty() ? 0.f : static_cast<float>(std::min(f.lights.size(), Frame2D::kMaxLights)), frame.time,
                                 occludersValid_ ? 1.f : 0.f, 0.f);
-    u.viewport = simd_make_float4(static_cast<float>(frame.width), static_cast<float>(frame.height), 1.f / std::max(1, frame.width),
-                                  1.f / std::max(1, frame.height));
+    // The scene pass may run below output resolution (upscaling): use its real size.
+    id<MTLTexture> target = pass.colorAttachments[0].texture;
+    const float vw = target ? static_cast<float>(target.width) : static_cast<float>(frame.width);
+    const float vh = target ? static_cast<float>(target.height) : static_cast<float>(frame.height);
+    u.viewport = simd_make_float4(vw, vh, 1.f / std::max(1.f, vw), 1.f / std::max(1.f, vh));
 
     [enc pushDebugGroup:@"2D world"];
     [enc setDepthStencilState:depthTest_];

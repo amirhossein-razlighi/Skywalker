@@ -41,6 +41,8 @@ void addFxTools(Engine& engine, ToolRegistry& reg);
 void addTools2D(Engine& engine, ToolRegistry& reg);        // sprites, atlases, tilemaps
 void addUiTools(Engine& engine, ToolRegistry& reg);        // ui_create, ui_style, ui_inspect, ui_interact
 void addDialogueTools(Engine& engine, ToolRegistry& reg);  // dialogue_check, dialogue_preview, dialogue_control
+void addWanderTools(Engine& engine, ToolRegistry& reg);  // Wander 2: check, test, spec, graph, AOT
+void addNativeTools(Engine& engine, ToolRegistry& reg);  // native C++ modules
 void addWorldBuildTools(Engine& engine, ToolRegistry& reg);
 void addAudioTools(Engine& engine, ToolRegistry& reg);
 void addInputTools(Engine& engine, ToolRegistry& reg);
@@ -53,5 +55,7 @@ void addStudioTools(Engine& engine, ToolRegistry& reg);
 /// physics_* and nav_* tools (PhysicsTools.cpp registers NavTools.cpp too).
 void addPhysicsTools(Engine& engine, ToolRegistry& reg);
 void addNavTools(Engine& engine, ToolRegistry& reg);
+void addAnimationTools(Engine& engine, ToolRegistry& reg);  // AnimationTools.cpp (+ SequenceTools.cpp)
+void addHairTools(Engine& engine, ToolRegistry& reg);
 
 }  // namespace sky::tools

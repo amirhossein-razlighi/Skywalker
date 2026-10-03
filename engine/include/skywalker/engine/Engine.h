@@ -18,12 +18,14 @@
 #include <vector>
 
 #include "skywalker/agent/ToolRegistry.h"
+#include "skywalker/anim/AnimationSystem.h"
 #include "skywalker/assets/AssetDatabase.h"
 #include "skywalker/assets/Material.h"
 #include "skywalker/assets/Prefab.h"
 #include "skywalker/audio/AudioSystem.h"
 #include "skywalker/core/Json.h"
 #include "skywalker/engine/Gizmo.h"
+#include "skywalker/fx/Groom.h"
 #include "skywalker/fx/Ocean.h"
 #include "skywalker/fx/Particles.h"
 #include "skywalker/input/ActionMap.h"
@@ -40,9 +42,14 @@ namespace sky {
 
 class SocketServer;
 class World2D;
+class NativeModules;
 namespace studio {
 class Studio;
 }
+
+/// Registers the engine's Wander builtins (effects, water, and every subsystem's) in the
+/// global registry. Idempotent; the Engine constructor calls it.
+void registerEngineBuiltins();
 
 struct EngineConfig {
     RendererBackend renderer = RendererBackend::Auto;
@@ -81,6 +88,7 @@ struct CaptureOptions {
     /// 1 = a single real-time frame (temporal AA uses history from previous frames).
     int samples = 4;
     int debugView = 0;  // see FrameData::debugView
+    bool clay = false;  // every surface matte white clay (look-dev of form and light; "sketch to fill" films)
 };
 
 struct Capture {
@@ -99,7 +107,12 @@ public:
     Scene& scene() { return *scene_; }
     History& history() { return *history_; }
     wander::Runtime& runtime() { return *runtime_; }
+    /// Wander builtins of this engine: the global registry plus native-module builtins.
+    wander::BuiltinRegistry& builtins() { return *builtins_; }
+    /// Native C++ modules and AOT-compiled behaviors (skywalker/native/NativeModules.h).
+    NativeModules& native() { return *native_; }
     Renderer& renderer() { return *renderer_; }
+    anim::AnimationSystem& animation() { return *animation_; }
     ToolRegistry& tools() { return tools_; }
     OrbitCamera& camera() { return camera_; }
     const EngineConfig& config() const { return config_; }
@@ -186,6 +199,7 @@ public:
     struct MeshImportOptions {
         bool normalize = true;  // fit a 1 m cube (handy for generated models); false keeps real units
         bool zUp = false;       // source is Z-up (CAD, scans, some exporters)
+        bool keepRiggedScale = true;  // rigged characters keep their real size unless normalize was asked for explicitly
     };
     Result<Json> importMeshAsset(const std::string& path, const MeshImportOptions& options);
     Result<Json> importMeshAsset(const std::string& path) { return importMeshAsset(path, MeshImportOptions{}); }
@@ -217,6 +231,7 @@ public:
     fx::ParticleSystem& particles() { return particles_; }
     /// 2D, text, UI and dialogue (sprites, tilemaps, 2D lights, canvases, conversations).
     World2D& world2d() { return *world2d_; }
+    fx::GroomSystem& grooms() { return grooms_; }  // hair & fur (generated grooms, cached)
     /// Seconds on the effects clock: simulation time while playing, a live preview clock while editing.
     double effectsTime() const;
     /// Height of the water surface at world (x, z), waves included. False if no water covers it.
@@ -264,9 +279,12 @@ private:
     EngineConfig config_;
     std::unique_ptr<Scene> scene_;
     std::unique_ptr<History> history_;
+    std::unique_ptr<wander::BuiltinRegistry> builtins_;  // before runtime_ (it compiles against it)
     std::unique_ptr<wander::Runtime> runtime_;
+    std::unique_ptr<NativeModules> native_;  // after builtins_/runtime_: unloads its builtins first
     std::unique_ptr<Renderer> renderer_;
     std::unique_ptr<AssetDatabase> assets_;
+    std::unique_ptr<anim::AnimationSystem> animation_;
     struct CachedMaterial {
         int64_t mtime = -1;
         bool ok = false;
@@ -288,6 +306,7 @@ private:
     double accumulator_ = 0;
     fx::ParticleSystem particles_;
     std::unique_ptr<world::WorldRuntime> world_;
+    fx::GroomSystem grooms_;
     std::unordered_map<EntityId, fx::Ocean> oceans_;
     double previewTime_ = 0;
     fx::Ocean& oceanFor(EntityId e, const Water& w);

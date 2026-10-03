@@ -12,12 +12,15 @@
 // The renderer receives sorted ParticleInstances (see Renderer.h); the look (flame, smoke,
 // rain...) is shaded procedurally on the GPU.
 
+#include <functional>
+#include <memory>
 #include <string>
 #include <unordered_map>
 #include <vector>
 
 #include "skywalker/core/Json.h"
 #include "skywalker/core/Random.h"
+#include "skywalker/render/MeshData.h"
 #include "skywalker/render/Renderer.h"
 #include "skywalker/scene/Scene.h"
 
@@ -50,6 +53,15 @@ public:
     size_t totalLive() const;
     size_t emitterCount() const { return states_.size(); }
 
+    /// Emitters with simulation "gpu" as renderer items (the GPU simulates them; the CPU
+    /// only resolves meshes, textures, colliders, sub-emitters and bakes curves).
+    using MeshProvider = std::function<const MeshData*(const std::string& key)>;
+    using PathResolver = std::function<std::string(const std::string& path)>;
+    void gatherGpu(const Scene& scene, const MeshProvider& meshes, const PathResolver& resolve,
+                   std::vector<GpuEmitterItem>& out);
+    /// Cumulative burst requests for an emitter (GPU emitters consume the difference).
+    uint64_t burstSerial(EntityId emitter) const;
+
     static constexpr size_t kMaxRendered = 120000;
 
 private:
@@ -67,6 +79,18 @@ private:
     void spawn(State& s, const ParticleEmitter& em, const Mat4& world, int count);
     std::unordered_map<EntityId, State> states_;
     float time_ = 0;
+    // GPU emitters
+    std::unordered_map<EntityId, uint64_t> gpuBursts_;
+    struct CachedSurface {
+        const MeshData* source = nullptr;
+        std::shared_ptr<const MeshSurface> surface;
+    };
+    std::unordered_map<std::string, CachedSurface> surfaces_;
+    struct CachedField {
+        int64_t stamp = -1;
+        std::shared_ptr<const VectorField> field;
+    };
+    std::unordered_map<std::string, CachedField> fields_;
 };
 
 /// Divergence-free swirl velocity at p (m/s per unit strength).

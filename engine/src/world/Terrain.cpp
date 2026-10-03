@@ -218,6 +218,21 @@ Status TerrainData::save(const std::string& path) const {
     return f ? Status{} : Status(Error::make("io_error", "failed writing " + path));
 }
 
+Status TerrainData::saveHeightmap16(const std::string& path, float& lo, float& hi) const {
+    lo = minHeight();
+    hi = maxHeight();
+    const float range = std::max(hi - lo, 0.01f);
+    std::vector<uint8_t> raw(heights_.size() * 2);
+    for (size_t i = 0; i < heights_.size(); ++i) {
+        auto v = static_cast<uint16_t>(std::lround(std::clamp((heights_[i] - lo) / range, 0.f, 1.f) * 65535.f));
+        raw[i * 2] = static_cast<uint8_t>(v & 0xff);
+        raw[i * 2 + 1] = static_cast<uint8_t>(v >> 8);
+    }
+    std::ofstream f(path, std::ios::binary);
+    f.write(reinterpret_cast<const char*>(raw.data()), static_cast<std::streamsize>(raw.size()));
+    return f ? Status{} : Status(Error::make("io_error", "cannot write " + path));
+}
+
 Result<TerrainData> TerrainData::load(const std::string& path) {
     std::ifstream f(path, std::ios::binary);
     if (!f) return Error::make("not_found", "terrain file not found: " + path);

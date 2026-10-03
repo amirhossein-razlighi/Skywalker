@@ -107,7 +107,7 @@ struct Gather2DOptions {
 /// Fills frame.render2d (sprites, tile layers, world text, 2D lights, halos, screen boxes).
 void gather2D(const Scene& scene, Assets2D& assets, FrameData& frame, const Gather2DOptions& opts);
 
-/// Advances sprite animations by dt; `emit(entity, event)` receives frame events and "anim_finished".
+/// Advances sprite animations by dt; `emit(entity, event)` receives frame events and "finished" (delivered to Wander as anim:<name>).
 void tickAnimators(Scene& scene, Assets2D& assets, float dt, const std::function<void(EntityId, const std::string&)>& emit);
 /// Starts `clip` on the entity's animator (restarts it when `restart` or when it differs).
 Status playAnimation(Scene& scene, Assets2D& assets, EntityId entity, const std::string& clip, bool restart);

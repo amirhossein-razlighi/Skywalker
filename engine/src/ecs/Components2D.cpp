@@ -59,7 +59,7 @@ const TypeInfo& SpriteAnimator::type() {
         "Flipbook animation for the entity's sprite. clips: {\"run\": {\"frames\": \"4-11\", \"fps\": 12, \"loop\": true, "
         "\"events\": {\"3\": \"footstep\"}}}. frames: index ranges (\"0-3,6\"), lists ([0, 1, 2] or [\"run_0\", ...]) or an "
         "atlas name pattern (\"run_*\"); a clip may switch sheets with \"texture\", \"columns\", \"rows\". Frame events "
-        "are sent to the entity's behaviors (on event \"footstep\"); non-looping clips send \"anim_finished\".",
+        "reach the entity's behaviors as `on anim \"footstep\"`; non-looping clips send `on anim \"finished\"`.",
         {
             SKY_FIELD_JSON(SpriteAnimator, clips, "Clip name -> {frames, fps, loop, events, texture?, columns?, rows?}", R"({"type": "object"})"),
             SKY_FIELD(SpriteAnimator, clip, String, "Clip playing now (Wander: play_anim(self, \"run\"))"),

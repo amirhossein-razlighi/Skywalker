@@ -175,7 +175,7 @@ fragment MainOut meshFragment(MeshOut in [[stage_in]],
     s.alpha = d.color.a * in.color.a;
     if (d.maps.x > 0.5) {
         float4 t = tri ? sampleTri(albedoTex, tp) : albedoTex.sample(materialSampler, uv);
-        s.albedo *= t.rgb;
+        if (d.material4.y < 0.5) s.albedo *= t.rgb;
         s.alpha *= t.a;
         if (d.material4.x > 0.0) {
             // Alpha test, sharpened to a ~1 px ramp so alpha-to-coverage antialiases the edge.

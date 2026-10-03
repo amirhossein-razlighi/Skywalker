@@ -17,6 +17,7 @@
 #include "skywalker/core/Result.h"
 #include "skywalker/ecs/Components.h"
 #include "skywalker/math/Math.h"
+#include "skywalker/render/FxItems.h"
 #include "skywalker/render/Image.h"
 #include "skywalker/render/Render2D.h"
 #include "skywalker/scene/Scene.h"
@@ -88,6 +89,7 @@ struct Surface {
     bool doubleSided = false;
     float occlusionStrength = 1.f;
     float alphaCutoff = 0.f;  // > 0: alpha-tested cutout
+    bool textureAlphaOnly = false;  // use the base-color texture for its alpha (cut-out) only (clay renders)
 };
 
 struct DrawItem {
@@ -98,6 +100,22 @@ struct DrawItem {
     bool selected = false;
     bool castShadows = true;
     Aabb worldBounds;
+    int skin = -1;  // index into FrameData::skins for skinned (animated) meshes
+};
+
+// --- Animation: GPU skinning input ------------------------------------------------------
+/// A posed skin: joint matrices (mesh space) for a rigged mesh, and its posed bounds.
+struct SkinPose {
+    std::shared_ptr<const std::vector<Mat4>> palette;
+    Aabb bounds;  // mesh space
+};
+/// One skinned draw. Backends skin `mesh` (which has a SkinStream) with `palette` into a
+/// per-instance vertex buffer registered under `key`; the DrawItem's mesh is `key`, so
+/// every pass (shadows, outlines, selection) draws the posed vertices unchanged.
+struct SkinItem {
+    std::string mesh;  // base mesh key ("asset:models/hero.glb#2")
+    std::string key;   // unique per instance ("asset:models/hero.glb#2@skin12")
+    std::shared_ptr<const std::vector<Mat4>> palette;
 };
 
 struct LightItem {
@@ -196,6 +214,7 @@ struct InstanceBatch {
     float wind = 1.f;           // bend strength
     float cullDistance = 100.f;
     float meshHeight = 1.f;     // height of the mesh (m) for wind bending
+    Mat4 part;                  // transform of this part inside a multi-part model (identity otherwise)
 };
 
 struct FrameData {
@@ -213,6 +232,9 @@ struct FrameData {
     std::vector<VolumeItem> volumes;
     std::vector<TerrainItem> terrains;
     std::vector<InstanceBatch> instances;
+    std::vector<SkinItem> skins;  // animation: skinned draws (see SkinItem)
+    std::vector<GpuEmitterItem> gpuEmitters;  // GPU-simulated particles (hair & VFX workstream)
+    std::vector<GroomItem> grooms;            // strand hair and fur
     bool drawGrid = true;
     float time = 0;
     Frame2D render2d;  // sprites, tilemaps, world text, 2D lights and UI (see Render2D.h)
@@ -222,7 +244,7 @@ struct FrameData {
     /// Discards temporal history (camera cuts). Large camera jumps are detected automatically.
     bool resetHistory = false;
     /// Buffer visualization instead of the final image: 0 off, 1 albedo, 2 normals,
-    /// 3 roughness/metallic, 4 GI, 5 reflections, 6 AO, 7 depth, 8 lighting before GI.
+    /// 3 roughness/metallic, 4 GI, 5 reflections, 6 AO, 7 depth, 8 lighting before GI, 9 sketch.
     int debugView = 0;
 
     static constexpr size_t kMaxLights = 1024;       // clustered lighting on surfaces
@@ -238,6 +260,8 @@ struct BuildOptions {
     float time = 0;
     /// Resolves MeshRenderer::material paths (provided by the engine's asset system).
     std::function<const ResolvedMaterial*(const std::string&)> material;
+    /// Animation: the posed skin of a rigged mesh drawn by an entity (null = rest pose).
+    std::function<const SkinPose*(EntityId entity, const std::string& mesh)> skin;
 };
 
 /// Orders lights by importance for this view (directional first, then the point/spot lights
@@ -293,6 +317,10 @@ public:
     /// Replaces the shader source at runtime; returns compiler diagnostics on failure.
     virtual Status reloadShaders(const std::string& source) = 0;
     virtual std::string shaderSource() const = 0;
+    /// Lights cast by GPU effects (glowing GPU particles), from a recent frame (no stall).
+    virtual std::vector<LightItem> effectLights() const { return {}; }
+    /// Backend statistics of the last completed frame (GPU time in ms, items drawn, effects...).
+    virtual Json stats() const { return Json::object(); }
 };
 
 enum class RendererBackend { Auto, Metal, Null };

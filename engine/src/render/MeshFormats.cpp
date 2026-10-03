@@ -50,10 +50,32 @@ void zUpToYUp(MeshData& m) {
             v[o + 2] = -y;
         }
     }
+    if (m.skinned()) {
+        Mat4 r;  // (x, y, z) -> (x, z, -y)
+        r.at(1, 1) = 0.f;
+        r.at(2, 1) = 1.f;
+        r.at(1, 2) = -1.f;
+        r.at(2, 2) = 0.f;
+        m.skin.transform = r * m.skin.transform;
+    }
     m.computeBounds();
 }
 
 Aabb zUpToYUp(const Aabb& b) { return {{b.min.x, b.min.z, -b.max.y}, {b.max.x, b.max.z, -b.min.y}}; }
+
+void turnAround(MeshData& m) {
+    for (size_t i = 0; i < m.vertices.size(); i += MeshData::kFloatsPerVertex) {
+        float* v = &m.vertices[i];
+        for (int o : {0, 3}) {  // position, normal: (x, y, z) -> (-x, y, -z)
+            v[o] = -v[o];
+            v[o + 2] = -v[o + 2];
+        }
+    }
+    if (m.skinned()) m.skin.transform = Mat4::scale({-1.f, 1.f, -1.f}) * m.skin.transform;
+    m.computeBounds();
+}
+
+Aabb turnAround(const Aabb& b) { return {{-b.max.x, b.min.y, -b.max.z}, {-b.min.x, b.max.y, -b.min.z}}; }
 
 std::pair<std::string, int> splitPart(const std::string& ref) {
     size_t hash = ref.rfind('#');
@@ -436,6 +458,10 @@ Result<MeshData> loadMeshFile(const std::string& path, const LoadOptions& option
     if (options.zUp) {
         zUpToYUp(r.value());
         reference = zUpToYUp(reference);
+    }
+    if (options.turnAround) {
+        turnAround(r.value());
+        reference = turnAround(reference);
     }
     if (options.normalize) {
         if (haveReference) normalizeToUnit(r.value(), reference);

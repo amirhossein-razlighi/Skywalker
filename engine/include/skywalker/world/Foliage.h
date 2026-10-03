@@ -32,6 +32,7 @@ static_assert(sizeof(FoliageInstance) == 16 * sizeof(float));
 struct FoliageLayer {
     std::string name;
     std::string mesh = "grass";         // primitive ("grass", "grass_tall", "pebbles", "fern", ...) or "asset:..." (incl. #part)
+    std::string prefab;                 // multi-part model (e.g. an imported tree: trunk + alpha-cut leaves)
     std::string material;               // optional material asset; otherwise the fields below
     std::string texture, normalMap, ormMap;  // optional maps (project-relative)
     bool triplanar = false;             // project the maps in world space (rocks)
@@ -94,7 +95,10 @@ std::vector<FoliageInstance> scatterChunk(const FoliageLayer& layer, int layerIn
 /// Per-entity cache of generated chunks with LRU-ish eviction.
 class FoliageCache {
 public:
-    static constexpr float kChunkSize = 16.f;
+    static constexpr float kChunkSize = 16.f;  // minimum; sparse layers use larger chunks
+    /// Chunk edge (m) holding ~256 instances of a layer: dense grass gets small chunks
+    /// (fine culling, streaming), sparse trees big ones (few draw calls).
+    static float chunkSizeFor(const FoliageLayer& layer);
     /// Returns the chunks of `layerIndex` that are within the layer's cull distance of `eye`
     /// and inside `area` (world xz bounds), generating missing ones (at most `budget` per call).
     std::vector<FoliageChunk> visibleChunks(const FoliageLayer& layer, int layerIndex, uint32_t seed, Vec3 eye,

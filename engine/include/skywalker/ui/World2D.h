@@ -21,6 +21,12 @@
 
 namespace sky {
 
+namespace wander {
+class BuiltinRegistry;
+}
+/// Registers play_anim, tile_at, set_tile, start_dialogue, dialogue_var, ... (UiBuiltins.cpp).
+void registerUiBuiltins(wander::BuiltinRegistry& reg);
+
 class World2D {
 public:
     explicit World2D(std::string projectDir);

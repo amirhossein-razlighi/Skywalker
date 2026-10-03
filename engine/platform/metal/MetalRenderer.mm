@@ -22,11 +22,13 @@
 
 #import <Foundation/Foundation.h>
 #import <Metal/Metal.h>
+#import <MetalFX/MetalFX.h>
 #import <MetalKit/MetalKit.h>
 #import <QuartzCore/CAMetalLayer.h>
 #include <simd/simd.h>
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
@@ -37,6 +39,7 @@
 
 #include <dispatch/dispatch.h>
 
+#include "MetalFx.h"  // [hair+vfx] GPU particles and strand hair
 #include "skywalker/core/Log.h"
 #include "skywalker/render/ColorGrading.h"
 #include "skywalker/render/Hdr.h"
@@ -52,6 +55,23 @@ namespace {
 const char* kDefaultShaderSource =
 #include "ShaderSource.inc"
     ;
+
+// --- Animation: GPU skinning (compute pre-pass, Skinning.metal) --------------------------
+const char* kSkinningShaderSource =
+#include "SkinningShaderSource.inc"
+    ;
+struct SkinGpuVertex {  // must match Skinning.metal
+    float position[3];
+    float normal[3];
+    uint16_t joints[4];
+    float weights[4];
+};
+static_assert(sizeof(SkinGpuVertex) == 48);
+struct SkinParams {
+    uint32_t vertexCount, jointCount, pad0, pad1;
+};
+static_assert(sizeof(Mat4) == sizeof(simd_float4x4));
+// -----------------------------------------------------------------------------------------
 
 // Must match Standard.metal.
 struct FrameUniforms {
@@ -158,6 +178,7 @@ struct TerrainNodeGpu {
 
 struct FoliageUniformsGpu {
     simd_float4 wind, params;
+    simd_float4x4 part;
 };
 
 struct LensUniformsGpu {
@@ -281,8 +302,25 @@ Cascades computeCascades(const FrameData& frame) {
 
 struct GpuMesh {
     id<MTLBuffer> vertices;
-    id<MTLBuffer> indices;
+    id<MTLBuffer> indices;  // LOD 0 first, then each coarser level
     uint32_t indexCount = 0;
+    static constexpr int kMaxLods = 6;
+    int lodCount = 1;
+    uint32_t lodOffset[kMaxLods] = {};  // in indices
+    uint32_t lodCount_[kMaxLods] = {};
+    float lodError[kMaxLods] = {};      // relative to the mesh extent
+    float radius = 1.f;                 // bounding-sphere radius (local units)
+
+    /// The coarsest level whose simplification error stays under ~1 pixel at `pixelsPerUnit`.
+    int lodFor(float pixelsPerUnit) const {
+        int best = 0;
+        for (int i = 1; i < lodCount; ++i) {
+            if (lodError[i] * radius * 2.f * pixelsPerUnit < 0.8f) best = i;
+        }
+        return best;
+    }
+    id<MTLBuffer> skin;  // animation: SkinGpuVertex stream of rigged meshes (nil if static)
+    uint32_t vertexCount = 0;
 };
 
 class MetalRenderer final : public Renderer {
@@ -322,12 +360,20 @@ public:
         if (!device_) return false;
         queue_ = [device_ newCommandQueue];
         textureLoader_ = [[MTKTextureLoader alloc] initWithDevice:device_];
+        fx_ = std::make_unique<MetalFx>(  // [hair+vfx]
+            device_, queue_,
+            [this](const std::string& key) {
+                const GpuMesh* m = mesh(key);
+                return m ? FxMesh{m->vertices, m->indices, m->indexCount} : FxMesh{};
+            },
+            [this](const std::string& path, bool srgb) { return texture(path, srgb); });
         Status s = buildPipelines(kDefaultShaderSource);
         if (!s) {
             log::error("render", "built-in shaders failed to compile: " + s.error().message);
             return false;
         }
         source_ = kDefaultShaderSource;
+        buildSkinningPipeline();  // animation
 
         MTLDepthStencilDescriptor* ds = [MTLDepthStencilDescriptor new];
         ds.depthCompareFunction = MTLCompareFunctionLess;
@@ -395,9 +441,26 @@ public:
         return true;
     }
 
+    Json stats() const override {
+        Json j = Json::object({{"gpuMs", std::round(gpuMs_->load() * 100.0) / 100.0},
+                             {"culledDraws", static_cast<int64_t>(culled_)},
+                             {"terrainNodes", static_cast<int64_t>(terrainNodesDrawn_)},
+                             {"instancesDrawn", static_cast<int64_t>(instancesDrawn_)},
+                             {"trianglesDrawn", static_cast<int64_t>(lastTriangles_)},
+                             {"meshesCached", static_cast<int64_t>(meshes_.size())},
+                             {"texturesCached", static_cast<int64_t>(textures_.size())},
+                             {"instanceBuffers", static_cast<int64_t>(instanceBuffers_.size())}});
+        if (fx_) {  // [hair+vfx] frame/simulation GPU times, emitters, grooms
+            const Json fx = fx_->stats();
+            for (const auto& [k, v] : fx.members()) j[k] = v;
+        }
+        return j;
+    }
+
     RendererInfo info() const override { return {"metal", device_ ? std::string(device_.name.UTF8String) : ""}; }
 
     std::string shaderSource() const override { return source_; }
+    std::vector<LightItem> effectLights() const override { return fx_->effectLights(); }  // [hair+vfx]
 
     Status reloadShaders(const std::string& source) override {
         @autoreleasepool {
@@ -428,7 +491,10 @@ public:
 
     Status render(const FrameData& frame) override {
         @autoreleasepool {
-            ensureTargets(frame.width, frame.height);
+            const bool accumulateFrame = std::clamp(frame.samples, 1, 256) > 1;
+            const float renderScale = accumulateFrame ? 1.f : std::clamp(frame.environment.renderScale, 0.33f, 1.f);
+            ensureTargets(frame.width, frame.height, renderScale);
+            const bool upscale = !accumulateFrame && renderScale < 0.999f && temporalScaler() != nil;
             ensureHdri(frame.environment);
             const Environment& env = frame.environment;
             Cascades cascades = computeCascades(frame);
@@ -450,7 +516,7 @@ public:
             const int samples = std::clamp(frame.samples, 1, 256);
             const bool accumulate = samples > 1;
             const bool jittered = accumulate || env.taa;
-            const float w = static_cast<float>(std::max(frame.width, 1)), h = static_cast<float>(std::max(frame.height, 1));
+            const float w = static_cast<float>(hdr_.width), h = static_cast<float>(hdr_.height);  // internal resolution
 
             // Bound the frames in flight so the transient ring is never overwritten in use.
             dispatch_semaphore_wait(inFlight_, DISPATCH_TIME_FOREVER);
@@ -459,12 +525,21 @@ public:
             id<MTLCommandBuffer> cmd = [queue_ commandBuffer];
             cmd.label = @"Skywalker Frame";
             dispatch_semaphore_t sem = inFlight_;
-            [cmd addCompletedHandler:^(id<MTLCommandBuffer>) { dispatch_semaphore_signal(sem); }];
+            auto gpuMs = gpuMs_;
+            [cmd addCompletedHandler:^(id<MTLCommandBuffer> done) {
+                double ms = (done.GPUEndTime - done.GPUStartTime) * 1000.0;
+                if (ms > 0.0) gpuMs->store(ms);
+                dispatch_semaphore_signal(sem);
+            }];
             lightsBuf_ = transient(allLights.data(), allLights.size() * sizeof(GPULight));
             clusterCellsBuf_ = transient(grid.cells.data(), grid.cells.size() * sizeof(uint32_t));
             clusterIndexBuf_ = transient(grid.indices.data(), grid.indices.size() * sizeof(uint32_t));
+            encodeSkinning(cmd, frame);  // animation: posed vertices for every pass below
             ensureCloudNoise(cmd);
             encodeEnvironment(cmd, frame, base);
+            lodFrame_ = &frame;
+            trianglesDrawn_ = 0;
+            fx_->simulate(frame, depthPrev_, gbufB_, prevViewProj_, historyValid_);  // [hair+vfx]
             encodeShadows(cmd, frame, base, cascades);
             if (r2d_) r2d_->encodeOccluders(cmd, frame);  // 2D shadow casters
             for (int i = 0; i < samples; ++i) {
@@ -487,26 +562,32 @@ public:
                 encodeResolve(cmd, frame, fu);
                 encodeEffects(cmd, frame, fu, lights, i == 0);
                 encodeVolumetrics(cmd, frame, fu, lights, seed);
-                int mode = accumulate ? 2 : (env.taa && historyValid_ ? 1 : 0);
+                int mode = accumulate ? 2 : (env.taa && historyValid_ && !upscale ? 1 : 0);
                 encodeTemporal(cmd, frame, fu, mode, 1.f / static_cast<float>(i + 1));
+                if (upscale) encodeUpscale(cmd, fu, j);
                 id<MTLBlitCommandEncoder> blit = [cmd blitCommandEncoder];
                 [blit copyFromTexture:depthResolved_ toTexture:depthPrev_];
                 [blit endEncoding];
                 if (!accumulate) historyValid_ = true;
             }
             if (accumulate) historyValid_ = true;  // the converged still seeds later TAA frames
+            postSource_ = upscale ? upscaled_ : taa_[taaCurrent_];
             encodePost(cmd, frame, accumulate, base);
             if (frame.debugView > 0) {
                 PostUniforms pu{};
                 pu.params = simd_make_float4(static_cast<float>(frame.debugView), 0, 0, 0);
+                pu.texel = simd_make_float4(1.f / std::max(frame.width, 1), 1.f / std::max(frame.height, 1), 0, 0);
                 fullscreen(cmd, debugViewPipeline_, resolve_, {gbufA_, gbufB_, giOut_, ssrOut_, aoBlurred_, depthResolved_, hdr_},
                            &pu, sizeof(pu), false, @"Debug view");
             }
             if (r2d_) r2d_->encodeUI(cmd, frame, resolve_, depthResolved_);  // UI at output resolution
             encodeOverlays(cmd, frame, base);
+            fx_->trackFrame(cmd);  // [hair+vfx] GPU frame time
             [cmd commit];
             lastCommand_ = cmd;
             evictWorldCaches();
+            lodFrame_ = nullptr;
+            lastTriangles_ = trianglesDrawn_ / static_cast<uint64_t>(samples);
             prevViewProj_ = vp;
             motionPrevVP_ = vp;
             motionValid_ = true;
@@ -617,10 +698,11 @@ private:
                                      "fluidCurl", "fluidForces", "fluidDivergence", "fluidJacobi", "fluidProject", "volumetricFragment",
                                      "ssgiFragment", "ssrFragment", "ssTemporalFragment", "lightingResolveFragment",
                                      "temporalFragment", "debugViewFragment", "terrainVertex", "terrainFragment",
-                                     "terrainShadowVertex", "foliageVertex", "foliageShadowVertex", "cloudsFragment",
+                                     "terrainShadowVertex", "foliageVertex", "foliageShadowVertex", "foliageShadowAlphaVertex",
+                                     "cloudsFragment",
                                      "cloudTemporalFragment", "cloudShapeKernel", "cloudDetailKernel", "lumaFragment",
                                      "exposureFragment", "motionBlurFragment", "dofCocFragment", "dofBlurFragment",
-                                     "dofCombineFragment"}) {
+                                     "dofCombineFragment", "motionVectorFragment"}) {
             if (!fn(required)) {
                 return Error::make("shader_missing_function", std::string("shader source must define ") + required);
             }
@@ -710,7 +792,9 @@ private:
         id<MTLRenderPipelineState> foliage = terrainShadow ? make("foliageVertex", "meshFragment", kHDRFormat, kSamples, Blend::None, true, &e, true) : nil;
         id<MTLRenderPipelineState> foliageCutout = foliage ? make("foliageVertex", "meshFragment", kHDRFormat, kSamples, Blend::None, true, &e, true, true) : nil;
         id<MTLRenderPipelineState> foliageShadow = foliageCutout ? make("foliageShadowVertex", nullptr, MTLPixelFormatInvalid, 1, Blend::None, true, &e) : nil;
-        id<MTLRenderPipelineState> clouds = foliageShadow ? make("fullscreenVertex", "cloudsFragment", kHDRFormat, 1, Blend::None, false, &e) : nil;
+        id<MTLRenderPipelineState> foliageShadowAlpha =
+            foliageShadow ? make("foliageShadowAlphaVertex", "shadowAlphaFragment", MTLPixelFormatInvalid, 1, Blend::None, true, &e) : nil;
+        id<MTLRenderPipelineState> clouds = foliageShadowAlpha ? make("fullscreenVertex", "cloudsFragment", kHDRFormat, 1, Blend::None, false, &e) : nil;
         id<MTLRenderPipelineState> cloudTemporal = clouds ? make("fullscreenVertex", "cloudTemporalFragment", kHDRFormat, 1, Blend::None, false, &e) : nil;
         id<MTLComputePipelineState> cloudShapeK = cloudTemporal ? [device_ newComputePipelineStateWithFunction:fn("cloudShapeKernel") error:&e] : nil;
         id<MTLComputePipelineState> cloudDetailK = cloudShapeK ? [device_ newComputePipelineStateWithFunction:fn("cloudDetailKernel") error:&e] : nil;
@@ -720,7 +804,8 @@ private:
         id<MTLRenderPipelineState> dofCoc = motionBlur ? make("fullscreenVertex", "dofCocFragment", kHDRFormat, 1, Blend::None, false, &e) : nil;
         id<MTLRenderPipelineState> dofBlur = dofCoc ? make("fullscreenVertex", "dofBlurFragment", kHDRFormat, 1, Blend::None, false, &e) : nil;
         id<MTLRenderPipelineState> dofCombine = dofBlur ? make("fullscreenVertex", "dofCombineFragment", kHDRFormat, 1, Blend::None, false, &e) : nil;
-        if (!dofCombine) volume = nil;
+        id<MTLRenderPipelineState> motionVec = dofCombine ? make("fullscreenVertex", "motionVectorFragment", MTLPixelFormatRG16Float, 1, Blend::None, false, &e) : nil;
+        if (!motionVec) volume = nil;
         if (volume) {
             for (const char* k : {"fluidAdvect", "fluidCorrect", "fluidCombust", "fluidCurl", "fluidForces", "fluidDivergence",
                                   "fluidJacobi", "fluidProject"}) {
@@ -770,6 +855,7 @@ private:
         foliagePipeline_ = foliage;
         foliageCutoutPipeline_ = foliageCutout;
         foliageShadowPipeline_ = foliageShadow;
+        foliageShadowAlphaPipeline_ = foliageShadowAlpha;
         cloudsPipeline_ = clouds;
         cloudTemporalPipeline_ = cloudTemporal;
         cloudShapeKernel_ = cloudShapeK;
@@ -781,6 +867,8 @@ private:
         dofCocPipeline_ = dofCoc;
         dofBlurPipeline_ = dofBlur;
         dofCombinePipeline_ = dofCombine;
+        motionPipeline_ = motionVec;
+        if (fx_) fx_->build(lib, FxFormats{kHDRFormat, kGbufAFormat, kGbufBFormat, kDepthFormat, kSamples, kShadowAtlas / 2});  // [hair+vfx]
         return {};
     }
 
@@ -806,25 +894,19 @@ private:
         return t;
     }
 
-    void ensureTargets(int width, int height) {
+    /// Scene targets render at the internal resolution (renderScale x output); post-processing
+    /// and the final image use the output resolution. MetalFX upscales between the two.
+    void ensureTargets(int width, int height, float scale) {
         auto w = static_cast<NSUInteger>(std::max(width, 1));
         auto h = static_cast<NSUInteger>(std::max(height, 1));
-        if (resolve_ && resolve_.width == w && resolve_.height == h) return;
+        auto iw = static_cast<NSUInteger>(std::max<long>(16, std::lround(static_cast<double>(w) * scale)));
+        auto ih = static_cast<NSUInteger>(std::max<long>(16, std::lround(static_cast<double>(h) * scale)));
+        if (resolve_ && resolve_.width == w && resolve_.height == h && hdr_.width == iw && hdr_.height == ih) return;
         const MTLTextureUsage rt = MTLTextureUsageRenderTarget | MTLTextureUsageShaderRead;
+        // --- output resolution ---
         resolve_ = target2D(kColorFormat, w, h, rt);
-        hdr_ = target2D(kHDRFormat, w, h, rt);
-        lit_ = target2D(kHDRFormat, w, h, rt);
-        gbufA_ = target2D(kGbufAFormat, w, h, rt);
-        gbufB_ = target2D(kGbufBFormat, w, h, rt);
-        for (auto& t : taa_) t = target2D(kHDRFormat, w, h, rt);
-        historyValid_ = false;
-        depthResolved_ = target2D(kDepthFormat, w, h, rt);
-        const NSUInteger hw = std::max<NSUInteger>(1, w / 2), hh = std::max<NSUInteger>(1, h / 2);
-        aoRaw_ = target2D(kAOFormat, hw, hh, rt);
-        aoBlurred_ = target2D(kAOFormat, hw, hh, rt);
-
-        // Bloom mip chain (half resolution).
-        MTLTextureDescriptor* bd = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:kHDRFormat width:hw height:hh mipmapped:YES];
+        const NSUInteger ow2 = std::max<NSUInteger>(1, w / 2), oh2 = std::max<NSUInteger>(1, h / 2);
+        MTLTextureDescriptor* bd = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:kHDRFormat width:ow2 height:oh2 mipmapped:YES];
         bd.mipmapLevelCount = std::min<NSUInteger>(kBloomLevels, bd.mipmapLevelCount);
         bd.storageMode = MTLStorageModePrivate;
         bd.usage = rt | MTLTextureUsagePixelFormatView;
@@ -836,21 +918,11 @@ private:
                                                                  levels:NSMakeRange(i, 1)
                                                                  slices:NSMakeRange(0, 1)]);
         }
-        sceneCopy_ = target2D(kHDRFormat, w, h, MTLTextureUsageShaderRead);
-        volumetric_ = target2D(kHDRFormat, hw, hh, rt);
-        depthCopy_ = target2D(kDepthFormat, w, h, MTLTextureUsageShaderRead);
-        msaaColor_ = targetMSAA(kHDRFormat, w, h);
-        msaaGbufA_ = targetMSAA(kGbufAFormat, w, h);
-        msaaGbufB_ = targetMSAA(kGbufBFormat, w, h);
-        depthPrev_ = target2D(kDepthFormat, w, h, MTLTextureUsageShaderRead);
-        giRaw_ = target2D(kHDRFormat, hw, hh, rt);
-        ssrRaw_ = target2D(kHDRFormat, hw, hh, rt);
-        for (auto& t : giHist_) t = target2D(kHDRFormat, hw, hh, rt);
-        cloudRaw_ = target2D(kHDRFormat, hw, hh, rt);
         postA_ = target2D(kHDRFormat, w, h, rt);
         postB_ = target2D(kHDRFormat, w, h, rt);
-        dofCoc_ = target2D(kHDRFormat, hw, hh, rt);
-        dofBlur_ = target2D(kHDRFormat, hw, hh, rt);
+        upscaled_ = target2D(kHDRFormat, w, h, rt | MTLTextureUsageShaderWrite);
+        dofCoc_ = target2D(kHDRFormat, ow2, oh2, rt);
+        dofBlur_ = target2D(kHDRFormat, ow2, oh2, rt);
         {
             const NSUInteger qw = std::max<NSUInteger>(1, w / 4), qh = std::max<NSUInteger>(1, h / 4);
             MTLTextureDescriptor* ld = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRG16Float width:qw height:qh mipmapped:YES];
@@ -860,9 +932,51 @@ private:
             for (auto& t : exposure_) t = target2D(MTLPixelFormatR32Float, 1, 1, rt);
             exposureValid_ = false;
         }
-        for (auto& t : cloudHist_) t = target2D(kHDRFormat, hw, hh, rt);
+        // --- internal (scene) resolution ---
+        hdr_ = target2D(kHDRFormat, iw, ih, rt);
+        lit_ = target2D(kHDRFormat, iw, ih, rt);
+        gbufA_ = target2D(kGbufAFormat, iw, ih, rt);
+        gbufB_ = target2D(kGbufBFormat, iw, ih, rt);
+        for (auto& t : taa_) t = target2D(kHDRFormat, iw, ih, rt);
+        historyValid_ = false;
+        depthResolved_ = target2D(kDepthFormat, iw, ih, rt);
+        motion_ = target2D(MTLPixelFormatRG16Float, iw, ih, rt);
+        const NSUInteger hw = std::max<NSUInteger>(1, iw / 2), hh = std::max<NSUInteger>(1, ih / 2);
+        aoRaw_ = target2D(kAOFormat, hw, hh, rt);
+        aoBlurred_ = target2D(kAOFormat, hw, hh, rt);
+        sceneCopy_ = target2D(kHDRFormat, iw, ih, MTLTextureUsageShaderRead);
+        volumetric_ = target2D(kHDRFormat, hw, hh, rt);
+        depthCopy_ = target2D(kDepthFormat, iw, ih, MTLTextureUsageShaderRead);
+        msaaColor_ = targetMSAA(kHDRFormat, iw, ih);
+        msaaGbufA_ = targetMSAA(kGbufAFormat, iw, ih);
+        msaaGbufB_ = targetMSAA(kGbufBFormat, iw, ih);
+        msaaDepth_ = targetMSAA(kDepthFormat, iw, ih);
+        depthPrev_ = target2D(kDepthFormat, iw, ih, MTLTextureUsageShaderRead);
+        giRaw_ = target2D(kHDRFormat, hw, hh, rt);
+        ssrRaw_ = target2D(kHDRFormat, hw, hh, rt);
+        for (auto& t : giHist_) t = target2D(kHDRFormat, hw, hh, rt);
         for (auto& t : ssrHist_) t = target2D(kHDRFormat, hw, hh, rt);
-        msaaDepth_ = targetMSAA(kDepthFormat, w, h);
+        cloudRaw_ = target2D(kHDRFormat, hw, hh, rt);
+        for (auto& t : cloudHist_) t = target2D(kHDRFormat, hw, hh, rt);
+        scaler_ = nil;  // rebuilt for the new sizes on demand
+    }
+
+    /// MetalFX temporal upscaler from the internal to the output resolution (nil if unsupported).
+    id<MTLFXTemporalScaler> temporalScaler() {
+        if (scaler_) return scaler_;
+        if (![MTLFXTemporalScalerDescriptor supportsDevice:device_]) return nil;
+        MTLFXTemporalScalerDescriptor* d = [MTLFXTemporalScalerDescriptor new];
+        d.colorTextureFormat = kHDRFormat;
+        d.depthTextureFormat = kDepthFormat;
+        d.motionTextureFormat = MTLPixelFormatRG16Float;
+        d.outputTextureFormat = kHDRFormat;
+        d.inputWidth = hdr_.width;
+        d.inputHeight = hdr_.height;
+        d.outputWidth = upscaled_.width;
+        d.outputHeight = upscaled_.height;
+        d.autoExposureEnabled = YES;
+        scaler_ = [d newTemporalScalerWithDevice:device_];
+        return scaler_;
     }
 
     GpuMesh makeMesh(const MeshData& m) {
@@ -870,12 +984,143 @@ private:
         g.vertices = [device_ newBufferWithBytes:m.vertices.data()
                                           length:m.vertices.size() * sizeof(float)
                                          options:MTLResourceStorageModeShared];
-        g.indices = [device_ newBufferWithBytes:m.indices.data()
-                                         length:m.indices.size() * sizeof(uint32_t)
-                                        options:MTLResourceStorageModeShared];
+        std::vector<uint32_t> all(m.indices);
+        g.lodOffset[0] = 0;
+        g.lodCount_[0] = static_cast<uint32_t>(m.indices.size());
+        for (size_t i = 0; i < m.lods.size() && g.lodCount < GpuMesh::kMaxLods; ++i) {
+            g.lodOffset[g.lodCount] = static_cast<uint32_t>(all.size());
+            g.lodCount_[g.lodCount] = static_cast<uint32_t>(m.lods[i].size());
+            g.lodError[g.lodCount] = i < m.lodErrors.size() ? m.lodErrors[i] : 0.f;
+            all.insert(all.end(), m.lods[i].begin(), m.lods[i].end());
+            ++g.lodCount;
+        }
+        g.indices = [device_ newBufferWithBytes:all.data() length:all.size() * sizeof(uint32_t) options:MTLResourceStorageModeShared];
         g.indexCount = static_cast<uint32_t>(m.indices.size());
+        g.vertexCount = static_cast<uint32_t>(m.vertexCount());
+        if (m.skinned() && m.skin.joints.size() >= m.vertexCount() * 4 && m.skin.bind.size() >= m.vertexCount() * 6) {
+            std::vector<SkinGpuVertex> sv(m.vertexCount());  // animation: skinning input stream
+            for (size_t v = 0; v < sv.size(); ++v) {
+                std::memcpy(sv[v].position, &m.skin.bind[v * 6], sizeof(float) * 3);
+                std::memcpy(sv[v].normal, &m.skin.bind[v * 6 + 3], sizeof(float) * 3);
+                std::memcpy(sv[v].joints, &m.skin.joints[v * 4], sizeof(uint16_t) * 4);
+                std::memcpy(sv[v].weights, &m.skin.weights[v * 4], sizeof(float) * 4);
+            }
+            g.skin = [device_ newBufferWithBytes:sv.data() length:sv.size() * sizeof(SkinGpuVertex) options:MTLResourceStorageModeShared];
+        }
+        Vec3 ext = m.bounds.max - m.bounds.min;
+        g.radius = std::max(length(ext) * 0.5f, 1e-3f);
         return g;
     }
+
+    /// Pixels per world unit at `distance` for the current view (perspective).
+    float pixelsPerUnit(const FrameData& frame, float distance) const {
+        float h = static_cast<float>(std::max(frame.height, 1));
+        if (frame.camera.orthographic) return h / (2.f * std::max(frame.camera.orthoSize, 1e-3f));
+        return h / (2.f * std::tan(radians(frame.camera.fovDeg) * 0.5f) * std::max(distance, 0.05f));
+    }
+
+    /// LOD for a draw item from its on-screen size (`bias` > 0 picks coarser levels, e.g. shadows).
+    int lodForDraw(const GpuMesh& m, const DrawItem& d, int bias = 0) const {
+        if (m.lodCount <= 1 || !lodFrame_) return 0;
+        float scale = std::max({length(d.model.transformDir({1, 0, 0})), length(d.model.transformDir({0, 1, 0})),
+                                length(d.model.transformDir({0, 0, 1}))});
+        float dist = distance(lodFrame_->camera.eye, d.worldBounds.center());
+        return std::min(m.lodFor(pixelsPerUnit(*lodFrame_, dist) * scale) + bias, m.lodCount - 1);
+    }
+    int lodForChunk(const GpuMesh& m, const InstanceBatch& b, int bias = 0) const {
+        if (m.lodCount <= 1 || !lodFrame_) return 0;
+        const Vec3 e = lodFrame_->camera.eye;
+        Vec3 c{std::clamp(e.x, b.bounds.min.x, b.bounds.max.x), std::clamp(e.y, b.bounds.min.y, b.bounds.max.y),
+               std::clamp(e.z, b.bounds.min.z, b.bounds.max.z)};
+        int lod = std::min(m.lodFor(pixelsPerUnit(*lodFrame_, distance(e, c)) * 1.3f) + bias, m.lodCount - 1);
+        // Leaf/grass cards thin out badly when simplified hard: keep the canopy readable
+        // (distant forests should use impostors).
+        if (b.surface.alphaCutoff > 0.f) lod = std::min(lod, 1 + bias);
+        return lod;
+    }
+
+    void drawLod(id<MTLRenderCommandEncoder> enc, const GpuMesh& m, int lod, NSUInteger instances = 1) {
+        lod = std::clamp(lod, 0, m.lodCount - 1);
+        trianglesDrawn_ += static_cast<uint64_t>(m.lodCount_[lod] / 3) * instances;
+        [enc drawIndexedPrimitives:MTLPrimitiveTypeTriangle
+                        indexCount:m.lodCount_[lod]
+                         indexType:MTLIndexTypeUInt32
+                       indexBuffer:m.indices
+                 indexBufferOffset:m.lodOffset[lod] * sizeof(uint32_t)
+                     instanceCount:instances];
+    }
+
+    // --- Animation: GPU skinning -----------------------------------------------------------
+    void buildSkinningPipeline() {
+        NSError* error = nil;
+        id<MTLLibrary> lib = [device_ newLibraryWithSource:[NSString stringWithUTF8String:kSkinningShaderSource] options:nil error:&error];
+        id<MTLFunction> fn = lib ? [lib newFunctionWithName:@"skinVertices"] : nil;
+        skinPipeline_ = fn ? [device_ newComputePipelineStateWithFunction:fn error:&error] : nil;
+        if (!skinPipeline_) {
+            log::warn("render", std::string("GPU skinning unavailable, characters show their rest pose: ") +
+                                    (error ? error.localizedDescription.UTF8String : "no skinVertices kernel"));
+        }
+    }
+
+    /// Writes each skinned draw's posed vertices into a per-instance buffer registered as a
+    /// mesh under the SkinItem key, so every pass draws it like any other mesh.
+    void encodeSkinning(id<MTLCommandBuffer> cmd, const FrameData& frame) {
+        id<MTLComputeCommandEncoder> enc = nil;
+        std::unordered_map<const void*, id<MTLBuffer>> palettes;  // parts of one character share a pose
+        for (const SkinItem& s : frame.skins) {
+            skinnedKeys_[s.key] = frameIndex_;
+            const GpuMesh* base = mesh(s.mesh);
+            if (!base) continue;
+            GpuMesh& out = meshes_[s.key];
+            if (!skinPipeline_ || !base->skin || !s.palette || s.palette->empty()) {
+                out = *base;  // no GPU skinning: the rest pose
+                continue;
+            }
+            if (!out.vertices || out.vertices == base->vertices || out.vertexCount != base->vertexCount) {
+                out.vertices = [device_ newBufferWithLength:static_cast<NSUInteger>(base->vertexCount) * MeshData::kFloatsPerVertex * sizeof(float)
+                                                    options:MTLResourceStorageModePrivate];
+                out.vertexCount = base->vertexCount;
+            }
+            out.indices = base->indices;
+            out.indexCount = base->indexCount;
+            out.lodCount = base->lodCount;  // LOD index ranges are shared with the source mesh
+            std::copy(std::begin(base->lodOffset), std::end(base->lodOffset), std::begin(out.lodOffset));
+            std::copy(std::begin(base->lodCount_), std::end(base->lodCount_), std::begin(out.lodCount_));
+            std::copy(std::begin(base->lodError), std::end(base->lodError), std::begin(out.lodError));
+            out.radius = base->radius;
+            out.skin = nil;
+            id<MTLBuffer> pal = palettes[s.palette.get()];
+            if (!pal) {
+                pal = [device_ newBufferWithBytes:s.palette->data() length:s.palette->size() * sizeof(Mat4)
+                                          options:MTLResourceStorageModeShared];
+                palettes[s.palette.get()] = pal;
+            }
+            if (!enc) {
+                enc = [cmd computeCommandEncoder];
+                enc.label = @"Skinning";
+                [enc setComputePipelineState:skinPipeline_];
+            }
+            SkinParams sp{base->vertexCount, static_cast<uint32_t>(s.palette->size()), 0, 0};
+            [enc setBuffer:base->vertices offset:0 atIndex:0];
+            [enc setBuffer:base->skin offset:0 atIndex:1];
+            [enc setBuffer:pal offset:0 atIndex:2];
+            [enc setBytes:&sp length:sizeof(sp) atIndex:3];
+            [enc setBuffer:out.vertices offset:0 atIndex:4];
+            NSUInteger group = std::min<NSUInteger>(skinPipeline_.maxTotalThreadsPerThreadgroup, 64);
+            [enc dispatchThreads:MTLSizeMake(base->vertexCount, 1, 1) threadsPerThreadgroup:MTLSizeMake(group, 1, 1)];
+        }
+        if (enc) [enc endEncoding];
+        // Drop instances not drawn for a while (kept briefly: thumbnails render in between frames).
+        for (auto it = skinnedKeys_.begin(); it != skinnedKeys_.end();) {
+            if (frameIndex_ - it->second > 120) {
+                meshes_.erase(it->first);
+                it = skinnedKeys_.erase(it);
+            } else {
+                ++it;
+            }
+        }
+    }
+    // -----------------------------------------------------------------------------------------
 
     const GpuMesh* mesh(const std::string& name) {
         auto it = meshes_.find(name);
@@ -974,7 +1219,7 @@ private:
         bool shadows = env.sunElevation > 0.f && env.sunIntensity > 0.f;
         fu.params = simd_make_float4(env.exposure, static_cast<float>(std::min(frame.lights.size(), FrameData::kMaxEffectLights)),
                                      shadows ? 1.f : 0.f, 1.f / static_cast<float>(kShadowAtlas));
-        float w = static_cast<float>(std::max(frame.width, 1)), h = static_cast<float>(std::max(frame.height, 1));
+        float w = static_cast<float>(hdr_ ? hdr_.width : std::max(frame.width, 1)), h = static_cast<float>(hdr_ ? hdr_.height : std::max(frame.height, 1));
         fu.viewport = simd_make_float4(w, h, 1.f / w, 1.f / h);
         float mode = env.skyMode == "atmosphere" ? 1.f : 0.f;
         if (env.skyMode == "hdri") mode = hdri_ ? 2.f : 1.f;  // no panorama loaded: fall back to the atmosphere
@@ -1018,7 +1263,7 @@ private:
         du.material3 = simd_make_float4(s.clearcoat, s.subsurface, s.rim, s.outline);
         du.maps = maps;
         du.outlineColor = lin(s.outlineColor);
-        du.material4 = simd_make_float4(s.alphaCutoff, 0, 0, 0);
+        du.material4 = simd_make_float4(s.alphaCutoff, s.textureAlphaOnly ? 1.f : 0.f, 0, 0);
         return du;
     }
 
@@ -1132,16 +1377,13 @@ private:
                     }
                     [enc setVertexBuffer:m->vertices offset:0 atIndex:0];
                     [enc setVertexBytes:&du length:sizeof(du) atIndex:1];
-                    [enc drawIndexedPrimitives:MTLPrimitiveTypeTriangle
-                                    indexCount:m->indexCount
-                                     indexType:MTLIndexTypeUInt32
-                                   indexBuffer:m->indices
-                             indexBufferOffset:0];
+                    drawLod(enc, *m, lodForDraw(*m, d, 1));
                 }
                 drawTerrainShadows(enc, frame, fr, lvp);
                 drawFoliageShadows(enc, frame, fr, lvp);
                 [enc setRenderPipelineState:shadowPipeline_];
                 [enc setCullMode:MTLCullModeNone];
+                fx_->encodeShadowCaster(enc, frame, lvp);  // [hair+vfx] hair and mesh particles
             }
         }
         [enc endEncoding];
@@ -1417,6 +1659,7 @@ private:
         FoliageUniformsGpu u{};
         u.wind = simd_make_float4(std::sin(a), std::cos(a), env.windSpeed, b.wind);
         u.params = simd_make_float4(b.cullDistance, b.meshHeight, 0, frame.time);
+        u.part = toSimd(b.part);
         return u;
     }
 
@@ -1455,12 +1698,7 @@ private:
             [enc setFragmentTexture:(normal ?: white_) atIndex:2];
             [enc setFragmentTexture:(orm ?: white_) atIndex:3];
             [enc setFragmentTexture:(emissive ?: white_) atIndex:4];
-            [enc drawIndexedPrimitives:MTLPrimitiveTypeTriangle
-                            indexCount:m->indexCount
-                             indexType:MTLIndexTypeUInt32
-                           indexBuffer:m->indices
-                     indexBufferOffset:0
-                         instanceCount:b.instances->size()];
+            drawLod(enc, *m, lodForChunk(*m, b), b.instances->size());
             instancesDrawn_ += b.instances->size();
         }
     }
@@ -1475,21 +1713,25 @@ private:
             const GpuMesh* m = mesh(b.mesh);
             if (!m) continue;
             if (!bound) {
-                [enc setRenderPipelineState:foliageShadowPipeline_];
                 [enc setCullMode:MTLCullModeNone];
                 bound = true;
+            }
+            id<MTLTexture> cutTex = b.surface.alphaCutoff > 0.f ? texture(b.surface.texture, true) : nil;
+            [enc setRenderPipelineState:cutTex ? foliageShadowAlphaPipeline_ : foliageShadowPipeline_];
+            if (cutTex) {
+                DrawItem d;
+                d.surface = b.surface;
+                DrawUniforms du = drawUniforms(d);
+                [enc setVertexBytes:&du length:sizeof(du) atIndex:1];
+                [enc setFragmentBytes:&du length:sizeof(du) atIndex:0];
+                [enc setFragmentTexture:cutTex atIndex:0];
             }
             FoliageUniformsGpu fu = foliageUniforms(frame, b);
             [enc setVertexBuffer:m->vertices offset:0 atIndex:0];
             [enc setVertexBytes:&lvp length:sizeof(lvp) atIndex:2];
             [enc setVertexBuffer:instanceBuffer(b) offset:0 atIndex:3];
             [enc setVertexBytes:&fu length:sizeof(fu) atIndex:4];
-            [enc drawIndexedPrimitives:MTLPrimitiveTypeTriangle
-                            indexCount:m->indexCount
-                             indexType:MTLIndexTypeUInt32
-                           indexBuffer:m->indices
-                     indexBufferOffset:0
-                         instanceCount:b.instances->size()];
+            drawLod(enc, *m, lodForChunk(*m, b, 1), b.instances->size());
         }
     }
 
@@ -1519,11 +1761,7 @@ private:
         [enc setFragmentTexture:(normal ?: white_) atIndex:2];
         [enc setFragmentTexture:(orm ?: white_) atIndex:3];
         [enc setFragmentTexture:(emissive ?: white_) atIndex:4];
-        [enc drawIndexedPrimitives:MTLPrimitiveTypeTriangle
-                        indexCount:m->indexCount
-                         indexType:MTLIndexTypeUInt32
-                       indexBuffer:m->indices
-                 indexBufferOffset:0];
+        drawLod(enc, *m, lodForDraw(*m, d));
     }
 
     void drawOutline(id<MTLRenderCommandEncoder> enc, const DrawItem& d, float width, simd_float4 color) {
@@ -1612,6 +1850,7 @@ private:
             }
             drawMesh(enc, d);
         }
+        fx_->encodeOpaque(enc, frame);  // [hair+vfx] strand hair, lit mesh particles
 
         // Terrain and instanced foliage (opaque)
         terrainNodesDrawn_ = 0;
@@ -1993,7 +2232,7 @@ private:
                        const std::vector<GPULight>& lights, bool simulate) {
         bool anyWater = false;
         for (const auto& w : frame.water) anyWater = anyWater || (w.ocean && w.ocean->resolution > 0);
-        if (!anyWater && frame.particles.empty() && frame.volumes.empty()) {
+        if (!anyWater && frame.particles.empty() && frame.volumes.empty() && !fx_->hasTransparent(frame)) {  // [hair+vfx]
             oceans_.clear();
             fluids_.clear();
             return;
@@ -2094,6 +2333,9 @@ private:
                   instanceCount:frame.particles.size()];
             [enc endEncoding];
         }
+        fx_->encodeTransparent(cmd, frame,  // [hair+vfx] GPU particles
+                               FxSceneInputs{shadowMap_, envCube_, depthCopy_, lit_, &fu, sizeof(fu), lights.data(),
+                                             lights.size() * sizeof(GPULight)});
     }
 
     void encodeVolumetrics(id<MTLCommandBuffer> cmd, const FrameData& frame, const FrameUniforms& fu,
@@ -2224,10 +2466,27 @@ private:
         t.params = simd_make_float4(static_cast<float>(mode), weight, 0.9f, volumetricActive_ ? 1.f : 0.f);
         t.texel = simd_make_float4(1.f / hdr_.width, 1.f / hdr_.height, 1.f / volumetric_.width, 1.f / volumetric_.height);
         id<MTLTexture> dst = taa_[taaCurrent_ ^ 1];
-        fullscreenFU(cmd, temporalPipeline_, dst, {lit_, volumetric_, taa_[taaCurrent_], depthResolved_}, fu, &t, sizeof(t),
+        fullscreenFU(cmd, temporalPipeline_, dst, {lit_, volumetric_, taa_[taaCurrent_], depthResolved_, fx_->reactiveMask()}, fu, &t, sizeof(t),  // [hair+vfx] reactive
                      mode == 1 ? @"TAA" : (mode == 2 ? @"Accumulate" : @"Scene resolve"));
         taaCurrent_ ^= 1;
         (void)frame;
+    }
+
+    /// MetalFX temporal upscaling: camera motion vectors from depth, then the scaler.
+    void encodeUpscale(id<MTLCommandBuffer> cmd, const FrameUniforms& fu, Vec2 jitterPx) {
+        fullscreenFU(cmd, motionPipeline_, motion_, {depthResolved_}, fu, &fu.temporal, sizeof(fu.temporal), @"Motion vectors");
+        id<MTLFXTemporalScaler> sc = temporalScaler();
+        sc.colorTexture = taa_[taaCurrent_];
+        sc.depthTexture = depthResolved_;
+        sc.motionTexture = motion_;
+        sc.outputTexture = upscaled_;
+        sc.jitterOffsetX = -jitterPx.x;
+        sc.jitterOffsetY = jitterPx.y;
+        sc.motionVectorScaleX = static_cast<float>(motion_.width);
+        sc.motionVectorScaleY = static_cast<float>(motion_.height);
+        sc.reset = !historyValid_;
+        sc.depthReversed = NO;
+        [sc encodeToCommandBuffer:cmd];
     }
 
     void encodeAO(id<MTLCommandBuffer> cmd, const FrameData& frame) {
@@ -2338,7 +2597,7 @@ private:
 
     void encodePost(id<MTLCommandBuffer> cmd, const FrameData& frame, bool accumulated, const FrameUniforms& base) {
         const Environment& env = frame.environment;
-        id<MTLTexture> src = taa_[taaCurrent_];
+        id<MTLTexture> src = postSource_ ?: taa_[taaCurrent_];
         const ViewCamera& cam = frame.camera;
         LensUniformsGpu lu{};
         float fl = 12.f / std::tan(radians(std::clamp(cam.fovDeg, 5.f, 170.f)) * 0.5f);  // focal length (mm), 24 mm sensor
@@ -2432,9 +2691,12 @@ private:
         aoBlurPipeline_, meshCutoutPipeline_, shadowAlphaPipeline_, waterPipeline_, particlePipeline_, volumePipeline_, volumetricPipeline_,
         ssgiPipeline_, ssrPipeline_, ssTemporalPipeline_, resolvePipeline_, temporalPipeline_, debugViewPipeline_,
         terrainPipeline_, terrainShadowPipeline_, foliagePipeline_, foliageCutoutPipeline_, foliageShadowPipeline_,
+        foliageShadowAlphaPipeline_,
         cloudsPipeline_, cloudTemporalPipeline_, lumaPipeline_, exposurePipeline_, motionBlurPipeline_, dofCocPipeline_,
         dofBlurPipeline_, dofCombinePipeline_;
-    id<MTLTexture> lum_, exposure_[2], postA_, postB_, dofCoc_, dofBlur_, lut_;
+    id<MTLTexture> lum_, exposure_[2], postA_, postB_, dofCoc_, dofBlur_, lut_, upscaled_, motion_, postSource_;
+    id<MTLFXTemporalScaler> scaler_;
+    id<MTLRenderPipelineState> motionPipeline_;
     std::vector<id<MTLTexture>> lumViews_;
     int exposureCurrent_ = 0;
     bool exposureValid_ = false;
@@ -2484,13 +2746,19 @@ private:
     std::string hdriPath_;
     id<MTLTexture> hdri_;
     std::unordered_set<std::string> warnedMeshes_;
+    id<MTLComputePipelineState> skinPipeline_;      // animation: GPU skinning
+    std::unordered_map<std::string, uint64_t> skinnedKeys_;  // animation: per-instance skinned meshes -> last frame drawn
     std::string source_;
     size_t culled_ = 0;
     size_t terrainNodesDrawn_ = 0, instancesDrawn_ = 0;
+    uint64_t trianglesDrawn_ = 0, lastTriangles_ = 0;
+    const FrameData* lodFrame_ = nullptr;  // frame being encoded (LOD selection)
+    std::shared_ptr<std::atomic<double>> gpuMs_ = std::make_shared<std::atomic<double>>(0.0);
     uint64_t frameIndex_ = 0;
     bool aoActive_ = false;
     bool volumetricActive_ = false;
     std::unique_ptr<MetalRenderer2D> r2d_;  // 2D world quads + UI
+    std::unique_ptr<MetalFx> fx_;  // [hair+vfx]
 };
 
 }  // namespace

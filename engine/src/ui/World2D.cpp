@@ -103,7 +103,7 @@ void World2D::onPlay(Scene& scene, wander::Runtime& runtime) {
 }
 
 void World2D::postTick(Scene& scene, wander::Runtime& runtime, float dt) {
-    render2d::tickAnimators(scene, *assets_, dt, [&](EntityId e, const std::string& ev) { runtime.emit(ev, e); });
+    render2d::tickAnimators(scene, *assets_, dt, [&](EntityId e, const std::string& ev) { runtime.emit("anim:" + ev, e); });
     render2d::tickCameras(scene, dt);
 }
 

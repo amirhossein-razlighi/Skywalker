@@ -15,10 +15,12 @@ There are three ways an AI works with Skywalker, and all three use the same
 
 Skywalker implements the [Model Context Protocol](https://modelcontextprotocol.io) server
 side: `initialize` (protocol versions 2025-11-25 → 2024-11-05), `tools/list`, `tools/call`
-(text, structured content, and PNG images), `ping`, plus empty `resources`/`prompts` lists.
+(text, structured content, and PNG images), `ping`, `resources/list|read|templates/list` (the docs, the `skywalker-*` skills, the live tool catalogue, live studio and scene state) and
+`prompts/list|get` (studio roles and workflows). See [INTEGRATIONS](INTEGRATIONS.md) for skills, subagents and `skywalker setup`.
 
 | Mode | Command | Use when |
 |---|---|---|
+| Auto | `skywalker mcp --auto [--project DIR]` | Default for agent configs: attach to the editor if it runs, else a headless engine. |
 | Attach to the editor | `skywalker mcp --attach [socket]` | You want to watch and co-edit live. Edits appear in the activity feed as `mcp:<client>`. |
 | Headless | `skywalker mcp --project DIR [--scene FILE]` | CI, batch generation, or no GUI. |
 
@@ -26,7 +28,7 @@ The editor's socket (`~/.skywalker/editor.sock`, mode 0600) starts with the edit
 it from the status bar or Settings → External Agents.
 
 ```bash
-claude mcp add skywalker -- /path/to/skywalker mcp --attach
+claude mcp add skywalker -- /path/to/skywalker mcp --auto     # or: skywalker setup claude|codex|gemini|cursor
 ```
 
 Generic MCP config (Cursor, Gemini CLI, …):
@@ -42,8 +44,10 @@ Generic MCP config (Cursor, Gemini CLI, …):
    `batch` for many edits (atomic, one undo step).
 3. Look with `viewport_capture` (`annotate: true` labels every entity with its `#id`;
    the structured result lists screen boxes).
-4. For behaviors: read `wander_reference` once, then `wander_check`, `behavior_set`,
-   `sim_control step`, `sim_input`, `logs`, and finally `sim_control stop`.
+4. For behaviors: read `wander_reference` once; derive spec rules from the intent; write the
+   code with a `test` block per rule; `wander_check`, `behavior_set` (with `spec`),
+   `wander_test` until green, `behavior_spec` for coverage; then `sim_control step`,
+   `sim_input`, `logs`, and finally `sim_control stop` (see [WANDER.md](WANDER.md)).
 5. If something went wrong, `history` → `undo`.
 
 ## 2. The studio and the crew
@@ -84,8 +88,8 @@ How the crew works together:
   earlier pipelines.
 - **Delegation.** Direction and production agents get an extra `crew_delegate` tool in chat,
   so they can hand a task to a teammate and review the report.
-- **Weave.** From any behavior's intent, Weave asks the gameplay programmer to write,
-  check, attach and test the Wander code.
+- **Weave.** From any behavior's intent, Weave asks the gameplay programmer to derive a
+  spec, write the Wander code with a test per rule, attach it, and run `wander_test`.
 
 You see agents in action through:
 - presence avatars in the toolbar, with a pulsing dot while working;

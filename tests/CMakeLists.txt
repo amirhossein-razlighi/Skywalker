@@ -31,6 +31,10 @@ set(SKY_TEST_SOURCES
     test_ui.cpp
     test_dialogue.cpp
     test_2d_tools.cpp
+    test_wander_examples.cpp
+    test_wander2.cpp
+    test_wander_native.cpp
+    test_hair_vfx.cpp
     test_world.cpp
     test_audio.cpp
     test_input.cpp
@@ -39,6 +43,11 @@ set(SKY_TEST_SOURCES
     test_studio.cpp
     test_physics.cpp
     test_nav.cpp
+    test_anim.cpp
+    test_animator.cpp
+    test_anim_engine.cpp
+    test_sequencer.cpp
+    test_integrations.cpp
 )
 
 add_executable(skywalker_tests ${SKY_TEST_SOURCES})

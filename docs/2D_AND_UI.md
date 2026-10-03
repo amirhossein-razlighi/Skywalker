@@ -27,7 +27,7 @@ Conventions:
 | Component | What it is | Key fields |
 |---|---|---|
 | `sprite` | Textured quad | `texture` (png / `*.atlas.json`), `frame` (name or index), `columns`/`rows` (grid sheets), `region`, `pivot` ([0.5, 0] = feet), `size` or `pixelsPerUnit`, `color`, `flipX/Y`, `sortingLayer`, `order`, `filter` (nearest for pixel art), `normalMap`, `emissive`, `billboard` (none/y/full for 2.5D), `lit`, `castShadows`, `alphaCutoff` |
-| `sprite_anim` | Flipbook | `clips` `{"run": {"frames": "4-11" \| [..] \| "run_*", "fps": 12, "loop": true, "events": {"3": "footstep"}, "texture"?}}`, `clip`, `playing`, `speed`. Frame events and `anim_finished` reach the entity's behaviors |
+| `sprite_anim` | Flipbook | `clips` `{"run": {"frames": "4-11" \| [..] \| "run_*", "fps": 12, "loop": true, "events": {"3": "footstep"}, "texture"?}}`, `clip`, `playing`, `speed`. Frame events reach the entity's behaviors as `on anim "footstep"`, a non-looping clip's end as `on anim "finished"` |
 | `tilemap` | Layers of tiles | `tileset` (png or `*.tileset.json`), `tileSize`, `cellSize`, `width`, `height`, `layers` (`[{name, data, solid, z, tint, sortingLayer, order}]`), `solidTiles`, `autotile` (terrains), `sortingLayer`, `filter`, `lit`, `castShadows` |
 | `light2d` | 2D light | `kind` point/spot/global (ambient), `color`, `intensity` (HDR), `radius`, `falloff`, `innerAngle`/`outerAngle` (spot along local +Y), `height` (normal maps), `shadows`, `shadowSoftness`, `halo` (glow in the air), `flicker` |
 | `parallax` | Parallax layer (entity + children) | `factor` (0 = fixed to camera, <1 far, >1 near), `origin`, `repeatX/Y`, `spacing` |
@@ -112,7 +112,7 @@ behavior Hero
       play_anim(self, "idle")
     end
   end
-  on event "footstep"                -- a frame event of the run clip
+  on anim "footstep"                 -- a frame event of the run clip
     log "step"
   end
 end

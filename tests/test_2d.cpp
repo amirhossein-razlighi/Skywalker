@@ -443,7 +443,7 @@ TEST_CASE("2d: animation clips advance deterministically and fire events") {
     for (int i = 0; i < 60; ++i) render2d::tickAnimators(s, assets, 1.f / 60.f, emit);
     REQUIRE(render2d::animatedFrame(s, assets, e, tex, cols, rows, frame));
     CHECK(frame == 6);  // held on the last frame
-    CHECK(events.back() == "anim_finished");
+    CHECK(events.back() == "finished");
     auto bad = render2d::playAnimation(s, assets, e, "jum", false);
     REQUIRE_FALSE(bad.ok());
     CHECK(bad.error().code == "unknown_clip");

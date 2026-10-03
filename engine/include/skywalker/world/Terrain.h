@@ -54,6 +54,8 @@ public:
     std::vector<uint8_t> serialize() const;
     static Result<TerrainData> deserialize(const std::vector<uint8_t>& bytes);
     Status save(const std::string& path) const;
+    /// 16-bit little-endian heightmap (.r16) normalized to [lo, hi] (for physics heightfields).
+    Status saveHeightmap16(const std::string& path, float& lo, float& hi) const;
     static Result<TerrainData> load(const std::string& path);
 
 private:

@@ -31,15 +31,16 @@ struct EntityDetails: View {
     @State private var schemas: JSON = .null
 
     private var selectedID: UInt64? { engine.selection.count == 1 ? engine.selection.first : nil }
-    private static let componentOrder = ["transform", "mesh", "light", "camera", "particles", "water", "terrain", "foliage",
-                                         "audio", "listener", "body", "collider", "character", "joint", "nav_agent", "navmesh",
-                                         "physics_world", "sprite", "sprite_anim", "tilemap", "light2d", "parallax", "camera2d",
-                                         "text", "ui_canvas", "ui", "dialogue"]
+    private static let componentOrder = ["transform", "mesh", "light", "camera", "particles", "groom", "water", "terrain",
+                                         "foliage", "audio", "listener", "body", "collider", "character", "joint", "nav_agent",
+                                         "navmesh", "physics_world", "animator", "attach", "ik", "sequencer", "sprite",
+                                         "sprite_anim", "tilemap", "light2d", "parallax", "camera2d", "text", "ui_canvas", "ui",
+                                         "dialogue"]
     /// Components offered by Add Component (transform is always present).
-    private static let addable = ["mesh", "light", "camera", "particles", "water", "terrain", "foliage", "audio", "listener",
-                                  "body", "collider", "character", "joint", "nav_agent", "navmesh", "physics_world",
-                                  "sprite", "sprite_anim", "tilemap", "light2d", "parallax", "camera2d", "text", "ui_canvas", "ui",
-                                  "dialogue"]
+    private static let addable = ["mesh", "light", "camera", "particles", "groom", "water", "terrain", "foliage", "audio",
+                                  "listener", "body", "collider", "character", "joint", "nav_agent", "navmesh", "physics_world",
+                                  "animator", "attach", "ik", "sequencer", "sprite", "sprite_anim", "tilemap", "light2d",
+                                  "parallax", "camera2d", "text", "ui_canvas", "ui", "dialogue"]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -50,6 +51,9 @@ struct EntityDetails: View {
                                     onRemove: { update(id, ["components": .object([(comp, .null)])]) }) {
                         PropertyGrid(schema: schemas[comp], values: doc["components"][comp]) { field, value in
                             update(id, ["components": .object([(comp, .object([(field, value)]))])])
+                        }
+                        if comp == "animator" || comp == "sequencer" {
+                            AnimationScrubBar(entityID: id, component: comp, values: doc["components"][comp]) { reload() }
                         }
                     }
                 }
@@ -85,6 +89,7 @@ struct EntityDetails: View {
         case "light": "lightbulb"
         case "camera": "video"
         case "particles": "flame"
+        case "groom": "comb"
         case "water": "water.waves"
         case "audio": "speaker.wave.2"
         case "listener": "ear"
@@ -107,6 +112,10 @@ struct EntityDetails: View {
         case "ui_canvas": "rectangle.on.rectangle"
         case "ui": "rectangle.and.hand.point.up.left"
         case "dialogue": "bubble.left.and.bubble.right"
+        case "animator": "figure.run"
+        case "attach": "paperclip"
+        case "ik": "hand.point.up.left"
+        case "sequencer": "film.stack"
         default: "puzzlepiece"
         }
     }
@@ -122,6 +131,8 @@ struct EntityDetails: View {
         case "camera2d": "Camera 2D"
         case "ui_canvas": "UI Canvas"
         case "ui": "UI Element"
+        case "attach": "Bone Attachment"
+        case "ik": "IK Target"
         default: comp.capitalized
         }
     }

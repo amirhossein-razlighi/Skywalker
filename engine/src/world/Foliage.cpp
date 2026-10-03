@@ -53,6 +53,7 @@ std::vector<FoliageLayer> foliageLayersFromJson(const Json& layers) {
         l.name = src.get("name").asString(src.get("preset").asString("layer" + std::to_string(i)));
         l.mesh = src.get("mesh").asString(l.mesh);
         l.material = src.get("material").asString();
+        l.prefab = src.get("prefab").asString();
         l.texture = src.get("texture").asString();
         l.normalMap = src.get("normalMap").asString();
         l.ormMap = src.get("ormMap").asString();
@@ -179,12 +180,20 @@ std::vector<FoliageInstance> scatterChunk(const FoliageLayer& l, int layerIndex,
     return out;
 }
 
+float FoliageCache::chunkSizeFor(const FoliageLayer& layer) {
+    float size = std::sqrt(256.f / std::max(layer.density, 1e-4f));
+    // Power-of-two multiples of the base size keep chunk grids aligned across layers.
+    float s = kChunkSize;
+    while (s < size && s < 512.f) s *= 2.f;
+    return s;
+}
+
 std::vector<FoliageChunk> FoliageCache::visibleChunks(const FoliageLayer& layer, int layerIndex, uint32_t seed, Vec3 eye,
                                                       Vec2 areaMin, Vec2 areaMax, const SurfaceFn& surface,
                                                       float meshHeight, int& budget) {
     ++tick_;
     std::vector<FoliageChunk> out;
-    const float cs = kChunkSize, r = layer.cullDistance;
+    const float cs = chunkSizeFor(layer), r = layer.cullDistance;
     int cx0 = static_cast<int>(std::floor(std::max(eye.x - r, areaMin.x) / cs));
     int cx1 = static_cast<int>(std::floor(std::min(eye.x + r, areaMax.x - 1e-3f) / cs));
     int cz0 = static_cast<int>(std::floor(std::max(eye.z - r, areaMin.y) / cs));

@@ -3,6 +3,7 @@
 // level building beyond single-entity edits.
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <sstream>
@@ -495,9 +496,40 @@ void addWorldTools(Engine& engine, ToolRegistry& reg) {
              }});
 
     reg.add({"perf_stats", "Performance stats",
-             "Frame cost and scene complexity: CPU frame-build time, draw calls, lights, entities, behaviors, "
-             "assets and cached meshes. Check after big scatters or generators.",
-             "render", object({}), false, false, [&engine](const Json&, ToolContext&) {
+             "Frame cost and scene complexity: GPU and CPU frame time, draw calls, lights, terrain nodes, foliage "
+             "instances, entities, behaviors and assets. Pass frames (e.g. 30) to benchmark real-time rendering of the "
+             "current view at width x height (temporal AA, no supersampling) and get average/min/max GPU ms. Check "
+             "after big scatters, generators or look changes; 16.6 ms = 60 fps.",
+             "render",
+             object({{"frames", integer("Benchmark this many real-time frames first (default 0 = just report)")},
+                     {"width", integer("Benchmark width (default 1920)")},
+                     {"height", integer("Benchmark height (default 1080)")},
+                     {"view", enumeration({"editor", "scene"}, "Camera for the benchmark (default editor)")}}),
+             false, false, [&engine](const Json& a, ToolContext&) {
+                 Json bench = Json::object();
+                 int frames = static_cast<int>(std::clamp<int64_t>(a.get("frames").asInt(0), 0, 600));
+                 if (frames > 0) {
+                     CaptureOptions o;
+                     o.width = static_cast<int>(std::clamp<int64_t>(a.get("width").asInt(1920), 64, 4096));
+                     o.height = static_cast<int>(std::clamp<int64_t>(a.get("height").asInt(1080), 64, 4096));
+                     o.samples = 1;
+                     o.useSceneCamera = a.get("view").asString() == "scene";
+                     o.editorOverlays = false;
+                     double sum = 0, lo = 1e9, hi = 0, cpu = 0;
+                     for (int i = 0; i < frames + 3; ++i) {  // 3 warm-up frames
+                         auto t0 = std::chrono::steady_clock::now();
+                         auto cap = engine.capture(o);
+                         if (!cap) return ToolResult::error(cap.error());
+                         double ms = engine.renderer().stats().get("gpuMs").asFloat(0.f);
+                         if (i < 3) continue;
+                         sum += ms, lo = std::min(lo, ms), hi = std::max(hi, ms);
+                         cpu += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+                     }
+                     bench = Json::object({{"frames", frames}, {"width", o.width}, {"height", o.height},
+                                           {"gpuMsAvg", std::round(sum / frames * 100) / 100}, {"gpuMsMin", std::round(lo * 100) / 100},
+                                           {"gpuMsMax", std::round(hi * 100) / 100},
+                                           {"wallMsAvg", std::round(cpu / frames * 100) / 100}});
+                 }
                  const auto& st = engine.stats();
                  Scene& s = engine.scene();
                  size_t meshes = 0, behaviors = 0, lights = 0;
@@ -514,7 +546,12 @@ void addWorldTools(Engine& engine, ToolRegistry& reg) {
                                         {"lightEntities", lights},
                                         {"behaviorEntities", behaviors},
                                         {"assets", engine.assets().size()},
-                                        {"renderer", engine.renderer().info().backend}});
+                                        {"renderer", engine.renderer().info().backend},
+                                        {"gpu", engine.renderer().stats()},
+                                        {"world", Json::object({{"terrains", static_cast<int64_t>(engine.world().stats().terrains)},
+                                                                 {"foliageChunks", static_cast<int64_t>(engine.world().stats().foliageChunks)},
+                                                                 {"foliageInstances", static_cast<int64_t>(engine.world().stats().foliageInstances)}})}});
+                 if (frames > 0) j["benchmark"] = bench;
                  std::ostringstream os;
                  os << "frame build " << j.get("cpuFrameMs").dump() << " ms, " << st.draws << " draws, " << st.lights
                     << " lights; " << s.size() << " entities (" << meshes << " meshes, " << behaviors

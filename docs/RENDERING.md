@@ -9,19 +9,99 @@ tools (`entity_update`, `material_create`, `environment_update`).
 
 ## Frame
 
+Each frame renders one or more sub-samples:
+- **Real time:** one jittered sample per frame, with temporal history.
+- **Stills and cinematics:** N jittered sub-samples are accumulated, so captures are
+  supersampled and GI and reflections come out noise-free (`viewport_capture` `samples`,
+  CLI `--samples`).
+
 | # | Pass | Notes |
 |---|---|---|
-| 0 | Environment | The sky is rendered into a 128² cubemap and GGX-prefiltered into 6 roughness mips. Re-baked only when the sky, sun or fog changes. |
-| 1 | Shadows | 4 sun cascades in a 4096² atlas: practical split scheme, bounding-sphere fit, texel snapping (no shimmering), rotated-Poisson PCF. |
-| 2 | Scene | 4× MSAA HDR. Draws sky, opaque meshes, toon outlines, transparent meshes back to front, selection outline and grid. Writes **color**, **indirect light** and **depth**. |
-| 3 | SSAO | Half resolution, 12 samples, normals reconstructed from depth, 4×4 blur. |
-| 3a | Fluids | GPU compute: each `fluid` volume advances its 3D gas simulation (see below). |
-| 3b | Water | FFT ocean surfaces, single-sampled over a copy of the resolved scene: refraction, depth absorption, screen-space reflections, foam. Writes depth. |
-| 3c | Volumes | Fluid volumes ray-marched over the scene (blackbody fire, lit smoke), stopping at opaque depth. |
-| 3d | Particles | Every particle in the scene as one back-to-front sorted, instanced stream; soft against depth; premultiplied alpha (emissive looks add). |
-| 3e | Volumetric light | Half resolution: haze in-scatters the shadow-mapped sun (forward-scattering phase: shafts toward the sun) and every lamp (`godRays`, `haze`). |
-| 4 | Post | Bloom chain, then the composite: AO applied **to indirect light only**, white balance, exposure, tonemap, saturation/contrast, vignette, dithering. |
-| 5 | Overlays | Gizmos, drawn in LDR on top. |
+| 0 | Environment | The sky (with volumetric clouds) is rendered into a 128² cubemap and GGX-prefiltered into 6 roughness mips. It is re-baked only when the sky changes. |
+| 1 | Shadows | 4 sun cascades in a 4096² atlas. Uses bounding-sphere fit, texel snapping and rotated-Poisson PCF. Terrain, instanced foliage (alpha-tested), hair and mesh particles cast too. Meshes use a coarser LOD. |
+| 2 | Clouds | Half resolution: ray-marched volumetric cloud layer, with temporal reprojection in real time. |
+| 3 | Scene | 4× MSAA, memoryless (tile memory), with a jittered projection. Draws sky, opaque meshes (automatic LODs), CDLOD terrain, instanced foliage, strand hair, mesh particles, outlines, transparent meshes and the grid. Writes HDR color plus a G-buffer: albedo + material AO, and octahedral normal + roughness + metallic or a "no screen-space lighting" flag. Surfaces use clustered lighting. |
+| 4 | SSAO, SSGI, SSR | Half resolution. GI uses cosine-sampled screen rays with a sky fallback. Reflections are GGX-importance-sampled. Both gather the previous anti-aliased frame (light keeps bouncing) and use temporal accumulation in real time. |
+| 5 | Lighting resolve | Swaps the sky-probe indirect light of PBR surfaces for GI and reflections (bilateral upsample), and applies SSAO to indirect diffuse. |
+| 6 | Effects | Fluid simulation (compute), FFT water, fluid volumes, GPU particles (compute, sorted) and CPU particles over the lit scene. |
+| 7 | Volumetric light | Half resolution: shadow-mapped sun shafts and lamp cones through height-falling haze. |
+| 8 | Temporal | Applies the volumetric light, then one of: TAA (Catmull-Rom history, YCoCg variance clipping, reactive mask for particles); accumulation of sub-samples; or a pass-through when MetalFX upscales. |
+| 9 | Upscale | Used when `renderScale` < 1: camera motion vectors, then the MetalFX temporal scaler, from internal to output resolution. |
+| 10 | Camera | Motion blur (camera motion), bokeh depth of field (thin-lens CoC, half-res gather) and auto exposure (center-weighted metering + adaptation). |
+| 11 | Post | Bloom chain, then the composite: chromatic aberration, white balance, exposure, tonemap, saturation/contrast, look / 3D LUT, vignette, grain, contrast-adaptive sharpening, dithering. Debug views replace the image. |
+| 12 | Overlays | Gizmos, drawn in LDR on top. |
+
+### Lighting
+
+- **Clustered forward lighting:** up to 1024 lights. The view is split into 16×9×24 clusters
+  (built on the CPU, tested), and each pixel evaluates only nearby lights. Directional
+  lights apply everywhere. The 16 most important lights also light water, particles, fluids
+  and volumetric fog.
+- **Global illumination** (`gi`, `giDistance`): bounce and emissive light from what is on
+  screen, with the sky probe for rays that leave the screen. It works best with temporal
+  accumulation (real time) or `samples` of 8 or more (stills).
+- **Reflections** (`ssr`): glossy surfaces (wet streets, floors, metal, still water)
+  reflect the scene. Rough surfaces fall back to the probe.
+- **Cloud shadows:** drifting cloud shadows dim the sun on every surface.
+
+### Sky, atmosphere and clouds
+
+- **Atmosphere** (`skyMode: atmosphere`): Rayleigh and Mie single scattering plus a
+  multiple-scattering term, so horizons are bright, not brown.
+- **Volumetric clouds** (`clouds` = coverage, `cloudMode`, `cloudHeight`, `cloudThickness`,
+  `cloudDensity`, `cloudScale`, `cloudSpeed`): a curved cloud layer shaped by GPU-generated
+  Perlin-Worley noise. It drifts with `windDirection`, is lit with Beer–powder,
+  multi-scattering and a dual-lobe phase, and appears in reflections. `cloudMode: flat` is
+  the cheap painted layer.
+- **Far sea:** the sea blends into the horizon, so the simulated grid never shows its edge.
+
+### Terrain and foliage
+
+See the `terrain_*` and `foliage_add` tools.
+- **Terrain:** a heightfield up to 4097² with erosion-based generation and up to 8
+  height-blended layers (photoscans or procedural, triplanar for cliffs). It has wet
+  shorelines (`waterLevel`, `wetBand`) and a matching physics heightfield. Rendering uses
+  CDLOD: a quadtree selects 32×32 patches displaced from the height texture, morphing
+  between LODs with no cracks or popping.
+- **Foliage:** GPU-instanced and wind-animated, generated in chunks around the camera
+  (about 256 instances per chunk) and thinned toward the cull distance. Multi-part models
+  (trunk + alpha-cut leaves) share instances.
+- **Levels of detail:** meshes of 3,000+ triangles (photoscans) get an automatic LOD chain
+  from meshoptimizer: attribute-aware, with a sloppy fallback for card geometry. The level
+  is chosen by on-screen error under one pixel. Leaf cards keep a readable canopy.
+
+### Camera, grading and looks
+
+- **Lens** (camera component, or `viewport_capture` `aperture` / `focus_distance`):
+  `aperture` (f-stop; 0 = everything sharp), `focusDistance` (0 = autofocus on the center)
+  and `motionBlur` (shutter fraction).
+- **Exposure:** `autoExposure`, `exposureCompensation` (EV), `adaptationSpeed`. Manual
+  `exposure` still multiplies.
+- **Looks:** `look` is one of `warm`, `cool`, `teal_orange`, `golden_hour`, `bleach`,
+  `noir`, `vivid`, `moonlight` or `vintage`. `lut` takes a `.cube` file (Resolve /
+  Premiere / Unreal format) and overrides the look. `lookStrength` blends either.
+- **Lens character:** `grain`, `chromaticAberration`, `vignette`, `sharpen`.
+
+### Debug and film views (`viewport_capture`)
+
+`debug_view` is one of:
+- `albedo`, `normals`, `material` (roughness/metallic), `gi`, `reflections`, `ao`,
+  `depth`, `lighting` (before GI);
+- `sketch`: pencil contours and hatching.
+
+`clay: true` renders every surface as matte white clay. Sketch, clay and final make
+"sketch to fill" sequences.
+
+### Performance
+
+- `perf_stats` reports GPU frame time, triangles drawn, terrain nodes, foliage instances,
+  draw calls and effect timings. `perf_stats {frames: 30}` benchmarks the current view in
+  real time.
+- `renderScale` 0.5–0.77 renders fewer pixels and lets MetalFX reconstruct full
+  resolution (about 25% faster at 0.67 on an M1 Pro).
+- Per-frame data uses a triple-buffered ring with a frames-in-flight semaphore. Static
+  geometry, terrain and instance buffers are uploaded once and cached. Terrain and
+  instance textures use unified memory on Apple silicon (no staging copies).
 
 ## Surfaces (`mesh` component and material assets)
 
@@ -80,6 +160,9 @@ surfaces are sorted back to front and don't cast shadows.
 
 Particles are simulated by the engine, not the GPU, so they are deterministic in play mode
 (seeded per emitter) and agents can count and test them. They preview live while editing.
+With `simulation: "gpu"` a particles component runs on compute shaders instead: millions of
+particles, depth-buffer collisions, sub-emitters, ribbons, mesh particles and flipbooks (visuals
+only) — see [HAIR_AND_VFX.md](HAIR_AND_VFX.md), which also covers strand hair and fur (`groom`).
 
 | | |
 |---|---|
@@ -132,11 +215,12 @@ embers or shrapnel on top.
 
 ## Limits and next steps
 
-- 16 punctual lights per frame: directional lights first, then the point and spot lights
-  most relevant to the view.
-- Point and spot lights don't cast shadows yet.
-- Screen-space reflections are used on water only; no GI yet.
-- Transparent meshes don't refract (water does).
-- Particles and fluid volumes render after transparent meshes (glass in front of fire won't sort with it).
+- Point and spot lights don't cast shadows yet. The sun casts four cascades; clouds and
+  hair cast their own.
+- GI and reflections are screen-space: what is off screen comes from the sky probe. There
+  are no reflection probes or world-space GI yet.
+- Transparent meshes don't refract (water does). Particles and fluid volumes render after
+  transparent meshes.
 - Fluid volumes don't cast shadows on the scene yet.
+- Distant forests use mesh LODs. Impostors (billboard captures) are planned.
 - Metal backend only; a Vulkan port is on the [roadmap](ROADMAP.md).

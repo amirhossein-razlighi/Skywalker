@@ -333,7 +333,7 @@ void tickAnimators(Scene& scene, Assets2D& assets, float dt, const std::function
         a->lastFrame_ = idx;
         if (finished) {
             a->finished_ = true;
-            if (emit) emit(e, "anim_finished");
+            if (emit) emit(e, "finished");
         }
     }
 }

@@ -8,8 +8,21 @@ set(SKY_ENGINE_SOURCES
     src/ecs/Components.cpp
     src/scene/Scene.cpp
     src/scene/History.cpp
+    src/wander/Value.cpp
+    src/wander/Parser.cpp
+    src/wander/Format.cpp
+    src/wander/Graph.cpp
     src/wander/Compiler.cpp
+    src/wander/Bytecode.cpp
+    src/wander/Builtins.cpp
+    src/wander/CoreBuiltins.cpp
+    src/wander/SystemBuiltins.cpp
+    src/wander/Reference.cpp
     src/wander/Runtime.cpp
+    src/wander/Aot.cpp
+    src/wander/TestRunner.cpp
+    src/native/Process.cpp
+    src/native/NativeModules.cpp
     src/render/Png.cpp
     src/render/MeshData.cpp
     src/render/FrameBuilder.cpp
@@ -25,6 +38,9 @@ set(SKY_ENGINE_SOURCES
     src/render/Vegetation.cpp
     src/render/ColorGrading.cpp
     src/render/LightClusters.cpp
+    src/render/MeshLod.cpp
+    src/fx/Groom.cpp
+    src/fx/GpuParticles.cpp
     src/render/MeshFormats.cpp
     src/assets/Fetch.cpp
     src/render/TextureGen.cpp
@@ -37,12 +53,15 @@ set(SKY_ENGINE_SOURCES
     src/agent/WorldTools.cpp
     src/agent/NetworkTools.cpp
     src/agent/FxTools.cpp
+    src/agent/WanderTools.cpp
+    src/agent/NativeTools.cpp
     src/agent/WorldBuildTools.cpp
     src/agent/DccTools.cpp
     src/dcc/Process.cpp
     src/dcc/Apps.cpp
     src/dcc/Manager.cpp
     src/dcc/Embedded.cpp
+    src/agent/HairTools.cpp
     src/agent/McpServer.cpp
     src/agent/SocketServer.cpp
     src/engine/Engine.cpp
@@ -62,9 +81,11 @@ set(SKY_ENGINE_SOURCES
     src/ui/UiSystem.cpp
     src/ui/Dialogue.cpp
     src/ui/World2D.cpp
+    src/ui/UiBuiltins.cpp
     src/agent/Tools2D.cpp
     src/agent/UiTools.cpp
     src/agent/DialogueTools.cpp
+    src/engine/EngineBuiltins.cpp
     # audio + input (workstream S)
     src/audio/AudioComponents.cpp
     src/audio/Wav.cpp
@@ -95,6 +116,17 @@ set(SKY_ENGINE_SOURCES
     src/physics/DebugDraw.cpp
     src/agent/PhysicsTools.cpp
     src/agent/NavTools.cpp
+    # Animation (skinning, animator state machines, sequencer)
+    src/anim/Animation.cpp
+    src/anim/Controller.cpp
+    src/anim/Sequence.cpp
+    src/anim/AnimationSystem.cpp
+    src/ecs/AnimationComponents.cpp
+    src/agent/AnimationTools.cpp
+    src/agent/SequenceTools.cpp
+    # Integrations (workstream K): embedded docs/skills + MCP resources and prompts
+    src/agent/Resources.cpp
+    src/agent/Setup.cpp
 )
 
 # DCC bridge: the Python helper library and the Blender add-on are embedded so the engine can
@@ -111,6 +143,31 @@ add_custom_command(
     VERBATIM)
 set_source_files_properties(src/dcc/Embedded.cpp PROPERTIES
     OBJECT_DEPENDS ${_dcc_inc} COMPILE_OPTIONS -Wno-overlength-strings)
+
+# Integrations (workstream K): the engine docs and the generated agent integrations (skills, subagents,
+# commands, config snippets; see integrations/generate.py) are embedded so MCP resources/prompts and
+# `skywalker setup` work without the source tree. Skills are identical for every tool, so only the Claude
+# Code tree (and the Codex-only workflow skills) is embedded; `setup` maps them to each tool's layout.
+file(GLOB_RECURSE _agent_inputs CONFIGURE_DEPENDS
+    ${PROJECT_SOURCE_DIR}/docs/*.md
+    ${PROJECT_SOURCE_DIR}/integrations/claude-code/*
+    ${PROJECT_SOURCE_DIR}/integrations/codex/*
+    ${PROJECT_SOURCE_DIR}/integrations/gemini/*
+    ${PROJECT_SOURCE_DIR}/integrations/cursor/*
+    ${PROJECT_SOURCE_DIR}/integrations/skills-src/context.md)
+set(_agent_inc ${CMAKE_CURRENT_BINARY_DIR}/generated/AgentEmbedded.inc)
+set(_agent_root ${PROJECT_SOURCE_DIR})
+add_custom_command(
+    OUTPUT ${_agent_inc}
+    COMMAND ${CMAKE_COMMAND}
+            "-DSPECS=docs=${_agent_root}/docs=*.md|integrations/claude-code=${_agent_root}/integrations/claude-code=*|integrations/codex=${_agent_root}/integrations/codex=*|integrations/gemini=${_agent_root}/integrations/gemini=*|integrations/cursor=${_agent_root}/integrations/cursor=*|integrations/skills-src=${_agent_root}/integrations/skills-src=context.md"
+            "-DEXCLUDE=^integrations/(codex|gemini|cursor)/.*skills/" "-DKEEP=skills/skywalker-cmd-"
+            -DOUTPUT=${_agent_inc} -P ${PROJECT_SOURCE_DIR}/cmake/EmbedTree.cmake
+    DEPENDS ${_agent_inputs} ${PROJECT_SOURCE_DIR}/cmake/EmbedTree.cmake
+    COMMENT "Embedding docs and agent integrations"
+    VERBATIM)
+set_source_files_properties(src/agent/Resources.cpp PROPERTIES
+    OBJECT_DEPENDS ${_agent_inc} COMPILE_OPTIONS -Wno-overlength-strings)
 
 add_library(skywalker_engine STATIC ${SKY_ENGINE_SOURCES})
 add_library(sky::engine ALIAS skywalker_engine)
@@ -145,6 +202,21 @@ find_package(Threads REQUIRED)
 
 target_include_directories(skywalker_engine PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
+
+# The native ABI headers are embedded in the engine: AOT-generated code and native modules
+# compile with nothing but a system compiler (no engine source tree needed at run time).
+set(_sky_native_inc)
+foreach(_hdr value aot sdk)
+    set(_in ${CMAKE_CURRENT_SOURCE_DIR}/include/skywalker/native/${_hdr}.h)
+    set(_out ${CMAKE_CURRENT_BINARY_DIR}/generated/native_${_hdr}_h.inc)
+    add_custom_command(
+        OUTPUT ${_out}
+        COMMAND ${CMAKE_COMMAND} -DINPUT=${_in} -DOUTPUT=${_out} -P ${PROJECT_SOURCE_DIR}/cmake/EmbedText.cmake
+        DEPENDS ${_in} ${PROJECT_SOURCE_DIR}/cmake/EmbedText.cmake
+        COMMENT "Embedding native ABI header ${_hdr}.h")
+    list(APPEND _sky_native_inc ${_out})
+endforeach()
+target_sources(skywalker_engine PRIVATE ${_sky_native_inc})
 target_include_directories(skywalker_engine PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/generated)
 target_link_libraries(skywalker_engine PUBLIC sky::options PRIVATE ZLIB::ZLIB CURL::libcurl Threads::Threads ${CMAKE_DL_LIBS})
 # Third-party header: included as a system path and compiled without our warning set.
@@ -155,6 +227,10 @@ set_source_files_properties(src/audio/Miniaudio.cpp PROPERTIES COMPILE_OPTIONS "
 # Physics (Jolt) and navigation (Recast/Detour), see cmake/PhysicsDeps.cmake.
 include(${PROJECT_SOURCE_DIR}/cmake/PhysicsDeps.cmake)
 target_link_libraries(skywalker_engine PRIVATE Jolt Recast Detour DetourCrowd)
+
+# meshoptimizer: automatic LODs, see cmake/MeshDeps.cmake.
+include(${PROJECT_SOURCE_DIR}/cmake/MeshDeps.cmake)
+target_link_libraries(skywalker_engine PRIVATE meshoptimizer)
 # Definitions are C-family only (Swift consumers of the C API must not see them).
 target_compile_definitions(skywalker_engine PUBLIC
     $<$<COMPILE_LANGUAGE:C,CXX,OBJCXX>:SKY_VERSION_STRING="${PROJECT_VERSION}">)
@@ -164,7 +240,7 @@ if(SKY_HAS_METAL)
     # by agents and does not require the offline Metal toolchain).
     # The standard shader library is several modules concatenated in dependency order.
     set(_shader_dir ${CMAKE_CURRENT_SOURCE_DIR}/platform/metal/shaders)
-    set(_shader_modules Common.metal Clouds.metal Sky.metal Surface.metal Terrain.metal Lighting.metal Effects.metal Post.metal)
+    set(_shader_modules Common.metal Clouds.metal Sky.metal Surface.metal Terrain.metal Lighting.metal Effects.metal Post.metal GpuParticles.metal Hair.metal)
     list(TRANSFORM _shader_modules PREPEND ${_shader_dir}/ OUTPUT_VARIABLE _shader_src)
     string(REPLACE ";" "," _shader_list "${_shader_modules}")
     set(_shader_inc ${CMAKE_CURRENT_BINARY_DIR}/generated/ShaderSource.inc)
@@ -187,13 +263,22 @@ if(SKY_HAS_METAL)
             COMMENT "Embedding ${_name}.metal")
         list(APPEND _extra_shader_incs ${_inc})
     endforeach()
-
+    # Animation: GPU skinning compute kernel (separate source, embedded the same way).
+    set(_skin_src ${CMAKE_CURRENT_SOURCE_DIR}/platform/metal/shaders/Skinning.metal)
+    set(_skin_inc ${CMAKE_CURRENT_BINARY_DIR}/generated/SkinningShaderSource.inc)
+    add_custom_command(
+        OUTPUT ${_skin_inc}
+        COMMAND ${CMAKE_COMMAND} -DINPUT=${_skin_src} -DOUTPUT=${_skin_inc}
+                -P ${PROJECT_SOURCE_DIR}/cmake/EmbedText.cmake
+        DEPENDS ${_skin_src} ${PROJECT_SOURCE_DIR}/cmake/EmbedText.cmake
+        COMMENT "Embedding Metal skinning shader source")
     target_sources(skywalker_engine PRIVATE platform/metal/MetalRenderer.mm platform/metal/MetalRenderer2D.mm
-                   ${_shader_inc} ${_extra_shader_incs})
+        platform/metal/MetalFx.mm platform/metal/MetalGpuParticles.mm platform/metal/MetalHair.mm
+        ${_shader_inc} ${_skin_inc} ${_extra_shader_incs})
     target_include_directories(skywalker_engine PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/generated)
     target_compile_definitions(skywalker_engine PUBLIC $<$<COMPILE_LANGUAGE:C,CXX,OBJCXX>:SKY_HAS_METAL=1>)
     target_link_libraries(skywalker_engine PUBLIC
-        "-framework Foundation" "-framework Metal" "-framework MetalKit" "-framework QuartzCore")
+        "-framework Foundation" "-framework Metal" "-framework MetalKit" "-framework MetalFX" "-framework QuartzCore")
 else()
     target_compile_definitions(skywalker_engine PUBLIC $<$<COMPILE_LANGUAGE:C,CXX,OBJCXX>:SKY_HAS_METAL=0>)
 endif()

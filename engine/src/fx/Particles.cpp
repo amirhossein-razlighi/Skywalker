@@ -75,7 +75,14 @@ void ParticleSystem::reset() {
 }
 
 void ParticleSystem::burst(EntityId emitter, int count) {
-    if (count > 0) states_[emitter].pendingBurst += std::min(count, 20000);
+    if (count <= 0) return;
+    states_[emitter].pendingBurst += std::min(count, 20000);
+    gpuBursts_[emitter] += static_cast<uint64_t>(std::min(count, 1000000));
+}
+
+uint64_t ParticleSystem::burstSerial(EntityId emitter) const {
+    auto it = gpuBursts_.find(emitter);
+    return it == gpuBursts_.end() ? 0 : it->second;
 }
 
 size_t ParticleSystem::liveCount(EntityId emitter) const {
@@ -254,7 +261,7 @@ void ParticleSystem::update(const Scene& scene, float dt) {
     std::vector<EntityId> alive;
     for (EntityId e : scene.entities()) {
         const ParticleEmitter* em = scene.get<ParticleEmitter>(e);
-        if (!em) continue;
+        if (!em || em->simulation == "gpu") continue;  // GPU emitters are simulated by the renderer
         alive.push_back(e);
         if (!scene.isActive(e)) continue;
         auto [it, inserted] = states_.try_emplace(e);
@@ -288,7 +295,7 @@ void ParticleSystem::gather(const Scene& scene, const ViewCamera& camera, std::v
     for (const auto& [id, s] : states_) {
         if (!scene.exists(id) || !scene.isActive(id)) continue;
         const ParticleEmitter* em = scene.get<ParticleEmitter>(id);
-        if (!em) continue;
+        if (!em || em->simulation == "gpu") continue;
         float look = lookId(em->look);
         bool emissive = emissiveLook(look);
         Vec4 c0{toLinear(em->colorStart.x), toLinear(em->colorStart.y), toLinear(em->colorStart.z), em->colorStart.w};
@@ -419,6 +426,85 @@ const Preset kParticlePresets[] = {
         "shapeSize":[0.5,0.5,0.5],"speed":14,"speedJitter":0.6,"spread":180,"gravity":9.8,"drag":0.4,"sizeStart":0.04,
         "sizeEnd":0.02,"colorStart":"#fff2c0","colorEnd":"#ff400a","intensity":30,"stretch":0.05,"collide":true,
         "floorHeight":0,"bounce":0.3,"softness":0.02,"prewarm":false,"maxParticles":300})"},
+    // --- GPU particles (simulation "gpu": compute shaders, visuals only) -----------------------
+    {"ember_storm", R"({"simulation":"gpu","look":"glow","facing":"velocity","rate":4000,"lifetime":4.5,"lifetimeJitter":0.5,
+        "shape":"box","shapeSize":[16,3,16],"speed":0.6,"spread":180,"gravity":-0.35,"drag":0.9,
+        "turbulence":3.2,"turbulenceScale":2.6,"wind":1.4,"sizeStart":0.022,"sizeEnd":0.008,
+        "sizeJitter":0.5,"stretch":0.035,
+        "colorGradient":"#fff3c4@0 #ffb347@0.15 #ff5a12@0.55 #a01800@0.85 #40000000@1",
+        "opacityCurve":"0@0 1@0.08 1@0.8 0@1","intensity":7,"softness":0.05,"maxParticles":25000,
+        "light":3,"lightColor":"#ff8a3a","lightRange":14})"},
+    {"magic_vortex", R"({"simulation":"gpu","look":"glow","facing":"ribbon","trailLength":0.6,"trailSegments":24,"rate":1500,
+        "lifetime":2.6,"lifetimeJitter":0.4,"shape":"disc","shapeSize":[2.4,0,2.4],"speed":0.3,
+        "spread":30,"gravity":0,"drag":1.6,"turbulence":0.6,"turbulenceScale":1.2,"wind":0,
+        "field":"vortex","fieldStrength":3.5,"fieldRadius":1.0,"fieldPull":1.5,"fieldLift":1.2,
+        "sizeStart":0.022,"sizeEnd":0.008,
+        "colorGradient":"#c8fbff@0 #50d8ff@0.25 #8a5cff@0.6 #ff40c800@1",
+        "opacityCurve":"0@0 1@0.1 1@0.75 0@1","hueVariation":0.06,"intensity":2.5,"softness":0.05,
+        "maxParticles":8000,"light":2,"lightColor":"#7a8cff","lightRange":7})"},
+    {"dust_storm", R"({"simulation":"gpu","look":"smoke","rate":500,"lifetime":9,"lifetimeJitter":0.4,"shape":"box",
+        "shapeSize":[44,5,44],"speed":0.8,"spread":60,"direction":[1,0.15,0],"gravity":-0.05,"drag":0.7,
+        "turbulence":2.4,"turbulenceScale":7,"wind":1.8,"sizeStart":3,"sizeEnd":8,"sizeJitter":0.4,
+        "colorStart":"#c2a27a18","colorEnd":"#c9b08c00","opacityCurve":"0@0 1@0.2 1@0.7 0@1","spin":12,
+        "softness":2.5,"maxParticles":6000})"},
+    {"falling_leaves", R"({"simulation":"gpu","look":"glow","facing":"mesh","mesh":"fx:leaf","rate":50,"lifetime":16,
+        "lifetimeJitter":0.2,"shape":"box","shapeSize":[16,0,16],"direction":[0,-1,0],"speed":0.3,
+        "spread":30,"gravity":1.6,"drag":2.2,"turbulence":1.4,"turbulenceScale":1.8,"wind":0.8,
+        "sizeStart":0.14,"sizeEnd":0.14,"sizeJitter":0.35,"colorStart":"#c75b19","colorEnd":"#c75b19",
+        "hueVariation":0.05,"spin":160,"roughness":0.55,"collide":true,"floorHeight":0,
+        "depthCollision":true,"stick":true,"maxParticles":8000})"},
+    {"snow_heavy", R"({"simulation":"gpu","look":"snow","rate":12000,"lifetime":14,"lifetimeJitter":0.2,"shape":"box",
+        "shapeSize":[44,0,44],"direction":[0,-1,0],"speed":0.9,"spread":20,"gravity":1.4,"drag":1.4,
+        "turbulence":1.1,"turbulenceScale":3,"wind":1,"sizeStart":0.032,"sizeEnd":0.032,
+        "sizeJitter":0.45,"colorStart":"#ffffffee","colorEnd":"#ffffffee",
+        "opacityCurve":"1@0 1@0.85 0@1","spin":90,"collide":true,"floorHeight":0,"depthCollision":true,
+        "stick":true,"softness":0.04,"maxParticles":200000})"},
+    {"smoke_column_gpu", R"({"simulation":"gpu","look":"smoke","rate":90,"lifetime":14,"lifetimeJitter":0.3,"shape":"disc",
+        "shapeSize":[1.4,0,1.4],"speed":2.2,"speedJitter":0.3,"spread":10,"gravity":-0.55,"drag":0.35,
+        "turbulence":0.9,"turbulenceScale":3.5,"wind":1,"sizeStart":1.1,"sizeEnd":10,"sizeJitter":0.3,
+        "colorGradient":"#4a4644c0@0 #6a6866a0@0.35 #a4a4a800@1","spin":14,"softness":2,
+        "maxParticles":2500})"},
+    {"sparks_gpu", R"({"simulation":"gpu","look":"spark","facing":"velocity","rate":900,"lifetime":1.6,"lifetimeJitter":0.5,
+        "shape":"point","direction":[0.4,0.7,0],"speed":7.5,"speedJitter":0.45,"spread":28,
+        "gravity":9.8,"drag":0.18,"turbulence":0,"sizeStart":0.018,"sizeEnd":0.008,"stretch":0.028,
+        "colorGradient":"#ffffff@0 #fff1a8@0.1 #ffa030@0.5 #ff3000@1","intensity":12,"collide":true,
+        "floorHeight":0,"depthCollision":true,"bounce":0.38,"friction":0.35,"subEmitOn":"collision",
+        "subEmitCount":2,"subEmitInherit":0.25,"softness":0.02,"wind":0.15,"maxParticles":60000,
+        "light":2,"lightColor":"#ffa04a","lightRange":7})"},
+    {"embers_gpu", R"({"simulation":"gpu","look":"glow","facing":"velocity","rate":0,"lifetime":1.1,"lifetimeJitter":0.5,
+        "shape":"point","speed":0.9,"speedJitter":0.6,"spread":70,"gravity":1.5,"drag":1.6,"turbulence":0.6,
+        "turbulenceScale":0.4,"sizeStart":0.014,"sizeEnd":0.004,"stretch":0.02,"colorGradient":"#ffd27a@0 #ff6a10@0.5 #60080000@1",
+        "intensity":12,"collide":true,"floorHeight":0,"depthCollision":true,"bounce":0.2,"softness":0.02,"prewarm":false,
+        "maxParticles":60000})"},
+    {"rain_gpu", R"({"simulation":"gpu","look":"rain","facing":"velocity","rate":32000,"lifetime":1.6,"lifetimeJitter":0.15,
+        "shape":"box","shapeSize":[36,0,36],"direction":[0,-1,0],"speed":10,"speedJitter":0.12,"spread":2,"gravity":9.8,
+        "drag":0,"turbulence":0,"sizeStart":0.011,"sizeEnd":0.011,"sizeJitter":0.3,"colorStart":"#c8d2e070",
+        "colorEnd":"#c8d2e070","stretch":0.032,"collide":true,"floorHeight":0,"depthCollision":true,"subEmitOn":"collision",
+        "subEmitCount":2,"subEmitInherit":0,"softness":0.02,"wind":1,"maxParticles":80000})"},
+    {"splashes_gpu", R"({"simulation":"gpu","look":"rain","facing":"velocity","rate":0,"lifetime":0.28,"lifetimeJitter":0.3,
+        "shape":"point","direction":[0,1,0],"speed":1.8,"speedJitter":0.4,"spread":50,"gravity":9.8,"drag":0,
+        "sizeStart":0.008,"sizeEnd":0.006,"stretch":0.025,"colorStart":"#d4dcea90","colorEnd":"#d4dcea00","softness":0.01,
+        "prewarm":false,"maxParticles":120000})"},
+    {"rockets_gpu", R"({"simulation":"gpu","look":"spark","facing":"ribbon","trailLength":0.55,"trailSegments":14,"rate":1.4,
+        "lifetime":1.45,"lifetimeJitter":0.2,"shape":"disc","shapeSize":[8,0,8],"speed":15,
+        "speedJitter":0.15,"spread":6,"gravity":9.8,"drag":0.1,"sizeStart":0.05,"sizeEnd":0.03,
+        "colorGradient":"#fff4d0@0 #ffb050@1","intensity":6,"subEmitOn":"death","subEmitCount":900,
+        "subEmitInherit":0.15,"softness":0.05,"prewarm":false,"maxParticles":64,"light":2,
+        "lightColor":"#ffc07a","lightRange":10})"},
+    {"firework_burst_gpu", R"({"simulation":"gpu","look":"spark","facing":"ribbon","trailLength":0.5,"trailSegments":12,"rate":0,
+        "lifetime":2.2,"lifetimeJitter":0.35,"shape":"point","speed":9,"speedJitter":0.12,"spread":180,
+        "gravity":3.2,"drag":1.3,"sizeStart":0.06,"sizeEnd":0.02,
+        "colorGradient":"#ffffff@0 #ff5a8c@0.12 #ff2a6a@0.6 #50001800@1","opacityCurve":"1@0 1@0.6 0@1",
+        "hueVariation":1,"intensity":4,"softness":0.05,"prewarm":false,"maxParticles":30000,"light":4,
+        "lightColor":"#ff8ab0","lightRange":30})"},
+    {"mist_gpu", R"({"simulation":"gpu","look":"mist","rate":160,"lifetime":5,"lifetimeJitter":0.4,"shape":"box",
+        "shapeSize":[6,0.4,2],"speed":2.4,"speedJitter":0.5,"spread":65,"gravity":-0.25,"drag":1.1,"turbulence":1.2,
+        "turbulenceScale":2.5,"wind":1,"sizeStart":1.2,"sizeEnd":6,"sizeJitter":0.4,"colorStart":"#eef4fa55",
+        "colorEnd":"#eef4fa00","opacityCurve":"0@0 1@0.15 0.6@0.6 0@1","spin":20,"softness":1.8,"maxParticles":4000})"},
+    {"droplets_gpu", R"({"simulation":"gpu","look":"rain","facing":"velocity","rate":3500,"lifetime":1.1,"lifetimeJitter":0.4,
+        "shape":"box","shapeSize":[6,0.3,1.5],"speed":4.5,"speedJitter":0.5,"spread":55,"gravity":9.8,"drag":0.4,
+        "sizeStart":0.012,"sizeEnd":0.008,"stretch":0.02,"colorStart":"#dfe8f2a0","colorEnd":"#dfe8f200","collide":true,
+        "floorHeight":0,"depthCollision":true,"softness":0.02,"wind":0.6,"maxParticles":8000})"},
 };
 
 const Preset kFluidPresets[] = {
@@ -454,6 +540,14 @@ const Preset kComposites[] = {
     {"burning_barrel", R"([{"name":"Fire","fluid":"volume_fire","position":[0,0,0],"fluid_overrides":{"size":[1,2.4,1],
                             "sourceRadius":0.24,"resolution":80,"light":4,"lightRange":8}},
                           {"name":"Embers","preset":"embers","position":[0,0.2,0],"particles":{"rate":7,"shapeSize":[0.4,0,0.4]}}])"},
+    {"sparks_shower", R"([{"name":"Sparks","preset":"sparks_gpu","position":[0,1.2,0],"particles":{"subEmitter":"Embers"}},
+                          {"name":"Embers","preset":"embers_gpu","position":[0,0,0]}])"},
+    {"fireworks", R"([{"name":"Rockets","preset":"rockets_gpu","position":[0,0,0],"particles":{"subEmitter":"Bursts"}},
+                      {"name":"Bursts","preset":"firework_burst_gpu","position":[0,0,0]}])"},
+    {"rain_heavy", R"([{"name":"Rain","preset":"rain_gpu","position":[0,12,0],"particles":{"subEmitter":"Splashes"}},
+                       {"name":"Splashes","preset":"splashes_gpu","position":[0,0,0]}])"},
+    {"waterfall_mist", R"([{"name":"Mist","preset":"mist_gpu","position":[0,0.2,0]},
+                           {"name":"Droplets","preset":"droplets_gpu","position":[0,0.3,0]}])"},
     {"sprite_campfire", R"([{"name":"Flames","preset":"fire","position":[0,0.05,0]},
                            {"name":"Embers","preset":"embers","position":[0,0.3,0]},
                            {"name":"Smoke","preset":"smoke","position":[0,1.4,0]}])"},

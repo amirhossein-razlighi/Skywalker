@@ -23,7 +23,8 @@
 
 namespace sky {
 
-enum class AssetType { Unknown, Mesh, Texture, Material, Prefab, Scene, Audio, Video, Script, Agent };
+enum class AssetType { Unknown, Mesh, Texture, Material, Prefab, Scene, Audio, Video, Script, Agent,
+                       Animation, Controller, Sequence /* animation: *.anim, *.animctl.json, *.sequence.json */ };
 
 const char* toString(AssetType t);
 AssetType assetTypeFromString(std::string_view s);
