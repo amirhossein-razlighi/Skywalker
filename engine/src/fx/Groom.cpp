@@ -57,6 +57,8 @@ const TypeInfo& Groom::type() {
             SKY_FIELD_RANGE(Groom, clumpShape, Float, "Clump profile: > 1 tips clump more than roots, < 1 clump early", 0.1f, 8.f),
             SKY_FIELD_RANGE(Groom, frizz, Float, "Noise / flyaways in meters", 0.f, 0.1f),
             SKY_FIELD_RANGE(Groom, frizzScale, Float, "Frizz noise frequency (per meter)", 0.1f, 1000.f),
+            SKY_FIELD(Groom, ponytail, Bool, "Comb every strand to ponytailPosition, then let them hang as one bundle"),
+            SKY_FIELD(Groom, ponytailPosition, Vec3, "Where the ponytail is tied (mesh space, meters; just outside the scalp)"),
             SKY_FIELD_ENUM(Groom, maskChannel, "Vertex-color channel that controls density (scalp painting)", "none", "r", "g",
                            "b", "a"),
             SKY_FIELD(Groom, maskDirection, Vec3, "Grow only where the surface faces this way (mesh space; with maskAngle)"),
@@ -311,13 +313,12 @@ public:
         for (uint32_t i = 0; i < pts.size(); ++i) cells_[key(cellOf(pts[i]))].push_back(i);
     }
     /// Up to k nearest points (ascending distance).
-    int nearest(Vec3 p, int k, uint32_t* idx, float* dist) const {
+    int nearest(Vec3 p, int k, uint32_t* idx, float* dist, int maxRing = 64) const {
         k = std::clamp(k, 1, 8);
         float bd[8];
         uint32_t bi[8];
         int n = 0;
         int ring = 1;
-        const int maxRing = 64;
         const int want = std::min<int>(k, static_cast<int>(pts_.size()));
         while (true) {
             n = 0;
@@ -368,6 +369,47 @@ private:
     std::unordered_map<uint64_t, std::vector<uint32_t>> cells_;
 };
 
+// --- the scalp mesh as a collider (generation only) ----------------------------------------
+
+/// Keeps generated strands outside the actual mesh: the nearest vertex's tangent plane is a
+/// good local approximation of a smooth surface (heads, bodies).
+class MeshCollider {
+public:
+    explicit MeshCollider(const MeshData& m) {
+        const size_t n = m.vertexCount();
+        pts_.reserve(n);
+        nrm_.reserve(n);
+        for (size_t i = 0; i < n; ++i) {
+            const float* v = &m.vertices[i * MeshData::kFloatsPerVertex];
+            pts_.push_back({v[0], v[1], v[2]});
+            nrm_.push_back(safeNormalize(Vec3{v[3], v[4], v[5]}, Vec3{0, 1, 0}));
+        }
+        Aabb b = m.bounds;
+        float diag = length(b.max - b.min);
+        cell_ = std::max(diag / 48.f, 1e-4f);
+        grid_ = std::make_unique<RootGrid>(pts_, cell_);
+        center_ = b.center();
+        reach_ = length(b.extents()) + cell_ * 2.f;
+    }
+    bool pushOut(Vec3& p, float margin) const {
+        if (distance(p, center_) > reach_) return false;  // outside the mesh's bounding sphere
+        uint32_t idx;
+        float dist;
+        if (!grid_->nearest(p, 1, &idx, &dist, 2)) return false;  // far from the mesh: outside
+        float h = dot(p - pts_[idx], nrm_[idx]);
+        if (h >= margin) return false;
+        p += nrm_[idx] * (margin - h);
+        return true;
+    }
+
+private:
+    std::vector<Vec3> pts_, nrm_;
+    float cell_ = 0.01f;
+    Vec3 center_{0, 0, 0};
+    float reach_ = 0.f;
+    std::unique_ptr<RootGrid> grid_;
+};
+
 // --- collision proxy -----------------------------------------------------------------------
 
 FxCollider proxyFromBounds(const Aabb& b) {
@@ -396,27 +438,6 @@ Vec3 closestOnSegment(Vec3 p, Vec3 a, Vec3 b) {
     Vec3 ab = b - a;
     float t = dot(ab, ab) > 1e-12f ? std::clamp(dot(p - a, ab) / dot(ab, ab), 0.f, 1.f) : 0.f;
     return a + ab * t;
-}
-
-/// Pushes p out of the proxy (with a small margin). Returns true if moved.
-bool pushOut(const FxCollider& c, Vec3& p, float margin) {
-    if (c.kind == FxCollider::Kind::Plane) {
-        float d = dot(p - c.a, c.b);
-        if (d < margin) {
-            p += c.b * (margin - d);
-            return true;
-        }
-        return false;
-    }
-    Vec3 q = c.kind == FxCollider::Kind::Sphere ? c.a : closestOnSegment(p, c.a, c.b);
-    Vec3 d = p - q;
-    float l = length(d);
-    float r = c.radius + margin;
-    if (l < r) {
-        p = q + safeNormalize(d, Vec3{0, 1, 0}) * r;
-        return true;
-    }
-    return false;
 }
 
 // --- child construction -----------------------------------------------------------------
@@ -529,6 +550,7 @@ Result<GroomData> generateGroom(const Groom& g, const MeshData* mesh) {
     const Vec3 down{0, -1, 0};
     d.guideRest.resize(guideRoots.size() * static_cast<size_t>(P));
     const float margin = std::max(0.0015f, g.length * 0.004f);
+    const MeshCollider scalp(*mesh);
     for (size_t gi = 0; gi < guideRoots.size(); ++gi) {
         const Root& r = guideRoots[gi];
         Vec3* out = &d.guideRest[gi * static_cast<size_t>(P)];
@@ -541,19 +563,56 @@ Result<GroomData> generateGroom(const Groom& g, const MeshData* mesh) {
         float segLen = g.length / static_cast<float>(P - 1);
         Vec3 pos = r.p;
         out[0] = pos;
+        // Ponytail: combed along the scalp to the tie, then gathered into a hanging bundle.
+        bool tied = !g.ponytail;
+        Vec3 tieOffset{0, 0, 0};
+        if (g.ponytail) {
+            float a = static_cast<float>(gi) * 2.399963f, rr = 0.012f * std::sqrt(static_cast<float>((gi * 7919u) % 1000u) / 1000.f);
+            tieOffset = Vec3{std::cos(a) * rr, std::sin(a) * rr * 0.6f, 0.f};
+        }
         for (int k = 1; k < P; ++k) {
+            if (!tied) {
+                Vec3 to = g.ponytailPosition + tieOffset - pos;
+                float dist = length(to);
+                Vec3 next = pos + safeNormalize(to, dir) * std::min(segLen, dist);
+                scalp.pushOut(next, margin * 1.5f);
+                if (distance(next, g.ponytailPosition + tieOffset) < segLen * 0.75f) {
+                    next = g.ponytailPosition + tieOffset;
+                    tied = true;
+                    dir = safeNormalize(Vec3{0, -0.6f, -1.f} + tieOffset * 20.f, down);
+                } else {
+                    dir = safeNormalize(next - pos, dir);
+                }
+                pos = next;
+                out[k] = pos;
+                continue;
+            }
             // Droop: bend toward gravity a little more each segment.
             dir = safeNormalize(dir + down * (g.gravity * 3.2f / static_cast<float>(P - 1)), dir);
             Vec3 next = pos + dir * segLen;
             // Lie on the scalp instead of growing through it (long hair drapes over the head).
-            if (pushOut(d.proxy, next, margin * (1.f + static_cast<float>(k) * 0.6f))) {
+            const float mk = margin * (1.f + static_cast<float>(k) * 0.2f);
+            if (scalp.pushOut(next, mk)) {
                 next = pos + safeNormalize(next - pos, dir) * segLen;
-                pushOut(d.proxy, next, margin * (1.f + static_cast<float>(k) * 0.6f));
+                scalp.pushOut(next, mk);
                 dir = safeNormalize(next - pos, dir);
             }
             pos = next;
             out[k] = pos;
         }
+    }
+
+    // The simulation's proxy must not push the groomed shape out: keep it below every guide point.
+    if (d.proxy.kind != FxCollider::Kind::Plane) {
+        float minGap = 1e30f;
+        for (size_t gi = 0; gi < guideRoots.size(); ++gi) {
+            for (int k = 2; k < P; ++k) {
+                Vec3 q = d.guideRest[gi * static_cast<size_t>(P) + static_cast<size_t>(k)];
+                Vec3 c = d.proxy.kind == FxCollider::Kind::Sphere ? d.proxy.a : closestOnSegment(q, d.proxy.a, d.proxy.b);
+                minGap = std::min(minGap, distance(q, c) - d.proxy.radius);
+            }
+        }
+        if (minGap < 0.002f) d.proxy.radius = std::max(d.proxy.radius * 0.5f, d.proxy.radius + minGap - 0.002f);
     }
 
     // Children: roots, guides, length, variation.
@@ -658,7 +717,7 @@ Result<GroomData> generateGroom(const Groom& g, const MeshData* mesh) {
             }
         }
         own[0] = base[0];
-        for (int k = 1; k < P; ++k) pushOut(d.proxy, own[k], margin);
+        for (int k = 1; k < P; ++k) scalp.pushOut(own[k], margin);
         for (int k = 0; k < P; ++k) {
             Vec3 dv = own[k] - base[k];
             Vec3 bn = cross(T[k], Nn[k]);
@@ -810,7 +869,8 @@ uint64_t groomHash(const Groom& g, const std::string& meshKey, const MeshData* m
     h = fnvs(h, g.source);
     h = fnvv(h, g.importScale);
     h = fnvv(h, g.importZUp);
-    for (int v : {g.strands, g.guides, g.segments, g.clumps, g.seed}) h = fnvv(h, v);
+    for (int v : {g.strands, g.guides, g.segments, g.clumps, g.seed, g.ponytail ? 1 : 0}) h = fnvv(h, v);
+    for (float v : {g.ponytailPosition.x, g.ponytailPosition.y, g.ponytailPosition.z}) h = fnvv(h, v);
     for (float v : {g.length, g.lengthVariation, g.directionBlend, g.gravity, g.curlRadius, g.curlFrequency, g.wave,
                     g.waveFrequency, g.clumpStrength, g.clumpShape, g.frizz, g.frizzScale, g.maskAngle, g.maskSoftness,
                     g.direction.x, g.direction.y, g.direction.z, g.maskDirection.x, g.maskDirection.y, g.maskDirection.z,
@@ -1108,10 +1168,10 @@ Json groomPreset(const std::string& name) {
             "clumps":1100,"clumpStrength":0.8,"clumpShape":0.7,"frizz":0.0035,"frizzScale":40,"maskDirection":[0,0.8,-0.6],
             "maskAngle":95,"maskSoftness":10,"melanin":0.93,"redness":0.15,"roughness":0.42,"radialRoughness":0.8,
             "stiffness":0.6})"},
-        {"hair_ponytail", R"({"strands":90000,"segments":24,"length":0.42,"lengthVariation":0.1,"widthRoot":0.075,
-            "widthTip":0.04,"direction":[0,0.15,-1],"directionBlend":0.95,"gravity":1.1,"clumps":1,"clumpStrength":0.92,
-            "clumpShape":0.35,"frizz":0.001,"maskDirection":[0,0.8,-0.6],"maskAngle":95,"maskSoftness":10,"melanin":0.35,
-            "redness":0.4,"roughness":0.3,"stiffness":0.5})"},
+        {"hair_ponytail", R"({"ponytail":true,"ponytailPosition":[0,0.035,-0.108],"strands":90000,"segments":28,
+            "length":0.5,"lengthVariation":0.12,"widthRoot":0.075,"widthTip":0.04,"direction":[0,0.2,-1],"directionBlend":0.95,
+            "gravity":0.9,"clumps":300,"clumpStrength":0.25,"clumpShape":3,"frizz":0.0008,"maskDirection":[0,0.8,-0.6],
+            "maskAngle":95,"maskSoftness":10,"melanin":0.35,"redness":0.4,"roughness":0.3,"stiffness":0.5})"},
         {"hair_short", R"({"strands":90000,"segments":5,"length":0.035,"lengthVariation":0.3,"widthRoot":0.07,
             "widthTip":0.03,"direction":[0,0.1,-1],"directionBlend":0.85,"gravity":0.2,"clumps":2500,"clumpStrength":0.25,
             "frizz":0.0012,"maskDirection":[0,0.8,-0.6],"maskAngle":95,"maskSoftness":10,"melanin":0.88,"redness":0.1,

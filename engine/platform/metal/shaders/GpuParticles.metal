@@ -40,7 +40,7 @@ struct GpuEmitterParams {
     float4 trail;        // x segments, y interval, z head slot, w 0
     float4 frame;        // x time, y dt, z spawn, w step
     float4 light;
-    float4 extra;        // x hue variation, y sort
+    float4 extra;        // x hue variation, y sort, z particles per sub-emitter event, w thin mesh
     float4 colliders[16];
     float4 colorTable[32];
     float sizeTable[32];
@@ -727,6 +727,7 @@ fragment GpuEffectOut gpuParticleFragment(GpuParticleOut in [[stage_in]], consta
         soft = saturate(gap / max(in.softness, 0.005));
     }
     soft *= saturate((camDist - 0.1) / max(in.size, 0.05));
+    soft *= saturate((camDist - 0.25) / 0.75);  // particles brushing past the lens fade out
     int look = int(in.look + 0.5);
     int facing = int(P.look.y + 0.5);
     float2 p = in.uv;
@@ -842,6 +843,15 @@ vertex MeshOut gpuMeshParticleVertex(uint vid [[vertex_id]], uint iid [[instance
     o.position = f.viewProj * float4(world, 1.0);
     o.worldPos = world;
     o.normal = R * float3(v.normal);
+    if (P.extra.w > 0.5) {
+        // Thin translucent meshes (leaves, petals): the side facing away from the sun is lit by
+        // the light coming through it. meshFragment flips the normal of back faces, so pre-flip.
+        float3 V = normalize(f.cameraPos.xyz - world);
+        float3 L = -f.sunDir.xyz;
+        float sv = dot(o.normal, V) >= 0.0 ? 1.0 : -1.0;
+        float3 Nv = o.normal * sv;
+        if (dot(Nv, L) < 0.0) o.normal = normalize(Nv + L * 1.2) * sv;
+    }
     o.uv = float2(v.uv);
     o.color = float4(rgb * float3(float4(v.color).rgb), 1.0);
     return o;

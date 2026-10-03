@@ -63,7 +63,7 @@ struct alignas(16) GpuEmitterParams {
     float trail[4];          // x segments, y sample interval (s), z head slot, w 0
     float frame[4];          // x time (s), y dt (s), z particles to spawn this step, w step counter
     float light[4];          // xyz light color (linear), w strength (0 = no light)
-    float extra[4];          // x hue variation, y sort, z 0, w 0
+    float extra[4];          // x hue variation, y sort, z particles per sub-emitter event (backend), w thin mesh
     float colliders[kGpuMaxColliders][8];  // [ax, ay, az, kind], [bx, by, bz, radius]
     float colorTable[GpuCurves::kSamples][4];
     float sizeTable[GpuCurves::kSamples];

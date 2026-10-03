@@ -373,7 +373,8 @@ GpuEmitterParams packEmitter(const GpuEmitterItem& item) {
     set4(p.frame, 0.f, 0.f, 0.f, 0.f);
     Vec4 lc = linearColor(em.lightColor);
     set4(p.light, lc.x, lc.y, lc.z, std::max(em.light, 0.f));
-    set4(p.extra, std::clamp(em.hueVariation, 0.f, 1.f), em.sort ? 1.f : 0.f, 0.f, 0.f);
+    const bool thin = item.particleMesh == "fx:leaf";
+    set4(p.extra, std::clamp(em.hueVariation, 0.f, 1.f), em.sort ? 1.f : 0.f, 0.f, thin ? 1.f : 0.f);
     for (int i = 0; i < GpuCurves::kSamples; ++i) {
         Vec4 c = item.curves.color[static_cast<size_t>(i)];
         set4(p.colorTable[i], c.x, c.y, c.z, c.w);

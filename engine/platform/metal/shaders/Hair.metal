@@ -47,7 +47,9 @@ struct HairChild {
     uint4 guides;    // xyz guide indices, w width multiplier (float bits)
 };
 
-constant float kGbufHair = 3.0;
+// Large so that even one hair sample in a pixel keeps the MSAA-resolved flag above 1.5: screen-space
+// GI / reflections then leave hair pixels alone (hair has its own ambient and scattering).
+constant float kGbufHair = 12.0;
 
 static float3 hairRotateFromTo(float3 a, float3 b, float3 v) {
     a = normalize(a);

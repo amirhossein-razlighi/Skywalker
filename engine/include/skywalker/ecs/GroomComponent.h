@@ -41,6 +41,8 @@ struct Groom {
     float clumpShape = 1.f;          // > 1: tips clump more than roots
     float frizz = 0.f;               // meters of noise (flyaways)
     float frizzScale = 30.f;         // noise frequency (per meter)
+    bool ponytail = false;           // gather all strands at ponytailPosition, then hang as a bundle
+    Vec3 ponytailPosition{0.f, 0.04f, -0.105f};  // the tie, in the mesh's space (meters)
     // --- Placement ----------------------------------------------------------------------
     std::string maskChannel = "none";  // none | r | g | b | a: vertex-color density mask
     Vec3 maskDirection{0.f, 1.f, 0.f};
