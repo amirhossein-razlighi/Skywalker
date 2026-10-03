@@ -270,4 +270,6 @@ sprite_atlas_pack {"folder": "art/props", "output": "art/props.atlas.json"}
 - Text shaping is per code point (kerning, no ligatures or complex scripts such as Arabic/Indic).
 - The UI blends in linear light on the GPU and in sRGB on the CPU (tiny differences on soft edges).
 - World-space canvases are hit-tested through the game camera; focus navigation is order-based.
-- The editor shows UI and sprites in the viewport; a dedicated 2D editing view is not included.
+- The editor shows UI and sprites in the viewport (click selects them); for the exact 2D framing
+  (orthographic, pixel-perfect, camera2d bounds) look through the scene camera. A dedicated 2D
+  editing camera (pan/zoom on the XY plane) is not included yet.
