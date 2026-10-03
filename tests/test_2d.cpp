@@ -482,3 +482,34 @@ TEST_CASE("2d: tilemaps cull to the view and lights gather") {
     // The halo is the last, additive batch.
     CHECK(f.render2d.spriteBatches.back().additive);
 }
+
+TEST_CASE("2d: linear-filtered tiles stay half a texel inside their cell of the sheet") {
+    fs::path dir = tempDir("tileinset");
+    REQUIRE(writePng(solid(64, 16, 90, 90, 90), (dir / "tiles.png").string()).ok());  // 4 tiles of 16 px
+    Scene s;
+    EntityId m = s.create("Map");
+    Tilemap& map = s.add<Tilemap>(m);
+    map.tileset = "tiles.png";
+    map.width = 1;
+    map.height = 1;
+    map.layers = Json::array({Json::object({{"name", "ground"}, {"data", "rle:1*2"}})});
+    render2d::Assets2D assets(dir.string());
+    ViewCamera cam;
+    cam.eye = {0.5f, -0.5f, 10};
+    cam.target = {0.5f, -0.5f, 0};
+    cam.orthographic = true;
+    cam.orthoSize = 2;
+    BuildOptions bo;
+    for (const char* filter : {"linear", "nearest"}) {
+        map.filter = filter;
+        FrameData f = buildFrame(s, cam, 64, 64, bo);
+        render2d::gather2D(s, assets, f, {});
+        REQUIRE(f.render2d.sprites.size() == 1);
+        const SpriteInstance& q = f.render2d.sprites[0];
+        float inset = std::string(filter) == "linear" ? 0.5f : 0.02f;
+        CHECK(q.uv[0] == doctest::Approx((16.f + inset) / 64.f));   // tile 2 starts at x = 16
+        CHECK(q.uv[2] == doctest::Approx((32.f - inset) / 64.f));
+        CHECK(q.uv[1] == doctest::Approx(inset / 16.f));
+    }
+    fs::remove_all(dir);
+}
