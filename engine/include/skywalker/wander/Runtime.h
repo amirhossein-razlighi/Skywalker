@@ -69,6 +69,9 @@ public:
     std::function<void(EntityId emitter, int count)> burst;
     /// Water surface height for water_height(); set by the engine (ocean simulation).
     std::function<float(float x, float z)> waterHeight;
+    // animation builtins: set_param, trigger, play_animation, anim_state, play_sequence.
+    // Set by the engine (AnimationSystem); args exclude the entity. Returns the value.
+    std::function<Result<Json>(const std::string& fn, EntityId entity, const std::vector<Json>& args)> animation;
 
     /// Maximum AST nodes evaluated per handler invocation.
     static constexpr int kBudget = 200000;

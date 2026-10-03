@@ -150,14 +150,17 @@ void addAssetTools(Engine& engine, ToolRegistry& reg) {
     reg.add({"asset_import", "Import asset",
              "Register a file placed in the project (e.g. by a generator) as an asset. Meshes (.glb/.gltf/.obj/.ply/.stl) "
              "are imported — glTF / OBJ+MTL materials become material assets, PLY/OBJ vertex colors are kept — and "
-             "can be placed as a new entity right away. To fetch models from the web use asset_download.",
+             "can be placed as a new entity right away. Rigged / animated glTF characters also get an animation "
+             "library (<name>.anim: skeleton + clips) and a prefab with an animator, keep their real size (unless "
+             "normalize is given) and are turned to face -Z; then use animation_list / animator_setup. Animation-only "
+             "glTF files become clip libraries. To fetch models from the web use asset_download.",
              "asset",
              object({{"path", string("Project-relative file path")},
                      {"create_entity", string("If set, create an entity with this name using the mesh")},
                      {"position", vec3("Position for the created entity")},
                      {"description", string("What the asset is (helps future searches)")},
                      {"tags", array(Json::object({{"type", "string"}}), "Tags")},
-                     {"normalize", boolean("Scale meshes to fit 1 m (default true); false keeps real-world units")},
+                     {"normalize", boolean("Scale meshes to fit 1 m (default true; rigged characters default to their real size); false keeps real-world units")},
                      {"z_up", boolean("The mesh is Z-up (CAD, scans, some exporters) — rotate to Y-up")}},
                     {"path"}),
              true, false, [&engine](const Json& a, ToolContext& ctx) {
@@ -167,6 +170,7 @@ void addAssetTools(Engine& engine, ToolRegistry& reg) {
                      Engine::MeshImportOptions opts;
                      opts.normalize = a.get("normalize").asBool(true);
                      opts.zUp = a.get("z_up").asBool(false);
+                     opts.keepRiggedScale = !a.contains("normalize");
                      auto r = engine.importMeshAsset(path, opts);
                      if (!r) return ToolResult::error(r.error());
                      result = r.value();
@@ -180,7 +184,7 @@ void addAssetTools(Engine& engine, ToolRegistry& reg) {
                  if (a.contains("description")) meta["description"] = a.get("description");
                  if (a.contains("tags")) meta["tags"] = a.get("tags");
                  if (meta.size()) (void)engine.assets().updateMeta(rec->path, meta);
-                 if (a.contains("create_entity") && rec->type == AssetType::Mesh) {
+                 if (a.contains("create_entity") && rec->type == AssetType::Mesh && result.contains("mesh")) {
                      EntityId id = kNoEntity;
                      Status st = engine.edit(ctx.actor, "Place " + a.get("create_entity").asString(), [&]() -> Status {
                          return placeImportedMesh(engine, result, a.get("create_entity").asString(), a.get("position"), id);

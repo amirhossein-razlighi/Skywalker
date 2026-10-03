@@ -193,6 +193,15 @@ FrameData buildFrame(const Scene& scene, const ViewCamera& camera, int width, in
             d.selected = opts.editorOverlays &&
                          std::find(opts.selection.begin(), opts.selection.end(), e) != opts.selection.end();
             d.worldBounds = scene.localBounds(e).transformed(d.model);
+            // Animation: skinned meshes draw a per-instance posed copy (see SkinItem).
+            if (opts.skin && !m->billboard) {
+                if (const SkinPose* sp = opts.skin(e, m->mesh); sp && sp->palette) {
+                    d.skin = static_cast<int>(f.skins.size());
+                    f.skins.push_back({m->mesh, m->mesh + "@skin" + std::to_string(e), sp->palette});
+                    d.mesh = f.skins.back().key;
+                    d.worldBounds = sp->bounds.transformed(d.model);
+                }
+            }
             f.draws.push_back(std::move(d));
         }
         if (const FluidVolume* v = scene.get<FluidVolume>(e)) {
@@ -310,6 +319,8 @@ EntityId pick(const Scene& scene, const FrameData& frame, float x, float y) {
                 float t0 = (-b - sq) / (2 * a), t1 = (-b + sq) / (2 * a);
                 tLocal = t0 >= 0 ? t0 : t1;
             }
+        } else if (d.skin >= 0) {
+            tLocal = intersect(ray, d.worldBounds) >= 0 ? intersect(local, d.worldBounds.transformed(inv)) : -1.f;  // posed bounds
         } else {
             tLocal = intersect(local, scene.localBounds(d.entity));
         }

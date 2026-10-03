@@ -49,8 +49,17 @@ Engine::Engine(EngineConfig config)
       history_(std::make_unique<History>(*scene_)),
       runtime_(std::make_unique<wander::Runtime>(*scene_)),
       renderer_(createRenderer(config_.renderer)),
-      assets_(std::make_unique<AssetDatabase>(config_.projectDir)) {
+      assets_(std::make_unique<AssetDatabase>(config_.projectDir)),
+      animation_(std::make_unique<anim::AnimationSystem>(*scene_)) {
     assets_->refresh();
+    // Animation: assets come from the project, events go to Wander.
+    animation_->hooks.resolvePath = [this](const std::string& p) { return resolvePath(p); };
+    animation_->hooks.mesh = [this](const std::string& key) { return cpuMesh(key); };
+    animation_->hooks.libraryFor = [this](const std::string& meshFile) -> std::string {
+        const AssetRecord* rec = assets_->find(meshFile);
+        return rec ? rec->importSettings.get("animation").asString() : std::string();
+    };
+    animation_->hooks.emit = [this](const std::string& name, EntityId target) { runtime_->emit(name, target); };
     runtime_->spawnPrefab = [this](const std::string& ref, Vec3 position, const std::string& name) -> Result<EntityId> {
         PrefabPlacement placement;
         placement.hasPosition = true;
@@ -59,6 +68,28 @@ Engine::Engine(EngineConfig config)
         return instantiatePrefabAsset(ref, placement);
     };
     runtime_->burst = [this](EntityId e, int count) { particles_.burst(e, count); };
+    // animation builtins for Wander
+    runtime_->animation = [this](const std::string& fn, EntityId e, const std::vector<Json>& args) -> Result<Json> {
+        auto arg = [&](size_t i) -> const Json& { return i < args.size() ? args[i] : Json::null(); };
+        if (fn == "anim_state") return Json(animation_->stateName(e));
+        if (fn == "play_sequence") {
+            if (Status s = animation_->playSequence(e, arg(0).asFloat(0.f)); !s) return s.error();
+            return Json();
+        }
+        if (!arg(0).isString()) return Error::make("invalid_argument", "argument 2 must be a quoted name");
+        Status s;
+        if (fn == "set_param") {
+            s = animation_->setParam(e, arg(0).asString(), arg(1));
+        } else if (fn == "trigger") {
+            s = animation_->trigger(e, arg(0).asString());
+        } else {  // play_animation
+            std::optional<bool> loop;
+            if (arg(2).isBool()) loop = arg(2).asBool();
+            s = animation_->play(e, arg(0).asString(), arg(1).asFloat(0.2f), loop);
+        }
+        if (!s) return s.error();
+        return Json();
+    };
     runtime_->waterHeight = [this](float x, float z) {
         float h = 0;
         return waterHeight(x, z, h) ? h : 0.f;
@@ -152,6 +183,8 @@ void Engine::play() {
         runtime_->reset(/*keepQueuedEvents=*/true);
         accumulator_ = 0;
         particles_.reset();  // play sessions replay exactly
+        animation_->reset();
+        animation_->setPlaying(true);
     }
     playState_ = PlayState::Playing;
     emitEvent(Json::object({{"type", "play_state"}, {"state", "playing"}}));
@@ -172,6 +205,8 @@ void Engine::stop() {
     playSnapshot_ = Json();
     runtime_->reset();
     particles_.reset();
+    animation_->reset();
+    animation_->setPlaying(false);
     input_ = {};
     std::erase_if(selection_, [&](EntityId id) { return !scene_->exists(id); });
     emitEvent(Json::object({{"type", "play_state"}, {"state", "editing"}}));
@@ -184,6 +219,7 @@ void Engine::step(int ticks) {
     }
     for (int i = 0; i < ticks; ++i) {
         runtime_->tick(kFixedDt, input_);
+        animation_->tick(kFixedDt);  // sequencers, animators, bone attachments
         particles_.update(*scene_, static_cast<float>(kFixedDt));
         input_.pressed.clear();
         input_.clicked.clear();
@@ -211,6 +247,7 @@ void Engine::update(double seconds) {
         float dt = static_cast<float>(std::min(seconds, 0.1));
         previewTime_ += dt;
         particles_.update(*scene_, dt);
+        animation_->editorUpdate(dt);
     }
     if (playState_ != PlayState::Playing) return;
     accumulator_ += std::min(seconds, 0.25);  // avoid spiral of death after stalls
@@ -277,6 +314,12 @@ void Engine::ensureMeshUploaded(const std::string& meshKey) {
 }
 
 FrameData Engine::frame(const CaptureOptions& opts) {
+    // Animation previews while editing (sequencer scrub, bone attachments) hold for this frame only.
+    struct PreviewGuard {
+        anim::AnimationSystem& a;
+        anim::AnimationSystem::FrameOverrides ov;
+        ~PreviewGuard() { a.endFrame(ov); }
+    } previewGuard{*animation_, animation_->beginFrame(playState_ == PlayState::Editing)};
     ViewCamera view = camera_.toView();
     if (opts.hasCustomView) {
         view = opts.customView;
@@ -292,6 +335,7 @@ FrameData Engine::frame(const CaptureOptions& opts) {
     bo.selection = selection_;
     bo.time = static_cast<float>(effectsTime());  // animates water, fluids and skies while editing too
     bo.material = [this](const std::string& path) { return resolveMaterial(path); };
+    bo.skin = [this](EntityId e, const std::string& mesh) { return animation_->skin(e, mesh); };
     for (EntityId e : scene_->entities()) {
         if (const auto* m = scene_->get<MeshRenderer>(e)) ensureMeshUploaded(m->mesh);
     }
@@ -478,6 +522,7 @@ Status Engine::newScene(const std::string& name, bool withDefaults) {
     scene_->clear();
     history_->clear();
     selection_.clear();
+    animation_->reset();
     scene_->name = name.empty() ? "Untitled" : name;
     scenePath_.clear();
     if (withDefaults) {
@@ -511,6 +556,7 @@ Status Engine::loadScene(const std::string& path) {
     Status s = scene_->loadJson(doc.value());
     history_->clear();
     selection_.clear();
+    animation_->reset();
     scenePath_ = path;
     emitEvent(Json::object({{"type", "scene"}, {"action", "load"}, {"name", scene_->name}, {"path", path}}));
     return s;
@@ -568,6 +614,7 @@ std::string stripAssetPrefix(const std::string& ref) {
 std::vector<std::string> Engine::refreshAssets() {
     std::vector<std::string> changed = assets_->refresh();
     for (const auto& path : changed) {
+        animation_->invalidate(path);
         switch (assetTypeForPath(path)) {
             case AssetType::Mesh: {
                 std::string key = "asset:" + path;
@@ -611,6 +658,7 @@ const MeshData* Engine::cpuMesh(const std::string& key) {
         if (const AssetRecord* rec = assets_->find(file)) {
             lo.normalize = rec->importSettings.get("normalize").asBool(true);
             lo.zUp = rec->importSettings.get("zUp").asBool(false);
+            lo.turnAround = rec->importSettings.get("turnAround").asBool(false);
         }
         data = mesh::loadMeshFile(resolvePath(file), lo);
     } else {
@@ -626,23 +674,61 @@ const MeshData* Engine::cpuMesh(const std::string& key) {
     return ptr.get();
 }
 
-Result<Json> Engine::importMeshAsset(const std::string& path, const MeshImportOptions& options) {
+Result<Json> Engine::importMeshAsset(const std::string& path, const MeshImportOptions& optionsIn) {
+    MeshImportOptions options = optionsIn;
     std::string rel = assets_->relative(resolvePath(path));
     if (rel.empty()) return Error::make("invalid_path", "mesh must be inside the project: " + path);
     std::string lower = str::lower(rel);
     Json result = Json::object();
     MeshData mesh;
     std::string materialPath;
+    // Animation: rigged / animated glTF models also get an animation library (*.anim) and an
+    // animator, and rigged characters are turned to face -Z (Skywalker's forward).
+    bool turnAround = false;
+    std::string animPath;
+    Json animator;
     if (lower.size() > 4 && (lower.rfind(".glb") == lower.size() - 4 || lower.rfind(".gltf") == lower.size() - 5)) {
         auto g = loadGltf(resolvePath(rel), false);
         if (!g) return g.error();
-        mesh = std::move(g->mesh);
-        // glTF materials become project materials next to the mesh. External images are
-        // referenced where they are; embedded ones are extracted once.
         fs::path base = fs::path(rel);
         std::string stem = base.stem().string();
         std::string dir = base.parent_path().generic_string();
         auto join = [&](const std::string& name) { return dir.empty() ? name : dir + "/" + name; };
+        if (g->animation) {
+            if (g->skinned) {
+                turnAround = true;
+                if (options.keepRiggedScale) options.normalize = false;  // characters keep their real size
+            }
+            animPath = join(stem + ".anim");
+            if (Status st = anim::saveLibrary(resolvePath(animPath), *g->animation); !st) return st.error();
+            animation_->invalidate(animPath);
+            Json clips = Json::array();
+            std::string idle;
+            for (const auto& c : g->animation->clips) {
+                clips.push(c.name);
+                if (idle.empty() && str::lower(c.name).find("idle") != std::string::npos) idle = c.name;
+            }
+            animator = Json::object({{"library", animPath}});
+            if (!idle.empty()) animator["clip"] = idle;
+            result["animation"] = animPath;
+            result["clips"] = clips;
+            result["bones"] = g->animation->skeleton.bones.size();
+            result["rigged"] = g->skinned;
+            if (auto reg = assets_->registerFile(resolvePath(animPath)); reg) {
+                (void)assets_->updateMeta(animPath, Json::object({{"description", "Skeleton and animation clips of " + rel},
+                                                                  {"source", Json::object({{"importedFrom", rel}})}}));
+            }
+            if (g->mesh.indices.empty()) {  // an animation-only file: a clip library, no geometry
+                if (auto reg = assets_->registerFile(resolvePath(rel)); reg) {
+                    (void)assets_->updateMeta(rel, Json::object({{"import", Json::object({{"animation", animPath}})}}));
+                }
+                refreshAssets();
+                return result;
+            }
+        }
+        mesh = std::move(g->mesh);
+        // glTF materials become project materials next to the mesh. External images are
+        // referenced where they are; embedded ones are extracted once.
         std::unordered_map<int, std::string> texPaths;
         auto texPath = [&](int image) -> std::string {
             if (image < 0 || static_cast<size_t>(image) >= g->images.size()) return "";
@@ -690,8 +776,6 @@ Result<Json> Engine::importMeshAsset(const std::string& path, const MeshImportOp
             Json children = Json::array();
             Json partList = Json::array();
             std::set<std::string> usedNames;
-            Aabb reference = mesh.bounds;
-            if (options.zUp) reference = mesh::zUpToYUp(reference);
             for (int part : parts) {
                 const GltfImport::Material* gm =
                     part >= 0 && static_cast<size_t>(part) < g->materials.size() ? &g->materials[static_cast<size_t>(part)] : nullptr;
@@ -715,11 +799,15 @@ Result<Json> Engine::importMeshAsset(const std::string& path, const MeshImportOp
                     partMat = join(stem + "_" + name + ".mat.json");
                     if (Status st = saveMaterial(resolvePath(partMat), toMaterial(*gm)); !st) return st.error();
                 }
-                auto pm = loadGltf(resolvePath(rel), false, part);
+                // Same path as reloading later (cpuMesh), so both always agree.
+                mesh::LoadOptions lo;
+                lo.part = part;
+                lo.normalize = options.normalize;
+                lo.zUp = options.zUp;
+                lo.turnAround = turnAround;
+                auto pm = mesh::loadMeshFile(resolvePath(rel), lo);
                 if (!pm) return pm.error();
-                MeshData partMesh = std::move(pm->mesh);
-                if (options.zUp) mesh::zUpToYUp(partMesh);
-                if (options.normalize) mesh::normalizeToUnit(partMesh, reference);
+                MeshData partMesh = std::move(pm.value());
                 std::string key = "asset:" + rel + "#" + std::to_string(part);
                 if (Status s = renderer_->uploadMesh(key, partMesh); !s) return s.error();
                 scene_->assetBounds[key] = partMesh.bounds;
@@ -737,7 +825,9 @@ Result<Json> Engine::importMeshAsset(const std::string& path, const MeshImportOp
                  {"name", stem},
                  {"root", Json::object({{"name", stem},
                                         {"enabled", true},
-                                        {"components", Json::object({{"transform", Json::object()}})},
+                                        {"components", animator.isObject()
+                                                           ? Json::object({{"transform", Json::object()}, {"animator", animator}})
+                                                           : Json::object({{"transform", Json::object()}})},
                                         {"children", children}})}});
             std::string prefabPath = join(stem + ".prefab.json");
             if (Status st = savePrefab(resolvePath(prefabPath), prefab); !st) return st.error();
@@ -773,13 +863,34 @@ Result<Json> Engine::importMeshAsset(const std::string& path, const MeshImportOp
         mesh = std::move(loaded.value());
     }
     if (options.zUp) mesh::zUpToYUp(mesh);
+    if (turnAround) mesh::turnAround(mesh);
     if (options.normalize) mesh::normalizeToUnit(mesh);
     std::string key = "asset:" + rel;
     if (Status s = renderer_->uploadMesh(key, mesh); !s) return s.error();
     scene_->assetBounds[key] = mesh.bounds;
     cpuMeshes_[key] = std::make_shared<MeshData>(mesh);
+    if (animator.isObject() && !result.contains("prefab")) {
+        // A single-part animated model: a prefab gives the ready-to-use character (mesh + animator).
+        Json meshJ = Json::object({{"mesh", key}});
+        if (!materialPath.empty()) meshJ["material"] = materialPath;
+        fs::path base = fs::path(rel);
+        std::string dir = base.parent_path().generic_string();
+        std::string prefabPath = (dir.empty() ? "" : dir + "/") + base.stem().string() + ".prefab.json";
+        Json prefab = Json::object(
+            {{"format", "skywalker.prefab"},
+             {"version", 1},
+             {"name", base.stem().string()},
+             {"root", Json::object({{"name", base.stem().string()},
+                                    {"enabled", true},
+                                    {"components", Json::object({{"transform", Json::object()}, {"mesh", meshJ}, {"animator", animator}})}})}});
+        if (Status st = savePrefab(resolvePath(prefabPath), prefab); !st) return st.error();
+        prefabs_.erase(prefabPath);
+        result["prefab"] = prefabPath;
+    }
     refreshAssets();
     Json settings = Json::object({{"normalize", options.normalize}, {"zUp", options.zUp}, {"vertexColors", mesh.hasVertexColors}});
+    if (turnAround) settings["turnAround"] = true;
+    if (!animPath.empty()) settings["animation"] = animPath;
     if (!materialPath.empty()) settings["material"] = materialPath;
     if (result.contains("prefab")) settings["prefab"] = result.get("prefab");
     if (auto reg = assets_->registerFile(resolvePath(rel)); reg) (void)assets_->updateMeta(rel, Json::object({{"import", settings}}));
@@ -959,8 +1070,10 @@ std::optional<Engine::Hit> Engine::raycast(const Ray& rayIn, const std::vector<E
         const MeshRenderer* m = scene_->get<MeshRenderer>(e);
         if (!m || !m->visible || !scene_->isActive(e)) continue;
         Mat4 world = scene_->worldMatrix(e);
-        if (intersect(ray, scene_->localBounds(e).transformed(world)) < 0) continue;
-        const MeshData* mesh = cpuMesh(m->mesh);
+        std::shared_ptr<const MeshData> posed = animation_->posedMesh(e, m->mesh);  // animated: the current pose
+        Aabb local = posed ? posed->bounds : scene_->localBounds(e);
+        if (intersect(ray, local.transformed(world)) < 0) continue;
+        const MeshData* mesh = posed ? posed.get() : cpuMesh(m->mesh);
         if (!mesh) continue;
         Mat4 inv = world.inverse();
         Vec3 o = inv.transformPoint(ray.origin), d = inv.transformDir(ray.dir);

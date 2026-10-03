@@ -842,6 +842,12 @@ float AnimatorRuntime::stateDuration(int layerIndex, int state) const {
     return d;
 }
 
+float AnimatorRuntime::currentDuration(int layerIndex) const {
+    if (layerIndex < 0 || static_cast<size_t>(layerIndex) >= layers_.size()) return 0.f;
+    int s = layers_[static_cast<size_t>(layerIndex)].current.state;
+    return s < 0 ? 0.f : stateDuration(layerIndex, s);
+}
+
 void AnimatorRuntime::advance(Layer& layer, Playing& p, float dt) const {
     if (p.state < 0) return;
     const State& st = layer.states[static_cast<size_t>(p.state)];
@@ -861,7 +867,8 @@ void AnimatorRuntime::samplePlaying(const Layer& layer, const Playing& p, Pose& 
     const State& st = layer.states[static_cast<size_t>(p.state)];
     std::vector<float> w = weights(layer, p);
     const bool loop = looping(layer, p);
-    const float phase = loop ? fract(p.nt) : std::clamp(p.nt, 0.f, 1.f);
+    float phase = loop ? fract(p.nt) : std::clamp(p.nt, 0.f, 1.f);
+    if (loop && phase == 0.f && p.nt > 0.f) phase = 1.f;  // the end of a cycle shows its last frame (scrubbing to the end)
     const int root = library_->rootBone;
     const bool pinRoot = rootMotion_ && root >= 0 && &layer == &layers_.front();
     bool first = true;

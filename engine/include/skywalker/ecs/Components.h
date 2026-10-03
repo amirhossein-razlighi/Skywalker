@@ -248,3 +248,6 @@ struct Environment {
 };
 
 }  // namespace sky
+
+// Workstream components (each in its own header).
+#include "skywalker/ecs/AnimationComponents.h"

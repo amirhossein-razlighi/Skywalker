@@ -92,6 +92,22 @@ struct DrawItem {
     bool selected = false;
     bool castShadows = true;
     Aabb worldBounds;
+    int skin = -1;  // index into FrameData::skins for skinned (animated) meshes
+};
+
+// --- Animation: GPU skinning input ------------------------------------------------------
+/// A posed skin: joint matrices (mesh space) for a rigged mesh, and its posed bounds.
+struct SkinPose {
+    std::shared_ptr<const std::vector<Mat4>> palette;
+    Aabb bounds;  // mesh space
+};
+/// One skinned draw. Backends skin `mesh` (which has a SkinStream) with `palette` into a
+/// per-instance vertex buffer registered under `key`; the DrawItem's mesh is `key`, so
+/// every pass (shadows, outlines, selection) draws the posed vertices unchanged.
+struct SkinItem {
+    std::string mesh;  // base mesh key ("asset:models/hero.glb#2")
+    std::string key;   // unique per instance ("asset:models/hero.glb#2@skin12")
+    std::shared_ptr<const std::vector<Mat4>> palette;
 };
 
 struct LightItem {
@@ -173,6 +189,7 @@ struct FrameData {
     std::vector<ParticleInstance> particles;  // sorted back to front
     std::vector<WaterItem> water;
     std::vector<VolumeItem> volumes;
+    std::vector<SkinItem> skins;  // animation: skinned draws (see SkinItem)
     bool drawGrid = true;
     float time = 0;
 
@@ -188,6 +205,8 @@ struct BuildOptions {
     float time = 0;
     /// Resolves MeshRenderer::material paths (provided by the engine's asset system).
     std::function<const ResolvedMaterial*(const std::string&)> material;
+    /// Animation: the posed skin of a rigged mesh drawn by an entity (null = rest pose).
+    std::function<const SkinPose*(EntityId entity, const std::string& mesh)> skin;
 };
 
 /// Keeps the kMaxLights lights that matter most for this view (directional first, then the

@@ -18,6 +18,7 @@
 #include <vector>
 
 #include "skywalker/agent/ToolRegistry.h"
+#include "skywalker/anim/AnimationSystem.h"
 #include "skywalker/assets/AssetDatabase.h"
 #include "skywalker/assets/Material.h"
 #include "skywalker/assets/Prefab.h"
@@ -86,6 +87,7 @@ public:
     History& history() { return *history_; }
     wander::Runtime& runtime() { return *runtime_; }
     Renderer& renderer() { return *renderer_; }
+    anim::AnimationSystem& animation() { return *animation_; }
     ToolRegistry& tools() { return tools_; }
     OrbitCamera& camera() { return camera_; }
     const EngineConfig& config() const { return config_; }
@@ -160,6 +162,7 @@ public:
     struct MeshImportOptions {
         bool normalize = true;  // fit a 1 m cube (handy for generated models); false keeps real units
         bool zUp = false;       // source is Z-up (CAD, scans, some exporters)
+        bool keepRiggedScale = true;  // rigged characters keep their real size unless normalize was asked for explicitly
     };
     Result<Json> importMeshAsset(const std::string& path, const MeshImportOptions& options);
     Result<Json> importMeshAsset(const std::string& path) { return importMeshAsset(path, MeshImportOptions{}); }
@@ -219,6 +222,7 @@ private:
     std::unique_ptr<wander::Runtime> runtime_;
     std::unique_ptr<Renderer> renderer_;
     std::unique_ptr<AssetDatabase> assets_;
+    std::unique_ptr<anim::AnimationSystem> animation_;
     struct CachedMaterial {
         int64_t mtime = -1;
         bool ok = false;

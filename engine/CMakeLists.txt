@@ -38,6 +38,9 @@ set(SKY_ENGINE_SOURCES
     # Animation (skinning, animator state machines, sequencer)
     src/anim/Animation.cpp
     src/anim/Controller.cpp
+    src/anim/Sequence.cpp
+    src/anim/AnimationSystem.cpp
+    src/ecs/AnimationComponents.cpp
 )
 
 add_library(skywalker_engine STATIC ${SKY_ENGINE_SOURCES})

@@ -186,6 +186,8 @@ const std::unordered_map<std::string, FnSig>& functions() {
         {"round", {1, 1}},    {"sign", {1, 1}},      {"min", {2, 2}},       {"max", {2, 2}},
         {"clamp", {3, 3}},    {"lerp", {3, 3}},      {"random", {0, 2}},    {"chance", {1, 1}},
         {"burst", {1, 2}},    {"water_height", {1, 2}},
+        // animation builtins
+        {"set_param", {3, 3}}, {"trigger", {2, 2}}, {"play_animation", {2, 4}}, {"anim_state", {1, 1}}, {"play_sequence", {1, 2}},
         {"vec", {3, 3}},      {"color", {3, 4}},     {"length", {1, 1}},    {"normalize", {1, 1}},
         {"dot", {2, 2}},      {"cross", {2, 2}},     {"key", {1, 1}},       {"exists", {1, 1}},
         {"str", {1, 1}},      {"spawn", {1, 3}},     {"tagged", {2, 2}},    {"forward", {1, 1}},
@@ -346,7 +348,7 @@ private:
         Handler h;
         h.loc = next().loc;  // 'on'
         const Token& t = next();
-        static const std::vector<std::string> triggers{"start", "tick", "event", "key", "click"};
+        static const std::vector<std::string> triggers{"start", "tick", "event", "key", "click", "anim"};
         if (t.text == "start") {
             h.trigger = Trigger::Start;
         } else if (t.text == "tick" || t.text == "update") {
@@ -361,9 +363,18 @@ private:
             }
         } else if (t.text == "click") {
             h.trigger = Trigger::Click;
+        } else if (t.text == "anim") {
+            // animation builtins: `on anim "footstep"` = an animation event on this entity
+            // (delivered as the event "anim:footstep" to the animator's entity).
+            h.trigger = Trigger::Event;
+            if (peek().kind != Tok::String) {
+                error(peek().loc, "expected_string", "'on anim' needs a quoted event name, e.g. on anim \"footstep\"");
+            } else {
+                h.argument = "anim:" + next().text;
+            }
         } else {
             std::string guess = str::closest(t.text, triggers);
-            error(t.loc, "unknown_trigger", "unknown trigger '" + t.text + "' (use start, tick, event, key, click)",
+            error(t.loc, "unknown_trigger", "unknown trigger '" + t.text + "' (use start, tick, event, key, click, anim)",
                   guess.empty() ? "" : "did you mean '" + guess + "'?");
         }
         scopes_.clear();
@@ -921,7 +932,7 @@ behavior Patrol
   end
 end
 
-Triggers:   on start | on tick | on event "name" | on key "space" | on click
+Triggers:   on start | on tick | on event "name" | on key "space" | on click | on anim "footstep" (animation event)
 Statements: let x = v | target = v | set target to v | if c then .. elif c then .. else .. end
             every <sec> .. end | after <sec> .. end | repeat <n> times .. end   (n <= 1000)
             move <e> by <vec> | move <e> toward <point|entity> at <speed> | rotate <e> by <deg vec>
@@ -938,6 +949,8 @@ Functions:  find(name) nearest(tag) count(tag) tagged(e, tag) exists(e) spawn(me
             clamp(x, lo, hi) lerp(a, b, t) random() random(hi) random(lo, hi) chance(p) key(name) str(v)
 Effects:    burst(n) / burst(e, n) emits n particles now (particles component; explosions, muzzle flashes)
             water_height(x, z) / water_height(pos): the animated water surface height (boats, buoyancy)
+Animation:  set_param(e, "speed", v) trigger(e, "jump") play_animation(e, "wave", fade?, loop?) anim_state(e)
+            play_sequence(e, from?)  (animator / sequencer components; see animation_list)
             e.particles.rate / .emitting / .colorStart ... and e.water.windSpeed ... like any component
 Comments:   -- comment   // comment   # comment (a '#' followed by a space)
 Rules:      no while-loops (every handler always terminates); randomness is seeded (replayable);

@@ -176,6 +176,8 @@ public:
     Json stateJson() const;
     /// Seconds one cycle of a state takes at its current blend weights.
     float stateDuration(int layer, int state) const;
+    /// Same for the state a layer is playing now.
+    float currentDuration(int layer = 0) const;
 
 private:
     struct Motion {
