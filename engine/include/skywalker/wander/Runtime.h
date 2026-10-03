@@ -82,6 +82,16 @@ public:
 
     std::vector<RuntimeMessage> drainMessages();
 
+    // --- Access for native code and tools ----------------------------------------------
+    /// Adds a log line (shows in the editor console and `logs`).
+    void log(EntityId entity, std::string text, std::string script = "native");
+    /// Entity var by name, as scripts see it during play (none if unset).
+    Value getVar(EntityId entity, std::string_view name);
+    void setVar(EntityId entity, std::string_view name, Value value);
+    /// Destroys an entity: at the end of the tick while scripts run, otherwise now.
+    void destroyEntity(EntityId entity);
+    bool ticking() const { return ticking_; }
+
     double time() const { return time_; }
     uint64_t frame() const { return frame_; }
     Random& rng() { return rng_; }
@@ -168,6 +178,7 @@ private:
     Random rng_;
     double time_ = 0;
     uint64_t frame_ = 0;
+    bool ticking_ = false;
     std::unordered_map<std::type_index, void*> services_;
     std::string projectDir_;
     std::unordered_map<uint64_t, std::shared_ptr<const NativeProgram>> native_;

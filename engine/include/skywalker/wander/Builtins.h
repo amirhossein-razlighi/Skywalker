@@ -71,6 +71,7 @@ public:
 
     // --- arguments -----------------------------------------------------------------
     int argc() const { return argc_; }
+    const Value* args() const { return args_; }
     const Value& arg(int i) const { return args_[i]; }
     Value& mutArg(int i) { return args_[i]; }  // methods: args 0 is the receiver
     double number(int i) const;
@@ -148,6 +149,7 @@ struct BuiltinDef {
     bool mutates = false;  // method changes its receiver (written back to the variable/property)
     bool hidden = false;   // statement helpers (not listed in references)
     std::string owner;     // who registered it ("core", "engine", "native:<module>")
+    std::shared_ptr<void> keepAlive;  // owns what `user` points to (lives as long as the definition)
 
     int minArgs() const;
     int maxArgs() const;  // -1 = variadic

@@ -1296,6 +1296,33 @@ void Runtime::clearNative() { native_.clear(); }
 
 std::string Runtime::currentState(EntityId e) const { return currentStateOf(*impl_, scene_, e); }
 
+void Runtime::log(EntityId entity, std::string text, std::string script) {
+    impl_->messages.push_back({RuntimeMessage::Kind::Log, entity, std::move(script), 0, std::move(text), {}});
+}
+
+Value Runtime::getVar(EntityId entity, std::string_view name) {
+    if (!scene_.exists(entity)) return {};
+    return getEntityVar(*impl_, scene_, entity, intern(name));
+}
+
+void Runtime::setVar(EntityId entity, std::string_view name, Value value) {
+    if (!scene_.exists(entity)) return;
+    setEntityVar(*impl_, scene_, entity, intern(name), std::move(value));
+    if (!ticking_) {
+        // Outside a tick, mirror right away so the scene shows it.
+        if (EntityRecord* rec = scene_.record(entity)) rec->vars[std::string(name)] = toJson(getVar(entity, name));
+    }
+}
+
+void Runtime::destroyEntity(EntityId entity) {
+    if (!scene_.exists(entity)) return;
+    if (ticking_) {
+        impl_->toDestroy.push_back(entity);
+    } else {
+        scene_.destroy(entity);
+    }
+}
+
 // --- scheduling ------------------------------------------------------------------------
 
 namespace {
@@ -1579,6 +1606,7 @@ void Runtime::tick(float dt, const InputState& input) {
     Impl& impl = *impl_;
     if (impl.stack.empty()) impl.stack.resize(kStackSize);
     compileScripts();
+    ticking_ = true;
     impl.dt = dt;
     impl.input = &input;
     impl.pending = std::move(impl.nextPending);
@@ -1672,6 +1700,7 @@ void Runtime::tick(float dt, const InputState& input) {
     impl.lastRevision = scene_.revision();
     impl.revisionValid = true;
     impl.input = nullptr;
+    ticking_ = false;
     time_ += dt;
     ++frame_;
 }
