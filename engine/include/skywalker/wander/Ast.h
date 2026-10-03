@@ -86,7 +86,7 @@ struct Stmt {
     Stmt(Kind k, SourceLoc l) : kind(k), loc(l) {}
 };
 
-enum class Trigger { Start, Tick, Event, Key, Click };
+enum class Trigger { Start, Tick, Event, Key, Click, Action };
 const char* toString(Trigger t);
 
 struct Handler {

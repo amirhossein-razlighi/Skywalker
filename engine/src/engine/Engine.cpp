@@ -63,6 +63,19 @@ Engine::Engine(EngineConfig config)
         float h = 0;
         return waterHeight(x, z, h) ? h : 0.f;
     };
+    // audio & input builtins and project settings
+    audio_ = std::make_unique<audio::AudioSystem>(audio::AudioSystem::Config{
+        config_.audio, [this](const std::string& path) { return resolvePath(path); }});
+    runtime_->playAudio = [this](EntityId e) { return audio_->playEntity(*scene_, e); };
+    runtime_->stopAudio = [this](EntityId e) { audio_->stopEntity(e); };
+    runtime_->playSound = [this](const std::string& clip, float volume, EntityId at) {
+        std::optional<Vec3> position;
+        if (at != kNoEntity && scene_->exists(at)) position = scene_->worldMatrix(at).translation();
+        return audio_->playOneShot(clip, volume, "sfx", position);
+    };
+    runtime_->playMusic = [this](const std::string& clip, float fade) { return audio_->playMusic(clip, fade); };
+    runtime_->setBusVolume = [this](const std::string& bus, float v) { audio_->setBusVolume(bus, v); };
+    reloadProjectSettings(/*force=*/true);
     registerEngineTools(*this);
     log::info("engine", std::string("Skywalker ") + SKY_VERSION_STRING + " ready (renderer: " + renderer_->info().backend +
                             " " + renderer_->info().device + ")");
@@ -173,6 +186,7 @@ void Engine::stop() {
     runtime_->reset();
     particles_.reset();
     input_ = {};
+    audio_->stopAll();
     std::erase_if(selection_, [&](EntityId id) { return !scene_->exists(id); });
     emitEvent(Json::object({{"type", "play_state"}, {"state", "editing"}}));
 }
@@ -183,11 +197,12 @@ void Engine::step(int ticks) {
         pause();
     }
     for (int i = 0; i < ticks; ++i) {
+        actionMap_.evaluate(input_);  // device state + agent input -> actions for this tick
         runtime_->tick(kFixedDt, input_);
         particles_.update(*scene_, static_cast<float>(kFixedDt));
-        input_.pressed.clear();
-        input_.clicked.clear();
+        input_.endTick();
     }
+    if (ticks > 0) audio_->update(*scene_, audio::Phase::Playing, ticks * static_cast<double>(kFixedDt), listenerPose());
     for (auto& m : runtime_->drainMessages()) {
         Json j = m.toJson();
         messages_.push_back(j);
@@ -212,7 +227,15 @@ void Engine::update(double seconds) {
         previewTime_ += dt;
         particles_.update(*scene_, dt);
     }
-    if (playState_ != PlayState::Playing) return;
+    settingsTimer_ += seconds;
+    if (settingsTimer_ >= 2.0) {
+        settingsTimer_ = 0;
+        reloadProjectSettings();  // input.json / audio.json edited on disk
+    }
+    if (playState_ != PlayState::Playing) {
+        audio_->update(*scene_, playState_ == PlayState::Paused ? audio::Phase::Paused : audio::Phase::Editing, seconds, std::nullopt);
+        return;
+    }
     accumulator_ += std::min(seconds, 0.25);  // avoid spiral of death after stalls
     int ticks = 0;
     while (accumulator_ >= kFixedDt) {
@@ -462,6 +485,90 @@ void Engine::endDrag() {
 // Scene files & assets
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Audio & input project settings
+// ---------------------------------------------------------------------------
+
+std::optional<audio::ListenerPose> Engine::listenerPose() {
+    ViewCamera cam;
+    if (!sceneCamera(*scene_, cam)) return std::nullopt;
+    audio::ListenerPose pose;
+    pose.position = cam.eye;
+    pose.forward = normalize(cam.target - cam.eye);
+    pose.up = cam.up;
+    return pose;
+}
+
+namespace {
+
+int64_t fileTime(const std::string& path) {
+    std::error_code ec;
+    auto t = fs::last_write_time(path, ec);
+    if (ec) return -1;
+    return std::chrono::duration_cast<std::chrono::nanoseconds>(t.time_since_epoch()).count();
+}
+
+Result<Json> readJson(const std::string& path) {
+    std::ifstream f(path);
+    if (!f) return Error::make("io_error", "cannot read " + path);
+    std::stringstream ss;
+    ss << f.rdbuf();
+    return Json::parse(ss.str());
+}
+
+Status writeText(const std::string& path, const std::string& text) {
+    std::ofstream f(path);
+    if (!f) return Error::make("io_error", "cannot write " + path);
+    f << text << "\n";
+    if (!f) return Error::make("io_error", "cannot write " + path);
+    return {};
+}
+
+}  // namespace
+
+void Engine::reloadProjectSettings(bool force) {
+    const std::string inputPath = resolvePath("input.json"), audioPath = resolvePath("audio.json");
+    const int64_t it = fileTime(inputPath), at = fileTime(audioPath);
+    if (force || it != inputFileTime_) {
+        inputFileTime_ = it;
+        if (it < 0) {
+            actionMap_ = input::ActionMap::defaults();
+        } else if (auto j = readJson(inputPath)) {
+            auto map = input::ActionMap::fromJson(*j);
+            if (map) actionMap_ = std::move(*map);
+            else log::warn("input", "input.json: " + map.error().message);
+        } else {
+            log::warn("input", "input.json: " + j.error().message);
+        }
+    }
+    if (force || at != audioFileTime_) {
+        audioFileTime_ = at;
+        if (at < 0) {
+            audio_->setMix(audio::MixSettings{});
+        } else if (auto j = readJson(audioPath)) {
+            auto mix = audio::MixSettings::fromJson(*j);
+            if (mix) audio_->setMix(*mix);
+            else log::warn("audio", "audio.json: " + mix.error().message);
+        } else {
+            log::warn("audio", "audio.json: " + j.error().message);
+        }
+    }
+}
+
+Status Engine::setAudioMix(const audio::MixSettings& mix) {
+    if (Status s = writeText(resolvePath("audio.json"), mix.toJson().dump(2)); !s) return s;
+    audioFileTime_ = fileTime(resolvePath("audio.json"));
+    audio_->setMix(mix);
+    return {};
+}
+
+Status Engine::setActionMap(input::ActionMap map) {
+    if (Status s = writeText(resolvePath("input.json"), map.toJson().dump(2)); !s) return s;
+    inputFileTime_ = fileTime(resolvePath("input.json"));
+    actionMap_ = std::move(map);
+    return {};
+}
+
 std::string Engine::resolvePath(const std::string& path) const {
     if (path.empty()) return path;
     fs::path p(path);
@@ -588,6 +695,7 @@ std::vector<std::string> Engine::refreshAssets() {
             case AssetType::Texture: renderer_->invalidate(resolvePath(path)); break;
             case AssetType::Material: materials_.erase(path); break;
             case AssetType::Prefab: prefabs_.erase(path); break;
+            case AssetType::Audio: audio_->invalidate(path); break;
             default: break;
         }
     }

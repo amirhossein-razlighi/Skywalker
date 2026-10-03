@@ -248,3 +248,6 @@ struct Environment {
 };
 
 }  // namespace sky
+
+// Components of other subsystems (each in its own header).
+#include "skywalker/ecs/AudioComponents.h"

@@ -18,16 +18,14 @@
 
 #include "skywalker/core/Json.h"
 #include "skywalker/core/Random.h"
+#include "skywalker/input/InputState.h"
 #include "skywalker/scene/Scene.h"
 #include "skywalker/wander/Ast.h"
 
 namespace sky::wander {
 
-struct InputState {
-    std::set<std::string> held;     // keys currently held ("w", "space", "left", ...)
-    std::set<std::string> pressed;  // keys pressed since last tick
-    std::vector<EntityId> clicked;  // entities clicked since last tick
-};
+/// Raw devices plus the evaluated input actions (see skywalker/input/InputState.h).
+using InputState = input::InputState;
 
 struct RuntimeMessage {
     enum class Kind { Log, Error, Compile } kind = Kind::Log;
@@ -69,6 +67,13 @@ public:
     std::function<void(EntityId emitter, int count)> burst;
     /// Water surface height for water_height(); set by the engine (ocean simulation).
     std::function<float(float x, float z)> waterHeight;
+
+    // audio builtins: set by the engine (audio system). Each returns an error message, "" on success.
+    std::function<std::string(EntityId entity)> playAudio;                                    // play(e)
+    std::function<void(EntityId entity)> stopAudio;                                           // stop_sound(e)
+    std::function<std::string(const std::string& clip, float volume, EntityId at)> playSound;  // play_sound(path, volume?) at an entity
+    std::function<std::string(const std::string& clip, float fadeSeconds)> playMusic;         // music(path, fade?)
+    std::function<void(const std::string& bus, float volume)> setBusVolume;                   // set_volume(bus, v)
 
     /// Maximum AST nodes evaluated per handler invocation.
     static constexpr int kBudget = 200000;

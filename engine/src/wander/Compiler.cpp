@@ -18,6 +18,7 @@ const char* toString(Trigger t) {
         case Trigger::Event: return "event";
         case Trigger::Key: return "key";
         case Trigger::Click: return "click";
+        case Trigger::Action: return "action";
     }
     return "?";
 }
@@ -186,6 +187,10 @@ const std::unordered_map<std::string, FnSig>& functions() {
         {"round", {1, 1}},    {"sign", {1, 1}},      {"min", {2, 2}},       {"max", {2, 2}},
         {"clamp", {3, 3}},    {"lerp", {3, 3}},      {"random", {0, 2}},    {"chance", {1, 1}},
         {"burst", {1, 2}},    {"water_height", {1, 2}},
+        // audio builtins
+        {"play", {1, 1}},     {"play_sound", {1, 2}}, {"stop_sound", {1, 1}}, {"music", {1, 2}}, {"set_volume", {2, 2}},
+        // input builtins
+        {"action", {1, 1}},   {"pressed", {1, 1}},    {"released", {1, 1}},   {"axis", {1, 1}},
         {"vec", {3, 3}},      {"color", {3, 4}},     {"length", {1, 1}},    {"normalize", {1, 1}},
         {"dot", {2, 2}},      {"cross", {2, 2}},     {"key", {1, 1}},       {"exists", {1, 1}},
         {"str", {1, 1}},      {"spawn", {1, 3}},     {"tagged", {2, 2}},    {"forward", {1, 1}},
@@ -346,16 +351,16 @@ private:
         Handler h;
         h.loc = next().loc;  // 'on'
         const Token& t = next();
-        static const std::vector<std::string> triggers{"start", "tick", "event", "key", "click"};
+        static const std::vector<std::string> triggers{"start", "tick", "event", "key", "click", "action"};
         if (t.text == "start") {
             h.trigger = Trigger::Start;
         } else if (t.text == "tick" || t.text == "update") {
             h.trigger = Trigger::Tick;
-        } else if (t.text == "event" || t.text == "key") {
-            h.trigger = t.text == "event" ? Trigger::Event : Trigger::Key;
+        } else if (t.text == "event" || t.text == "key" || t.text == "action") {
+            h.trigger = t.text == "event" ? Trigger::Event : t.text == "key" ? Trigger::Key : Trigger::Action;
             if (peek().kind != Tok::String) {
                 error(peek().loc, "expected_string", "'on " + t.text + "' needs a quoted name, e.g. on " + t.text +
-                                                         (t.text == "key" ? " \"space\"" : " \"door_opened\""));
+                                                         (t.text == "key" ? " \"space\"" : t.text == "action" ? " \"jump\"" : " \"door_opened\""));
             } else {
                 h.argument = next().text;
             }
@@ -363,7 +368,7 @@ private:
             h.trigger = Trigger::Click;
         } else {
             std::string guess = str::closest(t.text, triggers);
-            error(t.loc, "unknown_trigger", "unknown trigger '" + t.text + "' (use start, tick, event, key, click)",
+            error(t.loc, "unknown_trigger", "unknown trigger '" + t.text + "' (use start, tick, event, key, click, action)",
                   guess.empty() ? "" : "did you mean '" + guess + "'?");
         }
         scopes_.clear();
@@ -921,7 +926,7 @@ behavior Patrol
   end
 end
 
-Triggers:   on start | on tick | on event "name" | on key "space" | on click
+Triggers:   on start | on tick | on event "name" | on key "space" | on click | on action "jump"
 Statements: let x = v | target = v | set target to v | if c then .. elif c then .. else .. end
             every <sec> .. end | after <sec> .. end | repeat <n> times .. end   (n <= 1000)
             move <e> by <vec> | move <e> toward <point|entity> at <speed> | rotate <e> by <deg vec>
@@ -936,6 +941,11 @@ Functions:  find(name) nearest(tag) count(tag) tagged(e, tag) exists(e) spawn(me
             distance(a, b) direction(a, b) forward(e) length(v) normalize(v) dot(a, b) cross(a, b)
             vec(x, y, z) color(r, g, b, a?) sin cos tan abs sqrt floor ceil round sign min max
             clamp(x, lo, hi) lerp(a, b, t) random() random(hi) random(lo, hi) chance(p) key(name) str(v)
+Input:      action("jump") held? pressed("jump") this tick? released("jump") axis("move") -> number, or vec (x, y, 0)
+            for 2D actions (x right, y forward/up); `on action "jump"` fires when it is pressed. Actions come from
+            input.json (see the input_map tool): keyboard, mouse and gamepad share the same names.
+Audio:      play(e) starts e's audio component; play_sound("audio/hit.wav", volume?) one-shot at self; stop_sound(e)
+            music("audio/theme.wav", fade?) crossfades the music (music("") fades out); set_volume("music", 0.5)
 Effects:    burst(n) / burst(e, n) emits n particles now (particles component; explosions, muzzle flashes)
             water_height(x, z) / water_height(pos): the animated water surface height (boats, buoyancy)
             e.particles.rate / .emitting / .colorStart ... and e.water.windSpeed ... like any component

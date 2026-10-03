@@ -58,6 +58,8 @@ void Scene::registerKinds() {
     kinds_.push_back(makeReflectedKind<ParticleEmitter>());
     kinds_.push_back(makeReflectedKind<Water>());
     kinds_.push_back(makeReflectedKind<FluidVolume>());
+    kinds_.push_back(makeReflectedKind<AudioSource>());
+    kinds_.push_back(makeReflectedKind<AudioListener>());
 }
 
 const ComponentKind* Scene::componentKind(std::string_view n) const {
