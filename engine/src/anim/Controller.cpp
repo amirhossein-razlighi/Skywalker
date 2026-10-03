@@ -1062,7 +1062,12 @@ void AnimatorRuntime::update(float dt, std::vector<Event>* events, Vec3* rootDel
             float lo = std::max(std::floor(from - e) + 1.f, 0.f), hi = std::floor(now - e);
             return hi >= lo ? static_cast<int>(std::min(hi - lo + 1.f, 4.f)) : 0;
         };
-        if (events) {
+        float layerWeight = 1.f;  // silent layers (weight 0) play on but fire no events
+        if (li > 0) {
+            layerWeight = layer.def->weight;
+            if (!layer.def->weightParam.empty()) layerWeight *= std::clamp(param(layer.def->weightParam).value_or(0.f), 0.f, 1.f);
+        }
+        if (events && layerWeight > 1e-4f) {
             for (const auto& e : def.events) {
                 for (int k = crossings(e.time); k > 0; --k) events->push_back({e.name, def.name, static_cast<int>(li)});
             }

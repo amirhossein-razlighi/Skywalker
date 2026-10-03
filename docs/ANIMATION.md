@@ -285,6 +285,8 @@ did-you-mean hints. The `animator` fields are also properties: `self.animator.sp
   effectors from gameplay raycasts), no full-body IK.
 - Root motion is translation only (no root yaw).
 - Retargeting is by bone name with hips-translation scaling (no pose-space retargeting).
+- Sequencer `mesh.color` / `mesh.emissive` keys show on entities with inline surfaces; an
+  entity using a material asset (`mesh.material`) takes its look from the asset.
 
 ## Test models
 
