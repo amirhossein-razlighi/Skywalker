@@ -147,6 +147,16 @@ struct Mat4 {
 
     static Mat4 trs(Vec3 t, Vec3 eulerDeg, Vec3 s) { return translate(t) * rotateEulerDeg(eulerDeg) * scale(s); }
 
+    /// Rotation from a unit quaternion (x, y, z, w).
+    static Mat4 fromQuat(Vec4 q) {
+        float x = q.x, y = q.y, z = q.z, w = q.w;
+        Mat4 r;
+        r.at(0, 0) = 1 - 2 * (y * y + z * z); r.at(1, 0) = 2 * (x * y - z * w);     r.at(2, 0) = 2 * (x * z + y * w);
+        r.at(0, 1) = 2 * (x * y + z * w);     r.at(1, 1) = 1 - 2 * (x * x + z * z); r.at(2, 1) = 2 * (y * z - x * w);
+        r.at(0, 2) = 2 * (x * z - y * w);     r.at(1, 2) = 2 * (y * z + x * w);     r.at(2, 2) = 1 - 2 * (x * x + y * y);
+        return r;
+    }
+
     /// Right-handed perspective, depth [0,1].
     static Mat4 perspective(float fovYRad, float aspect, float zNear, float zFar) {
         Mat4 r;

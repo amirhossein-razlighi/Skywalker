@@ -3,6 +3,7 @@
 
 #include <string>
 #include <string_view>
+#include <cstdint>
 #include <vector>
 
 namespace sky::str {
@@ -22,6 +23,8 @@ size_t editDistance(std::string_view a, std::string_view b);
 std::string closest(std::string_view word, const std::vector<std::string>& candidates, size_t maxDistance = 2);
 
 std::string base64Encode(const void* data, size_t size);
+/// Decodes standard base64 (whitespace ignored). Returns false on invalid input.
+bool base64Decode(std::string_view text, std::vector<uint8_t>& out);
 
 /// Locale-independent double parsing of the whole input (std::from_chars for floating point
 /// needs macOS 26, so we parse in the "C" locale explicitly). Returns false on failure.

@@ -6,6 +6,7 @@ struct AgentTool: Sendable {
     var description: String
     var inputSchema: JSON
     var readOnly: Bool
+    var category = "crew"
 }
 
 struct ToolCall: Sendable, Identifiable {
@@ -30,6 +31,7 @@ struct AssistantTurn: Sendable {
     var text: String
     var toolCalls: [ToolCall]
     var stop: StopKind
+    var usage = TokenUsage()
 }
 
 enum ProviderError: LocalizedError {
@@ -162,7 +164,11 @@ final class AnthropicSession: LLMSession {
         case "refusal": stop = .refusal(response["stop_details"]["explanation"].string ?? "declined")
         case let other: stop = .other(other ?? "unknown")
         }
-        return AssistantTurn(text: text, toolCalls: calls, stop: calls.isEmpty ? stop : .toolUse)
+        let u = response["usage"]
+        let usage = TokenUsage(input: (u["input_tokens"].int ?? 0) + (u["cache_creation_input_tokens"].int ?? 0),
+                               output: u["output_tokens"].int ?? 0, cacheRead: u["cache_read_input_tokens"].int ?? 0,
+                               requests: 1)
+        return AssistantTurn(text: text, toolCalls: calls, stop: calls.isEmpty ? stop : .toolUse, usage: usage)
     }
 }
 
@@ -229,6 +235,11 @@ final class OpenAICompatibleSession: LLMSession {
         case "content_filter": stop = .refusal("content filter")
         default: stop = .done
         }
-        return AssistantTurn(text: message["content"].string ?? "", toolCalls: calls, stop: calls.isEmpty ? stop : .toolUse)
+        let u = response["usage"]
+        let cached = u["prompt_tokens_details"]["cached_tokens"].int ?? 0
+        let usage = TokenUsage(input: (u["prompt_tokens"].int ?? 0) - cached, output: u["completion_tokens"].int ?? 0,
+                               cacheRead: cached, requests: 1)
+        return AssistantTurn(text: message["content"].string ?? "", toolCalls: calls, stop: calls.isEmpty ? stop : .toolUse,
+                             usage: usage)
     }
 }

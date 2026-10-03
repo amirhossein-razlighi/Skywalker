@@ -16,8 +16,9 @@ interface the editor uses.
 
 ## Highlights
 
-- **One tool surface for everyone.** 35 typed, schema-validated tools (scene, entities,
-  behaviors, simulation, viewport, lighting, history, assets, shaders). The editor UI, the
+- **One tool surface for everyone.** 53 typed, schema-validated tools (scene, entities,
+  world/spatial, behaviors, simulation, viewport, lighting, history, assets, materials,
+  prefabs, shaders). The editor UI, the
   in-editor agents and external agents over **MCP** all use them. Errors come with
   `did you mean …?` hints. → [docs/TOOLS.md](docs/TOOLS.md)
 - **Agents can see.** `viewport_capture` returns a PNG plus every visible entity's screen
@@ -33,11 +34,21 @@ interface the editor uses.
 - **Deterministic simulation** with fixed 60 Hz ticks: agents test gameplay with
   `sim_control step` + `sim_input`, then `stop` restores the scene.
 - **Your crew of Cloudlings.** Specialized agents (director, level designer, gameplay
-  programmer, lighting artist, writer, …) with their own model, autonomy level
-  (observe / ask / autonomous), delegation, and pipelines. Bring Anthropic, any
+  programmer, lighting artist, writer, …), each designed in the **Agent Designer**: model,
+  mission and standing instructions, per-category tool permissions (allow / ask / off),
+  long-term memory, token usage, and sharing as `agents/*.agent.json`. Delegation and
+  pipelines with parallel stages. Bring Anthropic, any
   OpenAI-compatible API, or local models (Ollama, LM Studio, vLLM).
+- **An asset system agents can use.** Stable GUIDs, tags, descriptions and generator
+  provenance in `.meta` sidecars; glTF/GLB and OBJ import; materials and prefabs as files;
+  rendered previews; "who uses this?" queries; safe renames. → [docs/ASSETS.md](docs/ASSETS.md)
+- **Spatial tools.** Triangle-accurate `raycast`, `place_on_surface`, seeded `scatter`
+  (forests in one undo step), four-view `viewport_multi`, and `sim_trace` to verify
+  gameplay numerically.
+- **HDR rendering.** Linear HDR, bloom, ACES tone mapping, color grading, vignette and
+  frustum culling; emissive materials glow.
 - **Generative assets ready.** `asset_request` / `asset_complete` route 3D, texture,
-  sprite, audio, music and video requests to generators; OBJ meshes import directly.
+  sprite, audio, music and video requests to generators and record what prompt made each file.
 - **Pro editor.** Outliner, details with reflected properties and scrubbable fields,
   move/rotate/scale gizmos with snapping, Metal viewport with PBR, sun shadows, MSAA,
   selection outlines, stats, console, activity feed.
@@ -95,7 +106,8 @@ build/debug/bin/skywalker render examples/hello_sky/scenes/main.sky.json -o shot
 |---|---|
 | [ARCHITECTURE](docs/ARCHITECTURE.md) | Layers, threading, data flow, design decisions |
 | [WANDER](docs/WANDER.md) | The behavior language and the ECPS model |
-| [AGENTS](docs/AGENTS.md) | MCP, the crew, providers, generative assets |
+| [AGENTS](docs/AGENTS.md) | MCP, the crew, Agent Designer, providers, generative assets |
+| [ASSETS](docs/ASSETS.md) | Asset database, glTF, materials, prefabs, spatial tools |
 | [TOOLS](docs/TOOLS.md) | Generated reference of every tool |
 | [DEVELOPMENT](docs/DEVELOPMENT.md) | Building, testing, sanitizers, profiling, conventions |
 | [ROADMAP](docs/ROADMAP.md) | What's next |

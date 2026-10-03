@@ -116,6 +116,33 @@ std::string base64Encode(const void* data, size_t size) {
     return out;
 }
 
+bool base64Decode(std::string_view text, std::vector<uint8_t>& out) {
+    auto val = [](char c) -> int {
+        if (c >= 'A' && c <= 'Z') return c - 'A';
+        if (c >= 'a' && c <= 'z') return c - 'a' + 26;
+        if (c >= '0' && c <= '9') return c - '0' + 52;
+        if (c == '+' || c == '-') return 62;
+        if (c == '/' || c == '_') return 63;
+        return -1;
+    };
+    out.clear();
+    uint32_t acc = 0;
+    int bits = 0;
+    for (char c : text) {
+        if (c == '=' ) break;
+        if (std::isspace(static_cast<unsigned char>(c))) continue;
+        int v = val(c);
+        if (v < 0) return false;
+        acc = (acc << 6) | static_cast<uint32_t>(v);
+        bits += 6;
+        if (bits >= 8) {
+            bits -= 8;
+            out.push_back(static_cast<uint8_t>((acc >> bits) & 0xFF));
+        }
+    }
+    return true;
+}
+
 bool parseDouble(std::string_view text, double& out) {
     if (text.empty() || text.size() > 512) return false;
     std::string buf(text);  // NUL-terminated copy for strtod

@@ -53,12 +53,23 @@ The crew lives in the editor's **Agents** dock. Each Cloudling has:
 | Role | Creative Director, Level Designer, Gameplay Programmer, Lighting Artist, Writer, Asset Artist, QA Tester. The role becomes part of its system prompt. |
 | Provider and model | Anthropic (Messages API; default `claude-opus-5-5`), or any OpenAI-compatible API: OpenAI, DeepSeek, OpenRouter, Groq, or local Ollama / LM Studio / vLLM / llama.cpp. Keys live in the macOS Keychain. |
 | Autonomy | *Observe* (read-only tools), *Ask* (each mutating call waits for your Allow/Decline), *Autonomous*. |
+| Permissions | Per tool category (scene, entities, world, assets, behaviors, simulation, viewport, files, rendering): *Default* (follow autonomy), *Allow*, *Ask*, or *Off* (the tools are not even offered to the model). Categories come from each tool's `_meta["skywalker/category"]`. |
+| Mission and instructions | Override the role's mission; add standing instructions such as style guides, naming rules or constraints. |
+| Memory | Long-term notes the agent keeps with `memory_note` / `memory_forget`. They appear in its instructions at the start of every conversation and can be edited in the designer. |
+| Rounds | Max tool rounds per message (default 40). |
+| Usage | Input, cached and output tokens per agent, as reported by the provider. Shown in the chat header and designer. |
+
+Open the **Agent Designer** from the slider button in a chat header, or in Settings → Crew.
+**Save to Project** writes `agents/<name>.agent.json` (everything but provider ids and keys),
+so a team can commit and share its crew. Settings → Crew lists the project's agent files to load.
 
 How the crew works together:
 - **Delegation.** The Creative Director gets an extra `crew_delegate` tool, so it can
   plan, hand tasks to teammates, and review their reports.
-- **Pipelines.** Ordered steps, each a Cloudling plus an instruction. Every step receives
-  the goal and the earlier steps' reports.
+- **Pipelines.** Ordered stages, each a Cloudling plus an instruction. Mark a step
+  *parallel* (branch icon) to run it at the same time as the previous step. Each stage
+  receives the goal plus every earlier stage's report, and parallel agents are told who
+  else is working.
 - **Weave.** From any behavior's intent, Weave asks the gameplay programmer to write,
   check, attach and test the Wander code.
 

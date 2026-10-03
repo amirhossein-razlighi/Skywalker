@@ -83,6 +83,7 @@ public:
     }
     Status present(void*) override { return {}; }
     Status uploadMesh(const std::string&, const MeshData&) override { return {}; }
+    void invalidate(const std::string&) override {}
     Status reloadShaders(const std::string&) override {
         return Error::make("unsupported", "the null renderer has no shaders");
     }

@@ -8,6 +8,7 @@
 // screen, picking — is computed on the CPU from FrameData, so it behaves identically on
 // every backend (and in headless tests).
 
+#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
@@ -65,6 +66,8 @@ struct DrawItem {
     float metallic = 0;
     float roughness = 0.5f;
     bool selected = false;
+    bool unlit = false;
+    Vec2 tiling{1, 1};
     Aabb worldBounds;
 };
 
@@ -102,10 +105,22 @@ struct FrameData {
     Mat4 viewProjection() const { return projection * view; }
 };
 
+struct ResolvedMaterial {
+    Vec4 color;
+    float metallic = 0;
+    float roughness = 0.5f;
+    Vec4 emissive;
+    std::string texture;
+    Vec2 tiling{1, 1};
+    bool unlit = false;
+};
+
 struct BuildOptions {
     bool editorOverlays = true;  // grid, selection highlight
     std::vector<EntityId> selection;
     float time = 0;
+    /// Resolves MeshRenderer::material paths (provided by the engine's asset system).
+    std::function<const ResolvedMaterial*(const std::string&)> material;
 };
 
 /// Converts the scene into a renderer-agnostic frame description.
@@ -152,6 +167,8 @@ public:
     virtual Status present(void* surface) = 0;
     /// Uploads a mesh for "asset:<path>" meshes.
     virtual Status uploadMesh(const std::string& key, const struct MeshData& mesh) = 0;
+    /// Drops cached GPU data for a mesh key ("asset:...") or texture path so it reloads.
+    virtual void invalidate(const std::string& key) = 0;
     /// Replaces the shader source at runtime; returns compiler diagnostics on failure.
     virtual Status reloadShaders(const std::string& source) = 0;
     virtual std::string shaderSource() const = 0;

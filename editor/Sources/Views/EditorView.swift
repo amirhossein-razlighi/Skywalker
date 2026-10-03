@@ -1,10 +1,11 @@
 import SwiftUI
 
 enum DockTab: String, CaseIterable, Identifiable {
-    case console = "Console", activity = "Activity", agents = "Agents", pipelines = "Pipelines"
+    case assets = "Assets", console = "Console", activity = "Activity", agents = "Agents", pipelines = "Pipelines"
     var id: String { rawValue }
     var symbol: String {
         switch self {
+        case .assets: "shippingbox"
         case .console: "terminal"
         case .activity: "clock.arrow.circlepath"
         case .agents: "cloud"
@@ -25,7 +26,7 @@ struct EditorView: View {
     @AppStorage("layout.showLeft") private var showLeft = true
     @AppStorage("layout.showRight") private var showRight = true
     @AppStorage("layout.showBottom") private var showBottom = true
-    @State private var dockTab: DockTab = .console
+    @AppStorage("layout.dockTab") private var dockTab: DockTab = .assets
     @State private var focusedAgent: UUID?
 
     var body: some View {
@@ -64,6 +65,7 @@ struct EditorView: View {
         VStack(spacing: 0) {
             PanelTabs(tabs: DockTab.allCases, selection: $dockTab, title: { $0.rawValue }, icon: { $0.symbol })
             switch dockTab {
+            case .assets: AssetBrowser()
             case .console: ConsolePanel()
             case .activity: ActivityPanel()
             case .agents: AgentsPanel(focused: $focusedAgent)

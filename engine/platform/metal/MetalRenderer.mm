@@ -56,6 +56,13 @@ struct DrawUniforms {
     simd_float4 color;
     simd_float4 emissive;
     simd_float4 material;
+    simd_float4 material2;
+};
+
+struct PostUniforms {
+    simd_float4 params;
+    simd_float4 params2;
+    simd_float4 texel;
 };
 
 struct GPULight {
@@ -65,7 +72,9 @@ struct GPULight {
     simd_float4 kind;
 };
 
-constexpr MTLPixelFormat kColorFormat = MTLPixelFormatBGRA8Unorm_sRGB;
+constexpr MTLPixelFormat kColorFormat = MTLPixelFormatBGRA8Unorm_sRGB;  // final LDR image
+constexpr MTLPixelFormat kHDRFormat = MTLPixelFormatRGBA16Float;     // scene + bloom
+constexpr int kBloomLevels = 6;
 constexpr MTLPixelFormat kDepthFormat = MTLPixelFormatDepth32Float;
 constexpr NSUInteger kSamples = 4;
 constexpr NSUInteger kShadowSize = 2048;
@@ -81,6 +90,28 @@ simd_float4 v4(Vec3 v, float w) { return simd_make_float4(v.x, v.y, v.z, w); }
 float toLinear(float c) { return c <= 0.04045f ? c / 12.92f : std::pow((c + 0.055f) / 1.055f, 2.4f); }
 simd_float4 lin(Vec4 c) { return simd_make_float4(toLinear(c.x), toLinear(c.y), toLinear(c.z), c.w); }
 simd_float4 lin(Vec3 c, float w) { return simd_make_float4(toLinear(c.x), toLinear(c.y), toLinear(c.z), w); }
+
+/// View-frustum planes extracted from a view-projection matrix (Gribb/Hartmann, depth [0,1]).
+struct Frustum {
+    simd_float4 planes[6];
+    explicit Frustum(const Mat4& m) {
+        auto row = [&](int r) { return simd_make_float4(m.at(0, r), m.at(1, r), m.at(2, r), m.at(3, r)); };
+        simd_float4 r0 = row(0), r1 = row(1), r2 = row(2), r3 = row(3);
+        planes[0] = r3 + r0;
+        planes[1] = r3 - r0;
+        planes[2] = r3 + r1;
+        planes[3] = r3 - r1;
+        planes[4] = r2;
+        planes[5] = r3 - r2;
+    }
+    bool intersects(const Aabb& b) const {
+        for (const auto& p : planes) {
+            Vec3 v{p.x >= 0 ? b.max.x : b.min.x, p.y >= 0 ? b.max.y : b.min.y, p.z >= 0 ? b.max.z : b.min.z};
+            if (p.x * v.x + p.y * v.y + p.z * v.z + p.w < 0) return false;
+        }
+        return true;
+    }
+};
 
 struct GpuMesh {
     id<MTLBuffer> vertices;
@@ -150,6 +181,11 @@ public:
         }
     }
 
+    void invalidate(const std::string& key) override {
+        meshes_.erase(key);
+        textures_.erase(key);
+    }
+
     Status render(const FrameData& frame) override {
         @autoreleasepool {
             ensureTargets(frame.width, frame.height);
@@ -160,6 +196,8 @@ public:
             cmd.label = @"Skywalker Frame";
             encodeShadows(cmd, frame, fu);
             encodeMain(cmd, frame, fu, lights);
+            encodePost(cmd, frame);
+            encodeOverlays(cmd, frame, fu);
             [cmd commit];
             lastCommand_ = cmd;
             return {};
@@ -239,21 +277,29 @@ private:
         auto fn = [&](const char* name) { return [lib newFunctionWithName:[NSString stringWithUTF8String:name]]; };
         for (const char* required : {"fullscreenVertex", "skyFragment", "meshVertex", "meshFragment", "shadowVertex",
                                      "gridVertex", "gridFragment", "presentFragment", "outlineVertex",
-                                     "outlineFragment", "overlayFragment"}) {
+                                     "outlineFragment", "overlayFragment", "bloomPrefilter", "bloomDown", "bloomUp",
+                                     "compositeFragment"}) {
             if (!fn(required)) {
                 return Error::make("shader_missing_function", std::string("shader source must define ") + required);
             }
         }
 
         auto make = [&](const char* vs, const char* fs, MTLPixelFormat color, NSUInteger samples, bool blend,
-                        bool depth, NSError** err) -> id<MTLRenderPipelineState> {
+                        bool depth, NSError** err, bool additive = false) -> id<MTLRenderPipelineState> {
             MTLRenderPipelineDescriptor* d = [MTLRenderPipelineDescriptor new];
             d.vertexFunction = fn(vs);
             d.fragmentFunction = fs ? fn(fs) : nil;
             d.rasterSampleCount = samples;
             if (color != MTLPixelFormatInvalid) {
                 d.colorAttachments[0].pixelFormat = color;
-                if (blend) {
+                if (additive) {
+                    auto* ca = d.colorAttachments[0];
+                    ca.blendingEnabled = YES;
+                    ca.sourceRGBBlendFactor = MTLBlendFactorOne;
+                    ca.destinationRGBBlendFactor = MTLBlendFactorOne;
+                    ca.sourceAlphaBlendFactor = MTLBlendFactorOne;
+                    ca.destinationAlphaBlendFactor = MTLBlendFactorOne;
+                } else if (blend) {
                     auto* ca = d.colorAttachments[0];
                     ca.blendingEnabled = YES;
                     ca.sourceRGBBlendFactor = MTLBlendFactorSourceAlpha;
@@ -267,15 +313,19 @@ private:
         };
 
         NSError* e = nil;
-        id<MTLRenderPipelineState> sky = make("fullscreenVertex", "skyFragment", kColorFormat, kSamples, false, true, &e);
-        id<MTLRenderPipelineState> mesh = sky ? make("meshVertex", "meshFragment", kColorFormat, kSamples, false, true, &e) : nil;
-        id<MTLRenderPipelineState> meshBlend = mesh ? make("meshVertex", "meshFragment", kColorFormat, kSamples, true, true, &e) : nil;
-        id<MTLRenderPipelineState> grid = meshBlend ? make("gridVertex", "gridFragment", kColorFormat, kSamples, true, true, &e) : nil;
+        id<MTLRenderPipelineState> sky = make("fullscreenVertex", "skyFragment", kHDRFormat, kSamples, false, true, &e);
+        id<MTLRenderPipelineState> mesh = sky ? make("meshVertex", "meshFragment", kHDRFormat, kSamples, false, true, &e) : nil;
+        id<MTLRenderPipelineState> meshBlend = mesh ? make("meshVertex", "meshFragment", kHDRFormat, kSamples, true, true, &e) : nil;
+        id<MTLRenderPipelineState> grid = meshBlend ? make("gridVertex", "gridFragment", kHDRFormat, kSamples, true, true, &e) : nil;
         id<MTLRenderPipelineState> shadow = grid ? make("shadowVertex", nullptr, MTLPixelFormatInvalid, 1, false, true, &e) : nil;
         id<MTLRenderPipelineState> present = shadow ? make("fullscreenVertex", "presentFragment", kColorFormat, 1, false, false, &e) : nil;
-        id<MTLRenderPipelineState> outline = present ? make("outlineVertex", "outlineFragment", kColorFormat, kSamples, false, true, &e) : nil;
-        id<MTLRenderPipelineState> overlay = outline ? make("meshVertex", "overlayFragment", kColorFormat, kSamples, true, true, &e) : nil;
-        if (!overlay) {
+        id<MTLRenderPipelineState> outline = present ? make("outlineVertex", "outlineFragment", kHDRFormat, kSamples, false, true, &e) : nil;
+        id<MTLRenderPipelineState> overlay = outline ? make("meshVertex", "overlayFragment", kColorFormat, 1, true, false, &e) : nil;
+        id<MTLRenderPipelineState> prefilter = overlay ? make("fullscreenVertex", "bloomPrefilter", kHDRFormat, 1, false, false, &e) : nil;
+        id<MTLRenderPipelineState> down = prefilter ? make("fullscreenVertex", "bloomDown", kHDRFormat, 1, false, false, &e) : nil;
+        id<MTLRenderPipelineState> up = down ? make("fullscreenVertex", "bloomUp", kHDRFormat, 1, false, false, &e, true) : nil;
+        id<MTLRenderPipelineState> composite = up ? make("fullscreenVertex", "compositeFragment", kColorFormat, 1, false, false, &e) : nil;
+        if (!composite) {
             return Error::make("pipeline_error", e ? std::string(e.localizedDescription.UTF8String) : "pipeline creation failed");
         }
         skyPipeline_ = sky;
@@ -286,6 +336,10 @@ private:
         presentPipeline_ = present;
         outlinePipeline_ = outline;
         overlayPipeline_ = overlay;
+        bloomPrefilterPipeline_ = prefilter;
+        bloomDownPipeline_ = down;
+        bloomUpPipeline_ = up;
+        compositePipeline_ = composite;
         return {};
     }
 
@@ -301,6 +355,31 @@ private:
         d.usage = MTLTextureUsageRenderTarget | MTLTextureUsageShaderRead;
         resolve_ = [device_ newTextureWithDescriptor:d];
 
+        // HDR resolve target (scene) and the bloom mip chain (half resolution).
+        MTLTextureDescriptor* hd = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:kHDRFormat
+                                                                                      width:w
+                                                                                     height:h
+                                                                                  mipmapped:NO];
+        hd.storageMode = MTLStorageModePrivate;
+        hd.usage = MTLTextureUsageRenderTarget | MTLTextureUsageShaderRead;
+        hdr_ = [device_ newTextureWithDescriptor:hd];
+        MTLTextureDescriptor* bd = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:kHDRFormat
+                                                                                      width:std::max<NSUInteger>(1, w / 2)
+                                                                                     height:std::max<NSUInteger>(1, h / 2)
+                                                                                  mipmapped:YES];
+        bd.mipmapLevelCount = std::min<NSUInteger>(kBloomLevels, bd.mipmapLevelCount);
+        bd.storageMode = MTLStorageModePrivate;
+        bd.usage = MTLTextureUsageRenderTarget | MTLTextureUsageShaderRead | MTLTextureUsagePixelFormatView;
+        bloom_ = [device_ newTextureWithDescriptor:bd];
+        bloomViews_.clear();
+        for (NSUInteger i = 0; i < bloom_.mipmapLevelCount; ++i) {
+            bloomViews_.push_back([bloom_ newTextureViewWithPixelFormat:kHDRFormat
+                                                            textureType:MTLTextureType2D
+                                                                 levels:NSMakeRange(i, 1)
+                                                                 slices:NSMakeRange(0, 1)]);
+        }
+
+        d.pixelFormat = kHDRFormat;
         d.textureType = MTLTextureType2DMultisample;
         d.sampleCount = kSamples;
         d.usage = MTLTextureUsageRenderTarget;
@@ -417,6 +496,7 @@ private:
         du.color = lin(d.color);
         du.emissive = lin(d.emissive);
         du.material = simd_make_float4(d.metallic, d.roughness, d.selected ? 1.f : 0.f, hasTexture ? 1.f : 0.f);
+        du.material2 = simd_make_float4(d.tiling.x, d.tiling.y, d.unlit ? 1.f : 0.f, 0.f);
         return du;
     }
 
@@ -472,7 +552,7 @@ private:
                     const std::vector<GPULight>& lights) {
         MTLRenderPassDescriptor* rp = [MTLRenderPassDescriptor renderPassDescriptor];
         rp.colorAttachments[0].texture = msaaColor_;
-        rp.colorAttachments[0].resolveTexture = resolve_;
+        rp.colorAttachments[0].resolveTexture = hdr_;
         rp.colorAttachments[0].loadAction = MTLLoadActionClear;
         rp.colorAttachments[0].clearColor = MTLClearColorMake(0, 0, 0, 1);
         rp.colorAttachments[0].storeAction = MTLStoreActionMultisampleResolve;
@@ -499,7 +579,13 @@ private:
         [enc setRenderPipelineState:meshPipeline_];
         [enc setDepthStencilState:depthWrite_];
         std::vector<const DrawItem*> blended;
+        const Frustum frustum(frame.viewProjection());
+        culled_ = 0;
         for (const DrawItem& d : frame.draws) {
+            if (!frustum.intersects(d.worldBounds)) {
+                ++culled_;
+                continue;
+            }
             if (d.color.w < 0.999f) {
                 blended.push_back(&d);
                 continue;
@@ -550,10 +636,20 @@ private:
             [enc drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:6];
         }
 
-        // Overlays (gizmos) on top of everything
-        if (!frame.overlays.empty()) {
+        [enc endEncoding];
+    }
+
+    void encodeOverlays(id<MTLCommandBuffer> cmd, const FrameData& frame, const FrameUniforms& fu) {
+        if (frame.overlays.empty()) return;
+        MTLRenderPassDescriptor* rp = [MTLRenderPassDescriptor renderPassDescriptor];
+        rp.colorAttachments[0].texture = resolve_;
+        rp.colorAttachments[0].loadAction = MTLLoadActionLoad;
+        rp.colorAttachments[0].storeAction = MTLStoreActionStore;
+        id<MTLRenderCommandEncoder> enc = [cmd renderCommandEncoderWithDescriptor:rp];
+        enc.label = @"Overlays";
+        [enc setFrontFacingWinding:MTLWindingCounterClockwise];
+        {
             [enc setRenderPipelineState:overlayPipeline_];
-            [enc setDepthStencilState:depthNone_];
             [enc setCullMode:MTLCullModeBack];
             [enc setVertexBytes:&fu length:sizeof(fu) atIndex:2];
             [enc setFragmentBytes:&fu length:sizeof(fu) atIndex:1];
@@ -577,11 +673,55 @@ private:
         [enc endEncoding];
     }
 
+    void fullscreen(id<MTLCommandBuffer> cmd, id<MTLRenderPipelineState> pso, id<MTLTexture> target,
+                    std::initializer_list<id<MTLTexture>> inputs, const PostUniforms& pu, bool load, NSString* label) {
+        MTLRenderPassDescriptor* rp = [MTLRenderPassDescriptor renderPassDescriptor];
+        rp.colorAttachments[0].texture = target;
+        rp.colorAttachments[0].loadAction = load ? MTLLoadActionLoad : MTLLoadActionDontCare;
+        rp.colorAttachments[0].storeAction = MTLStoreActionStore;
+        id<MTLRenderCommandEncoder> enc = [cmd renderCommandEncoderWithDescriptor:rp];
+        enc.label = label;
+        [enc setRenderPipelineState:pso];
+        NSUInteger i = 0;
+        for (id<MTLTexture> t : inputs) [enc setFragmentTexture:t atIndex:i++];
+        [enc setFragmentBytes:&pu length:sizeof(pu) atIndex:0];
+        [enc drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:3];
+        [enc endEncoding];
+    }
+
+    void encodePost(id<MTLCommandBuffer> cmd, const FrameData& frame) {
+        const Environment& env = frame.environment;
+        PostUniforms pu{};
+        pu.params = simd_make_float4(env.exposure, env.bloomIntensity, env.bloomThreshold, env.saturation);
+        pu.params2 = simd_make_float4(env.contrast, env.vignette,
+                                      static_cast<float>(frame.width) / static_cast<float>(std::max(frame.height, 1)), 0);
+        const size_t levels = bloomViews_.size();
+        if (env.bloomIntensity > 0.001f && levels > 0) {
+            pu.texel = simd_make_float4(1.f / hdr_.width, 1.f / hdr_.height, 0, 0);
+            fullscreen(cmd, bloomPrefilterPipeline_, bloomViews_[0], {hdr_}, pu, false, @"Bloom prefilter");
+            for (size_t i = 1; i < levels; ++i) {
+                pu.texel = simd_make_float4(1.f / bloomViews_[i - 1].width, 1.f / bloomViews_[i - 1].height, 0, 0);
+                fullscreen(cmd, bloomDownPipeline_, bloomViews_[i], {bloomViews_[i - 1]}, pu, false, @"Bloom down");
+            }
+            for (size_t i = levels - 1; i > 0; --i) {
+                pu.texel = simd_make_float4(1.f / bloomViews_[i].width, 1.f / bloomViews_[i].height, 0, 0);
+                fullscreen(cmd, bloomUpPipeline_, bloomViews_[i - 1], {bloomViews_[i]}, pu, true, @"Bloom up");
+            }
+        } else {
+            pu.params.y = 0;
+        }
+        pu.texel = simd_make_float4(1.f / hdr_.width, 1.f / hdr_.height, 0, 0);
+        fullscreen(cmd, compositePipeline_, resolve_, {hdr_, levels ? bloomViews_[0] : hdr_}, pu, false, @"Composite");
+    }
+
     id<MTLDevice> device_;
     id<MTLCommandQueue> queue_;
     MTKTextureLoader* textureLoader_;
     id<MTLRenderPipelineState> skyPipeline_, meshPipeline_, meshBlendPipeline_, gridPipeline_, shadowPipeline_,
-        presentPipeline_, outlinePipeline_, overlayPipeline_;
+        presentPipeline_, outlinePipeline_, overlayPipeline_, bloomPrefilterPipeline_, bloomDownPipeline_,
+        bloomUpPipeline_, compositePipeline_;
+    id<MTLTexture> hdr_, bloom_;
+    std::vector<id<MTLTexture>> bloomViews_;
     id<MTLDepthStencilState> depthWrite_, depthRead_, depthNone_;
     id<MTLTexture> resolve_, msaaColor_, msaaDepth_, shadowMap_, white_;
     id<MTLCommandBuffer> lastCommand_;
@@ -589,6 +729,7 @@ private:
     std::unordered_map<std::string, id<MTLTexture>> textures_;
     std::unordered_set<std::string> warnedMeshes_;
     std::string source_;
+    size_t culled_ = 0;
 };
 
 }  // namespace

@@ -1,9 +1,9 @@
 import SwiftUI
 
 enum LeftTab: String, CaseIterable, Identifiable {
-    case outliner = "Outliner", assets = "Assets"
+    case outliner = "Outliner"
     var id: String { rawValue }
-    var symbol: String { self == .outliner ? "list.bullet.indent" : "folder" }
+    var symbol: String { "list.bullet.indent" }
 }
 
 struct OutlinerPanel: View {
@@ -12,10 +12,7 @@ struct OutlinerPanel: View {
     var body: some View {
         VStack(spacing: 0) {
             PanelTabs(tabs: LeftTab.allCases, selection: $tab, title: { $0.rawValue }, icon: { $0.symbol })
-            switch tab {
-            case .outliner: OutlinerView()
-            case .assets: AssetBrowser()
-            }
+            OutlinerView()
         }
         .background(Theme.panel)
     }
@@ -124,6 +121,11 @@ struct OutlinerView: View {
         Button(e.enabled ? "Disable" : "Enable") { engine.call("entity_update", ["entity": id, "enabled": .bool(!e.enabled)]) }
         Button("Unparent") { engine.call("entity_update", ["entity": id, "parent": 0]) }.disabled(e.parent == 0)
         Divider()
+        Button("Save as Prefab") {
+            let slug = e.name.lowercased().map { $0.isLetter || $0.isNumber ? String($0) : "-" }.joined()
+            engine.call("prefab_create", ["entity": id, "path": .string("prefabs/\(slug).prefab.json")])
+        }
+        Divider()
         Button("Delete", role: .destructive) { engine.call("entity_delete", ["entity": id]) }
     }
 }
@@ -221,140 +223,5 @@ struct AddEntityMenu: View {
     private func add(_ args: JSON) {
         let r = engine.call("entity_create", args)
         if let id = r.structured["id"].number { engine.selection = [UInt64(id)] }
-    }
-}
-
-/// Project files: scenes, meshes (OBJ, e.g. from 3D-generation models), images.
-struct AssetBrowser: View {
-    @Environment(EngineStore.self) private var engine
-    @State private var files: [URL] = []
-    @State private var filter = ""
-
-    var body: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 6) {
-                TextField("Filter", text: $filter).textFieldStyle(.plain).font(Theme.label)
-                    .padding(.horizontal, 6).frame(height: 22)
-                    .background(Theme.field, in: RoundedRectangle(cornerRadius: 4))
-                IconButton(symbol: "arrow.clockwise", help: "Rescan") { scan() }
-                IconButton(symbol: "folder", help: "Reveal project in Finder") {
-                    NSWorkspace.shared.activateFileViewerSelecting([engine.projectDirectory])
-                }
-            }
-            .padding(6)
-            List {
-                ForEach(grouped, id: \.0) { group, urls in
-                    Section(group) {
-                        ForEach(urls, id: \.self) { url in
-                            AssetRow(url: url, relative: relative(url)).listRowSeparator(.hidden)
-                        }
-                    }
-                }
-            }
-            .listStyle(.plain)
-            .scrollContentBackground(.hidden)
-            .overlay {
-                if files.isEmpty {
-                    Text("Drop .obj meshes, images and scenes into\n\(engine.projectDirectory.lastPathComponent)/")
-                        .font(Theme.label).foregroundStyle(Theme.textFaint).multilineTextAlignment(.center)
-                }
-            }
-        }
-        .onAppear(perform: scan)
-        .onChange(of: engine.sceneName) { _, _ in scan() }
-    }
-
-    private var grouped: [(String, [URL])] {
-        let visible = files.filter { filter.isEmpty || $0.lastPathComponent.localizedCaseInsensitiveContains(filter) }
-        let groups: [(String, (URL) -> Bool)] = [
-            ("Scenes", { $0.lastPathComponent.hasSuffix(".sky.json") }),
-            ("Meshes", { $0.pathExtension.lowercased() == "obj" }),
-            ("Images", { ["png", "jpg", "jpeg"].contains($0.pathExtension.lowercased()) }),
-            ("Audio", { ["wav", "mp3", "ogg", "m4a"].contains($0.pathExtension.lowercased()) }),
-        ]
-        return groups.compactMap { name, test in
-            let items = visible.filter(test)
-            return items.isEmpty ? nil : (name, items)
-        }
-    }
-
-    private func relative(_ url: URL) -> String {
-        let base = engine.projectDirectory.standardizedFileURL.path
-        let p = url.standardizedFileURL.path
-        return p.hasPrefix(base) ? String(p.dropFirst(base.count + 1)) : p
-    }
-
-    private func scan() {
-        let root = engine.projectDirectory
-        guard let e = FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil,
-                                                     options: [.skipsHiddenFiles, .skipsPackageDescendants]) else { return }
-        var out: [URL] = []
-        for case let url as URL in e where out.count < 2000 {
-            let ext = url.pathExtension.lowercased()
-            if url.lastPathComponent.hasSuffix(".sky.json") || ["obj", "png", "jpg", "jpeg", "wav", "mp3", "ogg", "m4a"].contains(ext) {
-                out.append(url)
-            }
-        }
-        files = out.sorted { $0.lastPathComponent < $1.lastPathComponent }
-    }
-}
-
-private struct AssetRow: View {
-    @Environment(EngineStore.self) private var engine
-    let url: URL
-    let relative: String
-
-    var body: some View {
-        HStack(spacing: 6) {
-            Image(systemName: icon).font(.system(size: 10.5)).foregroundStyle(Theme.textDim).frame(width: 14)
-            Text(url.lastPathComponent).font(Theme.body).lineLimit(1)
-        }
-        .help(relative)
-        .contextMenu { actions }
-        .onTapGesture(count: 2) { primary() }
-    }
-
-    private var icon: String {
-        if url.lastPathComponent.hasSuffix(".sky.json") { return "globe" }
-        switch url.pathExtension.lowercased() {
-        case "obj": return "cube.transparent"
-        case "png", "jpg", "jpeg": return "photo"
-        default: return "waveform"
-        }
-    }
-
-    @ViewBuilder private var actions: some View {
-        if url.lastPathComponent.hasSuffix(".sky.json") {
-            Button("Open Scene") { engine.call("scene_load", ["path": .string(relative)]) }
-        } else if url.pathExtension.lowercased() == "obj" {
-            Button("Add to Scene") { primary() }
-            Button("Assign to Selection") {
-                if let id = engine.selection.first {
-                    engine.call("asset_import_mesh", ["path": .string(relative), "entity": .number(Double(id))])
-                }
-            }
-            .disabled(engine.selection.count != 1)
-        } else if ["png", "jpg", "jpeg"].contains(url.pathExtension.lowercased()) {
-            Button("Apply as Texture to Selection") { primary() }.disabled(engine.selection.isEmpty)
-        }
-        Button("Reveal in Finder") { NSWorkspace.shared.activateFileViewerSelecting([url]) }
-    }
-
-    private func primary() {
-        if url.lastPathComponent.hasSuffix(".sky.json") {
-            engine.call("scene_load", ["path": .string(relative)])
-        } else if url.pathExtension.lowercased() == "obj" {
-            let name = url.deletingPathExtension().lastPathComponent
-            let created = engine.call("entity_create", ["name": .string(name), "position": .vec3(0, 0.5, 0), "mesh": "cube"])
-            if let id = created.structured["id"].number {
-                engine.call("asset_import_mesh", ["path": .string(relative), "entity": .number(id)])
-                engine.selection = [UInt64(id)]
-            }
-        } else if ["png", "jpg", "jpeg"].contains(url.pathExtension.lowercased()) {
-            let ops: [JSON] = engine.selection.map {
-                ["tool": "entity_update", "args": ["entity": .number(Double($0)), "components": ["mesh": ["texture": .string(relative)]]]]
-            }
-            if !ops.isEmpty { engine.call("batch", ["operations": .array(ops), "label": "Apply texture"]) }
-        }
     }
 }

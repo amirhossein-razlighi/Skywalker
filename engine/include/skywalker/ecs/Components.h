@@ -33,6 +33,8 @@ struct MeshRenderer {
     std::string texture;               // optional albedo texture path
     bool visible = true;
     bool billboard = false;  // always faces the camera (handy for 2D sprites)
+    std::string material;    // optional material asset (*.mat.json); overrides the inline values
+    bool unlit = false;      // flat shading without lighting (2D, UI, stylized)
 
     static const TypeInfo& type();
     static const std::vector<std::string>& primitives();
@@ -93,6 +95,12 @@ struct Environment {
     float fogDensity = 0.004f;
     float exposure = 1.f;
     bool showGrid = true;
+    // Post-processing (HDR pipeline)
+    float bloomIntensity = 0.55f;
+    float bloomThreshold = 1.0f;
+    float saturation = 1.05f;
+    float contrast = 1.05f;
+    float vignette = 0.22f;
 
     Vec3 sunDirection() const;  // direction light travels (from sun towards ground)
     static const TypeInfo& type();

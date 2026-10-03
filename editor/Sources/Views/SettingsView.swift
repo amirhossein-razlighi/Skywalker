@@ -3,85 +3,11 @@ import SwiftUI
 struct SettingsView: View {
     var body: some View {
         TabView {
-            Tab("Crew", systemImage: "cloud.fill") { CrewSettings() }
+            Tab("Crew", systemImage: "cloud.fill") { CrewManager() }
             Tab("Providers", systemImage: "brain") { ProviderSettings() }
             Tab("External Agents", systemImage: "antenna.radiowaves.left.and.right") { ExternalAgentSettings() }
         }
-        .frame(width: 680, height: 500)
-    }
-}
-
-private struct CrewSettings: View {
-    @Environment(CrewStore.self) private var crew
-    @State private var selection: UUID?
-
-    var body: some View {
-        @Bindable var crew = crew
-        HSplitView {
-            List(selection: $selection) {
-                ForEach(crew.cloudlings) { c in
-                    HStack {
-                        CloudAvatar(color: c.color, face: c.face, size: 20)
-                        VStack(alignment: .leading) {
-                            Text(c.name)
-                            Text(c.role.title).font(.caption).foregroundStyle(.secondary)
-                        }
-                    }
-                    .tag(c.id)
-                }
-            }
-            .frame(minWidth: 180, maxWidth: 220)
-            .safeAreaInset(edge: .bottom) {
-                HStack {
-                    Button("Add", systemImage: "plus") {
-                        let c = Cloudling(name: "Puff \(crew.cloudlings.count + 1)", roleID: "level", colorHex: "#7fb3ff",
-                                          face: .curious, providerID: crew.providers.first?.id)
-                        crew.cloudlings.append(c)
-                        selection = c.id
-                        crew.save()
-                    }
-                    Button("Remove", systemImage: "minus") {
-                        crew.cloudlings.removeAll { $0.id == selection }
-                        selection = nil
-                        crew.save()
-                    }
-                    .disabled(selection == nil)
-                }
-                .labelStyle(.iconOnly).buttonStyle(.borderless).padding(6)
-            }
-            if let i = crew.cloudlings.firstIndex(where: { $0.id == selection }) {
-                Form {
-                    HStack {
-                        Spacer()
-                        CloudAvatar(color: crew.cloudlings[i].color, face: crew.cloudlings[i].face, size: 64)
-                        Spacer()
-                    }
-                    TextField("Name", text: $crew.cloudlings[i].name)
-                    Picker("Role", selection: $crew.cloudlings[i].roleID) {
-                        ForEach(CrewRole.all) { Label($0.title, systemImage: $0.symbol).tag($0.id) }
-                    }
-                    Picker("Face", selection: $crew.cloudlings[i].face) {
-                        ForEach(CloudFace.allCases, id: \.self) { Text($0.rawValue.capitalized).tag($0) }
-                    }
-                    ColorPicker("Color", selection: Binding(get: { crew.cloudlings[i].color },
-                                                            set: { crew.cloudlings[i].colorHex = $0.hexString }))
-                    Picker("Provider", selection: $crew.cloudlings[i].providerID) {
-                        ForEach(crew.providers) { Text($0.name).tag(Optional($0.id)) }
-                    }
-                    TextField("Model (blank = provider default)", text: $crew.cloudlings[i].model)
-                    Picker("Autonomy", selection: $crew.cloudlings[i].autonomy) {
-                        ForEach(Autonomy.allCases) { Text($0.label).tag($0) }
-                    }
-                    TextField("Personality", text: $crew.cloudlings[i].personality, axis: .vertical)
-                    Text(crew.cloudlings[i].role.mission).font(.caption).foregroundStyle(.secondary)
-                }
-                .formStyle(.grouped)
-                .onDisappear { crew.save() }
-                .onChange(of: crew.cloudlings) { _, _ in crew.save() }
-            } else {
-                ContentUnavailableView("Select a Cloudling", systemImage: "cloud")
-            }
-        }
+        .frame(width: 820, height: 620)
     }
 }
 

@@ -310,6 +310,65 @@ final class EngineStore {
     func key(_ name: String, down: Bool) { sky_input_key(handle, name, down ? 1 : 0) }
     func click(entity: UInt64) { sky_input_click(handle, entity) }
 
+    // MARK: Assets
+
+    static let assetDragPrefix = "skywalker-asset:"
+
+    /// Places a mesh or prefab asset where a viewport pixel points (on the surface under it),
+    /// or in front of the camera's target when `pixel` is nil. Applies materials/textures to
+    /// the object under the cursor.
+    func placeAsset(_ path: String, type: String, at pixel: (x: Float, y: Float, width: Int, height: Int)?) {
+        var position: JSON = .vec3(0, 0, 0)
+        var target: UInt64 = 0
+        if let pixel {
+            let hit = call("raycast", ["x": .number(Double(pixel.x)), "y": .number(Double(pixel.y)),
+                                       "width": .number(Double(pixel.width)), "height": .number(Double(pixel.height))],
+                           actor: "editor").structured
+            if hit["hit"].bool == true {
+                position = hit["point"]
+                target = UInt64(hit["entity"].number ?? 0)
+            }
+        } else {
+            let t = call("camera_set", [:], actor: "editor").structured["target"].array  // current view target
+            if t.count == 3 { position = .array(t) }
+        }
+        let name = ((path as NSString).lastPathComponent as NSString).deletingPathExtension
+            .replacingOccurrences(of: ".prefab", with: "")
+        switch type {
+        case "mesh":
+            let r = call("asset_import", ["path": .string(path), "create_entity": .string(name.capitalized), "position": position])
+            if let id = r.structured["entity"].number {
+                call("place_on_surface", ["entities": [.number(id)]])
+                selection = [UInt64(id)]
+            }
+        case "prefab":
+            let r = call("prefab_instantiate", ["prefab": .string(path), "position": position, "on_surface": true])
+            if let id = r.structured["entity"].number { selection = [UInt64(id)] }
+        case "material", "texture":
+            if target != 0 { assignAsset(path, type: type, to: [target]) }
+        default:
+            break
+        }
+    }
+
+    func assignAsset(_ path: String, type: String, to entities: [UInt64]) {
+        guard !entities.isEmpty else { return }
+        let ids = JSON.array(entities.map { .number(Double($0)) })
+        switch type {
+        case "material":
+            call("material_assign", ["entities": ids, "material": .string(path)])
+        case "texture", "mesh":
+            let field = type == "texture" ? "texture" : "mesh"
+            let value = type == "texture" ? path : "asset:" + path
+            let ops: [JSON] = entities.map {
+                ["tool": "entity_update", "args": ["entity": .number(Double($0)), "components": ["mesh": [field: .string(value)]]]]
+            }
+            call("batch", ["operations": .array(ops), "label": .string("Assign \(type)")])
+        default:
+            break
+        }
+    }
+
     // MARK: Agent server
 
     func setAgentServer(enabled: Bool) {

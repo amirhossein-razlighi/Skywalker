@@ -78,6 +78,9 @@ Conventions: meters; +Y up; entities face −Z; rotations are Euler degrees `[pi
   events emitted *last* tick, then key presses, then clicks, then runs `on tick`.
 - `destroy` is deferred to the end of the tick. `spawn` takes effect immediately; the new
   entity's behaviors start next tick. Limits: 256 spawns per tick, 20,000 entities.
+- `spawn(mesh, pos?, name?)` creates a mesh entity (`"cube"`, `"asset:models/tree.glb"`);
+  `spawn("prefab:prefabs/coin.prefab.json", pos)` instantiates a whole prefab — children,
+  components and behaviors included — and returns its root.
 - A runtime error aborts that handler invocation and is reported. After 5 errors the
   script is disabled.
 - Replacing a behavior while playing restarts its instance state.

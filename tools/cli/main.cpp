@@ -24,6 +24,7 @@
 #include "skywalker/agent/McpServer.h"
 #include "skywalker/agent/SocketServer.h"
 #include "skywalker/core/Log.h"
+#include "skywalker/core/Strings.h"
 #include "skywalker/engine/Engine.h"
 #include "skywalker/wander/Compiler.h"
 
@@ -81,7 +82,7 @@ int usage() {
                  "  skywalker render SCENE -o out.png [--width W] [--height H] [--annotate] [--scene-camera]\n"
                  "  skywalker run SCENE [--ticks N] [-o out.png]\n"
                  "  skywalker check FILE.wander\n"
-                 "  skywalker call TOOL [JSON] [--scene FILE] [--project DIR]\n"
+                 "  skywalker call TOOL [JSON] [--scene FILE] [--project DIR] [-o image.png]\n"
                  "  skywalker call TOOL [JSON] --attach [--as NAME] [--socket PATH]   (on the running editor)\n"
                  "  skywalker tools [--markdown]\n"
                  "  skywalker version\n",
@@ -208,6 +209,18 @@ int runCheck(const Args& args) {
     return r.ok() ? 0 : 1;
 }
 
+/// `call ... -o FILE`: writes the first image a tool returned (previews, captures, multi-views).
+bool saveFirstImage(const Args& args, const std::string& base64) {
+    std::string out = args.get("-o");
+    if (out.empty() || base64.empty()) return false;
+    std::vector<uint8_t> bytes;
+    if (!str::base64Decode(base64, bytes)) return false;
+    std::ofstream f(out, std::ios::binary);
+    f.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
+    if (f) std::printf("wrote %s\n", out.c_str());
+    return static_cast<bool>(f);
+}
+
 /// `call --attach`: one tool call against the running editor over its MCP socket, as a
 /// named client (shows up as `mcp:<name>` in history and the activity feed).
 int runCallAttached(const Args& args, const std::string& tool, const Json& toolArgs) {
@@ -235,7 +248,7 @@ int runCallAttached(const Args& args, const std::string& tool, const Json& toolA
         const Json& result = msg->get("result");
         for (const auto& c : result.get("content").elements()) {
             if (c.get("type").asString() == "text") std::printf("%s\n", c.get("text").asString().c_str());
-            else std::printf("[image %zu base64 bytes]\n", c.get("data").asString().size());
+            else if (!saveFirstImage(args, c.get("data").asString())) std::printf("[image %zu base64 bytes]\n", c.get("data").asString().size());
         }
         return result.get("isError").asBool() ? 1 : 0;
     }
@@ -257,6 +270,7 @@ int runCall(const Args& args) {
         return runCallAttached(args, args.positional[1], a);
     }
     auto engine = makeEngine(args);
+    if (!args.get("--scene").empty() && engine->scenePath().empty()) return 1;  // load error already reported
     Json a = Json::object();
     if (args.positional.size() > 2) {
         auto parsed = Json::parse(args.positional[2]);
@@ -269,7 +283,7 @@ int runCall(const Args& args) {
     ToolResult r = engine->callTool(args.positional[1], a, "cli");
     for (const auto& c : r.content) {
         if (c.type == ContentBlock::Type::Text) std::printf("%s\n", c.text.c_str());
-        else std::printf("[image %s, %zu base64 bytes]\n", c.mimeType.c_str(), c.data.size());
+        else if (!saveFirstImage(args, c.data)) std::printf("[image %s, %zu base64 bytes]\n", c.mimeType.c_str(), c.data.size());
     }
     return r.isError ? 1 : 0;
 }

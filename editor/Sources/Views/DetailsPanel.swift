@@ -182,7 +182,11 @@ struct PropertyGrid: View {
                         .frame(width: Self.labelWidth, alignment: .leading)
                         .lineLimit(1)
                         .help(fieldSchema["description"].string ?? field)
-                    FieldEditor(schema: fieldSchema, value: values[field]) { onChange(field, $0) }
+                    if let kind = AssetField.kind(for: field, schema: fieldSchema) {
+                        AssetField(kind: kind, value: values[field].string ?? "") { onChange(field, .string($0)) }
+                    } else {
+                        FieldEditor(schema: fieldSchema, value: values[field]) { onChange(field, $0) }
+                    }
                 }
                 .frame(minHeight: 20)
             }
@@ -376,5 +380,57 @@ struct WorldSettings: View {
             }
         }
         .task { schema = engine.call("component_schema", ["component": "environment"], actor: "editor").structured["environment"] }
+    }
+}
+
+/// A string field that references a project asset: type a value, pick from a menu of matching
+/// assets, or drop an asset from the browser onto it.
+struct AssetField: View {
+    @Environment(EngineStore.self) private var engine
+    let kind: String  // material | texture | mesh
+    let value: String
+    let onChange: (String) -> Void
+    @State private var targeted = false
+    @State private var options: [String] = []
+
+    static func kind(for field: String, schema: JSON) -> String? {
+        guard schema["type"].string == "string" else { return nil }
+        return ["material": "material", "texture": "texture", "mesh": "mesh"][field]
+    }
+
+    var body: some View {
+        HStack(spacing: 4) {
+            CommitField(text: value, font: Theme.monoSmall) { onChange($0) }
+            Menu {
+                if kind == "mesh" {
+                    Section("Primitives") {
+                        ForEach(["cube", "sphere", "plane", "cylinder", "cone", "quad", "capsule", "torus"], id: \.self) { p in
+                            Button(p) { onChange(p) }
+                        }
+                    }
+                }
+                Section("Project") {
+                    if options.isEmpty { Text("No \(kind) assets") }
+                    ForEach(options, id: \.self) { path in Button(path) { onChange(kind == "mesh" ? "asset:" + path : path) } }
+                }
+                if !value.isEmpty && kind != "mesh" {
+                    Divider()
+                    Button("None") { onChange("") }
+                }
+            } label: { Image(systemName: "shippingbox") }
+            .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+            .help("Choose a \(kind) asset")
+        }
+        .overlay(RoundedRectangle(cornerRadius: 4).stroke(Theme.accent, lineWidth: targeted ? 1.5 : 0))
+        .dropDestination(for: String.self) { items, _ in
+            guard let s = items.first, s.hasPrefix(EngineStore.assetDragPrefix) else { return false }
+            let path = String(s.dropFirst(EngineStore.assetDragPrefix.count))
+            onChange(kind == "mesh" ? "asset:" + path : path)
+            return true
+        } isTargeted: { targeted = $0 }
+        .task(id: engine.revision) {
+            options = engine.call("asset_list", ["type": .string(kind), "limit": 200], actor: "editor")
+                .structured["assets"].array.compactMap { $0["path"].string }
+        }
     }
 }

@@ -40,5 +40,12 @@ MeshData torus(int segments = 64, int sides = 24, float major = 0.35f, float min
 Result<MeshData> parseObj(const std::string& text, bool normalize = true);
 Result<MeshData> loadObj(const std::string& path, bool normalize = true);
 
+/// Fills zero-length normals with smooth normals accumulated from faces.
+void computeMissingNormals(MeshData& m);
+/// Recentres and scales to fit a unit cube.
+void normalizeToUnit(MeshData& m);
+/// Loads .obj / .glb / .gltf by extension (geometry only; see assets/Gltf.h for materials).
+Result<MeshData> loadMeshFile(const std::string& path, bool normalize = true);
+
 }  // namespace mesh
 }  // namespace sky

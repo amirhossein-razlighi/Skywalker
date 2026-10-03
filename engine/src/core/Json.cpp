@@ -184,7 +184,10 @@ void appendNumber(std::string& out, double v) {
         return;
     }
     char buf[64];
-    auto res = std::to_chars(buf, buf + sizeof(buf), v);
+    // Most engine values are floats widened to double; print those with the shortest form
+    // that round-trips as a float ("0.3", not "0.30000001192092896") — cheaper for agents.
+    auto f = static_cast<float>(v);
+    auto res = static_cast<double>(f) == v ? std::to_chars(buf, buf + sizeof(buf), f) : std::to_chars(buf, buf + sizeof(buf), v);
     out.append(buf, res.ptr);
 }
 

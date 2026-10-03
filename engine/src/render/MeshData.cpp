@@ -283,39 +283,43 @@ Result<MeshData> parseObj(const std::string& text, bool normalizeMesh) {
     }
     if (m.indices.empty()) return Error::make("parse_error", "OBJ contains no faces");
 
-    if (anyMissingNormal) {
-        // Smooth normals from accumulated face normals.
-        std::vector<Vec3> acc(m.vertexCount(), Vec3{0, 0, 0});
-        for (size_t t = 0; t + 2 < m.indices.size(); t += 3) {
-            uint32_t a = m.indices[t], b = m.indices[t + 1], c = m.indices[t + 2];
-            Vec3 n = cross(pos(m, b) - pos(m, a), pos(m, c) - pos(m, a));
-            acc[a] += n;
-            acc[b] += n;
-            acc[c] += n;
-        }
-        for (size_t i = 0; i < acc.size(); ++i) {
-            float* v = &m.vertices[i * MeshData::kFloatsPerVertex + 3];
+    if (anyMissingNormal) computeMissingNormals(m);
+    m.computeBounds();
+    if (normalizeMesh) normalizeToUnit(m);
+    return m;
+}
+
+void computeMissingNormals(MeshData& m) {
+    std::vector<Vec3> acc(m.vertexCount(), Vec3{0, 0, 0});
+    for (size_t t = 0; t + 2 < m.indices.size(); t += 3) {
+        uint32_t a = m.indices[t], b = m.indices[t + 1], c = m.indices[t + 2];
+        Vec3 n = cross(pos(m, b) - pos(m, a), pos(m, c) - pos(m, a));
+        acc[a] += n;
+        acc[b] += n;
+        acc[c] += n;
+    }
+    for (size_t i = 0; i < acc.size(); ++i) {
+        float* v = &m.vertices[i * MeshData::kFloatsPerVertex + 3];
+        if (length(Vec3{v[0], v[1], v[2]}) < 0.5f) {
             Vec3 n = normalize(acc[i]);
-            if (length(Vec3{v[0], v[1], v[2]}) < 0.5f) {
-                v[0] = n.x;
-                v[1] = n.y;
-                v[2] = n.z;
-            }
+            v[0] = n.x;
+            v[1] = n.y;
+            v[2] = n.z;
         }
+    }
+}
+
+void normalizeToUnit(MeshData& m) {
+    m.computeBounds();
+    Vec3 c = m.bounds.center();
+    Vec3 e = m.bounds.max - m.bounds.min;
+    float s = 1.f / std::max({e.x, e.y, e.z, 1e-6f});
+    for (size_t i = 0; i < m.vertices.size(); i += MeshData::kFloatsPerVertex) {
+        m.vertices[i] = (m.vertices[i] - c.x) * s;
+        m.vertices[i + 1] = (m.vertices[i + 1] - c.y) * s;
+        m.vertices[i + 2] = (m.vertices[i + 2] - c.z) * s;
     }
     m.computeBounds();
-    if (normalizeMesh) {
-        Vec3 c = m.bounds.center();
-        Vec3 e = m.bounds.max - m.bounds.min;
-        float s = 1.f / std::max({e.x, e.y, e.z, 1e-6f});
-        for (size_t i = 0; i < m.vertices.size(); i += MeshData::kFloatsPerVertex) {
-            m.vertices[i] = (m.vertices[i] - c.x) * s;
-            m.vertices[i + 1] = (m.vertices[i + 1] - c.y) * s;
-            m.vertices[i + 2] = (m.vertices[i + 2] - c.z) * s;
-        }
-        m.computeBounds();
-    }
-    return m;
 }
 
 Result<MeshData> loadObj(const std::string& path, bool normalizeMesh) {

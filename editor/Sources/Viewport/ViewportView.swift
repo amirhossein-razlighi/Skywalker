@@ -33,6 +33,32 @@ final class ViewportNSView: NSView {
         super.init(frame: .zero)
         wantsLayer = true
         layerContentsRedrawPolicy = .never
+        registerForDraggedTypes([.string])
+    }
+
+    // MARK: Drag & drop from the asset browser
+
+    private func draggedAsset(_ info: NSDraggingInfo) -> String? {
+        guard let s = info.draggingPasteboard.string(forType: .string), s.hasPrefix(EngineStore.assetDragPrefix) else { return nil }
+        return String(s.dropFirst(EngineStore.assetDragPrefix.count))
+    }
+
+    override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
+        draggedAsset(sender) != nil && editing ? .copy : []
+    }
+
+    override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation {
+        draggingEntered(sender)
+    }
+
+    override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        guard let path = draggedAsset(sender), editing else { return false }
+        let p = convert(sender.draggingLocation, from: nil)
+        let (w, h) = pixelSize
+        let type = engine.call("asset_info", ["asset": .string(path)], actor: "editor").structured["type"].string ?? ""
+        engine.placeAsset(path, type: type, at: (Float(p.x * scale), Float(p.y * scale), w, h))
+        window?.makeFirstResponder(self)
+        return true
     }
 
     @available(*, unavailable)

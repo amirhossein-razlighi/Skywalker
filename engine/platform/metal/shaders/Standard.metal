@@ -28,6 +28,13 @@ struct DrawUniforms {
     float4 color;
     float4 emissive;    // rgb, w = strength
     float4 material;    // x = metallic, y = roughness, z = selected, w = has texture
+    float4 material2;   // x,y = UV tiling, z = unlit
+};
+
+struct PostUniforms {
+    float4 params;   // x = exposure, y = bloom intensity, z = bloom threshold, w = saturation
+    float4 params2;  // x = contrast, y = vignette, z = aspect, w = unused
+    float4 texel;    // xy = source texel size
 };
 
 struct GPULight {
@@ -132,8 +139,7 @@ vertex FullscreenOut fullscreenVertex(uint vid [[vertex_id]]) {
 fragment float4 skyFragment(FullscreenOut in [[stage_in]], constant FrameUniforms& f [[buffer(0)]]) {
     float4 farP = f.invViewProj * float4(in.ndc, 1.0, 1.0);
     float3 dir = normalize(farP.xyz / farP.w - f.cameraPos.xyz);
-    float3 c = skyColor(dir, f) * f.params.x;
-    return float4(acesTonemap(c), 1.0);
+    return float4(skyColor(dir, f), 1.0);  // linear HDR; tonemapped in the composite pass
 }
 
 // ---------------------------------------------------------------------------
@@ -166,10 +172,13 @@ fragment float4 meshFragment(MeshOut in [[stage_in]],
     float3 albedo = d.color.rgb;
     float alpha = d.color.a;
     if (d.material.w > 0.5) {
-        float4 t = albedoTex.sample(albedoSampler, in.uv);
+        float4 t = albedoTex.sample(albedoSampler, in.uv * d.material2.xy);
         albedo *= t.rgb;
         alpha *= t.a;
         if (alpha < 0.02) discard_fragment();
+    }
+    if (d.material2.z > 0.5) {  // unlit: flat color, still emissive
+        return float4(albedo + d.emissive.rgb * d.emissive.w, alpha);
     }
     float metallic = d.material.x;
     float roughness = clamp(d.material.y, 0.04, 1.0);
@@ -219,7 +228,7 @@ fragment float4 meshFragment(MeshOut in [[stage_in]],
     float fogAmt = 1.0 - exp(-dist * f.fog.w);
     color = mix(color, f.fog.rgb, saturate(fogAmt));
 
-    return float4(acesTonemap(color * f.params.x), alpha);
+    return float4(color, alpha);  // linear HDR
 }
 
 // ---------------------------------------------------------------------------
@@ -241,7 +250,7 @@ vertex float4 outlineVertex(uint vid [[vertex_id]],
 }
 
 fragment float4 outlineFragment() {
-    return float4(1.0, 0.32, 0.0, 1.0);  // selection orange (linear; sRGB target encodes it)
+    return float4(2.6, 0.75, 0.08, 1.0);  // selection orange in HDR (survives tonemapping, glows slightly)
 }
 
 // ---------------------------------------------------------------------------
@@ -314,4 +323,62 @@ fragment float4 gridFragment(GridOut in [[stage_in]], constant FrameUniforms& f 
 fragment float4 presentFragment(FullscreenOut in [[stage_in]], texture2d<float> src [[texture(0)]]) {
     float2 uv = float2(in.ndc.x * 0.5 + 0.5, 0.5 - in.ndc.y * 0.5);
     return src.sample(presentSampler, uv);
+}
+
+// ---------------------------------------------------------------------------
+// Post-processing: bloom (threshold -> downsample chain -> additive upsample) and the
+// final composite (exposure, bloom, ACES tonemap, saturation/contrast, vignette).
+// ---------------------------------------------------------------------------
+
+constexpr sampler linearClamp(coord::normalized, filter::linear, address::clamp_to_edge);
+
+static float3 sampleBox4(texture2d<float> t, float2 uv, float2 texel) {
+    float4 o = texel.xyxy * float4(-1.0, -1.0, 1.0, 1.0);
+    return 0.25 * (t.sample(linearClamp, uv + o.xy).rgb + t.sample(linearClamp, uv + o.zy).rgb +
+                   t.sample(linearClamp, uv + o.xw).rgb + t.sample(linearClamp, uv + o.zw).rgb);
+}
+
+fragment float4 bloomPrefilter(FullscreenOut in [[stage_in]], texture2d<float> src [[texture(0)]],
+                               constant PostUniforms& p [[buffer(0)]]) {
+    float2 uv = float2(in.ndc.x * 0.5 + 0.5, 0.5 - in.ndc.y * 0.5);
+    float3 c = sampleBox4(src, uv, p.texel.xy) * p.params.x;
+    float brightness = max(c.r, max(c.g, c.b));
+    float knee = p.params.z * 0.5;
+    float soft = clamp(brightness - p.params.z + knee, 0.0, 2.0 * knee);
+    soft = soft * soft / (4.0 * knee + 1e-4);
+    float contribution = max(soft, brightness - p.params.z) / max(brightness, 1e-4);
+    return float4(min(c * contribution, float3(64.0)), 1.0);
+}
+
+fragment float4 bloomDown(FullscreenOut in [[stage_in]], texture2d<float> src [[texture(0)]],
+                          constant PostUniforms& p [[buffer(0)]]) {
+    float2 uv = float2(in.ndc.x * 0.5 + 0.5, 0.5 - in.ndc.y * 0.5);
+    return float4(sampleBox4(src, uv, p.texel.xy), 1.0);
+}
+
+fragment float4 bloomUp(FullscreenOut in [[stage_in]], texture2d<float> src [[texture(0)]],
+                        constant PostUniforms& p [[buffer(0)]]) {
+    float2 uv = float2(in.ndc.x * 0.5 + 0.5, 0.5 - in.ndc.y * 0.5);
+    float2 t = p.texel.xy;
+    // 9-tap tent filter
+    float3 c = src.sample(linearClamp, uv).rgb * 4.0;
+    c += (src.sample(linearClamp, uv + float2(-t.x, 0)).rgb + src.sample(linearClamp, uv + float2(t.x, 0)).rgb +
+          src.sample(linearClamp, uv + float2(0, -t.y)).rgb + src.sample(linearClamp, uv + float2(0, t.y)).rgb) * 2.0;
+    c += src.sample(linearClamp, uv + t).rgb + src.sample(linearClamp, uv - t).rgb +
+         src.sample(linearClamp, uv + float2(t.x, -t.y)).rgb + src.sample(linearClamp, uv + float2(-t.x, t.y)).rgb;
+    return float4(c / 16.0, 1.0);
+}
+
+fragment float4 compositeFragment(FullscreenOut in [[stage_in]], texture2d<float> hdr [[texture(0)]],
+                                  texture2d<float> bloom [[texture(1)]], constant PostUniforms& p [[buffer(0)]]) {
+    float2 uv = float2(in.ndc.x * 0.5 + 0.5, 0.5 - in.ndc.y * 0.5);
+    float3 c = hdr.sample(linearClamp, uv).rgb * p.params.x;
+    c += bloom.sample(linearClamp, uv).rgb * p.params.y;
+    c = acesTonemap(c);
+    float luma = dot(c, float3(0.2126, 0.7152, 0.0722));
+    c = mix(float3(luma), c, p.params.w);
+    c = saturate((c - 0.5) * p.params2.x + 0.5);
+    float2 v = (uv - 0.5) * float2(p.params2.z, 1.0);
+    c *= 1.0 - p.params2.y * smoothstep(0.35, 1.05, length(v) * 1.15);
+    return float4(c, 1.0);
 }

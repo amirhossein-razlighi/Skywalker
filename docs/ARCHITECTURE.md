@@ -15,8 +15,11 @@ Skywalker is organized in strict layers. Lower layers never depend on higher one
 │ Scene        │ History       │ Wander        │ Render front │ Agent tools     │
 │ ids, hierarchy│ undo/redo,   │ compiler,     │ FrameBuilder,│ ToolRegistry,   │
 │ JSON I/O     │ attribution   │ runtime       │ picking, PNG │ schema checks   │
-├──────────────┴───────────────┴───────────────┼──────────────┴─────────────────┤
-│ ECS registry · reflection · components        │ Renderer backends: Metal, CPU │
+├──────────────┴───────────────┴───────────────┴──────────────┴─────────────────┤
+│ Assets: database (.meta GUIDs, tags, provenance) · materials · prefabs · glTF │
+├───────────────────────────────────────────────┬───────────────────────────────┤
+│ ECS registry · reflection · components        │ Renderer backends: Metal (HDR, │
+│                                               │ bloom, ACES), CPU fallback    │
 ├───────────────────────────────────────────────┴───────────────────────────────┤
 │ Core: Json · Result · Log · Strings · Random · Math                            │
 └──────────────────────────────────────────────────────────────────────────────┘

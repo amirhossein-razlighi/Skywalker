@@ -33,7 +33,7 @@ const TypeInfo& MeshRenderer::type() {
         "Renders a mesh with a simple physically based material.",
         {
             SKY_FIELD(MeshRenderer, mesh, String,
-                      "Primitive (cube, sphere, plane, cylinder, cone, quad, capsule, torus) or \"asset:<path.obj>\""),
+                      "Primitive (cube, sphere, plane, cylinder, cone, quad, capsule, torus) or \"asset:<path>\" (.obj/.glb/.gltf)"),
             SKY_FIELD(MeshRenderer, color, Color, "Base color"),
             SKY_FIELD_RANGE(MeshRenderer, metallic, Float, "0 = dielectric, 1 = metal", 0.f, 1.f),
             SKY_FIELD_RANGE(MeshRenderer, roughness, Float, "0 = mirror, 1 = matte", 0.02f, 1.f),
@@ -41,6 +41,9 @@ const TypeInfo& MeshRenderer::type() {
             SKY_FIELD(MeshRenderer, texture, String, "Optional albedo texture path (png/jpg), relative to project"),
             SKY_FIELD(MeshRenderer, visible, Bool, "Whether the mesh is drawn"),
             SKY_FIELD(MeshRenderer, billboard, Bool, "Always face the camera (useful for 2D sprites)"),
+            SKY_FIELD(MeshRenderer, material, String,
+                      "Material asset path (*.mat.json); when set it overrides color/metallic/roughness/emissive/texture"),
+            SKY_FIELD(MeshRenderer, unlit, Bool, "Flat color/texture without lighting (2D, UI, stylized)"),
         }};
     return info;
 }
@@ -98,6 +101,11 @@ const TypeInfo& Environment::type() {
             SKY_FIELD_RANGE(Environment, fogDensity, Float, "Exponential fog density (0 = off)", 0.f, 1.f),
             SKY_FIELD_RANGE(Environment, exposure, Float, "Camera exposure multiplier", 0.01f, 20.f),
             SKY_FIELD(Environment, showGrid, Bool, "Draw the editor ground grid"),
+            SKY_FIELD_RANGE(Environment, bloomIntensity, Float, "Glow around bright/emissive things (0 = off)", 0.f, 5.f),
+            SKY_FIELD_RANGE(Environment, bloomThreshold, Float, "Brightness where glow starts (lower = more glow)", 0.f, 10.f),
+            SKY_FIELD_RANGE(Environment, saturation, Float, "Color saturation (1 = neutral)", 0.f, 2.f),
+            SKY_FIELD_RANGE(Environment, contrast, Float, "Contrast (1 = neutral)", 0.5f, 2.f),
+            SKY_FIELD_RANGE(Environment, vignette, Float, "Darken the image corners", 0.f, 1.f),
         }};
     return info;
 }

@@ -129,6 +129,18 @@ FrameData buildFrame(const Scene& scene, const ViewCamera& camera, int width, in
             d.emissive = m->emissive;
             d.metallic = m->metallic;
             d.roughness = m->roughness;
+            d.unlit = m->unlit;
+            if (!m->material.empty() && opts.material) {
+                if (const ResolvedMaterial* mat = opts.material(m->material)) {
+                    d.color = mat->color;
+                    d.metallic = mat->metallic;
+                    d.roughness = mat->roughness;
+                    d.emissive = mat->emissive;
+                    d.texture = mat->texture;
+                    d.tiling = mat->tiling;
+                    d.unlit = d.unlit || mat->unlit;
+                }
+            }
             d.model = world;
             if (m->billboard) {
                 Vec3 p = world.translation();

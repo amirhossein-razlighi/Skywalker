@@ -48,6 +48,7 @@ struct ChatView: View {
     @Environment(CrewStore.self) private var crew
     let cloudling: Cloudling
     @State private var draft = ""
+    @State private var designing = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -57,8 +58,17 @@ struct ChatView: View {
                 Text("\(cloudling.role.title) · \(crew.modelLabel(for: cloudling)) · \(cloudling.autonomy.label)")
                     .font(Theme.label).foregroundStyle(Theme.textFaint).lineLimit(1)
                 Spacer()
+                let u = crew.usage(for: cloudling)
+                if u.requests > 0 {
+                    Text("\(Self.compact(u.input + u.cacheRead)) in · \(Self.compact(u.output)) out")
+                        .font(Theme.monoSmall).foregroundStyle(Theme.textFaint)
+                        .help("Tokens used by \(cloudling.name) (\(u.requests) requests, \(u.cacheRead.formatted()) cached)")
+                }
                 if crew.isWorking(cloudling) {
                     Button("Stop", systemImage: "stop.circle") { crew.stop(cloudling) }.controlSize(.small)
+                }
+                IconButton(symbol: "slider.horizontal.3", help: "Design \(cloudling.name): role, instructions, permissions, memory") {
+                    designing = true
                 }
                 IconButton(symbol: "square.and.pencil", help: "New conversation") { crew.resetConversation(cloudling) }
             }
@@ -102,6 +112,21 @@ struct ChatView: View {
             .background(Theme.field)
             .overlay(alignment: .top) { Rectangle().fill(Theme.border).frame(height: 1) }
         }
+        .sheet(isPresented: $designing) {
+            VStack(spacing: 0) {
+                AgentDesigner(cloudlingID: cloudling.id)
+                HStack {
+                    Spacer()
+                    Button("Done") { designing = false }.keyboardShortcut(.defaultAction)
+                }
+                .padding(10)
+            }
+            .frame(width: 620, height: 680)
+        }
+    }
+
+    static func compact(_ n: Int) -> String {
+        n >= 1_000_000 ? String(format: "%.1fM", Double(n) / 1e6) : n >= 1000 ? String(format: "%.1fk", Double(n) / 1e3) : "\(n)"
     }
 
     private var canSend: Bool { !draft.trimmingCharacters(in: .whitespaces).isEmpty && !crew.isWorking(cloudling) }
@@ -227,8 +252,23 @@ struct PipelinesPanel: View {
                     TextField("Name", text: $crew.plans[index].name).textFieldStyle(.plain).font(Theme.sectionTitle)
                     ScrollView(.horizontal) {
                         HStack(alignment: .center, spacing: 6) {
-                            ForEach($crew.plans[index].steps) { $step in
-                                StepCard(step: $step) { crew.plans[index].steps.removeAll { $0.id == step.id } }
+                            ForEach(Array(CrewStore.stages(of: crew.plans[index]).enumerated()), id: \.offset) { _, stage in
+                                VStack(spacing: 4) {
+                                    ForEach(stage) { step in
+                                        if let k = crew.plans[index].steps.firstIndex(where: { $0.id == step.id }) {
+                                            StepCard(step: $crew.plans[index].steps[k], canParallel: k > 0) {
+                                                crew.plans[index].steps.removeAll { $0.id == step.id }
+                                            }
+                                        }
+                                    }
+                                }
+                                .padding(stage.count > 1 ? 4 : 0)
+                                .background(stage.count > 1 ? Theme.accent.opacity(0.06) : .clear, in: RoundedRectangle(cornerRadius: 8))
+                                .overlay {
+                                    if stage.count > 1 {
+                                        RoundedRectangle(cornerRadius: 8).stroke(Theme.accent.opacity(0.35), style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
+                                    }
+                                }
                                 Image(systemName: "arrow.right").font(.system(size: 10)).foregroundStyle(Theme.textFaint)
                             }
                             Menu {
@@ -265,7 +305,7 @@ struct PipelinesPanel: View {
             } else {
                 VStack(spacing: 6) {
                     Text("Pipelines").font(Theme.sectionTitle)
-                    Text("Chain agents into an ordered workflow, or let your director delegate dynamically with crew_delegate.")
+                    Text("Chain agents into stages — steps can run in parallel — or let your director delegate dynamically with crew_delegate.")
                         .font(Theme.label).foregroundStyle(Theme.textFaint).multilineTextAlignment(.center)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -279,6 +319,7 @@ struct PipelinesPanel: View {
 private struct StepCard: View {
     @Environment(CrewStore.self) private var crew
     @Binding var step: FlightStep
+    var canParallel = false
     let onDelete: () -> Void
 
     var body: some View {
@@ -290,6 +331,14 @@ private struct StepCard: View {
                     Text(c.name).font(Theme.sectionTitle)
                 }
                 Spacer()
+                if canParallel {
+                    Button { step.parallelWithPrevious.toggle() } label: {
+                        Image(systemName: "arrow.triangle.branch").font(.system(size: 10))
+                            .foregroundStyle(step.parallelWithPrevious ? Theme.accent : Theme.textFaint)
+                    }
+                    .buttonStyle(.borderless)
+                    .help(step.parallelWithPrevious ? "Runs in parallel with the previous step" : "Run in parallel with the previous step")
+                }
                 Button(action: onDelete) { Image(systemName: "xmark").font(.system(size: 9)) }.buttonStyle(.borderless)
             }
             TextField("What should this step do?", text: $step.instruction, axis: .vertical)

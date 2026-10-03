@@ -1,0 +1,31 @@
+#pragma once
+// Internal helpers shared by the tool catalogue files (EngineTools / AssetTools / WorldTools).
+
+#include <optional>
+#include <string>
+#include <vector>
+
+#include "skywalker/agent/ToolRegistry.h"
+#include "skywalker/engine/Engine.h"
+
+namespace sky::tools {
+
+/// Entity by numeric id or (case-insensitive) name, with a did-you-mean error.
+Result<EntityId> resolve(Engine& engine, const Json& ref);
+/// One-line, token-efficient entity description.
+std::string describe(const Scene& s, EntityId e);
+Json briefJson(const Scene& s, EntityId e);
+ToolResult fail(const Status& s);
+void duplicateTree(Scene& s, EntityId src, EntityId newParent, const std::string& name, Vec3 offset, bool root,
+                   std::vector<EntityId>& created);
+
+void collectSubtree(const Scene& s, EntityId root, std::vector<EntityId>& out);
+/// World-space bounds of every mesh in an entity's subtree (nullopt if it has none).
+std::optional<Aabb> subtreeBounds(const Scene& s, EntityId root);
+/// Moves an entity vertically so its bounds rest on the geometry below (recorded edit).
+Status dropToSurface(Engine& engine, EntityId id, float offset = 0.f);
+
+void addAssetTools(Engine& engine, ToolRegistry& reg);
+void addWorldTools(Engine& engine, ToolRegistry& reg);
+
+}  // namespace sky::tools

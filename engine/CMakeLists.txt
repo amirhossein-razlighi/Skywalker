@@ -15,8 +15,14 @@ set(SKY_ENGINE_SOURCES
     src/render/FrameBuilder.cpp
     src/render/NullRenderer.cpp
     src/render/Annotate.cpp
+    src/render/Gltf.cpp
+    src/assets/AssetDatabase.cpp
+    src/assets/Material.cpp
+    src/assets/Prefab.cpp
     src/agent/ToolRegistry.cpp
     src/agent/EngineTools.cpp
+    src/agent/AssetTools.cpp
+    src/agent/WorldTools.cpp
     src/agent/McpServer.cpp
     src/agent/SocketServer.cpp
     src/engine/Engine.cpp

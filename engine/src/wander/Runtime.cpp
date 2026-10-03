@@ -63,8 +63,12 @@ struct StopSignal {};
 // RuntimeError and caught at the handler boundary (exceptions never escape the runtime).
 class Exec {
 public:
-    Exec(Runtime& rt, EntityId self, Script& script, Runtime::Instance& inst, float dt, const InputState& input)
-        : rt_(rt), scene_(rt.scene_), self_(self), script_(script), inst_(inst), dt_(dt), input_(input) {}
+    // The script is addressed by index, never by reference: `spawn` can add Behavior
+    // components mid-handler and reallocate their storage.
+    Exec(Runtime& rt, EntityId self, size_t scriptIndex, Runtime::Instance& inst, float dt, const InputState& input)
+        : rt_(rt), scene_(rt.scene_), self_(self), scriptIndex_(scriptIndex), inst_(inst), dt_(dt), input_(input) {
+        if (Script* s = script()) scriptName_ = s->name;
+    }
 
     void run(const Block& body) {
         locals_.clear();
@@ -74,11 +78,11 @@ public:
             block(body);
         } catch (const StopSignal&) {
         } catch (const RuntimeError& err) {
-            rt_.messages_.push_back(
-                {RuntimeMessage::Kind::Error, self_, script_.name, err.loc.line, err.message});
-            if (++script_.runtimeErrors >= 5) {
-                script_.enabled = false;
-                rt_.messages_.push_back({RuntimeMessage::Kind::Error, self_, script_.name, err.loc.line,
+            rt_.messages_.push_back({RuntimeMessage::Kind::Error, self_, scriptName_, err.loc.line, err.message});
+            Script* s = script();
+            if (s && ++s->runtimeErrors >= 5) {
+                s->enabled = false;
+                rt_.messages_.push_back({RuntimeMessage::Kind::Error, self_, scriptName_, err.loc.line,
                                          "script disabled after repeated runtime errors"});
             }
         }
@@ -94,7 +98,7 @@ public:
             try {
                 rec->vars[v.name] = toJson(eval(*v.initial));
             } catch (const RuntimeError& err) {
-                rt_.messages_.push_back({RuntimeMessage::Kind::Error, self_, script_.name, err.loc.line, err.message});
+                rt_.messages_.push_back({RuntimeMessage::Kind::Error, self_, scriptName_, err.loc.line, err.message});
             }
         }
     }
@@ -302,7 +306,7 @@ private:
                 break;
             }
             case Stmt::Kind::Log:
-                rt_.messages_.push_back({RuntimeMessage::Kind::Log, self_, script_.name, s.loc.line, toText(eval(*s.value))});
+                rt_.messages_.push_back({RuntimeMessage::Kind::Log, self_, scriptName_, s.loc.line, toText(eval(*s.value))});
                 break;
             case Stmt::Kind::Stop: throw StopSignal{};
             case Stmt::Kind::Call: (void)eval(*s.value); break;
@@ -676,6 +680,13 @@ private:
             if (++rt_.spawnedThisTick_ > 256) fail(e.loc, "too many spawns in one tick (limit 256)");
             if (scene_.size() >= 20000) fail(e.loc, "entity limit reached (20000)");
             std::string mesh = s(0);
+            if (str::startsWith(mesh, "prefab:")) {
+                if (!rt_.spawnPrefab) fail(e.loc, "prefabs are not available in this context");
+                Vec3 pos = a.size() > 1 ? v(1) : Vec3{0, 0, 0};
+                auto id = rt_.spawnPrefab(mesh.substr(7), pos, a.size() > 2 ? toText(a[2]) : "");
+                if (!id) fail(e.loc, id.error().message);
+                return Value::entity(*id);
+            }
             const auto& prims = MeshRenderer::primitives();
             if (std::find(prims.begin(), prims.end(), mesh) == prims.end() && !str::startsWith(mesh, "asset:")) {
                 std::string guess = str::closest(mesh, prims, 3);
@@ -690,10 +701,16 @@ private:
         fail(e.loc, "unknown function '" + f + "'");
     }
 
+    Script* script() {
+        Behavior* b = scene_.get<Behavior>(self_);
+        return b && scriptIndex_ < b->scripts.size() ? &b->scripts[scriptIndex_] : nullptr;
+    }
+
     Runtime& rt_;
     Scene& scene_;
     EntityId self_;
-    Script& script_;
+    size_t scriptIndex_;
+    std::string scriptName_;
     Runtime::Instance& inst_;
     float dt_;
     const InputState& input_;
@@ -747,13 +764,11 @@ void Runtime::tick(float dt, const InputState& input) {
     const std::vector<EntityId> order = scene_.entities();
     for (EntityId id : order) {
         if (!scene_.exists(id) || !scene_.isActive(id)) continue;
-        Behavior* b = scene_.get<Behavior>(id);
-        if (!b) continue;
-        for (size_t si = 0; si < b->scripts.size(); ++si) {
-            // Re-fetch each iteration: spawning may reallocate component storage.
-            b = scene_.get<Behavior>(id);
+        // Never hold Behavior pointers across handler runs: `spawn` may reallocate storage.
+        for (size_t si = 0;; ++si) {
+            Behavior* b = scene_.get<Behavior>(id);
             if (!b || si >= b->scripts.size()) break;
-            Script& script = b->scripts[si];
+            const Script& script = b->scripts[si];
             if (!script.enabled || !script.program) continue;
             std::shared_ptr<const Program> program = script.program;  // keep alive during execution
             Instance& inst = instances_[{id, si}];
@@ -761,15 +776,14 @@ void Runtime::tick(float dt, const InputState& input) {
                 inst = Instance{};
                 inst.program = program;
             }
-            Exec exec(*this, id, script, inst, dt, input);
+            Exec exec(*this, id, si, inst, dt, input);
             auto runAll = [&](Trigger trig, const std::string& arg) {
                 for (const auto& beh : program->behaviors) {
                     for (const auto& h : beh.handlers) {
                         if (h.trigger == trig && (arg.empty() || h.argument == arg)) {
-                            // Exec holds a reference to `script`; refresh in case storage moved.
                             Behavior* cur = scene_.get<Behavior>(id);
                             if (!cur || si >= cur->scripts.size() || !cur->scripts[si].enabled) return;
-                            Exec(*this, id, cur->scripts[si], inst, dt, input).run(h.body);
+                            Exec(*this, id, si, inst, dt, input).run(h.body);
                         }
                     }
                 }

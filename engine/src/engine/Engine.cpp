@@ -4,11 +4,14 @@
 #include <chrono>
 #include <cstdlib>
 #include <filesystem>
+#include <cstring>
 #include <fstream>
 #include <sstream>
 
 #include "skywalker/agent/SocketServer.h"
 #include "skywalker/core/Log.h"
+#include "skywalker/core/Strings.h"
+#include "skywalker/render/Gltf.h"
 #include "skywalker/render/MeshData.h"
 
 namespace sky {
@@ -41,7 +44,16 @@ Engine::Engine(EngineConfig config)
       scene_(std::make_unique<Scene>()),
       history_(std::make_unique<History>(*scene_)),
       runtime_(std::make_unique<wander::Runtime>(*scene_)),
-      renderer_(createRenderer(config_.renderer)) {
+      renderer_(createRenderer(config_.renderer)),
+      assets_(std::make_unique<AssetDatabase>(config_.projectDir)) {
+    assets_->refresh();
+    runtime_->spawnPrefab = [this](const std::string& ref, Vec3 position, const std::string& name) -> Result<EntityId> {
+        PrefabPlacement placement;
+        placement.hasPosition = true;
+        placement.position = position;
+        placement.name = name;
+        return instantiatePrefabAsset(ref, placement);
+    };
     registerEngineTools(*this);
     log::info("engine", std::string("Skywalker ") + SKY_VERSION_STRING + " ready (renderer: " + renderer_->info().backend +
                             " " + renderer_->info().device + ")");
@@ -174,6 +186,12 @@ void Engine::step(int ticks) {
 }
 
 void Engine::update(double seconds) {
+    // Hot reload: rescan the project for changed assets every couple of seconds while editing.
+    assetScanTimer_ += seconds;
+    if (assetScanTimer_ >= 2.0 && playState_ == PlayState::Editing && !drag_.entity && !gizmoDrag_) {
+        assetScanTimer_ = 0;
+        refreshAssets();
+    }
     // While the user drags an object or a gizmo handle, an undo transaction is open;
     // agent jobs wait until it is committed so their edits are never attributed to it.
     if (!drag_.entity && !gizmoDrag_) pump();
@@ -209,14 +227,13 @@ void Engine::setSelection(std::vector<EntityId> ids, const std::string& actor) {
 
 void Engine::ensureMeshUploaded(const std::string& meshKey) {
     if (meshKey.rfind("asset:", 0) != 0 || scene_->assetBounds.count(meshKey)) return;
-    auto mesh = mesh::loadObj(resolvePath(meshKey.substr(6)));
+    const MeshData* mesh = cpuMesh(meshKey);
     if (!mesh) {
-        log::warn("asset", mesh.error().message);
         scene_->assetBounds[meshKey] = {Vec3(-0.5f), Vec3(0.5f)};  // don't retry every frame
         return;
     }
-    (void)renderer_->uploadMesh(meshKey, mesh.value());
-    scene_->assetBounds[meshKey] = mesh.value().bounds;
+    (void)renderer_->uploadMesh(meshKey, *mesh);
+    scene_->assetBounds[meshKey] = mesh->bounds;
 }
 
 FrameData Engine::frame(const CaptureOptions& opts) {
@@ -234,10 +251,12 @@ FrameData Engine::frame(const CaptureOptions& opts) {
     bo.editorOverlays = opts.editorOverlays && playState_ == PlayState::Editing;
     bo.selection = selection_;
     bo.time = static_cast<float>(runtime_->time());
+    bo.material = [this](const std::string& path) { return resolveMaterial(path); };
     for (EntityId e : scene_->entities()) {
         if (const auto* m = scene_->get<MeshRenderer>(e)) ensureMeshUploaded(m->mesh);
     }
     FrameData f = buildFrame(*scene_, view, opts.width, opts.height, bo);
+    if (!opts.fog) f.environment.fogDensity = 0;
     for (auto& d : f.draws) {
         if (!d.texture.empty()) d.texture = resolvePath(d.texture);
     }
@@ -450,12 +469,9 @@ Status Engine::saveScene(const std::string& path) {
 }
 
 Result<std::string> Engine::importMesh(const std::string& path) {
-    auto mesh = mesh::loadObj(resolvePath(path));
-    if (!mesh) return mesh.error();
-    std::string key = "asset:" + path;
-    if (Status s = renderer_->uploadMesh(key, mesh.value()); !s) return s.error();
-    scene_->assetBounds[key] = mesh.value().bounds;
-    return key;
+    auto r = importMeshAsset(path);
+    if (!r) return r.error();
+    return r->get("mesh").asString();
 }
 
 AssetRequest& Engine::addAssetRequest(AssetRequest req) {
@@ -463,6 +479,296 @@ AssetRequest& Engine::addAssetRequest(AssetRequest req) {
     assetRequests_.push_back(std::move(req));
     emitEvent(Json::object({{"type", "asset_request"}, {"request", assetRequests_.back().toJson()}}));
     return assetRequests_.back();
+}
+
+// ---------------------------------------------------------------------------
+// Asset system
+// ---------------------------------------------------------------------------
+
+namespace {
+std::string stripAssetPrefix(const std::string& ref) {
+    for (const char* p : {"asset:", "prefab:"}) {
+        if (ref.rfind(p, 0) == 0) return ref.substr(std::strlen(p));
+    }
+    return ref;
+}
+}  // namespace
+
+std::vector<std::string> Engine::refreshAssets() {
+    std::vector<std::string> changed = assets_->refresh();
+    for (const auto& path : changed) {
+        switch (assetTypeForPath(path)) {
+            case AssetType::Mesh:
+                renderer_->invalidate("asset:" + path);
+                cpuMeshes_.erase("asset:" + path);
+                scene_->assetBounds.erase("asset:" + path);
+                break;
+            case AssetType::Texture: renderer_->invalidate(resolvePath(path)); break;
+            case AssetType::Material: materials_.erase(path); break;
+            case AssetType::Prefab: prefabs_.erase(path); break;
+            default: break;
+        }
+    }
+    if (!changed.empty()) {
+        Json arr = Json::array();
+        for (size_t i = 0; i < changed.size() && i < 50; ++i) arr.push(changed[i]);
+        emitEvent(Json::object({{"type", "assets"}, {"changed", arr}, {"count", changed.size()}}));
+        scene_->markDirty();
+    }
+    return changed;
+}
+
+const MeshData* Engine::cpuMesh(const std::string& key) {
+    if (auto it = cpuMeshes_.find(key); it != cpuMeshes_.end()) return it->second.get();
+    Result<MeshData> data = key.rfind("asset:", 0) == 0 ? mesh::loadMeshFile(resolvePath(key.substr(6)))
+                                                        : mesh::primitive(key);
+    if (!data) {
+        log::warn("asset", data.error().message);
+        cpuMeshes_[key] = nullptr;
+        return nullptr;
+    }
+    auto ptr = std::make_shared<MeshData>(std::move(data.value()));
+    cpuMeshes_[key] = ptr;
+    return ptr.get();
+}
+
+Result<Json> Engine::importMeshAsset(const std::string& path) {
+    std::string rel = assets_->relative(resolvePath(path));
+    if (rel.empty()) return Error::make("invalid_path", "mesh must be inside the project: " + path);
+    std::string lower = str::lower(rel);
+    Json result = Json::object();
+    MeshData mesh;
+    std::string materialPath;
+    if (lower.size() > 4 && (lower.rfind(".glb") == lower.size() - 4 || lower.rfind(".gltf") == lower.size() - 5)) {
+        auto g = loadGltf(resolvePath(rel));
+        if (!g) return g.error();
+        mesh = std::move(g->mesh);
+        // glTF materials become a project material (+ extracted texture) next to the mesh.
+        fs::path base = fs::path(rel);
+        std::string stem = base.stem().string();
+        std::string dir = base.parent_path().generic_string();
+        auto join = [&](const std::string& name) { return dir.empty() ? name : dir + "/" + name; };
+        MaterialAsset m;
+        m.color = g->baseColor;
+        m.metallic = g->metallic;
+        m.roughness = std::max(0.02f, g->roughness);
+        m.emissive = g->emissive;
+        if (!g->textureBytes.empty()) {
+            std::string texPath = join(stem + (g->textureMime == "image/jpeg" ? "_albedo.jpg" : "_albedo.png"));
+            std::ofstream tf(resolvePath(texPath), std::ios::binary);
+            tf.write(reinterpret_cast<const char*>(g->textureBytes.data()), static_cast<std::streamsize>(g->textureBytes.size()));
+            m.texture = texPath;
+        }
+        if (g->materialCount > 0 || !g->textureBytes.empty()) {
+            materialPath = join(stem + ".mat.json");
+            if (Status st = saveMaterial(resolvePath(materialPath), m); !st) return st.error();
+        }
+        result["primitives"] = g->primitiveCount;
+    } else {
+        auto loaded = mesh::loadObj(resolvePath(rel));
+        if (!loaded) return loaded.error();
+        mesh = std::move(loaded.value());
+    }
+    std::string key = "asset:" + rel;
+    if (Status s = renderer_->uploadMesh(key, mesh); !s) return s.error();
+    scene_->assetBounds[key] = mesh.bounds;
+    cpuMeshes_[key] = std::make_shared<MeshData>(mesh);
+    refreshAssets();
+    if (!materialPath.empty()) (void)assets_->updateMeta(rel, Json::object({{"import", Json::object({{"material", materialPath}})}}));
+    result["mesh"] = key;
+    result["triangles"] = mesh.indices.size() / 3;
+    if (!materialPath.empty()) result["material"] = materialPath;
+    return result;
+}
+
+const ResolvedMaterial* Engine::resolveMaterial(const std::string& path) {
+    std::string rel = assets_->relative(resolvePath(stripAssetPrefix(path)));
+    if (rel.empty()) rel = path;
+    std::error_code ec;
+    auto t = fs::last_write_time(resolvePath(rel), ec);
+    int64_t mtime = ec ? -2 : std::chrono::duration_cast<std::chrono::nanoseconds>(t.time_since_epoch()).count();
+    CachedMaterial& c = materials_[rel];
+    if (c.mtime != mtime) {
+        c.mtime = mtime;
+        auto m = loadMaterial(resolvePath(rel));
+        c.ok = m.ok();
+        if (m) {
+            c.material = ResolvedMaterial{m->color, m->metallic, m->roughness, m->emissive, m->texture,
+                                          Vec2{m->tilingU, m->tilingV}, m->unlit};
+        } else if (mtime != -2) {
+            log::warn("asset", "material " + rel + ": " + m.error().message);
+        }
+    }
+    return c.ok ? &c.material : nullptr;
+}
+
+Result<Json> Engine::loadPrefabAsset(const std::string& path) {
+    std::string rel = assets_->relative(resolvePath(stripAssetPrefix(path)));
+    if (rel.empty()) rel = stripAssetPrefix(path);
+    std::error_code ec;
+    auto t = fs::last_write_time(resolvePath(rel), ec);
+    if (ec) return Error::make("not_found", "no prefab " + rel, "use asset_list type=prefab to see prefabs");
+    int64_t mtime = std::chrono::duration_cast<std::chrono::nanoseconds>(t.time_since_epoch()).count();
+    CachedPrefab& c = prefabs_[rel];
+    if (c.mtime != mtime) {
+        auto p = loadPrefab(resolvePath(rel));
+        if (!p) return p.error();
+        c.prefab = std::move(p.value());
+        c.mtime = mtime;
+    }
+    return c.prefab;
+}
+
+Result<EntityId> Engine::instantiatePrefabAsset(const std::string& path, const PrefabPlacement& placement) {
+    auto prefab = loadPrefabAsset(path);
+    if (!prefab) return prefab.error();
+    return instantiatePrefab(*scene_, prefab.value(), placement);
+}
+
+size_t Engine::rewriteAssetReferences(const std::string& from, const std::string& to) {
+    size_t n = 0;
+    for (EntityId e : std::vector<EntityId>(scene_->entities())) {
+        const MeshRenderer* m = scene_->get<MeshRenderer>(e);
+        if (!m) continue;
+        Json patch = Json::object();
+        if (m->mesh == "asset:" + from) patch["mesh"] = "asset:" + to;
+        if (m->texture == from) patch["texture"] = to;
+        if (m->material == from) patch["material"] = to;
+        if (patch.size()) {
+            (void)scene_->patchComponent(e, "mesh", patch);
+            ++n;
+        }
+    }
+    return n;
+}
+
+std::vector<EntityId> Engine::assetUsage(const std::string& path) const {
+    std::vector<EntityId> out;
+    for (EntityId e : scene_->entities()) {
+        const MeshRenderer* m = scene_->get<MeshRenderer>(e);
+        if (m && (m->mesh == "asset:" + path || m->texture == path || m->material == path)) out.push_back(e);
+    }
+    return out;
+}
+
+Result<Image> Engine::assetPreview(const std::string& ref, int size) {
+    const AssetRecord* rec = assets_->find(ref);
+    if (!rec) return Error::make("not_found", "no asset " + ref, "use asset_list to find assets");
+    Scene tmp;
+    tmp.assetBounds = scene_->assetBounds;
+    (void)tmp.patchEnvironment(Json::parse(R"({"skyTop":"#3a3d48","skyHorizon":"#5a5e6c","ground":"#2a2c33","ambient":0.6,
+        "sunElevation":40,"sunAzimuth":35,"sunIntensity":2.2,"fogDensity":0,"showGrid":false,"vignette":0,"bloomIntensity":0.3})").value());
+    bool front = false;
+    switch (rec->type) {
+        case AssetType::Mesh: {
+            EntityId e = tmp.create("Preview");
+            (void)tmp.patchComponent(e, "mesh", Json::object({{"mesh", "asset:" + rec->path}}));
+            ensureMeshUploaded("asset:" + rec->path);
+            tmp.assetBounds = scene_->assetBounds;
+            if (!rec->importSettings.get("material").asString().empty()) {
+                (void)tmp.patchComponent(e, "mesh", Json::object({{"material", rec->importSettings.get("material")}}));
+            }
+            break;
+        }
+        case AssetType::Material: {
+            EntityId e = tmp.create("Preview");
+            (void)tmp.patchComponent(e, "mesh", Json::object({{"mesh", "sphere"}, {"material", rec->path}}));
+            break;
+        }
+        case AssetType::Texture: {
+            EntityId e = tmp.create("Preview");
+            (void)tmp.patchComponent(e, "mesh", Json::object({{"mesh", "quad"}, {"texture", rec->path}, {"unlit", true}, {"color", "#ffffff"}}));
+            front = true;
+            break;
+        }
+        case AssetType::Prefab: {
+            auto prefab = loadPrefabAsset(rec->path);
+            if (!prefab) return prefab.error();
+            auto root = instantiatePrefab(tmp, prefab.value(), {});
+            if (!root) return root.error();
+            for (EntityId e : tmp.entities()) {
+                if (const auto* m = tmp.get<MeshRenderer>(e)) ensureMeshUploaded(m->mesh);
+            }
+            tmp.assetBounds = scene_->assetBounds;
+            break;
+        }
+        default:
+            return Error::make("unsupported", std::string("no preview for ") + toString(rec->type) + " assets");
+    }
+    Aabb box{Vec3(1e30f), Vec3(-1e30f)};
+    for (EntityId e : tmp.entities()) {
+        if (!tmp.get<MeshRenderer>(e)) continue;
+        Aabb b = tmp.localBounds(e).transformed(tmp.worldMatrix(e));
+        box.min = vmin(box.min, b.min);
+        box.max = vmax(box.max, b.max);
+    }
+    if (box.min.x > box.max.x) box = {Vec3(-0.5f), Vec3(0.5f)};
+    Vec3 c = box.center();
+    float radius = std::max(length(box.extents()), 0.1f);
+    ViewCamera cam;
+    cam.fovDeg = 35;
+    Vec3 dir = front ? Vec3{0, 0, 1} : normalize(Vec3{1.0f, 0.75f, 1.25f});
+    cam.eye = c + dir * (radius / std::sin(radians(cam.fovDeg * 0.5f)) * 1.05f);
+    cam.target = c;
+    cam.nearPlane = radius * 0.01f;
+    cam.farPlane = radius * 20.f;
+    BuildOptions bo;
+    bo.editorOverlays = false;
+    bo.material = [this](const std::string& p) { return resolveMaterial(p); };
+    FrameData f = buildFrame(tmp, cam, size, size, bo);
+    for (auto& d : f.draws) {
+        if (!d.texture.empty()) d.texture = resolvePath(d.texture);
+    }
+    if (Status st = renderer_->render(f); !st) return st.error();
+    return renderer_->readback();
+}
+
+// ---------------------------------------------------------------------------
+// Spatial queries
+// ---------------------------------------------------------------------------
+
+std::optional<Engine::Hit> Engine::raycast(const Ray& rayIn, const std::vector<EntityId>& exclude) {
+    Ray ray{rayIn.origin, normalize(rayIn.dir)};
+    std::optional<Hit> best;
+    for (EntityId e : scene_->entities()) {
+        if (std::find(exclude.begin(), exclude.end(), e) != exclude.end()) continue;
+        const MeshRenderer* m = scene_->get<MeshRenderer>(e);
+        if (!m || !m->visible || !scene_->isActive(e)) continue;
+        Mat4 world = scene_->worldMatrix(e);
+        if (intersect(ray, scene_->localBounds(e).transformed(world)) < 0) continue;
+        const MeshData* mesh = cpuMesh(m->mesh);
+        if (!mesh) continue;
+        Mat4 inv = world.inverse();
+        Vec3 o = inv.transformPoint(ray.origin), d = inv.transformDir(ray.dir);
+        const auto& v = mesh->vertices;
+        for (size_t t = 0; t + 2 < mesh->indices.size(); t += 3) {
+            auto P = [&](uint32_t i) {
+                const float* p = &v[static_cast<size_t>(i) * MeshData::kFloatsPerVertex];
+                return Vec3{p[0], p[1], p[2]};
+            };
+            Vec3 a = P(mesh->indices[t]), b = P(mesh->indices[t + 1]), c = P(mesh->indices[t + 2]);
+            // Moller-Trumbore (two-sided)
+            Vec3 e1 = b - a, e2 = c - a, pv = cross(d, e2);
+            float det = dot(e1, pv);
+            if (std::fabs(det) < 1e-9f) continue;
+            float invDet = 1.f / det;
+            Vec3 tv = o - a;
+            float u = dot(tv, pv) * invDet;
+            if (u < 0 || u > 1) continue;
+            Vec3 qv = cross(tv, e1);
+            float w = dot(d, qv) * invDet;
+            if (w < 0 || u + w > 1) continue;
+            float tl = dot(e2, qv) * invDet;
+            if (tl <= 1e-5f) continue;
+            Vec3 hitWorld = world.transformPoint(o + d * tl);
+            float dist = distance(ray.origin, hitWorld);
+            if (best && dist >= best->distance) continue;
+            Vec3 n = normalize(inv.transposed().transformDir(cross(e1, e2)));
+            if (dot(n, ray.dir) > 0) n = -n;
+            best = Hit{e, hitWorld, n, dist};
+        }
+    }
+    return best;
 }
 
 // ---------------------------------------------------------------------------

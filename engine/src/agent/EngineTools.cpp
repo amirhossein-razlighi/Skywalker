@@ -8,10 +8,11 @@
 #include "skywalker/core/Strings.h"
 #include "skywalker/engine/Engine.h"
 #include "skywalker/wander/Compiler.h"
+#include "ToolHelpers.h"
 
 namespace sky {
 
-namespace {
+namespace tools {
 
 using namespace schema;
 
@@ -146,6 +147,13 @@ void duplicateTree(Scene& s, EntityId src, EntityId newParent, const std::string
 // ---------------------------------------------------------------------------
 // Registration
 // ---------------------------------------------------------------------------
+
+}  // namespace tools
+
+namespace {
+
+using namespace schema;
+using namespace tools;
 
 void addSceneTools(Engine& engine, ToolRegistry& reg) {
     reg.add({"engine_info", "Engine info",
@@ -882,10 +890,11 @@ void addHistoryAndFileTools(Engine& engine, ToolRegistry& reg) {
 
 void addAssetAndRenderTools(Engine& engine, ToolRegistry& reg) {
     reg.add({"asset_import_mesh", "Import mesh",
-             "Import a Wavefront OBJ (e.g. output of a 3D-generation model) and optionally assign it to an entity "
-             "(its mesh becomes \"asset:<path>\"). Meshes are normalized to fit a 1m cube.",
+             "Import a mesh (.obj, .glb, .gltf — e.g. output of a 3D-generation model) and optionally assign it to an "
+             "entity (its mesh becomes \"asset:<path>\"). Meshes are normalized to fit a 1m cube; glTF materials "
+             "become a material asset. See also asset_import.",
              "asset",
-             object({{"path", string("Project-relative .obj path")},
+             object({{"path", string("Project-relative .obj/.glb/.gltf path")},
                      {"entity", schema::entity("Entity to assign the mesh to")}},
                     {"path"}),
              true, false, [&engine](const Json& a, ToolContext& ctx) {
@@ -975,6 +984,16 @@ void addAssetAndRenderTools(Engine& engine, ToolRegistry& reg) {
                          if (!st) return fail(st);
                      }
                  }
+                 // Record provenance so agents can later find and regenerate this asset.
+                 if (auto reg = engine.assets().registerFile(engine.resolvePath(req->path))) {
+                     (void)engine.assets().updateMeta(
+                         (*reg)->path, Json::object({{"source", Json::object({{"kind", req->kind},
+                                                                              {"prompt", req->prompt},
+                                                                              {"style", req->style},
+                                                                              {"by", req->requestedBy},
+                                                                              {"completedBy", ctx.actor}})},
+                                                     {"description", (*reg)->description.empty() ? Json(req->prompt) : Json()}}));
+                 }
                  req->status = "done";
                  engine.emitEvent(Json::object({{"type", "asset_done"}, {"request", req->toJson()}}));
                  return ToolResult::json(req->toJson(), "completed");
@@ -1009,6 +1028,8 @@ void registerEngineTools(Engine& engine) {
     addViewTools(engine, reg);
     addHistoryAndFileTools(engine, reg);
     addAssetAndRenderTools(engine, reg);
+    tools::addAssetTools(engine, reg);
+    tools::addWorldTools(engine, reg);
 }
 
 }  // namespace sky

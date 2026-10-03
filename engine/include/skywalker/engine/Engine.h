@@ -13,12 +13,17 @@
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <unordered_map>
 #include <string>
 #include <vector>
 
 #include "skywalker/agent/ToolRegistry.h"
+#include "skywalker/assets/AssetDatabase.h"
+#include "skywalker/assets/Material.h"
+#include "skywalker/assets/Prefab.h"
 #include "skywalker/core/Json.h"
 #include "skywalker/engine/Gizmo.h"
+#include "skywalker/render/MeshData.h"
 #include "skywalker/render/Renderer.h"
 #include "skywalker/scene/History.h"
 #include "skywalker/scene/Scene.h"
@@ -59,6 +64,7 @@ struct CaptureOptions {
     ViewCamera customView;
     bool editorOverlays = true;
     bool annotate = false;  // draw numbered entity boxes ("set-of-mark" prompting)
+    bool fog = true;        // false for analysis views (orthographic/top-down)
 };
 
 struct Capture {
@@ -142,6 +148,35 @@ public:
     const std::string& scenePath() const { return scenePath_; }
     std::string resolvePath(const std::string& path) const;
     Result<std::string> importMesh(const std::string& path);
+
+    // --- Asset system ------------------------------------------------------------------
+    AssetDatabase& assets() { return *assets_; }
+    /// Rescans the project; drops renderer/material/prefab caches of changed files.
+    std::vector<std::string> refreshAssets();
+    /// Imports a mesh file (.obj/.glb/.gltf). glTF base color + texture become a material
+    /// asset next to the mesh. Returns {"mesh": "asset:...", "material": "...?"}.
+    Result<Json> importMeshAsset(const std::string& path);
+    const ResolvedMaterial* resolveMaterial(const std::string& path);
+    Result<Json> loadPrefabAsset(const std::string& path);
+    Result<EntityId> instantiatePrefabAsset(const std::string& path, const PrefabPlacement& placement);
+    /// Renders an isolated preview of an asset (mesh, material, texture, prefab) to an image.
+    Result<Image> assetPreview(const std::string& ref, int size = 256);
+    /// Rewrites references to `from` in the scene (mesh, texture, material fields).
+    size_t rewriteAssetReferences(const std::string& from, const std::string& to);
+    /// Entities that reference an asset.
+    std::vector<EntityId> assetUsage(const std::string& path) const;
+
+    // --- Spatial queries -------------------------------------------------------------------
+    struct Hit {
+        EntityId entity = kNoEntity;
+        Vec3 point;
+        Vec3 normal;
+        float distance = 0;
+    };
+    /// Precise ray cast against rendered meshes (triangle-accurate). `exclude` skips entities.
+    std::optional<Hit> raycast(const Ray& ray, const std::vector<EntityId>& exclude = {});
+    /// CPU copy of a mesh ("cube", "asset:...") for spatial queries.
+    const MeshData* cpuMesh(const std::string& key);
     std::vector<AssetRequest>& assetRequests() { return assetRequests_; }
     AssetRequest& addAssetRequest(AssetRequest req);
 
@@ -168,6 +203,20 @@ private:
     std::unique_ptr<History> history_;
     std::unique_ptr<wander::Runtime> runtime_;
     std::unique_ptr<Renderer> renderer_;
+    std::unique_ptr<AssetDatabase> assets_;
+    struct CachedMaterial {
+        int64_t mtime = -1;
+        bool ok = false;
+        ResolvedMaterial material;
+    };
+    std::unordered_map<std::string, CachedMaterial> materials_;
+    struct CachedPrefab {
+        int64_t mtime = -1;
+        Json prefab;
+    };
+    std::unordered_map<std::string, CachedPrefab> prefabs_;
+    std::unordered_map<std::string, std::shared_ptr<MeshData>> cpuMeshes_;
+    double assetScanTimer_ = 0;
     ToolRegistry tools_;
     OrbitCamera camera_;
 

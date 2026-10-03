@@ -86,6 +86,57 @@ enum Autonomy: String, Codable, CaseIterable, Identifiable, Sendable {
     }
 }
 
+/// Per-category override of what a Cloudling may do with a group of engine tools.
+enum ToolAccess: String, Codable, CaseIterable, Identifiable, Sendable {
+    case inherit  // follow the Cloudling's autonomy
+    case allow
+    case ask
+    case off
+
+    var id: String { rawValue }
+    var label: String {
+        switch self {
+        case .inherit: "Default"
+        case .allow: "Allow"
+        case .ask: "Ask"
+        case .off: "Off"
+        }
+    }
+}
+
+/// Engine tool categories (the `skywalker/category` of each tool) shown in the Agent Designer.
+struct ToolCategory: Identifiable, Hashable, Sendable {
+    let id: String
+    let title: String
+    let symbol: String
+    let detail: String
+
+    static let all: [ToolCategory] = [
+        ToolCategory(id: "scene", title: "Scene", symbol: "square.stack.3d.up", detail: "overview, query, environment"),
+        ToolCategory(id: "entity", title: "Entities", symbol: "cube", detail: "create, edit, transform, delete, batch"),
+        ToolCategory(id: "world", title: "World", symbol: "globe", detail: "raycast, scatter, place on surface"),
+        ToolCategory(id: "asset", title: "Assets", symbol: "shippingbox", detail: "browse, import, materials, prefabs, generators"),
+        ToolCategory(id: "wander", title: "Behaviors", symbol: "chevron.left.forwardslash.chevron.right", detail: "Wander code"),
+        ToolCategory(id: "sim", title: "Simulation", symbol: "play", detail: "play, step, input, trace"),
+        ToolCategory(id: "view", title: "Viewport", symbol: "eye", detail: "captures, camera, selection"),
+        ToolCategory(id: "history", title: "Files & History", symbol: "clock.arrow.circlepath", detail: "undo, save, load"),
+        ToolCategory(id: "render", title: "Rendering", symbol: "paintbrush", detail: "shaders, perf stats"),
+    ]
+}
+
+/// Tokens a Cloudling has used (reported by the provider).
+struct TokenUsage: Codable, Hashable, Sendable {
+    var input = 0
+    var output = 0
+    var cacheRead = 0
+    var requests = 0
+
+    static func + (a: TokenUsage, b: TokenUsage) -> TokenUsage {
+        TokenUsage(input: a.input + b.input, output: a.output + b.output, cacheRead: a.cacheRead + b.cacheRead,
+                   requests: a.requests + b.requests)
+    }
+}
+
 /// A crew member.
 struct Cloudling: Codable, Identifiable, Hashable, Sendable {
     var id = UUID()
@@ -97,6 +148,29 @@ struct Cloudling: Codable, Identifiable, Hashable, Sendable {
     var model: String = ""
     var autonomy: Autonomy = .auto
     var personality: String = ""
+    /// Extra standing instructions, appended to the role's mission.
+    var instructions: String = ""
+    /// Replaces the role's built-in mission when not empty.
+    var missionOverride: String = ""
+    var maxRounds: Int = 40
+    var toolAccess: [String: ToolAccess] = [:]
+    /// Long-term notes the Cloudling keeps across conversations (memory_note tool).
+    var memory: [String] = []
+
+    var mission: String { missionOverride.isEmpty ? role.mission : missionOverride }
+
+    /// Effective access for a tool category; read-only tools are never "ask".
+    func access(category: String, readOnly: Bool) -> ToolAccess {
+        let explicit = toolAccess[category] ?? .inherit
+        if explicit == .off { return .off }
+        if readOnly { return .allow }
+        if explicit != .inherit { return explicit }
+        switch autonomy {
+        case .observe: return .off
+        case .ask: return .ask
+        case .auto: return .allow
+        }
+    }
 
     var role: CrewRole { CrewRole.named(roleID) }
     var color: Color { Color(hex: colorHex) }
@@ -118,14 +192,102 @@ struct Cloudling: Codable, Identifiable, Hashable, Sendable {
     }
 }
 
+extension Cloudling {
+    // Tolerant decoding: crews saved by older versions lack the newer fields.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        name = try c.decode(String.self, forKey: .name)
+        roleID = try c.decodeIfPresent(String.self, forKey: .roleID) ?? "level"
+        colorHex = try c.decodeIfPresent(String.self, forKey: .colorHex) ?? "#7fb3ff"
+        face = try c.decodeIfPresent(CloudFace.self, forKey: .face) ?? .happy
+        providerID = try c.decodeIfPresent(UUID.self, forKey: .providerID)
+        model = try c.decodeIfPresent(String.self, forKey: .model) ?? ""
+        autonomy = try c.decodeIfPresent(Autonomy.self, forKey: .autonomy) ?? .auto
+        personality = try c.decodeIfPresent(String.self, forKey: .personality) ?? ""
+        instructions = try c.decodeIfPresent(String.self, forKey: .instructions) ?? ""
+        missionOverride = try c.decodeIfPresent(String.self, forKey: .missionOverride) ?? ""
+        maxRounds = try c.decodeIfPresent(Int.self, forKey: .maxRounds) ?? 40
+        toolAccess = try c.decodeIfPresent([String: ToolAccess].self, forKey: .toolAccess) ?? [:]
+        memory = try c.decodeIfPresent([String].self, forKey: .memory) ?? []
+    }
+}
+
+/// A Cloudling as a shareable project asset (`agents/<name>.agent.json`): everything except
+/// machine-specific bits (provider ids, API keys).
+struct AgentDefinition: Codable, Sendable {
+    var format = "skywalker.agent"
+    var version = 1
+    var name: String
+    var role: String
+    var color: String
+    var face: CloudFace
+    var provider: String?
+    var model: String
+    var autonomy: Autonomy
+    var personality: String
+    var mission: String
+    var instructions: String
+    var maxRounds: Int
+    var toolAccess: [String: ToolAccess]
+    var memory: [String]
+
+    init(_ c: Cloudling, providerName: String?) {
+        name = c.name
+        role = c.roleID
+        color = c.colorHex
+        face = c.face
+        provider = providerName
+        model = c.model
+        autonomy = c.autonomy
+        personality = c.personality
+        mission = c.missionOverride
+        instructions = c.instructions
+        maxRounds = c.maxRounds
+        toolAccess = c.toolAccess
+        memory = c.memory
+    }
+
+    func cloudling(providers: [ProviderConfig]) -> Cloudling {
+        var c = Cloudling(name: name, roleID: role, colorHex: color, face: face,
+                          providerID: providers.first { $0.name == provider }?.id ?? providers.first?.id)
+        c.model = model
+        c.autonomy = autonomy
+        c.personality = personality
+        c.missionOverride = mission
+        c.instructions = instructions
+        c.maxRounds = maxRounds
+        c.toolAccess = toolAccess
+        c.memory = memory
+        return c
+    }
+}
+
 /// A step of a pipeline ("flight plan"): one Cloudling, one instruction.
 struct FlightStep: Codable, Identifiable, Hashable, Sendable {
     var id = UUID()
     var cloudlingID: UUID
     var instruction: String
+    /// Runs at the same time as the previous step (both see the same earlier notes).
+    var parallelWithPrevious = false
+
+    init(cloudlingID: UUID, instruction: String, parallelWithPrevious: Bool = false) {
+        self.cloudlingID = cloudlingID
+        self.instruction = instruction
+        self.parallelWithPrevious = parallelWithPrevious
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        cloudlingID = try c.decode(UUID.self, forKey: .cloudlingID)
+        instruction = try c.decodeIfPresent(String.self, forKey: .instruction) ?? ""
+        parallelWithPrevious = try c.decodeIfPresent(Bool.self, forKey: .parallelWithPrevious) ?? false
+    }
 }
 
-/// An ordered pipeline. Each step receives the goal plus the previous steps' reports.
+/// A pipeline. Steps run in order; consecutive steps marked parallel run together. Each
+/// stage receives the goal plus the reports of all earlier stages.
 struct FlightPlan: Codable, Identifiable, Hashable, Sendable {
     var id = UUID()
     var name: String

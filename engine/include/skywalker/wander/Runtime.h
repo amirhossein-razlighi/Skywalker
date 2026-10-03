@@ -8,6 +8,7 @@
 // hang the engine; scripts that keep failing are disabled and reported.
 
 #include <cstdint>
+#include <functional>
 #include <map>
 #include <memory>
 #include <set>
@@ -60,6 +61,9 @@ public:
     double time() const { return time_; }
     uint64_t frame() const { return frame_; }
     Random& rng() { return rng_; }
+
+    /// Instantiates "prefab:path" for spawn(); set by the engine (asset system).
+    std::function<Result<EntityId>(const std::string& ref, Vec3 position, const std::string& name)> spawnPrefab;
 
     /// Maximum AST nodes evaluated per handler invocation.
     static constexpr int kBudget = 200000;

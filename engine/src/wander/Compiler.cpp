@@ -931,7 +931,7 @@ Names:      self, dt (seconds this tick), time (seconds since play), frame, pi, 
 Properties: e.position e.rotation (degrees) e.scale e.color e.name e.id e.enabled
             e.<component>.<field> e.g. self.light.intensity, self.mesh.roughness
             e.<var> for entity vars; v.x v.y v.z on vectors; c.r c.g c.b c.a on colors
-Functions:  find(name) nearest(tag) count(tag) tagged(e, tag) exists(e) spawn(mesh, pos?, name?)
+Functions:  find(name) nearest(tag) count(tag) tagged(e, tag) exists(e) spawn(mesh | "prefab:path", pos?, name?)
             distance(a, b) direction(a, b) forward(e) length(v) normalize(v) dot(a, b) cross(a, b)
             vec(x, y, z) color(r, g, b, a?) sin cos tan abs sqrt floor ceil round sign min max
             clamp(x, lo, hi) lerp(a, b, t) random() random(hi) random(lo, hi) chance(p) key(name) str(v)
