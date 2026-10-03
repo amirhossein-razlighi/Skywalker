@@ -19,6 +19,9 @@ const char* toString(Trigger t) {
         case Trigger::Key: return "key";
         case Trigger::Click: return "click";
         case Trigger::Action: return "action";
+        case Trigger::Collide: return "collide";
+        case Trigger::TriggerEnter: return "trigger_enter";
+        case Trigger::TriggerExit: return "trigger_exit";
     }
     return "?";
 }
@@ -194,6 +197,11 @@ const std::unordered_map<std::string, FnSig>& functions() {
         {"vec", {3, 3}},      {"color", {3, 4}},     {"length", {1, 1}},    {"normalize", {1, 1}},
         {"dot", {2, 2}},      {"cross", {2, 2}},     {"key", {1, 1}},       {"exists", {1, 1}},
         {"str", {1, 1}},      {"spawn", {1, 3}},     {"tagged", {2, 2}},    {"forward", {1, 1}},
+        // physics builtins
+        {"push", {2, 2}},     {"impulse", {2, 2}},   {"torque", {2, 2}},    {"velocity", {1, 1}},
+        {"raycast", {2, 3}},  {"overlap_sphere", {2, 3}},
+        {"walk", {2, 2}},     {"jump", {1, 2}},      {"grounded", {1, 1}},
+        {"navigate", {2, 2}}, {"stop_navigation", {1, 1}}, {"arrived", {1, 1}}, {"path_length", {2, 2}},
     };
     return fns;
 }
@@ -207,7 +215,11 @@ const std::unordered_set<std::string>& reservedWords() {
 }
 
 const std::vector<std::string>& builtinNames() {
-    static const std::vector<std::string> names{"self", "dt", "time", "frame", "pi"};
+    static const std::vector<std::string> names{"self", "dt", "time", "frame", "pi",
+                                                // physics builtins: contact details (collide/trigger handlers)
+                                                // and the most recent raycast() hit in this handler
+                                                "other", "contact_point", "contact_normal", "impact",
+                                                "hit_point", "hit_normal", "hit_distance"};
     return names;
 }
 
@@ -351,7 +363,8 @@ private:
         Handler h;
         h.loc = next().loc;  // 'on'
         const Token& t = next();
-        static const std::vector<std::string> triggers{"start", "tick", "event", "key", "click", "action"};
+        static const std::vector<std::string> triggers{"start", "tick",    "event",         "key",         "click",
+                                                       "action", "collide", "trigger_enter", "trigger_exit"};
         if (t.text == "start") {
             h.trigger = Trigger::Start;
         } else if (t.text == "tick" || t.text == "update") {
@@ -366,9 +379,17 @@ private:
             }
         } else if (t.text == "click") {
             h.trigger = Trigger::Click;
+        } else if (t.text == "collide" || t.text == "trigger_enter" || t.text == "trigger_exit") {
+            // physics triggers, optionally filtered by the other entity's name or tag
+            h.trigger = t.text == "collide"         ? Trigger::Collide
+                        : t.text == "trigger_enter" ? Trigger::TriggerEnter
+                                                    : Trigger::TriggerExit;
+            if (peek().kind == Tok::String) h.argument = next().text;
         } else {
             std::string guess = str::closest(t.text, triggers);
-            error(t.loc, "unknown_trigger", "unknown trigger '" + t.text + "' (use start, tick, event, key, click, action)",
+            error(t.loc, "unknown_trigger",
+                  "unknown trigger '" + t.text +
+                      "' (use start, tick, event, key, click, action, collide, trigger_enter, trigger_exit)",
                   guess.empty() ? "" : "did you mean '" + guess + "'?");
         }
         scopes_.clear();
@@ -740,11 +761,13 @@ private:
         auto e = mk(Expr::Kind::Ident, loc);
         e->text = name;
         const auto& builtins = builtinNames();
-        bool known = isLocal(name) || std::find(builtins.begin(), builtins.end(), name) != builtins.end();
+        // Locals shadow vars, vars shadow built-in names (so adding a builtin never breaks a script).
+        bool local = isLocal(name);
         bool isVar = false;
-        if (!known && behavior_) {
+        if (!local && behavior_) {
             for (const auto& v : behavior_->vars) isVar = isVar || v.name == name;
         }
+        bool known = local || isVar || std::find(builtins.begin(), builtins.end(), name) != builtins.end();
         if (isVar) {
             // Bare var name is sugar for self.<var>.
             auto self = mk(Expr::Kind::Ident, loc);
@@ -927,6 +950,7 @@ behavior Patrol
 end
 
 Triggers:   on start | on tick | on event "name" | on key "space" | on click | on action "jump"
+            on collide ("name or tag")? | on trigger_enter ("name or tag")? | on trigger_exit (...)?
 Statements: let x = v | target = v | set target to v | if c then .. elif c then .. else .. end
             every <sec> .. end | after <sec> .. end | repeat <n> times .. end   (n <= 1000)
             move <e> by <vec> | move <e> toward <point|entity> at <speed> | rotate <e> by <deg vec>
@@ -949,6 +973,14 @@ Audio:      play(e) starts e's audio component; play_sound("audio/hit.wav", volu
 Effects:    burst(n) / burst(e, n) emits n particles now (particles component; explosions, muzzle flashes)
             water_height(x, z) / water_height(pos): the animated water surface height (boats, buoyancy)
             e.particles.rate / .emitting / .colorStart ... and e.water.windSpeed ... like any component
+Physics:    push(e, force) (continuous, N) impulse(e, vec) (instant kick, N s) torque(e, vec) velocity(e)
+            e.body.velocity = (0, 5, 0) sets it; e.body.mass / .gravityScale ... like any component
+            raycast(origin, direction, max?) -> entity or none; then hit_point, hit_normal, hit_distance
+            overlap_sphere(center, radius, tag?) -> nearest overlapping entity (not self) or none
+            In collide/trigger handlers: other, contact_point, contact_normal, impact (approach speed m/s)
+Character:  walk(self, dir) every tick (|dir| 1 = moveSpeed), jump(self) / jump(self, speed), grounded(self)
+Navigation: navigate(self, point | entity) arrived(self) stop_navigation(self) path_length(a, b) (none if unreachable)
+            `on event "arrived"` fires when a nav agent reaches its destination
 Comments:   -- comment   // comment   # comment (a '#' followed by a space)
 Rules:      no while-loops (every handler always terminates); randomness is seeded (replayable);
             entities are -Z forward; rotations are Euler degrees (pitch X, yaw Y, roll Z).

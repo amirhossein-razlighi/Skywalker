@@ -61,3 +61,9 @@ the engine only through processes and sockets, so the engine and editor keep the
 the rest of `integrations/dcc` (which never imports `bpy`) is under the project license. The
 engine embeds these files as data and writes them out to run them; ship their license text with
 any binary distribution.
+Libraries fetched at build time (CMake FetchContent, pinned tags) and linked into the engine:
+
+| Library | Version | License | Used for |
+|---|---|---|---|
+| [Jolt Physics](https://github.com/jrouwe/JoltPhysics) | v5.6.0 | MIT | Rigid bodies, colliders, character controller, joints, physics queries |
+| [Recast & Detour](https://github.com/recastnavigation/recastnavigation) | v1.6.0 | zlib | Navigation mesh generation, path finding, crowd steering |

@@ -66,6 +66,17 @@ set(SKY_ENGINE_SOURCES
     src/studio/Llm.cpp
     src/studio/Runner.cpp
     src/agent/StudioTools.cpp
+    # Physics (Jolt) + navigation (Recast/Detour)
+    src/ecs/PhysicsComponents.cpp
+    src/physics/JoltCommon.cpp
+    src/physics/Shapes.cpp
+    src/physics/PhysicsWorld.cpp
+    src/physics/PhysicsSystem.cpp
+    src/nav/NavMesh.cpp
+    src/nav/NavSystem.cpp
+    src/physics/DebugDraw.cpp
+    src/agent/PhysicsTools.cpp
+    src/agent/NavTools.cpp
 )
 
 # DCC bridge: the Python helper library and the Blender add-on are embedded so the engine can
@@ -112,6 +123,10 @@ target_link_libraries(skywalker_engine PUBLIC sky::options PRIVATE ZLIB::ZLIB CU
 target_include_directories(skywalker_engine SYSTEM PRIVATE ${miniaudio_SOURCE_DIR})
 # (miniaudio does unsigned pointer-offset arithmetic that UBSan flags; ASan still checks it.)
 set_source_files_properties(src/audio/Miniaudio.cpp PROPERTIES COMPILE_OPTIONS "-w;-fno-sanitize=undefined")
+
+# Physics (Jolt) and navigation (Recast/Detour), see cmake/PhysicsDeps.cmake.
+include(${PROJECT_SOURCE_DIR}/cmake/PhysicsDeps.cmake)
+target_link_libraries(skywalker_engine PRIVATE Jolt Recast Detour DetourCrowd)
 # Definitions are C-family only (Swift consumers of the C API must not see them).
 target_compile_definitions(skywalker_engine PUBLIC
     $<$<COMPILE_LANGUAGE:C,CXX,OBJCXX>:SKY_VERSION_STRING="${PROJECT_VERSION}">)

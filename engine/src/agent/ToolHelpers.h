@@ -47,5 +47,8 @@ Status applySimInput(Engine& engine, const Json& args);
 /// folder / host (tests); the default talks to the real machine. Returns the manager in use.
 std::shared_ptr<dcc::Manager> addDccTools(Engine& engine, ToolRegistry& reg, std::shared_ptr<dcc::Manager> manager = nullptr);
 void addStudioTools(Engine& engine, ToolRegistry& reg);
+/// physics_* and nav_* tools (PhysicsTools.cpp registers NavTools.cpp too).
+void addPhysicsTools(Engine& engine, ToolRegistry& reg);
+void addNavTools(Engine& engine, ToolRegistry& reg);
 
 }  // namespace sky::tools

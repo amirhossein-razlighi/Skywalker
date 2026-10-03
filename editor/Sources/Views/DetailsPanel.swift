@@ -31,14 +31,19 @@ struct EntityDetails: View {
     @State private var schemas: JSON = .null
 
     private var selectedID: UInt64? { engine.selection.count == 1 ? engine.selection.first : nil }
-    private static let componentOrder = ["transform", "mesh", "light", "camera", "particles", "water", "audio", "listener"]
+    private static let componentOrder = ["transform", "mesh", "light", "camera", "particles", "water", "terrain", "foliage",
+                                         "audio", "listener", "body", "collider", "character", "joint", "nav_agent", "navmesh",
+                                         "physics_world"]
+    /// Components offered by Add Component (transform is always present).
+    private static let addable = ["mesh", "light", "camera", "particles", "water", "terrain", "foliage", "audio", "listener",
+                                  "body", "collider", "character", "joint", "nav_agent", "navmesh", "physics_world"]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             if let id = selectedID, !doc.isNull {
                 header(id: id)
                 ForEach(Self.componentOrder.filter { !doc["components"][$0].isNull }, id: \.self) { comp in
-                    PropertySection(title: comp.capitalized, icon: icon(comp), removable: comp != "transform",
+                    PropertySection(title: title(comp), icon: icon(comp), removable: comp != "transform",
                                     onRemove: { update(id, ["components": .object([(comp, .null)])]) }) {
                         PropertyGrid(schema: schemas[comp], values: doc["components"][comp]) { field, value in
                             update(id, ["components": .object([(comp, .object([(field, value)]))])])
@@ -80,7 +85,26 @@ struct EntityDetails: View {
         case "water": "water.waves"
         case "audio": "speaker.wave.2"
         case "listener": "ear"
+        case "body": "scalemass"
+        case "collider": "square.dashed"
+        case "character": "figure.walk"
+        case "joint": "link"
+        case "nav_agent": "arrow.triangle.turn.up.right.diamond"
+        case "navmesh": "map"
+        case "physics_world": "globe"
+        case "terrain": "mountain.2"
+        case "foliage": "leaf"
         default: "puzzlepiece"
+        }
+    }
+
+    private func title(_ comp: String) -> String {
+        switch comp {
+        case "body": "Rigid Body"
+        case "nav_agent": "Nav Agent"
+        case "navmesh": "NavMesh"
+        case "physics_world": "Physics Settings"
+        default: comp.capitalized
         }
     }
 
@@ -121,8 +145,8 @@ struct EntityDetails: View {
 
     private func addComponent(id: UInt64) -> some View {
         Menu {
-            ForEach(["mesh", "light", "camera", "particles", "water", "audio", "listener"].filter { doc["components"][$0].isNull }, id: \.self) { comp in
-                Button(comp.capitalized) { update(id, ["components": .object([(comp, [:])])]) }
+            ForEach(Self.addable.filter { doc["components"][$0].isNull }, id: \.self) { comp in
+                Button { update(id, ["components": .object([(comp, [:])])]) } label: { Label(title(comp), systemImage: icon(comp)) }
             }
         } label: {
             Label("Add Component", systemImage: "plus").font(Theme.label)

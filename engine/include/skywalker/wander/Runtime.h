@@ -21,6 +21,7 @@
 #include "skywalker/input/InputState.h"
 #include "skywalker/scene/Scene.h"
 #include "skywalker/wander/Ast.h"
+#include "skywalker/wander/PhysicsHooks.h"
 
 namespace sky::wander {
 
@@ -78,6 +79,23 @@ public:
     std::function<std::string(const std::string& clip, float fadeSeconds)> playMusic;         // music(path, fade?)
     std::function<void(const std::string& bus, float volume)> setBusVolume;                   // set_volume(bus, v)
 
+    // --- physics builtins ---------------------------------------------------------------
+    /// Physics, character and navigation services behind push(), raycast(), walk(),
+    /// navigate()...; installed by the engine (null = those builtins report an error).
+    PhysicsHooks* physics = nullptr;
+    /// A contact from the physics step. Delivered on the next tick to `self`'s
+    /// `on collide` / `on trigger_enter` / `on trigger_exit` handlers whose filter matches
+    /// `other` (name or tag); `other`, `contact_point`, `contact_normal` and `impact` describe it.
+    struct Contact {
+        Trigger trigger = Trigger::Collide;
+        EntityId self = kNoEntity;
+        EntityId other = kNoEntity;
+        Vec3 point;
+        Vec3 normal;      // pointing away from `other`, toward `self`
+        float speed = 0;  // approach speed along the normal (m/s)
+    };
+    void queueContact(const Contact& contact) { nextContacts_.push_back(contact); }
+
     /// Maximum AST nodes evaluated per handler invocation.
     static constexpr int kBudget = 200000;
 
@@ -103,6 +121,9 @@ private:
     uint64_t frame_ = 0;
     std::vector<Event> pending_;
     std::vector<Event> nextPending_;
+    bool matchesContactFilter(EntityId other, const std::string& filter) const;  // physics builtins
+    std::vector<Contact> contacts_;      // physics builtins: delivered this tick
+    std::vector<Contact> nextContacts_;  // physics builtins: queued for the next tick
     std::map<std::pair<EntityId, size_t>, Instance> instances_;
     std::vector<RuntimeMessage> messages_;
     std::vector<EntityId> toDestroy_;

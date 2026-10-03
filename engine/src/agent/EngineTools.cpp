@@ -1085,6 +1085,7 @@ void registerEngineTools(Engine& engine) {
     tools::addInputTools(engine, reg);
     tools::addDccTools(engine, reg);
     tools::addStudioTools(engine, reg);
+    tools::addPhysicsTools(engine, reg);
 }
 
 }  // namespace sky

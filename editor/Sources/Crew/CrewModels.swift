@@ -112,6 +112,7 @@ struct ToolCategory: Identifiable, Hashable, Sendable {
         ToolCategory(id: "view", title: "Viewport", symbol: "eye", detail: "captures, camera, selection"),
         ToolCategory(id: "history", title: "Files & History", symbol: "clock.arrow.circlepath", detail: "undo, save, load"),
         ToolCategory(id: "render", title: "Rendering", symbol: "paintbrush", detail: "shaders, perf stats"),
+        ToolCategory(id: "physics", title: "Physics & Navigation", symbol: "atom", detail: "bodies, queries, settle, navmesh, paths"),
         ToolCategory(id: "network", title: "Network", symbol: "arrow.down.circle", detail: "download licensed assets (asks by default)"),
         ToolCategory(id: "dcc", title: "Design apps", symbol: "wand.and.stars", detail: "run Blender / Maya / Houdini scripts, convert and edit models (asks by default)"),
         ToolCategory(id: "studio", title: "Studio", symbol: "person.3", detail: "board, feedback, decisions, messages, playtests"),

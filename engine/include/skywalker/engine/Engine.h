@@ -27,6 +27,8 @@
 #include "skywalker/fx/Ocean.h"
 #include "skywalker/fx/Particles.h"
 #include "skywalker/input/ActionMap.h"
+#include "skywalker/nav/NavSystem.h"
+#include "skywalker/physics/PhysicsSystem.h"
 #include "skywalker/render/MeshData.h"
 #include "skywalker/render/Renderer.h"
 #include "skywalker/scene/History.h"
@@ -232,6 +234,9 @@ public:
     /// Created on first use from the project's agents/ and studio/ folders. Main thread only.
     studio::Studio& studio();
     bool hasStudio() const { return studio_ != nullptr; }
+    // --- Physics & navigation (Jolt, Recast/Detour) -------------------------------------
+    physics::PhysicsSystem& physics() { return *physics_; }
+    nav::NavSystem& navigation() { return *nav_; }
 
     // --- Events (activity feed) -----------------------------------------------------
     void emitEvent(Json event);
@@ -289,6 +294,8 @@ private:
     int64_t inputFileTime_ = -1, audioFileTime_ = -1;
     double settingsTimer_ = 0;
     std::deque<Json> messages_;
+    std::unique_ptr<physics::PhysicsSystem> physics_;  // after scene_/runtime_; nav_ refers to it
+    std::unique_ptr<nav::NavSystem> nav_;
 
     std::vector<EntityId> selection_;
     std::string scenePath_;
