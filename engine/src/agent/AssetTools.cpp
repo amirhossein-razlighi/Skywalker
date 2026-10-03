@@ -79,7 +79,8 @@ void addAssetTools(Engine& engine, ToolRegistry& reg) {
              "text (matches path, description and tags; supports * globs). Each line shows path, type, tags, "
              "description and, for generated assets, the prompt that made them.",
              "asset",
-             object({{"type", enumeration({"mesh", "texture", "material", "prefab", "scene", "audio", "video", "script", "agent"},
+             object({{"type", enumeration({"mesh", "texture", "material", "prefab", "scene", "audio", "video", "script", "agent", "animation",
+                                           "controller", "sequence"},
                                           "Filter by asset type")},
                      {"tag", string("Required tag")},
                      {"query", string("Text or glob, e.g. \"tree\" or \"props/*.glb\"")},

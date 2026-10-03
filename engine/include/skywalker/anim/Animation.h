@@ -91,6 +91,10 @@ void blendPosesMasked(const Pose& a, const Pose& b, float w, const std::vector<b
 /// Model-space (glTF space) matrix of every bone.
 void computeGlobals(const Skeleton& skeleton, const Pose& pose, std::vector<Mat4>& globals);
 
+/// Average horizontal speed of the root bone over a clip (model units per second, `up` is
+/// the model's up axis). Locomotion clips report how fast they move: blend thresholds.
+float rootSpeed(const Library& library, const Clip& clip, Vec3 up = {0, 1, 0});
+
 /// Re-addresses a clip from another skeleton onto `target` by bone name. Channels whose
 /// bone has no match are dropped. Returns the number of channels kept.
 size_t retarget(const Clip& clip, const Skeleton& source, const Skeleton& target, Clip& out);

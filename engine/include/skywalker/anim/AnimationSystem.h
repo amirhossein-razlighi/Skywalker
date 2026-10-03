@@ -70,6 +70,8 @@ public:
     EntityId animatorFor(EntityId e) const;
     /// World transform of a bone (fuzzy name match), using the current pose.
     Result<Mat4> boneWorld(EntityId animatorEntity, std::string_view bone);
+    /// The animator's model (glTF) -> mesh-space transform (import scaling / facing), identity if unknown.
+    Mat4 modelTransform(EntityId animatorEntity);
 
     // --- Assets ---------------------------------------------------------------------------
     /// "models/hero.anim", "models/hero.glb" or "asset:models/hero.glb" -> library.

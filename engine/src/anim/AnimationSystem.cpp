@@ -713,6 +713,11 @@ Result<Mat4> AnimationSystem::boneWorld(EntityId e, std::string_view bone) {
     return modelToWorld(*inst, e) * inst->globals[static_cast<size_t>(b)];
 }
 
+Mat4 AnimationSystem::modelTransform(EntityId e) {
+    Instance* inst = instance(e);
+    return inst ? inst->transform : Mat4{};
+}
+
 void AnimationSystem::updateAttachments(FrameOverrides* ov) {
     if (!scene_.registry().count<BoneAttachment>()) return;
     for (EntityId e : std::vector<EntityId>(scene_.entities())) {

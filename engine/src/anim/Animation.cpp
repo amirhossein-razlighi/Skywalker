@@ -204,6 +204,23 @@ void computeGlobals(const Skeleton& skeleton, const Pose& pose, std::vector<Mat4
     }
 }
 
+float rootSpeed(const Library& lib, const Clip& clip, Vec3 up) {
+    if (lib.rootBone < 0 || clip.duration <= 1e-4f) return 0.f;
+    const Bone& root = lib.skeleton.bones[static_cast<size_t>(lib.rootBone)];
+    Mat4 parent;
+    if (root.parent >= 0) {
+        std::vector<Mat4> rest;
+        computeGlobals(lib.skeleton, restPose(lib.skeleton), rest);
+        parent = rest[static_cast<size_t>(root.parent)];
+    }
+    up = normalize(up);
+    auto flat = [&](float t) {
+        Vec3 p = parent.transformPoint(sampleTranslation(clip, lib.rootBone, t, root.rest.t));
+        return p - up * dot(p, up);
+    };
+    return length(flat(clip.duration) - flat(0.f)) / clip.duration;
+}
+
 size_t retarget(const Clip& clip, const Skeleton& source, const Skeleton& target, Clip& out) {
     out.name = clip.name;
     out.duration = clip.duration;

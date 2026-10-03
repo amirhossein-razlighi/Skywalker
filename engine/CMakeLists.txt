@@ -41,6 +41,8 @@ set(SKY_ENGINE_SOURCES
     src/anim/Sequence.cpp
     src/anim/AnimationSystem.cpp
     src/ecs/AnimationComponents.cpp
+    src/agent/AnimationTools.cpp
+    src/agent/SequenceTools.cpp
 )
 
 add_library(skywalker_engine STATIC ${SKY_ENGINE_SOURCES})
