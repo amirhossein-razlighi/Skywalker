@@ -224,6 +224,7 @@ fragment MainOut terrainFragment(TerrainOut in [[stage_in]],
     }
     s.clearcoat = 0.0;
     s.subsurface = 0.0;
+    s.N = N;
     float3 color = shadeSurface(s, Ngeo, wp, in.position.xy, V, false, 0.0, f, lights, clusterCells, clusterIndices, shadowAtlas,
                                 envTex, brdfLut, cloudShape);
     if (tu.water.z > 0.5) color = mix(color, float3(1.0, 0.5, 0.1), 0.15);  // selection tint
