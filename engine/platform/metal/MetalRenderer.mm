@@ -958,7 +958,10 @@ private:
         for (auto& t : ssrHist_) t = target2D(kHDRFormat, hw, hh, rt);
         cloudRaw_ = target2D(kHDRFormat, hw, hh, rt);
         for (auto& t : cloudHist_) t = target2D(kHDRFormat, hw, hh, rt);
-        scaler_ = nil;  // rebuilt for the new sizes on demand
+        // Rebuilt for the new sizes on demand. MetalFX encodes asynchronously (on the Neural
+        // Engine for the ML scaler), so the old scaler must outlive work already queued with it.
+        if (scaler_) retiredScalers_.push_back({scaler_, frameIndex_});
+        scaler_ = nil;
     }
 
     /// MetalFX temporal upscaler from the internal to the output resolution (nil if unsupported).
@@ -2490,6 +2493,8 @@ private:
         sc.reset = !historyValid_;
         sc.depthReversed = NO;
         [sc encodeToCommandBuffer:cmd];
+        [cmd addCompletedHandler:^(id<MTLCommandBuffer>) { (void)sc; }];  // keep it alive until the GPU is done
+        std::erase_if(retiredScalers_, [&](const RetiredScaler& r) { return frameIndex_ - r.frame > 30; });
     }
 
     void encodeAO(id<MTLCommandBuffer> cmd, const FrameData& frame) {
@@ -2699,6 +2704,11 @@ private:
         dofBlurPipeline_, dofCombinePipeline_;
     id<MTLTexture> lum_, exposure_[2], postA_, postB_, dofCoc_, dofBlur_, lut_, upscaled_, motion_, postSource_;
     id<MTLFXTemporalScaler> scaler_;
+    struct RetiredScaler {
+        id<MTLFXTemporalScaler> scaler;
+        uint64_t frame = 0;
+    };
+    std::vector<RetiredScaler> retiredScalers_;
     id<MTLRenderPipelineState> motionPipeline_;
     std::vector<id<MTLTexture>> lumViews_;
     int exposureCurrent_ = 0;
