@@ -437,7 +437,9 @@ TEST_CASE("setup: gemini and cursor write their own layouts; headless mode pins 
     // Global Cursor has no file-based rules.
     SetupOptions cg = optionsFor(root, SetupTool::Cursor);
     cg.global = true;
-    for (const auto& ch : planSetup(cg).value().changes) CHECK(ch.path.string().find("/rules/") == std::string::npos);
+    auto globalPlan = planSetup(cg);
+    REQUIRE(globalPlan);
+    for (const auto& ch : globalPlan->changes) CHECK(ch.path.string().find("/rules/") == std::string::npos);
 }
 
 TEST_CASE("setup: snippets for --print") {

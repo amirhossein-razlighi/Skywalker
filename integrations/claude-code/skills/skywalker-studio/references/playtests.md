@@ -22,6 +22,9 @@ Your scene, undo history and selection are never touched. Deterministic: same sc
   `*collected`/`pickup`, `checkpoint`. A sudden player teleport without a death event counts as a respawn death.
 - Controls default to world-space WASD with `w` = -Z and `space` to jump; pass `controls` for others.
 
+Bots only press inputs; the game must respond. If every run is "stuck" at the spawn point, check the player has a behavior reading `axis("move")` (or WASD keys)
+by driving it yourself: `sim_input {axes:[{name:"move", x:0, y:1, ticks:60}]}`, `sim_control {action:"step", ticks:60}`, `sim_trace`.
+
 ## Reading a report
 
 Metrics: completion_rate, time_to_goal, deaths, fails, damage, objectives, stuck_seconds, coverage, distance, quit_rate, script_errors, avg_tick_ms,

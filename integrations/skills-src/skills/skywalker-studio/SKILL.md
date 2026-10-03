@@ -112,7 +112,8 @@ Unattended: `skywalker studio run --project DIR --loop NAME --iterations 3` (nee
 ## Pitfalls
 
 - Task assigned to `@role` that nobody holds: `not_found` error. Create the member or assign an id.
-- A playtest with no `player`/`goal` tags or events returns thin metrics: fix the game's instrumentation first.
+- A playtest with no `player`/`goal` tags or events returns thin metrics: fix the game's instrumentation first. A bot "stuck" at the spawn for the whole run usually means
+  the player has no behavior that reacts to input (`axis("move")` / WASD): the bot presses keys, the game ignores them. Verify with `sim_input` + `sim_trace` before blaming the level.
 - `studio_decide` as an identified non-director fails; omit `as` to act for the human only when the human is actually deciding.
 - Loops stall on `awaiting_approval`: it is a human gate, not an error.
 - Do not run `playtest_run` with huge `seconds` x `runs` in the editor: it blocks the UI while it runs.
