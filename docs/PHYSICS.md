@@ -165,7 +165,7 @@ on trigger_exit ... end
 ```
 
 Inside them: `other` (the other entity), `contact_point`, `contact_normal` (pointing toward
-`self`), `impact` (approach speed in m/s; 0 for triggers).
+`self`), `impact` (approach speed in m/s: how hard it hit).
 
 Builtins:
 

@@ -127,9 +127,22 @@ std::optional<Vec3> PhysicsSystem::velocity(EntityId e) {
     return queryWorld().velocity(e);
 }
 
+namespace {
+
+/// `self` and the bodies it is part of (a script on a child of a compound must not hit its own body).
+std::vector<EntityId> selfAndOwners(const Scene& scene, EntityId e) {
+    std::vector<EntityId> out;
+    for (const EntityRecord* r = scene.record(e); r; r = r->parent ? scene.record(r->parent) : nullptr) {
+        if (r->id == e || scene.get<RigidBody>(r->id) || scene.get<CharacterController>(r->id)) out.push_back(r->id);
+    }
+    return out;
+}
+
+}  // namespace
+
 std::optional<wander::RayHitInfo> PhysicsSystem::raycast(Vec3 origin, Vec3 direction, float maxDistance, EntityId ignore) {
     QueryFilter f;
-    if (ignore) f.exclude.push_back(ignore);
+    if (ignore) f.exclude = selfAndOwners(scene_, ignore);
     auto hit = queryWorld().raycast(origin, direction, maxDistance, f);
     if (!hit) return std::nullopt;
     return wander::RayHitInfo{hit->entity, hit->point, hit->normal, hit->distance};
@@ -137,7 +150,7 @@ std::optional<wander::RayHitInfo> PhysicsSystem::raycast(Vec3 origin, Vec3 direc
 
 std::vector<EntityId> PhysicsSystem::overlapSphere(Vec3 center, float radius, EntityId ignore) {
     QueryFilter f;
-    if (ignore) f.exclude.push_back(ignore);
+    if (ignore) f.exclude = selfAndOwners(scene_, ignore);
     QueryShape s;
     s.radius = std::max(radius, 0.001f);
     return queryWorld().overlap(s, center, f);

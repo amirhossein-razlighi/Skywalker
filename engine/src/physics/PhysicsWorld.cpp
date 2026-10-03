@@ -1263,7 +1263,7 @@ void PhysicsWorld::step(Scene& scene, float dt) {
     // physics_world.enabled pauses play simulation; what-if worlds (no write-back) always run.
     if ((!m.enabled && m.options.writeBack) || dt <= 0) return;
     m.lastDt = dt;
-    m.stepCharacters(dt);
+    if (m.options.writeBack) m.stepCharacters(dt);  // what-if worlds keep characters as still obstacles
     JPH::JobSystem& jobs = m.localJobs ? static_cast<JPH::JobSystem&>(*m.localJobs) : sharedJobSystem();
     {
         static std::mutex sharedPoolMutex;  // the shared pool steps one world at a time
