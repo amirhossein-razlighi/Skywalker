@@ -248,8 +248,8 @@ std::string textDiff(const std::string& before, const std::string& after) {
     size_t i = 0, j = 0;
     while (i < n || j < m) {
         if (i < n && j < m && a[i] == b[j]) { ops.push_back({' ', &a[i]}); ++i; ++j; }
-        else if (j < m && (i == n || lcs[i][j + 1] >= lcs[i + 1][j])) { ops.push_back({'+', &b[j]}); ++j; }
-        else { ops.push_back({'-', &a[i]}); ++i; }
+        else if (i < n && (j == m || lcs[i + 1][j] >= lcs[i][j + 1])) { ops.push_back({'-', &a[i]}); ++i; }
+        else { ops.push_back({'+', &b[j]}); ++j; }
     }
     // Keep two lines of context around changes.
     std::vector<bool> keep(ops.size(), false);

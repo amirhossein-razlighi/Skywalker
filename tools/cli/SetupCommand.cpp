@@ -4,6 +4,7 @@
 #include <spawn.h>
 #include <sys/wait.h>
 
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
@@ -32,6 +33,7 @@ int setupUsage() {
                  "  --no-skills     only the MCP server entry\n"
                  "  --mode MODE     auto (default: editor if running, else headless), attach, or headless\n"
                  "  --binary PATH   path to write for the skywalker executable (default: this binary)\n"
+                 "  --home DIR      use DIR as the home directory for --global (for tests); external commands are printed, not run\n"
                  "  --verbose       list every file instead of a summary\n");
     return 2;
 }
@@ -93,7 +95,7 @@ int runSetup(const std::vector<std::string>& raw) {
     std::string toolName;
     for (size_t i = 1; i < raw.size(); ++i) {
         if (raw[i].rfind("-", 0) == 0) {
-            if (raw[i] == "--project" || raw[i] == "--mode" || raw[i] == "--binary") ++i;
+            if (raw[i] == "--project" || raw[i] == "--mode" || raw[i] == "--binary" || raw[i] == "--home") ++i;
             continue;
         }
         toolName = raw[i];
@@ -112,6 +114,7 @@ int runSetup(const std::vector<std::string>& raw) {
     options.global = hasFlag(raw, "--global");
     options.skills = !hasFlag(raw, "--no-skills");
     options.mode = flagValue(raw, "--mode", "auto");
+    options.homeDir = flagValue(raw, "--home");
     std::string binary = flagValue(raw, "--binary");
     options.binary = binary.empty() ? sky::currentExecutablePath() : fs::absolute(binary);
     if (!options.global) {
@@ -149,7 +152,16 @@ int runSetup(const std::vector<std::string>& raw) {
         std::printf("  [%s] %s  (%s)\n", !c.changes() ? "same  " : (c.existed ? "update" : "create"), c.path.string().c_str(), c.what.c_str());
         if (dryRun && c.changes()) {
             std::string diff = sky::textDiff(c.before, c.after);
-            if (!diff.empty()) std::printf("%s", diff.c_str());
+            // Cap long diffs (a new guidance file or a rewritten config) so the summary stays readable.
+            size_t lines = 0, cut = 0;
+            for (size_t i = 0; i < diff.size() && cut == 0; ++i) {
+                if (diff[i] == '\n' && ++lines == 40) cut = i + 1;
+            }
+            if (cut != 0 && cut < diff.size()) {
+                std::printf("%s    ... (%zu more diff lines)\n", diff.substr(0, cut).c_str(), std::count(diff.begin() + static_cast<std::ptrdiff_t>(cut), diff.end(), '\n'));
+            } else if (!diff.empty()) {
+                std::printf("%s", diff.c_str());
+            }
         }
     }
     std::printf("  files: %d to create, %d to update, %d unchanged\n", created, updated, same);
@@ -165,6 +177,10 @@ int runSetup(const std::vector<std::string>& raw) {
         std::printf("  wrote %d file(s), %d already up to date\n", applied->written, applied->unchanged);
         if (!applied->backupDir.empty()) std::printf("  backups of replaced files: %s\n", applied->backupDir.string().c_str());
         for (const auto& argv : plan->commands) {
+            if (!options.homeDir.empty()) {
+                std::printf("  run this yourself:\n    %s\n", commandLine(argv).c_str());
+                continue;
+            }
             if (!onPath(argv[0])) {
                 std::printf("  '%s' is not on PATH; run this yourself:\n    %s\n", argv[0].c_str(), commandLine(argv).c_str());
                 continue;

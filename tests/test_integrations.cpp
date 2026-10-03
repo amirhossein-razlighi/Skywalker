@@ -461,6 +461,20 @@ TEST_CASE("integrations: generated files are up to date with integrations/skills
     CHECK_MESSAGE(std::system(cmd.c_str()) == 0, "run `python3 integrations/generate.py` and commit the result");
 }
 
+TEST_CASE("integrations: the SDK examples are valid Python") {
+    if (!pythonAvailable()) {
+        MESSAGE("python3 not available: skipping");
+        return;
+    }
+    // py_compile checks syntax without importing the (uninstalled) SDKs; the cache goes to a temp dir.
+    for (const char* rel : {"/integrations/examples/openai_agents_sdk/skywalker_agents.py",
+                            "/integrations/examples/anthropic_tool_runner/skywalker_claude.py",
+                            "/integrations/generate.py", "/integrations/check_skills.py"}) {
+        std::string cmd = std::string("python3 -c \"import ast,sys; ast.parse(open(sys.argv[1]).read())\" \"") + SKY_SOURCE_DIR + rel + "\" > /dev/null 2>&1";
+        CHECK_MESSAGE(std::system(cmd.c_str()) == 0, rel);
+    }
+}
+
 TEST_CASE("integrations: skill sources only use tools and arguments that exist") {
     if (!pythonAvailable()) {
         MESSAGE("python3 not available: skipping");
