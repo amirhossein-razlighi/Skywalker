@@ -67,3 +67,17 @@ Libraries fetched at build time (CMake FetchContent, pinned tags) and linked int
 |---|---|---|---|
 | [Jolt Physics](https://github.com/jrouwe/JoltPhysics) | v5.6.0 | MIT | Rigid bodies, colliders, character controller, joints, physics queries |
 | [Recast & Detour](https://github.com/recastnavigation/recastnavigation) | v1.6.0 | zlib | Navigation mesh generation, path finding, crowd steering |
+
+### 2D, text and UI (workstream T)
+
+| Library / asset | Version | License | Used for |
+|---|---|---|---|
+| [stb](https://github.com/nothings/stb) (`stb_truetype`, `stb_image`, `stb_rect_pack`) | commit `2c980bb` (truetype 1.26, image 2.30, rect_pack 1.01) | Public domain (or MIT) | SDF glyph rasterization, image decoding (PNG/JPEG/BMP/TGA), atlas packing |
+| [Inter](https://github.com/rsms/inter) (`assets/fonts/Inter.ttf`) | google/fonts `9710da1` | SIL OFL 1.1 (`assets/fonts/Inter-OFL.txt`) | Default UI font (also compiled into the engine with `#embed` as a fallback) |
+| [EB Garamond](https://github.com/octaviopardo/EBGaramond12) (`assets/fonts/EBGaramond.ttf`) | google/fonts `9710da1` | SIL OFL 1.1 (`assets/fonts/EBGaramond-OFL.txt`) | Serif font (books, letters, documents) |
+| [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono) (`assets/fonts/JetBrainsMono.ttf`) | google/fonts `9710da1` | SIL OFL 1.1 (`assets/fonts/JetBrainsMono-OFL.txt`) | Monospace font (terminals, data, pixel-style UIs) |
+
+The fonts come unmodified from the official [google/fonts](https://github.com/google/fonts)
+repository (`ofl/inter`, `ofl/ebgaramond`, `ofl/jetbrainsmono`; variable fonts renamed to short
+file names). The OFL allows bundling them with games and software, including commercial ones; the
+license text must travel with the font files, and the fonts may not be sold on their own.

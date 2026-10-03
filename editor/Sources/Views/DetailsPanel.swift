@@ -33,10 +33,13 @@ struct EntityDetails: View {
     private var selectedID: UInt64? { engine.selection.count == 1 ? engine.selection.first : nil }
     private static let componentOrder = ["transform", "mesh", "light", "camera", "particles", "water", "terrain", "foliage",
                                          "audio", "listener", "body", "collider", "character", "joint", "nav_agent", "navmesh",
-                                         "physics_world"]
+                                         "physics_world", "sprite", "sprite_anim", "tilemap", "light2d", "parallax", "camera2d",
+                                         "text", "ui_canvas", "ui", "dialogue"]
     /// Components offered by Add Component (transform is always present).
     private static let addable = ["mesh", "light", "camera", "particles", "water", "terrain", "foliage", "audio", "listener",
-                                  "body", "collider", "character", "joint", "nav_agent", "navmesh", "physics_world"]
+                                  "body", "collider", "character", "joint", "nav_agent", "navmesh", "physics_world",
+                                  "sprite", "sprite_anim", "tilemap", "light2d", "parallax", "camera2d", "text", "ui_canvas", "ui",
+                                  "dialogue"]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -94,6 +97,16 @@ struct EntityDetails: View {
         case "physics_world": "globe"
         case "terrain": "mountain.2"
         case "foliage": "leaf"
+        case "sprite": "photo"
+        case "sprite_anim": "film.stack"
+        case "tilemap": "square.grid.3x3"
+        case "light2d": "sun.max"
+        case "parallax": "square.3.layers.3d"
+        case "camera2d": "camera.viewfinder"
+        case "text": "textformat"
+        case "ui_canvas": "rectangle.on.rectangle"
+        case "ui": "rectangle.and.hand.point.up.left"
+        case "dialogue": "bubble.left.and.bubble.right"
         default: "puzzlepiece"
         }
     }
@@ -104,6 +117,11 @@ struct EntityDetails: View {
         case "nav_agent": "Nav Agent"
         case "navmesh": "NavMesh"
         case "physics_world": "Physics Settings"
+        case "sprite_anim": "Sprite Animator"
+        case "light2d": "Light 2D"
+        case "camera2d": "Camera 2D"
+        case "ui_canvas": "UI Canvas"
+        case "ui": "UI Element"
         default: comp.capitalized
         }
     }
@@ -237,7 +255,12 @@ struct FieldEditor: View {
     let onChange: (JSON) -> Void
 
     var body: some View {
-        if !schema["enum"].isNull {
+        if schema["x-sky-json"].bool == true {
+            // Structured data (animation clips, tile layers, style overrides): edited as compact JSON.
+            CommitField(text: value.serialized(), font: Theme.monoSmall) { text in
+                if let parsed = JSON.parse(text) { onChange(parsed) }
+            }
+        } else if !schema["enum"].isNull {
             Picker("", selection: Binding(get: { value.string ?? "" }, set: { onChange(.string($0)) })) {
                 ForEach(schema["enum"].array.compactMap(\.string), id: \.self) { Text($0.capitalized).tag($0) }
             }
@@ -251,11 +274,13 @@ struct FieldEditor: View {
         } else if schema["type"].string == "number" {
             ScrubField(value: value.number ?? 0, step: step, range: range) { onChange(.number($0)) }
         } else if schema["type"].string == "array" {
+            // vec2 / vec3 / vec4 (maxItems tells which)
+            let count = max(2, min(4, Int(schema["maxItems"].number ?? 3)))
             HStack(spacing: 3) {
-                ForEach(0..<3, id: \.self) { i in
-                    ScrubField(value: value[i].number ?? 0, step: step, axis: i) { v in
+                ForEach(0..<count, id: \.self) { i in
+                    ScrubField(value: value[i].number ?? 0, step: step, axis: i < 3 ? i : nil) { v in
                         var arr = value.array
-                        while arr.count < 3 { arr.append(0) }
+                        while arr.count < count { arr.append(0) }
                         arr[i] = .number(v)
                         onChange(.array(arr))
                     }

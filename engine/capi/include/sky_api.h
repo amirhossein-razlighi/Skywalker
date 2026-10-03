@@ -94,6 +94,8 @@ void sky_input_click(SkyEngine* engine, uint64_t entity);
 void sky_input_mouse_move(SkyEngine* engine, float x, float y, float dx, float dy);
 void sky_input_mouse_button(SkyEngine* engine, int button, int down);
 void sky_input_scroll(SkyEngine* engine, float dx, float dy);
+/* Typed characters (UTF-8) for UI text fields; delivered with the next tick. */
+void sky_input_text(SkyEngine* engine, const char* utf8);
 
 /* Gamepads. Call once per frame for every connected controller (index 0..3) and once with connected = 0 when one
    leaves. Sticks -1..1 with +y up, triggers 0..1. `buttons` is a bitmask in this order: bit 0 south (A / Cross),
