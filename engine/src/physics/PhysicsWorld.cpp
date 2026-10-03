@@ -210,6 +210,7 @@ struct PhysicsWorld::Impl final : public JPH::ContactListener {
     std::map<std::pair<EntityId, int>, BodyEntry> bodies;
     std::map<EntityId, CharEntry> chars;
     std::map<EntityId, JointEntry> joints;
+    std::unordered_map<EntityId, std::pair<std::string, EntityId>> jointTargets;  // joint -> (target text, entity)
     std::unordered_map<uint32_t, EntityId> bodyEntity;  // BodyID (incl. character inner bodies) -> entity
     std::vector<std::pair<uint32_t, uint32_t>> noCollide;  // sorted body pairs joined without collideConnected
 
@@ -627,10 +628,14 @@ struct PhysicsWorld::Impl final : public JPH::ContactListener {
         bool moved = !(std::equal(std::begin(d.world.m), std::end(d.world.m), std::begin(e.lastWorld.m)));
         if (e.motion == JPH::EMotionType::Kinematic) {
             Decomposed pose = decompose(d.world);
-            if (dt > 0) {
+            // Follow the transform with a velocity (so riders and pushed bodies react) unless it
+            // jumped: a teleport must not fling everything it touches.
+            bool teleport = distance(d.world.translation(), e.lastWorld.translation()) > 2.f;
+            if (dt > 0 && !teleport) {
                 bi().MoveKinematic(e.id, JPH::RVec3(toJolt(pose.translation)), pose.rotation, dt);
             } else if (moved) {
                 bi().SetPositionAndRotation(e.id, JPH::RVec3(toJolt(pose.translation)), pose.rotation, JPH::EActivation::DontActivate);
+                bi().SetLinearAndAngularVelocity(e.id, JPH::Vec3::sZero(), JPH::Vec3::sZero());
             }
         } else if (moved) {
             Decomposed pose = decompose(d.world);
@@ -772,8 +777,9 @@ struct PhysicsWorld::Impl final : public JPH::ContactListener {
             ce.desired = {};
             ce.jumpRequested = false;
 
-            // Contacts with the character (it is not part of Jolt's contact listener).
-            JPH::Vec3 vel = ch.GetLinearVelocity();
+            // Contacts with the character (it is not part of Jolt's contact listener). Impact speed
+            // uses the velocity before the move resolved the collision.
+            const JPH::Vec3 vel = v;
             for (const auto& contact : ch.GetActiveContacts()) {
                 if (!contact.mHadCollision || contact.mIsSensorB || contact.mWasDiscarded) continue;
                 EntityId other = kNoEntity;
@@ -855,7 +861,13 @@ struct PhysicsWorld::Impl final : public JPH::ContactListener {
             JPH::BodyID bId = JPH::BodyID();
             EntityId target = kNoEntity;
             if (!j->target.empty()) {
-                target = s.find(j->target);
+                // Name lookups scan the scene: cache the resolution while the name still matches.
+                auto& cached = jointTargets[e];
+                const EntityRecord* cr = cached.second ? s.record(cached.second) : nullptr;
+                if (cached.first != j->target || !cr || !(cr->name == j->target || formatEntityRef(cr->id) == j->target)) {
+                    cached = {j->target, s.find(j->target)};
+                }
+                target = cached.second;
                 if (target == kNoEntity) {
                     warn("joint on entity #" + std::to_string(e) + ": target \"" + j->target + "\" not found");
                     continue;

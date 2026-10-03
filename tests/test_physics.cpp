@@ -262,8 +262,17 @@ TEST_CASE("physics: joints hold, swing and break") {
     broke = true
   end
 end)");
+    // Chain: a link ball-jointed to the welded sign (body-to-body), and a rope (distance joint) to a world point.
+    EntityId link = make(*e, R"({"name":"Link","components":{"transform":{"position":[-3,1.5,0],"scale":[0.2,0.2,0.2]},
+        "mesh":{"mesh":"sphere"},"body":{"mass":1},"joint":{"kind":"ball","target":"Sign","anchor":[0,5,0]}}})");
+    EntityId lamp = make(*e, R"({"name":"Lamp","components":{"transform":{"position":[8,2,0],"scale":[0.3,0.3,0.3]},
+        "mesh":{"mesh":"sphere"},"body":{"mass":1},
+        "joint":{"kind":"distance","connectedAnchor":[8,6,0],"limitMin":0,"limitMax":3}}})");
     e->play();
     e->step(120);
+    CHECK(distance(pos(*e, link), Vec3{-3, 2.5f, 0}) < 1.1f);  // hangs from the sign's bottom face area
+    CHECK(pos(*e, link).y > 1.f);
+    CHECK(pos(*e, lamp).y == doctest::Approx(3.f).epsilon(0.03));  // rope of 3 m from y = 6
     CHECK(pos(*e, sign).y == doctest::Approx(3.f).epsilon(0.01));
     Vec3 b = pos(*e, bob);
     CHECK(distance(b, Vec3{0, 3, 0}) == doctest::Approx(1.f).epsilon(0.03));  // rope length kept
@@ -288,8 +297,11 @@ TEST_CASE("physics: hinge motor spins a wheel; kinematic platforms carry bodies"
 end)");
     EntityId box = make(*e, R"({"name":"Box","components":{"transform":{"position":[5,1,0],"scale":[0.5,0.5,0.5]},
         "mesh":{"mesh":"cube"},"body":{"mass":2}}})");
+    EntityId rider = make(*e, R"({"name":"Rider","components":{"transform":{"position":[5.6,1.4,0.6]},
+        "character":{"height":1.6,"radius":0.3}}})");
     e->play();
     e->step(120);
+    CHECK(pos(*e, rider).y > 2.5f + 0.75f);  // stood on the lift (top 2.5) while it rose
     CHECK(std::fabs(e->scene().get<RigidBody>(wheel)->angularVelocity.y) == doctest::Approx(180.f).epsilon(0.05));
     CHECK(pos(*e, lift).y == doctest::Approx(2.25f).epsilon(0.02));
     CHECK(pos(*e, box).y > 2.4f);  // rode up on the platform
