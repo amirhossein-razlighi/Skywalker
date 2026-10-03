@@ -1,12 +1,17 @@
 #pragma once
 // Internal helpers shared by the tool catalogue files (EngineTools / AssetTools / WorldTools).
 
+#include <memory>
 #include <optional>
 #include <string>
 #include <vector>
 
 #include "skywalker/agent/ToolRegistry.h"
 #include "skywalker/engine/Engine.h"
+
+namespace sky::dcc {
+class Manager;
+}
 
 namespace sky::tools {
 
@@ -36,5 +41,17 @@ void addFxTools(Engine& engine, ToolRegistry& reg);
 void addTools2D(Engine& engine, ToolRegistry& reg);        // sprites, atlases, tilemaps
 void addUiTools(Engine& engine, ToolRegistry& reg);        // ui_create, ui_style, ui_inspect, ui_interact
 void addDialogueTools(Engine& engine, ToolRegistry& reg);  // dialogue_check, dialogue_preview, dialogue_control
+void addWorldBuildTools(Engine& engine, ToolRegistry& reg);
+void addAudioTools(Engine& engine, ToolRegistry& reg);
+void addInputTools(Engine& engine, ToolRegistry& reg);
+/// Applies the action / axis / gamepad / mouse parts of a sim_input call (InputTools.cpp).
+Status applySimInput(Engine& engine, const Json& args);
+/// DCC bridge tools (Blender, Maya, Houdini, 3ds Max). Pass a manager to use a specific state
+/// folder / host (tests); the default talks to the real machine. Returns the manager in use.
+std::shared_ptr<dcc::Manager> addDccTools(Engine& engine, ToolRegistry& reg, std::shared_ptr<dcc::Manager> manager = nullptr);
+void addStudioTools(Engine& engine, ToolRegistry& reg);
+/// physics_* and nav_* tools (PhysicsTools.cpp registers NavTools.cpp too).
+void addPhysicsTools(Engine& engine, ToolRegistry& reg);
+void addNavTools(Engine& engine, ToolRegistry& reg);
 
 }  // namespace sky::tools

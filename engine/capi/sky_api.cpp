@@ -55,6 +55,43 @@ char* sky_call_tool(SkyEngine* h, const char* name, const char* args_json, const
     return dup(e->callTool(name, args, actor ? actor : "user").toMcp().dump());
 }
 
+struct SkyPendingCall {
+    Engine::PendingCall call;
+};
+
+char* sky_call_tool_begin(SkyEngine* h, const char* name, const char* args_json, const char* actor, SkyPendingCall** pending) {
+    if (pending) *pending = nullptr;
+    Engine* e = E(h);
+    if (!e || !name) return dup(R"({"content":[{"type":"text","text":"invalid engine or tool name"}],"isError":true})");
+    Json args = Json::object();
+    if (args_json && *args_json) {
+        auto parsed = Json::parse(args_json);
+        if (!parsed) return dup(ToolResult::error(parsed.error()).toMcp().dump());
+        args = std::move(parsed.value());
+    }
+    Engine::PendingCall call = e->beginTool(name, args, actor ? actor : "user");
+    if (!call.result.deferred || !pending) return dup(e->finishTool(call).toMcp().dump());
+    *pending = new SkyPendingCall{std::move(call)};  // NOLINT(cppcoreguidelines-owning-memory)
+    return nullptr;
+}
+
+void sky_pending_run(SkyPendingCall* p) {
+    if (!p || !p->call.result.deferred || !p->call.result.deferred->work) return;
+    try {
+        p->call.result.deferred->work();
+    } catch (...) {
+        // The failure surfaces in finish(): the tool's own handling decides what to report.
+    }
+}
+
+char* sky_pending_finish(SkyEngine* h, SkyPendingCall* p) {
+    Engine* e = E(h);
+    if (!p) return dup(R"({"content":[{"type":"text","text":"no pending call"}],"isError":true})");
+    std::unique_ptr<SkyPendingCall> owner(p);
+    if (!e) return dup(R"({"content":[{"type":"text","text":"invalid engine"}],"isError":true})");
+    return dup(e->finishTool(owner->call).toMcp().dump());
+}
+
 char* sky_tools_list(SkyEngine* h) {
     Engine* e = E(h);
     return dup(e ? e->tools().listJson().dump() : "{\"tools\":[]}");
@@ -199,13 +236,65 @@ char* sky_frame_stats(SkyEngine* h) {
 void sky_input_key(SkyEngine* h, const char* key, int down) {
     Engine* e = E(h);
     if (!e || !key) return;
-    std::string k = key;
+    std::string k = input::canonicalKey(key);
+    if (k.empty()) return;
+    auto& in = e->input();
     if (down) {
-        if (!e->input().held.count(k)) e->input().pressed.insert(k);
-        e->input().held.insert(k);
-    } else {
-        e->input().held.erase(k);
+        if (!in.held.count(k)) in.pressed.insert(k);
+        in.held.insert(k);
+    } else if (in.held.erase(k)) {
+        in.released.insert(k);
     }
+}
+
+void sky_input_mouse_move(SkyEngine* h, float x, float y, float dx, float dy) {
+    Engine* e = E(h);
+    if (!e) return;
+    auto& in = e->input();
+    in.mouseX = std::clamp(x, 0.f, 1.f);
+    in.mouseY = std::clamp(y, 0.f, 1.f);
+    in.mouseDX += dx;
+    in.mouseDY -= dy;  // screen y points down; input y points up
+}
+
+void sky_input_mouse_button(SkyEngine* h, int button, int down) {
+    Engine* e = E(h);
+    if (!e || button < 0 || button > 2) return;
+    static const char* names[] = {"left", "right", "middle"};
+    auto& in = e->input();
+    if (down) {
+        if (!in.mouseHeld.count(names[button])) in.mousePressed.insert(names[button]);
+        in.mouseHeld.insert(names[button]);
+    } else if (in.mouseHeld.erase(names[button])) {
+        in.mouseReleased.insert(names[button]);
+    }
+}
+
+void sky_input_scroll(SkyEngine* h, float dx, float dy) {
+    Engine* e = E(h);
+    if (!e) return;
+    e->input().scrollX += dx;
+    e->input().scrollY += dy;
+}
+
+void sky_input_gamepad(SkyEngine* h, int index, int connected, const char* name, const SkyGamepad* state) {
+    Engine* e = E(h);
+    if (!e || index < 0 || index >= input::kMaxGamepads) return;
+    input::GamepadState& pad = e->input().pads[static_cast<size_t>(index)];
+    pad.connected = connected != 0;
+    if (name) pad.name = name;
+    if (!pad.connected || !state) {
+        pad.lx = pad.ly = pad.rx = pad.ry = pad.lt = pad.rt = 0.f;
+        pad.buttons = 0;
+        return;
+    }
+    pad.lx = std::clamp(state->left_x, -1.f, 1.f);
+    pad.ly = std::clamp(state->left_y, -1.f, 1.f);
+    pad.rx = std::clamp(state->right_x, -1.f, 1.f);
+    pad.ry = std::clamp(state->right_y, -1.f, 1.f);
+    pad.lt = std::clamp(state->left_trigger, 0.f, 1.f);
+    pad.rt = std::clamp(state->right_trigger, 0.f, 1.f);
+    pad.buttons = state->buttons & ((1u << static_cast<unsigned>(input::PadButton::Count)) - 1u);
 }
 
 void sky_input_click(SkyEngine* h, uint64_t entity) {

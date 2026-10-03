@@ -258,14 +258,13 @@ end)"}}));
         return Vec2{n->rect.x + n->rect.w * 0.5f, n->rect.y + n->rect.h * 0.5f};
     };
     auto& in = e->input();
-    in.pointer.width = 1000;
-    in.pointer.height = 500;
+    e->world2d().setViewport(1000, 500);
     auto clickAt = [&](Vec2 p) {
-        in.pointer.x = p.x;
-        in.pointer.y = p.y;
-        in.pointer.down = true;
+        in.mouseX = p.x / 1000.f;
+        in.mouseY = p.y / 500.f;
+        in.mouseHeld.insert("left");
         e->step(1);
-        in.pointer.down = false;
+        in.mouseHeld.erase("left");
         e->step(2);  // release, then the event is delivered
     };
     clickAt(center("Play"));
@@ -275,11 +274,11 @@ end)"}}));
     CHECK(s.get<UIElement>(s.find("Music"))->value == doctest::Approx(1.f));
     // Dragging the slider to its right end sets the max value and sends the event.
     const ui::Node* slider = lay.find(s.find("Volume"));
-    in.pointer.x = slider->rect.x + slider->rect.w - 1;
-    in.pointer.y = slider->rect.y + slider->rect.h * 0.5f;
-    in.pointer.down = true;
+    in.mouseX = (slider->rect.x + slider->rect.w - 1) / 1000.f;
+    in.mouseY = (slider->rect.y + slider->rect.h * 0.5f) / 500.f;
+    in.mouseHeld.insert("left");
     e->step(2);
-    in.pointer.down = false;
+    in.mouseHeld.erase("left");
     e->step(2);
     CHECK(s.get<UIElement>(s.find("Volume"))->value == doctest::Approx(1.f));
     CHECK(s.record(game)->vars.get("volume").asNumber() == doctest::Approx(1.0));
@@ -290,7 +289,7 @@ end)"}}));
     e->step(1);
     CHECK(s.get<UIElement>(s.find("Player Name"))->text == "Ad");
     // Keyboard: tab cycles focus, enter activates the focused button.
-    in.pointer = {};
+    in.mouseX = in.mouseY = 0;  // away from the panel
     in.pressed.insert("escape");
     e->step(1);
     in.pressed.insert("tab");

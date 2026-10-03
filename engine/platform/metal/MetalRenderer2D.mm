@@ -190,7 +190,8 @@ id<MTLRenderPipelineState> MetalRenderer2D::worldPipeline(MTLRenderPassDescripto
         MTLRenderPipelineColorAttachmentDescriptor* ca = pd.colorAttachments[i];
         ca.pixelFormat = t.pixelFormat;
         if (i != 0) {
-            ca.writeMask = MTLColorWriteMaskNone;  // indirect-light / auxiliary targets: untouched
+            // G-buffer targets: overwritten with "no lighting" by opaque-ish quads; halos leave them alone.
+            ca.writeMask = additive ? MTLColorWriteMaskNone : MTLColorWriteMaskAll;
             continue;
         }
         ca.blendingEnabled = YES;

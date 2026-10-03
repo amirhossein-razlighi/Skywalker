@@ -36,3 +36,34 @@ Also decide:
 - A contributor agreement (CLA or DCO), so contributions can be dual-licensed.
 - Trademark policy for the name "Skywalker". It is a well-known term in entertainment, so
   check trademark availability before branding a product with it.
+
+## Third-party
+
+Dependencies are fetched at configure time from their official repositories at pinned tags, and
+must have permissive licenses (MIT, BSD, zlib, Apache-2.0, public domain).
+
+| Library | Version | License | Used for |
+|---|---|---|---|
+| [miniaudio](https://github.com/mackron/miniaudio) | 0.11.22 | Public domain (or MIT-0) | Audio engine: mixing, spatialization, decoding of wav/mp3/flac, output devices (`engine/src/audio`). |
+### Design apps (DCC bridge)
+
+Blender, Maya, Houdini and 3ds Max are **not** bundled, linked or redistributed: Skywalker starts
+the copies the user already has installed as separate processes (`docs/DCC.md`), so their
+licenses (Blender: GPL-3.0-or-later; the others: proprietary) do not apply to Skywalker or to
+games made with it. No new third-party dependencies were added.
+
+One licensing consequence to decide before the public release: Python that runs *inside*
+Blender and imports `bpy` is, by the Blender Foundation's long-standing position, subject to the
+GPL. The files that do so (`integrations/blender/skywalker_bridge/*.py` and
+`integrations/dcc/skywalker_dcc/{blender,procedural,tasks}.py`) therefore carry
+`SPDX-License-Identifier: GPL-3.0-or-later`. They are small, self-contained scripts that talk to
+the engine only through processes and sockets, so the engine and editor keep the project license;
+the rest of `integrations/dcc` (which never imports `bpy`) is under the project license. The
+engine embeds these files as data and writes them out to run them; ship their license text with
+any binary distribution.
+Libraries fetched at build time (CMake FetchContent, pinned tags) and linked into the engine:
+
+| Library | Version | License | Used for |
+|---|---|---|---|
+| [Jolt Physics](https://github.com/jrouwe/JoltPhysics) | v5.6.0 | MIT | Rigid bodies, colliders, character controller, joints, physics queries |
+| [Recast & Detour](https://github.com/recastnavigation/recastnavigation) | v1.6.0 | zlib | Navigation mesh generation, path finding, crowd steering |

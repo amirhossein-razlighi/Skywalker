@@ -6,6 +6,7 @@ struct SettingsView: View {
             Tab("Crew", systemImage: "cloud.fill") { CrewManager() }
             Tab("Providers", systemImage: "brain") { ProviderSettings() }
             Tab("External Agents", systemImage: "antenna.radiowaves.left.and.right") { ExternalAgentSettings() }
+            Tab("Design Apps", systemImage: "wand.and.stars") { DesignAppSettings() }
         }
         .frame(width: 820, height: 620)
     }
@@ -94,6 +95,83 @@ private struct ExternalAgentSettings: View {
             }
         }
         .formStyle(.grouped)
+    }
+}
+
+/// Design apps agents can drive (Blender, Maya, Houdini, 3ds Max): what was detected on this
+/// computer, and the live Blender bridge.
+private struct DesignAppSettings: View {
+    @Environment(EngineStore.self) private var engine
+    @State private var apps: [JSON] = []
+    @State private var session: JSON = .null
+    @State private var busy = false
+    @State private var message = ""
+
+    var body: some View {
+        Form {
+            Section("Detected on this computer") {
+                if apps.isEmpty {
+                    Text(busy ? "Looking…" : "No design apps found. Install Blender (free, blender.org), or set SKY_BLENDER to its executable.")
+                        .foregroundStyle(.secondary)
+                }
+                ForEach(Array(apps.enumerated()), id: \.offset) { _, app in
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack {
+                            Text("\(app["name"].string ?? "") \(app["version"].string ?? "")").font(.headline)
+                            if app["tested"].bool == false {
+                                Text("untested adapter").font(.caption).foregroundStyle(Theme.warning)
+                            }
+                            Spacer()
+                            Text((app["found_via"].string ?? "")).font(.caption).foregroundStyle(.secondary)
+                        }
+                        Text(app["executable"].string ?? "").font(Theme.monoSmall).foregroundStyle(.secondary).textSelection(.enabled)
+                        if let note = app["note"].string { Text(note).font(.caption).foregroundStyle(Theme.warning) }
+                    }
+                }
+                HStack {
+                    Button("Rescan") { refresh(rescan: true) }.disabled(busy)
+                    if busy { ProgressView().controlSize(.small) }
+                    Spacer()
+                }
+                Text("Override a path with SKY_BLENDER, SKY_MAYAPY, SKY_HOUDINI_HYTHON or SKY_3DSMAX_BATCH, or in ~/.skywalker/dcc/paths.json.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            Section("Live Blender session") {
+                if let version = session["version"].string, session["connected"].bool == true {
+                    LabeledContent("Connected", value: "Blender \(version) (\(session["mode"].string ?? ""))")
+                    Button("Stop Bridge") { run("dcc_session_stop") }.disabled(busy)
+                } else {
+                    Text("Not connected. Install the add-on, then click Start Bridge in Blender's Skywalker tab (press N in the 3D viewport) " +
+                         "— or right-click a model in the Asset Browser and choose Open in Blender.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                Button("Install Blender Add-on") { run("dcc_install_addon") }
+                    .disabled(busy || !apps.contains { $0["app"].string == "blender" })
+                if !message.isEmpty { Text(message).font(.caption).foregroundStyle(.secondary).textSelection(.enabled) }
+            }
+        }
+        .formStyle(.grouped)
+        .onAppear { refresh(rescan: false) }
+    }
+
+    private func run(_ tool: String) {
+        busy = true
+        Task {
+            let r = await engine.callAsync(tool, [:], actor: "editor")
+            message = r.text.components(separatedBy: "\n").first ?? ""
+            busy = false
+            refresh(rescan: false)
+        }
+    }
+
+    private func refresh(rescan: Bool) {
+        busy = true
+        Task {
+            let list = await engine.callAsync("dcc_list", rescan ? ["refresh": true] : [:], actor: "editor")
+            apps = list.structured["apps"].array
+            session = await engine.callAsync("dcc_session_status", [:], actor: "editor").structured
+            busy = false
+        }
     }
 }
 

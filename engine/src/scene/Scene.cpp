@@ -57,6 +57,8 @@ void Scene::registerKinds() {
     kinds_.push_back(makeReflectedKind<Camera>());
     kinds_.push_back(makeReflectedKind<ParticleEmitter>());
     kinds_.push_back(makeReflectedKind<Water>());
+    kinds_.push_back(makeReflectedKind<Terrain>());
+    kinds_.push_back(makeReflectedKind<Foliage>());
     kinds_.push_back(makeReflectedKind<FluidVolume>());
     // 2D, text, UI and dialogue
     kinds_.push_back(makeReflectedKind<Sprite>());
@@ -69,6 +71,15 @@ void Scene::registerKinds() {
     kinds_.push_back(makeReflectedKind<UICanvas>());
     kinds_.push_back(makeReflectedKind<UIElement>());
     kinds_.push_back(makeReflectedKind<DialogueRunner>());
+    kinds_.push_back(makeReflectedKind<AudioSource>());
+    kinds_.push_back(makeReflectedKind<AudioListener>());
+    kinds_.push_back(makeReflectedKind<RigidBody>());
+    kinds_.push_back(makeReflectedKind<Collider>());
+    kinds_.push_back(makeReflectedKind<CharacterController>());
+    kinds_.push_back(makeReflectedKind<Joint>());
+    kinds_.push_back(makeReflectedKind<PhysicsSettings>());
+    kinds_.push_back(makeReflectedKind<NavAgent>());
+    kinds_.push_back(makeReflectedKind<NavMeshSurface>());
 }
 
 const ComponentKind* Scene::componentKind(std::string_view n) const {

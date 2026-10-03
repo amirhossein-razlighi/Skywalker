@@ -61,7 +61,7 @@ const TypeInfo& SpriteAnimator::type() {
         "atlas name pattern (\"run_*\"); a clip may switch sheets with \"texture\", \"columns\", \"rows\". Frame events "
         "are sent to the entity's behaviors (on event \"footstep\"); non-looping clips send \"anim_finished\".",
         {
-            SKY_FIELD(SpriteAnimator, clips, Json, "Clip name -> {frames, fps, loop, events, texture?, columns?, rows?}"),
+            SKY_FIELD_JSON(SpriteAnimator, clips, "Clip name -> {frames, fps, loop, events, texture?, columns?, rows?}", R"({"type": "object"})"),
             SKY_FIELD(SpriteAnimator, clip, String, "Clip playing now (Wander: play_anim(self, \"run\"))"),
             SKY_FIELD(SpriteAnimator, playing, Bool, "Advance frames"),
             SKY_FIELD_RANGE(SpriteAnimator, speed, Float, "Playback speed multiplier", 0.f, 100.f),
@@ -81,11 +81,9 @@ const TypeInfo& Tilemap::type() {
             SKY_FIELD_RANGE(Tilemap, cellSize, Float, "World units per cell", 0.001f, 1000.f),
             SKY_FIELD_RANGE(Tilemap, width, Int, "Columns", 1, 4096),
             SKY_FIELD_RANGE(Tilemap, height, Int, "Rows", 1, 4096),
-            SKY_FIELD(Tilemap, layers, Json,
-                      "[{name, data, solid (true | \"tiles\"), visible, z, tint, sortingLayer, order}] bottom to top"),
-            SKY_FIELD(Tilemap, solidTiles, Json, "Tile ids that collide in layers with solid: \"tiles\" ([3, \"10-20\"])"),
-            SKY_FIELD(Tilemap, autotile, Json,
-                      "Terrains for auto-tiling: {\"wall\": {\"mode\": \"blob47\" | \"wang16\", \"first\": 33}} or \"tiles\": [ids]"),
+            SKY_FIELD_JSON(Tilemap, layers, "[{name, data, solid (true | \"tiles\"), visible, z, tint, sortingLayer, order}] bottom to top", R"({"type": "array", "items": {"type": "object"}})"),
+            SKY_FIELD_JSON(Tilemap, solidTiles, "Tile ids that collide in layers with solid: \"tiles\" ([3, \"10-20\"])", R"({"type": "array"})"),
+            SKY_FIELD_JSON(Tilemap, autotile, "Terrains for auto-tiling: {\"wall\": {\"mode\": \"blob47\" | \"wang16\", \"first\": 33}} or \"tiles\": [ids]", R"({"type": "object"})"),
             SKY_FIELD(Tilemap, color, Color, "Tint"),
             SKY_FIELD_ENUM(Tilemap, sortingLayer, "Draw layer of all tile layers (unless a layer overrides it)", SKY_SORTING_LAYERS),
             SKY_FIELD(Tilemap, order, Int, "Order within the sorting layer (each tile layer adds its index)"),
@@ -239,7 +237,7 @@ const TypeInfo& UIElement::type() {
             SKY_FIELD(UIElement, maxValue, Float, "Slider/progress maximum"),
             SKY_FIELD(UIElement, placeholder, String, "Input: hint shown when empty"),
             SKY_FIELD(UIElement, style, String, "Style classes, space separated (\"primary large\")"),
-            SKY_FIELD(UIElement, styleOverrides, Json, "Inline style properties ({\"background\": \"#223\", \"radius\": 12})"),
+            SKY_FIELD_JSON(UIElement, styleOverrides, "Inline style properties ({\"background\": \"#223\", \"radius\": 12})", R"({"type": "object"})"),
             SKY_FIELD(UIElement, event, String, "Extra event sent when activated (in addition to ui:<name>)"),
             SKY_FIELD(UIElement, interactable, Bool, "Receives input (disabled look when false)"),
             SKY_FIELD(UIElement, visible, Bool, "Shown (hidden elements and their children take no space)"),
@@ -266,8 +264,8 @@ const TypeInfo& DialogueRunner::type() {
             SKY_FIELD(DialogueRunner, node, String, "State: current node"),
             SKY_FIELD(DialogueRunner, speaker, String, "State: speaker of the current line"),
             SKY_FIELD(DialogueRunner, line, String, "State: current line text"),
-            SKY_FIELD(DialogueRunner, choices, Json, "State: current choices (array of strings)"),
-            SKY_FIELD(DialogueRunner, tags, Json, "State: tags of the current line ({\"mood\": \"angry\"})"),
+            SKY_FIELD_JSON(DialogueRunner, choices, "State: current choices (array of strings)", R"({"type": "array", "items": {"type": "string"}})"),
+            SKY_FIELD_JSON(DialogueRunner, tags, "State: tags of the current line ({\"mood\": \"angry\"})", R"({"type": "object"})"),
         }};
     return info;
 }

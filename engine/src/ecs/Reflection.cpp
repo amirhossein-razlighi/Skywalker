@@ -263,7 +263,15 @@ Status fieldFromJson(void* object, const FieldInfo& f, const Json& v, std::strin
             return {};
         }
         case FieldType::Json: {
-            // Structured data: the owning system validates the content; null resets it.
+            // Shallow structural check against the declared schema's top-level type.
+            if (!f.jsonSchema.empty()) {
+                if (auto sch = Json::parse(f.jsonSchema)) {
+                    const std::string want = sch->get("type").asString();
+                    bool ok = want.empty() || (want == "array" && v.isArray()) || (want == "object" && v.isObject()) ||
+                              (want == "string" && v.isString()) || (want == "number" && v.isNumber());
+                    if (!ok) return typeError(context, f, v, "a JSON " + want);
+                }
+            }
             at<Json>(object, f) = v;
             return {};
         }
@@ -348,8 +356,8 @@ Json schema(const TypeInfo& type) {
                 p["maxItems"] = 4;
                 break;
             case FieldType::Json:
-                p["type"] = Json::array({"object", "array", "string", "null"});
-                p["x-skywalker-json"] = true;
+                if (auto sch = Json::parse(f.jsonSchema.empty() ? "{}" : f.jsonSchema)) p = *sch;
+                p["x-sky-json"] = true;
                 break;
         }
         if (!f.doc.empty()) {

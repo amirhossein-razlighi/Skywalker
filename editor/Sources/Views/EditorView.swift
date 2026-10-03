@@ -1,7 +1,7 @@
 import SwiftUI
 
 enum DockTab: String, CaseIterable, Identifiable {
-    case assets = "Assets", console = "Console", activity = "Activity", agents = "Agents", pipelines = "Pipelines"
+    case assets = "Assets", console = "Console", activity = "Activity", agents = "Agents", studio = "Studio"
     var id: String { rawValue }
     var symbol: String {
         switch self {
@@ -9,7 +9,7 @@ enum DockTab: String, CaseIterable, Identifiable {
         case .console: "terminal"
         case .activity: "clock.arrow.circlepath"
         case .agents: "cloud"
-        case .pipelines: "point.3.connected.trianglepath.dotted"
+        case .studio: "person.3.sequence"
         }
     }
 }
@@ -27,7 +27,7 @@ struct EditorView: View {
     @AppStorage("layout.showRight") private var showRight = true
     @AppStorage("layout.showBottom") private var showBottom = true
     @AppStorage("layout.dockTab") private var dockTab: DockTab = .assets
-    @State private var focusedAgent: UUID?
+    @State private var focusedAgent: String?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -69,7 +69,7 @@ struct EditorView: View {
             case .console: ConsolePanel()
             case .activity: ActivityPanel()
             case .agents: AgentsPanel(focused: $focusedAgent)
-            case .pipelines: PipelinesPanel()
+            case .studio: StudioPanel(openAgent: { id in focusedAgent = id; dockTab = .agents })
             }
         }
         .background(Theme.panel)
@@ -163,7 +163,7 @@ struct PlayControls: View {
 struct CrewPresence: View {
     @Environment(CrewStore.self) private var crew
     @Environment(EngineStore.self) private var engine
-    let open: (UUID) -> Void
+    let open: (String) -> Void
 
     var body: some View {
         HStack(spacing: -7) {

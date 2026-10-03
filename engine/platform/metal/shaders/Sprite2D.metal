@@ -44,6 +44,22 @@ struct VOut {
     uint instance [[flat]];
 };
 
+// The scene pass writes a G-buffer (Common.metal MainOut): 2D quads mark their pixels "no lighting"
+// (flag 4 in gbufB.w) so screen-space GI and reflections leave sprites exactly as shaded here.
+struct SpriteOut {
+    float4 color [[color(0)]];
+    float4 gbufA [[color(1)]];
+    float4 gbufB [[color(2)]];
+};
+
+static SpriteOut spriteOut(float4 color, float3 albedo) {
+    SpriteOut o;
+    o.color = color;
+    o.gbufA = float4(albedo, 1.0);
+    o.gbufB = float4(0.0, 0.0, 1.0, 4.0);  // octahedral normal (0,0,1), roughness 1, kGbufNoLighting
+    return o;
+}
+
 constant float2 kCorners[6] = {float2(0, 0), float2(1, 0), float2(0, 1), float2(1, 0), float2(1, 1), float2(0, 1)};
 
 vertex VOut spriteVertex(uint vid [[vertex_id]], uint iid [[instance_id]],
@@ -79,7 +95,7 @@ static float shadowAt(float2 fragUv, float3 lightPos, constant Sprite2DUniforms&
     return 1.0 - saturate(occlusion);
 }
 
-fragment float4 spriteFragment(VOut in [[stage_in]],
+fragment SpriteOut spriteFragment(VOut in [[stage_in]],
                                const device SpriteInstance* instances [[buffer(0)]],
                                constant Sprite2DUniforms& u [[buffer(1)]],
                                constant Light2D* lights [[buffer(2)]],
@@ -91,7 +107,7 @@ fragment float4 spriteFragment(VOut in [[stage_in]],
     int mode = int(s.params.x + 0.5);
     if (mode == 2) {  // halo: soft radial glow, additive
         float r = saturate(1.0 - length(in.local * 2.0 - 1.0));
-        return float4(s.color.rgb * r * r, 0.0);
+        return spriteOut(float4(s.color.rgb * r * r, 0.0), float3(0.0));
     }
     float4 tex = albedo.sample(smp, in.uv);
     float4 c;
@@ -109,7 +125,7 @@ fragment float4 spriteFragment(VOut in [[stage_in]],
             c.a = s.color.a * outer;
         }
         if (c.a <= 0.002) discard_fragment();
-        return c;
+        return spriteOut(c, c.rgb);
     }
     c = tex * s.color;
     if (s.extra.y > 0.0) {
@@ -156,7 +172,7 @@ fragment float4 spriteFragment(VOut in [[stage_in]],
     float dist = length(in.world - u.cameraPos.xyz);
     float fog = (1.0 - exp(-u.fog.a * dist)) * s.origin.w;
     rgb = mix(rgb, u.fog.rgb, saturate(fog));
-    return float4(rgb, c.a);
+    return spriteOut(float4(rgb, c.a), c.rgb);
 }
 
 // Shadow casters write their coverage into the occluder mask.

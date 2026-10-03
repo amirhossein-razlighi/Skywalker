@@ -637,20 +637,34 @@ void addSimTools(Engine& engine, ToolRegistry& reg) {
              }});
 
     reg.add({"sim_input", "Simulate input",
-             "Inject player input for the next ticks: press keys (fires `on key`), hold/release keys (for key()), "
-             "click an entity (fires `on click`), or emit a named event.",
+             "Inject player input for the next ticks, like a player (or a playtest bot) would: press keys (fires `on key`), "
+             "hold/release keys (for key()), press or hold input ACTIONS (jump, fire, ... see input_map; fires `on action`) "
+             "for N ticks (60 ticks = 1 s), hold an axis at a value (move forward: axes=[{name:\"move\", x:0, y:1, "
+             "ticks:120}]), set a simulated gamepad (sticks, triggers, buttons) or mouse (position, movement, buttons), "
+             "click an entity (fires `on click`), or emit a named event. Applies on the next tick: follow with "
+             "sim_control step.",
              "sim",
              object({{"press", array(Json::object({{"type", "string"}}), "Keys pressed once, e.g. [\"space\"]")},
                      {"hold", array(Json::object({{"type", "string"}}), "Keys to start holding, e.g. [\"w\"]")},
                      {"release", array(Json::object({{"type", "string"}}), "Keys to release")},
+                     {"actions", array(Json::object({{"description", "Action name, or {name, ticks (default 1 = a tap), x (value)}"}}),
+                                       "Input actions to hold for ticks, e.g. [\"jump\"] or [{\"name\":\"fire\",\"ticks\":30}]")},
+                     {"axes", array(Json::object({{"type", "object"}}), "Axis actions to hold: [{name, x, y, ticks}] with y = forward/up")},
+                     {"release_actions", array(Json::object({{"type", "string"}}), "Actions to stop holding")},
+                     {"gamepad", Json::object({{"type", "object"}, {"description", "Simulated controller: {index?, leftStick:[x,y], rightStick:[x,y], leftTrigger, rightTrigger, buttons:[\"south\",...]} (buttons = the full held set; persists until changed)"}})},
+                     {"mouse", Json::object({{"type", "object"}, {"description", "Simulated mouse: {x, y (0..1), dx, dy (pixels, y up), scroll, press:[\"left\"], hold, release}"}})},
                      {"click", schema::entity("Entity to click")},
                      {"event", string("Event name to emit")},
                      {"target", schema::entity("Event receiver (default: broadcast)")}}),
              true, false, [&engine](const Json& a, ToolContext&) {
                  auto& in = engine.input();
-                 for (const auto& k : a.get("press").elements()) in.pressed.insert(str::lower(k.asString()));
-                 for (const auto& k : a.get("hold").elements()) in.held.insert(str::lower(k.asString()));
-                 for (const auto& k : a.get("release").elements()) in.held.erase(str::lower(k.asString()));
+                 for (const auto& k : a.get("press").elements()) in.pressed.insert(input::canonicalKey(k.asString()));
+                 for (const auto& k : a.get("hold").elements()) in.held.insert(input::canonicalKey(k.asString()));
+                 for (const auto& k : a.get("release").elements()) {
+                     in.held.erase(input::canonicalKey(k.asString()));
+                     in.released.insert(input::canonicalKey(k.asString()));
+                 }
+                 if (Status s = tools::applySimInput(engine, a); !s) return tools::fail(s);
                  if (a.contains("click")) {
                      auto id = resolve(engine, a.get("click"));
                      if (!id) return ToolResult::error(id.error());
@@ -690,8 +704,15 @@ void addViewTools(Engine& engine, ToolRegistry& reg) {
                      {"eye", vec3("Custom camera position")},
                      {"target", vec3("Custom look-at point (with eye)")},
                      {"fov", number("Vertical field of view in degrees for the custom view (lens: 25 tele .. 90 wide)")},
+                     {"aperture", number("Custom view depth of field f-stop (1.4 shallow .. 16 deep; default off)")},
+                     {"focus_distance", number("Custom view focus distance in meters (default: autofocus on the center)")},
                      {"annotate", boolean("Draw entity id labels (default true)")},
                      {"overlays", boolean("Editor grid & selection highlight (default true)")},
+                     {"samples", integer("Supersampling: jittered sub-frames accumulated (default 4; 1 = fastest preview, "
+                                         "16-32 = final-quality stills with noise-free GI and reflections)")},
+                     {"debug_view", enumeration({"final", "albedo", "normals", "material", "gi", "reflections", "ao", "depth", "lighting"},
+                                                "Buffer visualization for diagnosing looks: material = roughness (red) / metallic (green), "
+                                                "gi = bounce light, lighting = before screen-space GI/reflections")},
                      {"include_image", boolean("Return the image (default true); false = only the entity list")},
                      {"save_path", string("Also write the PNG to this project-relative path")}}),
              false, false, [&engine](const Json& a, ToolContext&) {
@@ -711,9 +732,17 @@ void addViewTools(Engine& engine, ToolRegistry& reg) {
                      o.customView.eye = eye;
                      if (reflect::jsonToVec3(a.get("target"), target)) o.customView.target = target;
                      if (a.contains("fov")) o.customView.fovDeg = std::clamp(a.get("fov").asFloat(), 5.f, 150.f);
+                     o.customView.aperture = std::max(0.f, a.get("aperture").asFloat(0.f));
+                     o.customView.focusDistance = std::max(0.f, a.get("focus_distance").asFloat(0.f));
                  }
                  o.annotate = a.get("annotate").asBool(true);
                  o.editorOverlays = a.get("overlays").asBool(true);
+                 o.samples = static_cast<int>(std::clamp<int64_t>(a.get("samples").asInt(4), 1, 64));
+                 {
+                     static const char* kViews[] = {"final", "albedo", "normals", "material", "gi", "reflections", "ao", "depth", "lighting"};
+                     std::string dv = a.get("debug_view").asString();
+                     for (int i = 0; i < 9; ++i) if (dv == kViews[i]) o.debugView = i;
+                 }
                  auto cap = engine.capture(o);
                  if (!cap) return ToolResult::error(cap.error());
                  Json visible = Json::array();
@@ -1054,6 +1083,12 @@ void registerEngineTools(Engine& engine) {
     tools::addTools2D(engine, reg);
     tools::addUiTools(engine, reg);
     tools::addDialogueTools(engine, reg);
+    tools::addWorldBuildTools(engine, reg);
+    tools::addAudioTools(engine, reg);
+    tools::addInputTools(engine, reg);
+    tools::addDccTools(engine, reg);
+    tools::addStudioTools(engine, reg);
+    tools::addPhysicsTools(engine, reg);
 }
 
 }  // namespace sky

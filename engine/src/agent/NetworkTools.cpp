@@ -42,7 +42,9 @@ std::string extOf(const std::string& name) {
 /// File kinds we accept from the web: meshes and their side files, images, audio, license texts.
 bool allowedFile(const std::string& name) {
     static const std::set<std::string> ok{".glb", ".gltf", ".bin", ".obj", ".mtl", ".ply", ".stl", ".png", ".jpg",
-                                          ".jpeg", ".hdr", ".wav", ".mp3", ".ogg", ".m4a", ".txt", ".md"};
+                                          ".jpeg", ".hdr", ".wav", ".mp3", ".ogg", ".m4a", ".txt", ".md",
+                                          // Convertible with Blender (dcc_convert); not imported directly.
+                                          ".fbx", ".dae", ".3ds", ".usd", ".usda", ".usdc", ".usdz", ".abc", ".blend"};
     return ok.count(extOf(name)) > 0;
 }
 
@@ -176,7 +178,8 @@ void addNetworkTools(Engine& engine, ToolRegistry& reg) {
             } else {
                 if (!allowedFile(name)) {
                     return ToolResult::error(Error::make("unsupported_file", "won't download '" + name + "' (unsupported type)",
-                                                         "models: .glb .gltf .obj .ply .stl (or a .zip of them); images: .png .jpg .hdr; audio"));
+                                                         "models: .glb .gltf .obj .ply .stl, or .fbx .dae .usd .blend to convert with dcc_convert "
+                                                         "(or a .zip of them); images: .png .jpg .hdr; audio"));
                 }
                 if (Status s = save(name, resp->body); !s) return fail(s);
                 // Explicitly listed side files first, so relative fetches below find them in place.
@@ -265,6 +268,17 @@ void addNetworkTools(Engine& engine, ToolRegistry& reg) {
                 result["skipped"] = sk;
             }
 
+            // Formats the engine cannot read directly are converted through Blender (dcc_convert).
+            size_t convertible = 0;
+            for (const auto& f : written) {
+                static const std::set<std::string> conv{".fbx", ".dae", ".3ds", ".usd", ".usda", ".usdc", ".usdz", ".abc", ".blend"};
+                if (conv.count(extOf(f))) ++convertible;
+            }
+            if (convertible) {
+                result["convert_hint"] = std::to_string(convertible) + " file(s) (FBX/Collada/USD/.blend) need converting to glTF: call dcc_convert {\"path\": \"" +
+                                         folder + "\", \"recursive\": true}";
+            }
+
             // Import the best model file: glb > gltf > obj > ply > stl
             if (a.get("import").asBool(true)) {
                 std::string meshFile;
@@ -293,6 +307,7 @@ void addNetworkTools(Engine& engine, ToolRegistry& reg) {
             std::string summary = "downloaded " + std::to_string(written.size()) + " file(s) into " + folder + " (" + license + ")";
             if (result.contains("mesh")) summary += "; imported " + result.get("mesh").asString();
             for (const auto& w : warnings) summary += "\nwarning: " + w;
+            if (result.contains("convert_hint")) summary += "\nnext: " + result.get("convert_hint").asString();
             if (!warnings.empty()) {
                 Json wj = Json::array();
                 for (const auto& w : warnings) wj.push(w);

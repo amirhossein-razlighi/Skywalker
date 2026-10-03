@@ -25,6 +25,11 @@ void World2D::invalidate(const std::string& absolutePath) {
     scripts_.erase(absolutePath);
 }
 
+void World2D::setViewport(int width, int height) {
+    viewW_ = std::max(1, width);
+    viewH_ = std::max(1, height);
+}
+
 void World2D::reset() {
     conversations_.clear();
     ui_->reset();
@@ -104,12 +109,12 @@ void World2D::postTick(Scene& scene, wander::Runtime& runtime, float dt) {
 
 void World2D::preTick(Scene& scene, wander::InputState& input, wander::Runtime& runtime, float dt) {
     ui::UiInput in;
-    in.x = input.pointer.x;
-    in.y = input.pointer.y;
-    in.width = input.pointer.width;
-    in.height = input.pointer.height;
-    in.down = input.pointer.down;
-    in.wheel = input.pointer.wheel;
+    in.width = viewW_;
+    in.height = viewH_;
+    in.x = input.mouseX * static_cast<float>(viewW_);  // normalized 0..1, origin top-left
+    in.y = input.mouseY * static_cast<float>(viewH_);
+    in.down = input.mouseHeld.count("left") != 0;
+    in.wheel = input.scrollY;
     in.keys.assign(input.pressed.begin(), input.pressed.end());
     in.text = input.text;
     // World canvases are hit through the game camera.
@@ -135,11 +140,10 @@ void World2D::preTick(Scene& scene, wander::InputState& input, wander::Runtime& 
     };
     ui_->tick(scene, in, dt, camPtr, ev);
     input.text.clear();
-    input.pointer.wheel = 0;
 
     // Conversations: waits, typewriter, advancing with a click / space / enter, number keys for choices.
-    const bool released = pointerWasDown_ && !input.pointer.down && input.pointer.x >= 0;
-    pointerWasDown_ = input.pointer.down;
+    const bool released = pointerWasDown_ && !in.down;
+    pointerWasDown_ = in.down;
     const bool advanceKey = input.pressed.count("space") || input.pressed.count("enter") || input.pressed.count("return");
     std::vector<EntityId> ids;
     for (const auto& [e, c] : conversations_) ids.push_back(e);

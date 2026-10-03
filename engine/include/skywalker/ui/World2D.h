@@ -41,8 +41,12 @@ public:
     void refineVisible(const FrameData& frame, std::vector<VisibleEntity>& visible, const Scene& scene) const;
 
     // --- Simulation ---------------------------------------------------------------------
-    /// UI input (pointer, keys, text) and dialogues; consumes the pointer wheel and typed text.
+    /// UI input (mouse, keys, typed text) and dialogues; consumes the typed text.
     void preTick(Scene& scene, wander::InputState& input, wander::Runtime& runtime, float dt);
+    /// Size of the view the player sees (the normalized mouse position maps into it). Default 1920x1080.
+    void setViewport(int width, int height);
+    int viewportWidth() const { return viewW_; }
+    int viewportHeight() const { return viewH_; }
     void postTick(Scene& scene, wander::Runtime& runtime, float dt);
     void preview(Scene& scene, float dt);
     void onPlay(Scene& scene, wander::Runtime& runtime);
@@ -90,6 +94,7 @@ private:
     };
     std::unordered_map<std::string, CachedScript> scripts_;
     bool pointerWasDown_ = false;
+    int viewW_ = 1920, viewH_ = 1080;
     std::vector<std::string> pendingKeys_;
 };
 

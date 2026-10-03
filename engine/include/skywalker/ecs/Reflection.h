@@ -16,9 +16,10 @@
 
 namespace sky {
 
-enum class FieldType { Float, Int, Bool, String, Vec3, Color, Enum, Vec2, Vec4, Json };
-// Vec2/Vec4 store sky::Vec2/Vec4; Json stores a free-form sky::Json (structured data such as
-// animation clips or tilemap layers) that is validated by the owning system.
+/// Json fields hold structured data (lists of layers, clips, curves...) as a sky::Json member;
+/// `jsonSchema` (JSON text) describes it to agents and the editor.
+/// Vec2/Vec4 store sky::Vec2/Vec4 (Vec4 accepts CSS-style shorthand for paddings/margins).
+enum class FieldType { Float, Int, Bool, String, Vec3, Color, Enum, Json, Vec2, Vec4 };
 
 const char* toString(FieldType t);
 
@@ -30,6 +31,7 @@ struct FieldInfo {
     std::vector<std::string> enumValues;  // FieldType::Enum (stored as std::string)
     float minValue = -1e30f;
     float maxValue = 1e30f;
+    std::string jsonSchema;  // FieldType::Json: JSON Schema of the value (as JSON text)
 };
 
 struct TypeInfo {
@@ -76,10 +78,12 @@ Json vec4ToJson(Vec4 v);
 
 // Helper for writing tables:  SKY_FIELD(Transform, position, Vec3, "World position")
 #define SKY_FIELD(Type, member, ftype, docstr) \
-    ::sky::FieldInfo { #member, ::sky::FieldType::ftype, offsetof(Type, member), docstr, {}, -1e30f, 1e30f }
+    ::sky::FieldInfo { #member, ::sky::FieldType::ftype, offsetof(Type, member), docstr, {}, -1e30f, 1e30f, {} }
 #define SKY_FIELD_RANGE(Type, member, ftype, docstr, lo, hi) \
-    ::sky::FieldInfo { #member, ::sky::FieldType::ftype, offsetof(Type, member), docstr, {}, lo, hi }
+    ::sky::FieldInfo { #member, ::sky::FieldType::ftype, offsetof(Type, member), docstr, {}, lo, hi, {} }
+#define SKY_FIELD_JSON(Type, member, docstr, schemaText) \
+    ::sky::FieldInfo { #member, ::sky::FieldType::Json, offsetof(Type, member), docstr, {}, -1e30f, 1e30f, schemaText }
 #define SKY_FIELD_ENUM(Type, member, docstr, ...) \
-    ::sky::FieldInfo { #member, ::sky::FieldType::Enum, offsetof(Type, member), docstr, {__VA_ARGS__}, -1e30f, 1e30f }
+    ::sky::FieldInfo { #member, ::sky::FieldType::Enum, offsetof(Type, member), docstr, {__VA_ARGS__}, -1e30f, 1e30f, {} }
 
 }  // namespace sky
