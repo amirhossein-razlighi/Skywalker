@@ -28,7 +28,7 @@ bool endsWithSuffix(const std::string& s, const char* suffix) {
 /// Folders that are never part of a shipped game.
 bool neverShippedDir(const std::string& name) {
     static const std::set<std::string> dirs{"build",   "node_modules", "DerivedData", "__MACOSX", "studio",
-                                            "agents",  "native",       "playtests",   "Pods",     "film"};
+                                            "agents",  "native",       "playtests",   "Pods"};
     return name.empty() || name[0] == '.' || dirs.count(name) > 0 || endsWithSuffix(name, ".app");  // .app: earlier builds
 }
 

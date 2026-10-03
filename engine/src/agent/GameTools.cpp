@@ -251,7 +251,7 @@ void addGameTools(Engine& engine, ToolRegistry& reg) {
             "game.json's start scene. Returns the pid and a log file. `status` shows whether it is still running and its recent "
             "output; `stop` ends it. With `capture` the player renders one frame to a PNG after `frames` frames and exits "
             "(a screenshot of the real player output). `seconds` closes the game by itself. `app` runs a built .app instead. "
-            "Example: {\"action\":\"start\",\"scene\":\"scenes/level2.sky.json\",\"windowed\":true} or "
+            "Example: {\"action\":\"start\",\"scene\":\"scenes/level2.sky.json\",\"width\":1280} or "
             "{\"capture\":\"/tmp/shot.png\",\"frames\":120}",
             "files",
             object({{"action", enumeration({"start", "stop", "status"}, "start (default), stop, or status")},
