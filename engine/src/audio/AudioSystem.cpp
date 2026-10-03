@@ -290,6 +290,17 @@ struct AudioSystem::Impl {
         if (!fs::is_regular_file(path, ec)) {
             return "audio file not found: " + clip + " (generate one with the audio_generate tool, or list audio with asset_list type=audio)";
         }
+        // Probe the header first: miniaudio's resource manager mishandles files that fail to decode
+        // (it reads a freed node on that path), so garbage never reaches it.
+        {
+            ma_decoder_config probeConfig = ma_decoder_config_init_default();
+            ma_decoder probe;
+            ma_result pr = ma_decoder_init_file(path.c_str(), &probeConfig, &probe);
+            if (pr != MA_SUCCESS) {
+                return "cannot play " + clip + ": not a valid audio file (" + ma_result_description(pr) + "; supported: wav, mp3, flac)";
+            }
+            ma_decoder_uninit(&probe);
+        }
         int bi = busIndex(bus);
         if (bi < 0) bi = busIndex("sfx");
         ma_uint32 flags = 0;
@@ -365,7 +376,7 @@ struct AudioSystem::Impl {
 
     std::string startEntity(Scene& scene, EntityId e) {
         const AudioSource* src = scene.get<AudioSource>(e);
-        if (!src) return "entity has no `audio` component (add one with component_set, or use play_sound(\"path\"))";
+        if (!src) return "entity has no `audio` component (add one with entity_update (components.audio) or audio_generate entity=..., or use play_sound(\"path\"))";
         if (src->clip.empty()) return "the audio component has no clip set";
         if (Voice* old = findEntityVoice(e)) removeVoice(old);
         Voice* v = nullptr;

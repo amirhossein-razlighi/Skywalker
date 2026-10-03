@@ -65,6 +65,7 @@ struct ActivityItem: Identifiable, Sendable {
 @Observable
 final class EngineStore {
     private(set) var handle: OpaquePointer?
+    private let gamepads = GamepadBridge()
     private(set) var entities: [EntitySummary] = []
     private(set) var sceneName = "Untitled"
     private(set) var playState = "editing"
@@ -162,6 +163,7 @@ final class EngineStore {
     func tick() {
         guard let handle else { return }
         let now = Date()
+        if playState == "playing" { gamepads.poll(into: handle) }  // controllers feed the game only while it runs
         sky_update(handle, now.timeIntervalSince(lastTick))
         lastTick = now
         pollEvents()
@@ -308,6 +310,11 @@ final class EngineStore {
     func dragEnd() { sky_drag_end(handle) }
 
     func key(_ name: String, down: Bool) { sky_input_key(handle, name, down ? 1 : 0) }
+    /// Mouse input while playing: `x`/`y` are 0...1 inside the viewport (top-left origin), `dx`/`dy` in points (+y down).
+    func mouseMove(x: Float, y: Float, dx: Float, dy: Float) { sky_input_mouse_move(handle, x, y, dx, dy) }
+    /// button: 0 left, 1 right, 2 middle.
+    func mouseButton(_ button: Int, down: Bool) { sky_input_mouse_button(handle, Int32(button), down ? 1 : 0) }
+    func scroll(dx: Float, dy: Float) { sky_input_scroll(handle, dx, dy) }
     func click(entity: UInt64) { sky_input_click(handle, entity) }
 
     // MARK: Assets

@@ -254,7 +254,7 @@ void addAudioTools(Engine& engine, ToolRegistry& reg) {
                  std::string bus = a.get("bus").asString("sfx");
                  if (entity != kNoEntity) {
                      const AudioSource* src = engine.scene().get<AudioSource>(entity);
-                     if (!src) return ToolResult::error(Error::make("not_found", "that entity has no audio component", "add one with component_set or audio_generate entity=..."));
+                     if (!src) return ToolResult::error(Error::make("not_found", "that entity has no audio component", "add one with entity_update (components.audio) or audio_generate entity=..."));
                      clip = src->clip;
                      if (playing) {
                          err = au.playEntity(engine.scene(), entity);

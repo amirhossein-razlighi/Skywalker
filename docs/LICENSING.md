@@ -36,3 +36,12 @@ Also decide:
 - A contributor agreement (CLA or DCO), so contributions can be dual-licensed.
 - Trademark policy for the name "Skywalker". It is a well-known term in entertainment, so
   check trademark availability before branding a product with it.
+
+## Third-party
+
+Dependencies are fetched at configure time from their official repositories at pinned tags, and
+must have permissive licenses (MIT, BSD, zlib, Apache-2.0, public domain).
+
+| Library | Version | License | Used for |
+|---|---|---|---|
+| [miniaudio](https://github.com/mackron/miniaudio) | 0.11.22 | Public domain (or MIT-0) | Audio engine: mixing, spatialization, decoding of wav/mp3/flac, output devices (`engine/src/audio`). |
