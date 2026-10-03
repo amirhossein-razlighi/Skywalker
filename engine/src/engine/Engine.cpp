@@ -14,6 +14,7 @@
 #include "skywalker/agent/SocketServer.h"
 #include "skywalker/core/Log.h"
 #include "skywalker/core/Strings.h"
+#include "skywalker/native/NativeModules.h"
 #include "skywalker/assets/Prefab.h"
 #include "skywalker/render/Gltf.h"
 #include "skywalker/render/MeshData.h"
@@ -49,7 +50,9 @@ Engine::Engine(EngineConfig config)
     : config_(std::move(config)),
       scene_(std::make_unique<Scene>()),
       history_(std::make_unique<History>(*scene_)),
-      runtime_(std::make_unique<wander::Runtime>(*scene_)),
+      builtins_(std::make_unique<wander::BuiltinRegistry>(&wander::BuiltinRegistry::global())),
+      runtime_(std::make_unique<wander::Runtime>(*scene_, builtins_.get())),
+      native_(std::make_unique<NativeModules>(*this, *builtins_)),
       renderer_(createRenderer(config_.renderer)),
       assets_(std::make_unique<AssetDatabase>(config_.projectDir)),
       animation_(std::make_unique<anim::AnimationSystem>(*scene_)) {
@@ -76,7 +79,9 @@ Engine::Engine(EngineConfig config)
         placement.name = name;
         return instantiatePrefabAsset(ref, placement);
     };
-    runtime_->burst = [this](EntityId e, int count) { particles_.burst(e, count); };
+    registerEngineBuiltins();
+    runtime_->provide<Engine>(this);  // engine-side Wander builtins reach subsystems through this
+    runtime_->setProjectDir(config_.projectDir);
     // animation builtins for Wander
     runtime_->animation = [this](const std::string& fn, EntityId e, const std::vector<Json>& args) -> Result<Json> {
         auto arg = [&](size_t i) -> const Json& { return i < args.size() ? args[i] : Json::null(); };
@@ -98,10 +103,6 @@ Engine::Engine(EngineConfig config)
         }
         if (!s) return s.error();
         return Json();
-    };
-    runtime_->waterHeight = [this](float x, float z) {
-        float h = 0;
-        return waterHeight(x, z, h) ? h : 0.f;
     };
     world::WorldRuntime::Hooks hooks;
     hooks.resolvePath = [this](const std::string& p) { return resolvePath(p); };
@@ -274,6 +275,8 @@ void Engine::play() {
     if (playState_ == PlayState::Playing) return;
     if (playState_ == PlayState::Editing) {
         playSnapshot_ = scene_->toJson();
+        runtime_->refreshModules();  // hot reload of `use`d Wander modules
+        native_->onPlay();           // native modules (rebuilt if changed) and AOT behaviors
         runtime_->reset(/*keepQueuedEvents=*/true);
         accumulator_ = 0;
         particles_.reset();  // play sessions replay exactly
@@ -320,6 +323,7 @@ void Engine::step(int ticks) {
         actionMap_.evaluate(input_);  // device state + agent input -> actions for this tick
         runtime_->tick(kFixedDt, input_);
         animation_->tick(kFixedDt);  // sequencers, animators, bone attachments
+        native_->tick(kFixedDt);     // per-tick systems of native modules
         physics_->step(static_cast<float>(kFixedDt), *runtime_);  // nav steering, bodies, characters, contacts
         particles_.update(*scene_, static_cast<float>(kFixedDt));
         input_.endTick();
@@ -830,6 +834,7 @@ std::vector<std::string> Engine::refreshAssets() {
     for (const auto& path : changed) {
         animation_->invalidate(path);
         switch (assetTypeForPath(path)) {
+            case AssetType::Script: runtime_->refreshModules(); break;
             case AssetType::Mesh: {
                 std::string key = "asset:" + path;
                 std::vector<std::string> keys{key};

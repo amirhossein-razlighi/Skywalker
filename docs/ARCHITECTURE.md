@@ -67,7 +67,8 @@ change to an actor. Interactive drags and gizmo moves hold one transaction per g
 
 **Deterministic simulation.** Play runs fixed 1/60 s ticks. Entities are processed in scene
 order. Events are delivered on the next tick in emission order. Randomness is a seeded
-PCG32. Wander has no unbounded loops, and each handler has an evaluation budget. Stop
+PCG32. Every Wander handler run has an instruction budget (loops and calls are charged), so
+scripts always terminate; Wander compiles to register bytecode (or native code). Stop
 restores the pre-play snapshot. Live edits during play are atomic too: they are rolled back
 from a snapshot if they fail.
 
@@ -111,6 +112,6 @@ that time out are marked abandoned, so they can never apply changes later.
 |---|---|
 | A component | Struct + `type()` table in `Components.{h,cpp}`, then one `makeReflectedKind<T>()` line in `Scene::registerKinds`. JSON, schema, editor UI and Wander access follow automatically. |
 | A tool | `reg.add({...})` in `EngineTools.cpp`, using an `edit(actor, label, …)` transaction for mutations. It then appears in MCP, the editor and the docs (`skywalker tools --markdown`). |
-| A Wander function | The arity table in `Compiler.cpp`, the implementation in `Runtime.cpp::call`, and a line in `referenceText()`. |
+| A Wander function | `reg.add(BuiltinDef{...})` in a `registerXxxBuiltins(reg)` called from `registerEngineBuiltins` (`EngineBuiltins.cpp`): name, typed params, doc, category, implementation. The compiler, `wander_reference` and the docs pick it up (see docs/WANDER.md). |
 | A render backend | Implement `Renderer` (render / readback / present / uploadMesh / reloadShaders), then add it to `createRenderer`. |
 | An LLM provider | Most need nothing: they already speak the OpenAI-compatible protocol. Otherwise implement `LLMSession` in `Providers.swift`. |

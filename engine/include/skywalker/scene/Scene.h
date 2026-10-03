@@ -53,6 +53,9 @@ struct ComponentKind {
     std::function<void(Scene&, EntityId)> remove;
     std::function<Json(const Scene&, EntityId)> toJson;
     std::function<Status(Scene&, EntityId, const Json&)> apply;
+    /// Raw component pointer (null if absent; reflected kinds only). Wander reads and
+    /// writes fields through it without a JSON round trip.
+    std::function<void*(Scene&, EntityId)> ptr;
 };
 
 class Scene {
@@ -153,6 +156,9 @@ public:
     /// Bumped on every structural or data change; renderers/editors use it to refresh.
     uint64_t revision() const { return revision_; }
     void markDirty() { ++revision_; }
+    /// Bumped whenever any entity's behaviors (Wander scripts) change; the runtime only
+    /// rescans scripts for recompilation when this moves.
+    uint64_t behaviorsRevision() const { return behaviorsRevision_; }
 
 private:
     void notify(EntityId id) {
@@ -170,6 +176,7 @@ private:
     std::vector<ComponentKind> kinds_;
     ChangeObserver* observer_ = nullptr;
     uint64_t revision_ = 0;
+    uint64_t behaviorsRevision_ = 0;
 };
 
 std::string formatEntityRef(EntityId id);

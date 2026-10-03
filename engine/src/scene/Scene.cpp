@@ -19,6 +19,7 @@ ComponentKind makeReflectedKind() {
     k.has = [](const Scene& s, EntityId id) { return s.get<T>(id) != nullptr; };
     k.add = [](Scene& s, EntityId id) { s.add<T>(id); };
     k.remove = [](Scene& s, EntityId id) { s.registry().remove<T>(s.handle(id)); };
+    k.ptr = [](Scene& s, EntityId id) -> void* { return s.get<T>(id); };
     k.toJson = [](const Scene& s, EntityId id) -> Json {
         const T* c = s.get<T>(id);
         return c ? reflect::toJson(c, T::type()) : Json();
@@ -40,8 +41,10 @@ Json behaviorsToJson(const Behavior* b) {
     Json arr = Json::array();
     if (!b) return arr;
     for (const auto& s : b->scripts) {
-        arr.push(Json::object(
-            {{"name", s.name}, {"intent", s.intent}, {"source", s.source}, {"enabled", s.enabled}}));
+        Json j = Json::object({{"name", s.name}, {"intent", s.intent}, {"source", s.source}, {"enabled", s.enabled}});
+        if (!s.spec.isNull()) j["spec"] = s.spec;
+        if (!s.graph.isNull()) j["graph"] = s.graph;
+        arr.push(std::move(j));
     }
     return arr;
 }
@@ -128,6 +131,7 @@ void Scene::clear() {
     nextId_ = 1;
     environment_ = Environment{};
     ++revision_;
+    ++behaviorsRevision_;
 }
 
 EntityRecord* Scene::record(EntityId id) {
@@ -281,9 +285,12 @@ Status Scene::setBehaviors(EntityId id, const Json& behaviors) {
         s.intent = b.get("intent").asString();
         s.source = b.get("source").asString();
         s.enabled = b.get("enabled").asBool(true);
+        if (const Json* spec = b.find("spec"); spec && !spec->isNull()) s.spec = *spec;
+        if (const Json* graph = b.find("graph"); graph && !graph->isNull()) s.graph = *graph;
         scripts.push_back(std::move(s));
     }
     notify(id);
+    ++behaviorsRevision_;
     ecs::Entity h = handle(id);
     if (scripts.empty()) {
         registry_.remove<Behavior>(h);
@@ -296,6 +303,7 @@ Status Scene::setBehaviors(EntityId id, const Json& behaviors) {
                 if (o.compiledSource == s.source && o.program) {
                     s.program = o.program;
                     s.compiledSource = o.compiledSource;
+                    s.compiledEpoch = o.compiledEpoch;
                     s.hasErrors = o.hasErrors;
                 }
             }

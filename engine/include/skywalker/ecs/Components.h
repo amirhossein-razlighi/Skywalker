@@ -193,9 +193,16 @@ struct Script {
     std::string source;  // Wander code (source of truth for the runtime)
     bool enabled = true;
 
+    /// Structured spec an agent derived from the intent (rules, notes); params and tests
+    /// come from the code itself. Serialized; see docs/WANDER.md "From intent to code".
+    Json spec;
+    /// Node positions of the graph view {"nodeId": [x, y]}. Serialized.
+    Json graph;
+
     // Runtime cache (not serialized).
     std::shared_ptr<const wander::Program> program;
     std::string compiledSource;
+    uint64_t compiledEpoch = 0;  // modules/builtins generation the program was compiled against
     bool hasErrors = false;
     int runtimeErrors = 0;
 };

@@ -102,9 +102,6 @@ ToolResult entityResult(Engine& engine, EntityId id, const std::string& verb) {
     return ToolResult::json(doc, verb + " " + describe(engine.scene(), id));
 }
 
-Json compileFor(Engine& engine, const std::string& source) {
-    return wander::compile(source, engine.scene().componentNames()).toJson();
-}
 
 Json presetPatch(const std::string& name) {
     if (name == "noon") {
@@ -537,79 +534,6 @@ void addSceneTools(Engine& engine, ToolRegistry& reg) {
              }});
 }
 
-void addWanderTools(Engine& engine, ToolRegistry& reg) {
-    reg.add({"wander_reference", "Wander language reference",
-             "The Wander behavior language guide (syntax, triggers, statements, functions). Read once before writing "
-             "behaviors.",
-             "wander", object({}), false, false,
-             [](const Json&, ToolContext&) { return ToolResult::text(wander::referenceText()); }});
-
-    reg.add({"wander_check", "Check Wander code",
-             "Compile Wander source without attaching it. Returns diagnostics with line, column, code and hints.",
-             "wander", object({{"source", string("Wander source code")}}, {"source"}), false, false,
-             [&engine](const Json& a, ToolContext&) {
-                 Json r = compileFor(engine, a.get("source").asString());
-                 return ToolResult::json(r, r.get("ok").asBool() ? "compiles cleanly" : "has errors");
-             }});
-
-    reg.add({"behavior_set", "Set behavior",
-             "Create or replace a named behavior on an entity: the natural-language `intent` (what it should do) and "
-             "its Wander `source` (how). The source is compiled; by default code with errors is rejected and the "
-             "diagnostics are returned so you can fix and retry.",
-             "wander",
-             object({{"entity", schema::entity()},
-                     {"name", string("Behavior name, e.g. \"Patrol\"")},
-                     {"intent", string("What the behavior should do, in plain language")},
-                     {"source", string("Wander source code")},
-                     {"enabled", boolean("Enabled (default true)")},
-                     {"allow_errors", boolean("Save even if the code does not compile (default false)")}},
-                    {"entity", "name"}),
-             true, false, [&engine](const Json& a, ToolContext& ctx) {
-                 auto id = resolve(engine, a.get("entity"));
-                 if (!id) return ToolResult::error(id.error());
-                 Scene& s = engine.scene();
-                 Json list = s.entityToJson(*id).get("behaviors");
-                 if (!list.isArray()) list = Json::array();
-                 const std::string& name = a.get("name").asString();
-                 Json* existing = nullptr;
-                 for (auto& b : list.elements()) {
-                     if (b.get("name").asString() == name) existing = &b;
-                 }
-                 if (!existing) {
-                     list.push(Json::object({{"name", name}, {"intent", ""}, {"source", ""}, {"enabled", true}}));
-                     existing = &list.elements().back();
-                 }
-                 for (const char* k : {"intent", "source", "enabled"}) {
-                     if (a.contains(k)) (*existing)[k] = a.get(k);
-                 }
-                 Json report = compileFor(engine, existing->get("source").asString());
-                 if (!report.get("ok").asBool() && !a.get("allow_errors").asBool()) {
-                     ToolResult r = ToolResult::json(report, "rejected: the Wander source has errors (nothing changed)");
-                     r.isError = true;
-                     return r;
-                 }
-                 Status st = engine.edit(ctx.actor, "Behavior " + name, [&] { return s.setBehaviors(*id, list); });
-                 if (!st) return fail(st);
-                 return ToolResult::json(report, "behavior \"" + name + "\" saved on " + s.record(*id)->name);
-             }});
-
-    reg.add({"behavior_remove", "Remove behavior", "Remove a named behavior from an entity.", "wander",
-             object({{"entity", schema::entity()}, {"name", string("Behavior name")}}, {"entity", "name"}), true, true,
-             [&engine](const Json& a, ToolContext& ctx) {
-                 auto id = resolve(engine, a.get("entity"));
-                 if (!id) return ToolResult::error(id.error());
-                 Json list = engine.scene().entityToJson(*id).get("behaviors");
-                 Json kept = Json::array();
-                 for (const auto& b : list.elements()) {
-                     if (b.get("name").asString() != a.get("name").asString()) kept.push(b);
-                 }
-                 if (kept.size() == list.size()) return ToolResult::error(Error::make("not_found", "no such behavior"));
-                 Status st = engine.edit(ctx.actor, "Remove behavior", [&] { return engine.scene().setBehaviors(*id, kept); });
-                 if (!st) return fail(st);
-                 return ToolResult::text("removed");
-             }});
-}
-
 void addSimTools(Engine& engine, ToolRegistry& reg) {
     reg.add({"sim_control", "Simulation control",
              "play / pause / stop the game, or `step` N fixed ticks (1/60 s each) deterministically and get the "
@@ -655,6 +579,7 @@ void addSimTools(Engine& engine, ToolRegistry& reg) {
                      {"mouse", Json::object({{"type", "object"}, {"description", "Simulated mouse: {x, y (0..1), dx, dy (pixels, y up), scroll, press:[\"left\"], hold, release}"}})},
                      {"click", schema::entity("Entity to click")},
                      {"event", string("Event name to emit")},
+                     {"data", any("Event payload, `data` in the handler, e.g. {\"amount\": 2}")},
                      {"target", schema::entity("Event receiver (default: broadcast)")}}),
              true, false, [&engine](const Json& a, ToolContext&) {
                  auto& in = engine.input();
@@ -677,7 +602,7 @@ void addSimTools(Engine& engine, ToolRegistry& reg) {
                          if (!id) return ToolResult::error(id.error());
                          target = *id;
                      }
-                     engine.runtime().emit(a.get("event").asString(), target);
+                     engine.runtime().emitJson(a.get("event").asString(), target, a.get("data"));
                  }
                  return ToolResult::text("input queued (applies on the next tick)");
              }});
@@ -1071,7 +996,8 @@ void addAssetAndRenderTools(Engine& engine, ToolRegistry& reg) {
 void registerEngineTools(Engine& engine) {
     ToolRegistry& reg = engine.tools();
     addSceneTools(engine, reg);
-    addWanderTools(engine, reg);
+    tools::addWanderTools(engine, reg);  // engine/src/agent/WanderTools.cpp
+    tools::addNativeTools(engine, reg);  // engine/src/agent/NativeTools.cpp
     addSimTools(engine, reg);
     addViewTools(engine, reg);
     addHistoryAndFileTools(engine, reg);

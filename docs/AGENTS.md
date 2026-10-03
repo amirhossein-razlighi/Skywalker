@@ -44,8 +44,10 @@ Generic MCP config (Cursor, Gemini CLI, …):
    `batch` for many edits (atomic, one undo step).
 3. Look with `viewport_capture` (`annotate: true` labels every entity with its `#id`;
    the structured result lists screen boxes).
-4. For behaviors: read `wander_reference` once, then `wander_check`, `behavior_set`,
-   `sim_control step`, `sim_input`, `logs`, and finally `sim_control stop`.
+4. For behaviors: read `wander_reference` once; derive spec rules from the intent; write the
+   code with a `test` block per rule; `wander_check`, `behavior_set` (with `spec`),
+   `wander_test` until green, `behavior_spec` for coverage; then `sim_control step`,
+   `sim_input`, `logs`, and finally `sim_control stop` (see [WANDER.md](WANDER.md)).
 5. If something went wrong, `history` → `undo`.
 
 ## 2. The studio and the crew
@@ -86,8 +88,8 @@ How the crew works together:
   earlier pipelines.
 - **Delegation.** Direction and production agents get an extra `crew_delegate` tool in chat,
   so they can hand a task to a teammate and review the report.
-- **Weave.** From any behavior's intent, Weave asks the gameplay programmer to write,
-  check, attach and test the Wander code.
+- **Weave.** From any behavior's intent, Weave asks the gameplay programmer to derive a
+  spec, write the Wander code with a test per rule, attach it, and run `wander_test`.
 
 You see agents in action through:
 - presence avatars in the toolbar, with a pulsing dot while working;

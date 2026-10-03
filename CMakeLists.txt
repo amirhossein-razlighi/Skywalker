@@ -49,6 +49,7 @@ add_subdirectory(engine)
 
 if(SKY_BUILD_CLI)
     add_subdirectory(tools/cli)
+    add_subdirectory(tools/wander_bench)
 endif()
 
 if(SKY_BUILD_TESTS)
