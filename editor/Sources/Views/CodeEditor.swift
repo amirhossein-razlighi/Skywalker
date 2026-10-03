@@ -58,8 +58,8 @@ struct CodeEditor: NSViewRepresentable {
         }
 
         private static let keywords = try! NSRegularExpression(  // swiftlint:disable:this force_try
-            pattern: #"\b(behavior|intent|var|on|end|if|then|elif|else|every|after|repeat|times|move|by|toward|at|rotate|look|emit|to|destroy|log|stop|let|set|and|or|not|seconds?)\b"#)
-        private static let literals = try! NSRegularExpression(pattern: #"\b(true|false|none|self|dt|time|frame|pi|start|tick|event|key|click)\b"#)  // swiftlint:disable:this force_try
+            pattern: #"\b(behavior|intent|var|param|const|fn|return|use|as|on|end|if|then|elif|else|while|do|for|in|step|break|continue|every|after|repeat|times|wait|until|frames?|state|go|goto|test|expect|press|hold|release|move|by|toward|at|rotate|look|emit|with|to|destroy|log|print|stop|let|set|and|or|not|seconds?)\b"#)
+        private static let literals = try! NSRegularExpression(pattern: #"\b(true|false|none|self|other|data|dt|time|frame|pi|state_time|start|tick|event|key|click|enter|exit|action|collide|trigger_enter|trigger_exit)\b"#)  // swiftlint:disable:this force_try
         private static let numbers = try! NSRegularExpression(pattern: #"\b\d+(\.\d+)?\b"#)  // swiftlint:disable:this force_try
         private static let strings = try! NSRegularExpression(pattern: #""[^"\n]*"?|'[^'\n]*'?"#)  // swiftlint:disable:this force_try
         private static let colors = try! NSRegularExpression(pattern: #"#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3,4})\b"#)  // swiftlint:disable:this force_try
