@@ -1,0 +1,9 @@
+---
+description: "Editing Wander behavior files (.wander) for the Skywalker engine"
+globs: ["**/*.wander"]
+alwaysApply: false
+---
+
+Wander is Skywalker's behavior language. Read it from the engine before writing any: call the `wander_reference` MCP tool (or read the MCP resource `skywalker://docs/WANDER`).
+Check source with `wander_check` (or `skywalker check FILE.wander`), attach it with `behavior_set`, and verify by stepping the simulation (`sim_control step`, `sim_trace`, `logs`).
+Keep each behavior's `intent` accurate whenever the code changes. See the `skywalker-wander` skill.

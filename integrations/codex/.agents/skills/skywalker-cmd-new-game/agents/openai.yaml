@@ -1,0 +1,4 @@
+interface:
+  display_name: "Skywalker: new game"
+policy:
+  allow_implicit_invocation: false

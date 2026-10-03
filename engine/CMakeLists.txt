@@ -65,6 +65,9 @@ set(SKY_ENGINE_SOURCES
     src/studio/Llm.cpp
     src/studio/Runner.cpp
     src/agent/StudioTools.cpp
+    # Integrations (workstream K): embedded docs/skills + MCP resources and prompts
+    src/agent/Resources.cpp
+    src/agent/Setup.cpp
 )
 
 # DCC bridge: the Python helper library and the Blender add-on are embedded so the engine can
@@ -81,6 +84,31 @@ add_custom_command(
     VERBATIM)
 set_source_files_properties(src/dcc/Embedded.cpp PROPERTIES
     OBJECT_DEPENDS ${_dcc_inc} COMPILE_OPTIONS -Wno-overlength-strings)
+
+# Integrations (workstream K): the engine docs and the generated agent integrations (skills, subagents,
+# commands, config snippets; see integrations/generate.py) are embedded so MCP resources/prompts and
+# `skywalker setup` work without the source tree. Skills are identical for every tool, so only the Claude
+# Code tree (and the Codex-only workflow skills) is embedded; `setup` maps them to each tool's layout.
+file(GLOB_RECURSE _agent_inputs CONFIGURE_DEPENDS
+    ${PROJECT_SOURCE_DIR}/docs/*.md
+    ${PROJECT_SOURCE_DIR}/integrations/claude-code/*
+    ${PROJECT_SOURCE_DIR}/integrations/codex/*
+    ${PROJECT_SOURCE_DIR}/integrations/gemini/*
+    ${PROJECT_SOURCE_DIR}/integrations/cursor/*
+    ${PROJECT_SOURCE_DIR}/integrations/skills-src/context.md)
+set(_agent_inc ${CMAKE_CURRENT_BINARY_DIR}/generated/AgentEmbedded.inc)
+set(_agent_root ${PROJECT_SOURCE_DIR})
+add_custom_command(
+    OUTPUT ${_agent_inc}
+    COMMAND ${CMAKE_COMMAND}
+            "-DSPECS=docs=${_agent_root}/docs=*.md|integrations/claude-code=${_agent_root}/integrations/claude-code=*|integrations/codex=${_agent_root}/integrations/codex=*|integrations/gemini=${_agent_root}/integrations/gemini=*|integrations/cursor=${_agent_root}/integrations/cursor=*|integrations/skills-src=${_agent_root}/integrations/skills-src=context.md"
+            "-DEXCLUDE=^integrations/(codex|gemini|cursor)/.*skills/" "-DKEEP=skills/skywalker-cmd-"
+            -DOUTPUT=${_agent_inc} -P ${PROJECT_SOURCE_DIR}/cmake/EmbedTree.cmake
+    DEPENDS ${_agent_inputs} ${PROJECT_SOURCE_DIR}/cmake/EmbedTree.cmake
+    COMMENT "Embedding docs and agent integrations"
+    VERBATIM)
+set_source_files_properties(src/agent/Resources.cpp PROPERTIES
+    OBJECT_DEPENDS ${_agent_inc} COMPILE_OPTIONS -Wno-overlength-strings)
 
 add_library(skywalker_engine STATIC ${SKY_ENGINE_SOURCES})
 add_library(sky::engine ALIAS skywalker_engine)

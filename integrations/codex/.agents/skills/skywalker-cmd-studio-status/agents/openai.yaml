@@ -1,0 +1,4 @@
+interface:
+  display_name: "Skywalker: studio status"
+policy:
+  allow_implicit_invocation: false
