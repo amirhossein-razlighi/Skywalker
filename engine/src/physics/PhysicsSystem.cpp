@@ -41,8 +41,10 @@ PhysicsWorld& PhysicsSystem::queryWorld() {
     if (playing_) return ensurePlayWorld();
     if (!edit_) {
         WorldOptions o;
-        o.multithreaded = false;
+        o.multithreaded = false;  // queries only: never stepped
         o.writeBack = false;
+        o.maxBodyPairs = 1024;
+        o.maxContactConstraints = 1024;
         edit_ = makeWorld(std::move(o));
     }
     if (editRevision_ != scene_.revision()) {

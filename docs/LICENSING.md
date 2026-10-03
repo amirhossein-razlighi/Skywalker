@@ -36,3 +36,12 @@ Also decide:
 - A contributor agreement (CLA or DCO), so contributions can be dual-licensed.
 - Trademark policy for the name "Skywalker". It is a well-known term in entertainment, so
   check trademark availability before branding a product with it.
+
+## Third-party
+
+Libraries fetched at build time (CMake FetchContent, pinned tags) and linked into the engine:
+
+| Library | Version | License | Used for |
+|---|---|---|---|
+| [Jolt Physics](https://github.com/jrouwe/JoltPhysics) | v5.6.0 | MIT | Rigid bodies, colliders, character controller, joints, physics queries |
+| [Recast & Detour](https://github.com/recastnavigation/recastnavigation) | v1.6.0 | zlib | Navigation mesh generation, path finding, crowd steering |

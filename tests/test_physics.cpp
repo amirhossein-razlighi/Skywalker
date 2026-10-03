@@ -4,7 +4,10 @@
 #include <doctest/doctest.h>
 
 #include <cmath>
+#include <cstdio>
 #include <filesystem>
+#include <fstream>
+#include <sstream>
 #include <vector>
 
 #include "skywalker/engine/Engine.h"
@@ -493,4 +496,77 @@ TEST_CASE("physics tools: physics_settle drops props to rest as one undo step") 
     REQUIRE(e->history().undo());
     CHECK(pos(*e, a).y == doctest::Approx(2.f));
     CHECK(pos(*e, b).y == doctest::Approx(4.f));
+}
+
+TEST_CASE("physics: heightfields (16-bit heightmap and sampled mesh), convex hulls and triangle meshes") {
+    auto e = makePhysicsEngine();
+    // A 64 x 64 ramp rising along +X from 0 to 1 (scaled to 2 m by collider.size.y).
+    {
+        std::vector<unsigned char> bytes;
+        for (int z = 0; z < 64; ++z) {
+            for (int x = 0; x < 64; ++x) {
+                unsigned v = static_cast<unsigned>(std::lround(x / 63.0 * 65535.0));
+                bytes.push_back(static_cast<unsigned char>(v & 0xff));
+                bytes.push_back(static_cast<unsigned char>(v >> 8));
+            }
+        }
+        fs::create_directories(e->resolvePath("terrain"));
+        FILE* f = std::fopen(e->resolvePath("terrain/ramp.r16").c_str(), "wb");
+        REQUIRE(f);
+        std::fwrite(bytes.data(), 1, bytes.size(), f);
+        std::fclose(f);
+    }
+    EntityId ramp = make(*e, R"({"name":"Ramp","components":{"transform":{"position":[0,0,0]},
+        "collider":{"shape":"heightfield","heightmap":"terrain/ramp.r16","size":[10,2,10],"resolution":64}}})");
+    EntityId flat = make(*e, R"({"name":"Flat","components":{"transform":{"position":[30,-1,0],"scale":[10,1,10]},
+        "mesh":{"mesh":"plane"},"collider":{"shape":"heightfield","resolution":32}}})");
+    EntityId torus = make(*e, R"({"name":"Ring","components":{"transform":{"position":[-30,0,0],"scale":[2,2,2]},
+        "mesh":{"mesh":"torus"},"collider":{}}})");
+    auto& w = e->physics().queryWorld();
+    auto mid = w.raycast({0, 10, 0}, {0, -1, 0}, 50.f);
+    REQUIRE(mid);
+    CHECK(mid->entity == ramp);
+    CHECK(mid->point.y == doctest::Approx(1.f).epsilon(0.05));
+    auto high = w.raycast({2.5f, 10, 0}, {0, -1, 0}, 50.f);
+    REQUIRE(high);
+    CHECK(high->point.y == doctest::Approx(1.5f).epsilon(0.05));
+    auto f = w.raycast({31, 10, 2}, {0, -1, 0}, 50.f);
+    REQUIRE(f);
+    CHECK(f->entity == flat);
+    CHECK(f->point.y == doctest::Approx(-1.f).epsilon(0.02));
+    // Triangle-mesh torus (static): the ring is solid, the hole is empty.
+    auto ring = w.raycast({-30 + 0.7f, 10, 0}, {0, -1, 0}, 50.f);
+    REQUIRE(ring);
+    CHECK(ring->entity == torus);
+    CHECK(ring->point.y == doctest::Approx(0.3f).epsilon(0.08));
+    CHECK_FALSE(w.raycast({-30, 10, 0}, {0, -1, 0}, 50.f));
+    CHECK(w.drainWarnings().empty());
+
+    // A dynamic cone (convex hull) lands on the flat heightfield and rests.
+    EntityId cone = make(*e, R"({"name":"Cone","components":{"transform":{"position":[30,3,0]},
+        "mesh":{"mesh":"cone"},"body":{"mass":4}}})");
+    e->play();
+    e->step(240);
+    CHECK(pos(*e, cone).y == doctest::Approx(-0.5f).epsilon(0.05));  // cone base on the surface at y = -1
+}
+
+TEST_CASE("physics: the Wander examples in docs/PHYSICS.md compile") {
+    std::ifstream in(std::string(SKY_SOURCE_DIR) + "/docs/PHYSICS.md");
+    REQUIRE(in);
+    std::stringstream ss;
+    ss << in.rdbuf();
+    std::string doc = ss.str();
+    int blocks = 0;
+    for (size_t at = doc.find("```wander"); at != std::string::npos; at = doc.find("```wander", at)) {
+        size_t start = doc.find('\n', at) + 1;
+        size_t end = doc.find("```", start);
+        REQUIRE(end != std::string::npos);
+        std::string code = doc.substr(start, end - start);
+        auto r = wander::compile(code, {"body", "collider", "character", "joint", "nav_agent", "transform", "mesh"});
+        INFO(code, "\n", r.toJson().dump(2));
+        CHECK(r.ok());
+        ++blocks;
+        at = end + 3;
+    }
+    CHECK(blocks >= 2);
 }

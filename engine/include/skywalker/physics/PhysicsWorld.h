@@ -95,6 +95,8 @@ struct WorldOptions {
     bool writeBack = true;
     std::shared_ptr<ShapeCache> shapeCache;  // null = a private cache
     uint32_t maxBodies = 65536;
+    uint32_t maxBodyPairs = 65536;           // broad-phase pairs per step
+    uint32_t maxContactConstraints = 20480;  // touching pairs per step (query-only worlds need few)
 };
 
 class PhysicsWorld {

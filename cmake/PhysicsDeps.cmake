@@ -41,6 +41,15 @@ FetchContent_Declare(JoltPhysics
     SOURCE_SUBDIR Build
     SYSTEM)
 FetchContent_MakeAvailable(JoltPhysics)
+# Jolt exports -pthread as a public compile/link option. The Swift linker (editor) rejects it and
+# consumers already link Threads::Threads, so keep it private to Jolt's own compilation.
+foreach(_sky_prop INTERFACE_LINK_OPTIONS INTERFACE_COMPILE_OPTIONS)
+    get_target_property(_sky_opts Jolt ${_sky_prop})
+    if(_sky_opts)
+        list(REMOVE_ITEM _sky_opts -pthread)
+        set_target_properties(Jolt PROPERTIES ${_sky_prop} "${_sky_opts}")
+    endif()
+endforeach()
 
 # --- Recast / Detour ------------------------------------------------------------------------
 set(RECASTNAVIGATION_DEMO OFF CACHE BOOL "" FORCE)

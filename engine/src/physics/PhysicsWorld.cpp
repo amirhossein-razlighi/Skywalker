@@ -237,7 +237,8 @@ struct PhysicsWorld::Impl final : public JPH::ContactListener {
         ensureJoltInitialized();
         cache = options.shapeCache ? options.shapeCache : makeShapeCache();
         const JPH::uint maxBodies = std::max<JPH::uint>(options.maxBodies, 64);
-        system.Init(maxBodies, 0, maxBodies, maxBodies, bpLayers, objVsBp, matrix);
+        system.Init(maxBodies, 0, std::max<JPH::uint>(options.maxBodyPairs, 64), std::max<JPH::uint>(options.maxContactConstraints, 64),
+                    bpLayers, objVsBp, matrix);
         system.SetContactListener(this);
         temp = std::make_unique<JPH::TempAllocatorImplWithMallocFallback>(8 * 1024 * 1024);
         if (!options.multithreaded) localJobs = std::make_unique<JPH::JobSystemSingleThreaded>(JPH::cMaxPhysicsJobs);
@@ -821,6 +822,7 @@ struct PhysicsWorld::Impl final : public JPH::ContactListener {
             ce.lastVelocity = v;
             ce.lastWorld = s.worldMatrix(e);
         }
+        if (!chars.empty()) s.markDirty();
     }
 
     // --- Joints ------------------------------------------------------------------------------------
