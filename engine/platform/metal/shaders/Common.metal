@@ -45,7 +45,18 @@ struct FrameUniforms {
     float4 temporal;       // xy = jitter (NDC), z = frame index, w = sub-sample index
     float4 clouds;         // x = unused (coverage is sky.y), y = base height (m), z = thickness (m), w = density
     float4 clouds2;        // x = scale, y = drift speed (m/s), z = mode (0 volumetric, 1 flat), w = wind angle (rad)
+    float4 cluster;        // x = tiles x, y = tiles y, z = depth slices, w = log(far / near)
+    float4 cluster2;       // x = near (m), y = directional light count, zw = unused
 };
+
+// Clustered lighting: which cluster a pixel at `fragXY` (pixels) / `worldPos` belongs to.
+static uint clusterOf(constant FrameUniforms& f, float2 fragXY, float3 worldPos) {
+    float z = max(dot(worldPos - f.cameraPos.xyz, f.cameraForward.xyz), f.cluster2.x);
+    int tx = clamp(int(fragXY.x * f.viewport.z * f.cluster.x), 0, int(f.cluster.x) - 1);
+    int ty = clamp(int(fragXY.y * f.viewport.w * f.cluster.y), 0, int(f.cluster.y) - 1);
+    int sl = clamp(int(log(z / f.cluster2.x) / max(f.cluster.w, 1e-3) * f.cluster.z), 0, int(f.cluster.z) - 1);
+    return uint((sl * int(f.cluster.y) + ty) * int(f.cluster.x) + tx);
+}
 
 struct DrawUniforms {
     float4x4 model;

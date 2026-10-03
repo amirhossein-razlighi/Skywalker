@@ -117,18 +117,15 @@ Shading shadingFromString(std::string_view s) {
 }
 
 void prioritizeLights(FrameData& f) {
-    // The GPU takes kMaxLights: keep directional lights, then the point/spot lights whose
-    // influence sphere is closest to what the camera looks at (stable order for ties).
-    if (f.lights.size() > FrameData::kMaxLights) {
-        auto score = [&](const LightItem& l) {
-            if (l.kind == LightItem::Kind::Directional) return -1e30f;
-            float d = std::min(distance(l.position, f.camera.target), distance(l.position, f.camera.eye));
-            return std::max(0.f, d - l.range) - l.range * 0.05f * std::min(l.intensity, 10.f);
-        };
-        std::stable_sort(f.lights.begin(), f.lights.end(),
-                         [&](const LightItem& a, const LightItem& b) { return score(a) < score(b); });
-        f.lights.resize(FrameData::kMaxLights);
-    }
+    // Directional lights first, then point/spot lights whose influence sphere is closest to
+    // what the camera looks at (stable order for ties). Effects use the first kMaxEffectLights.
+    auto score = [&](const LightItem& l) {
+        if (l.kind == LightItem::Kind::Directional) return -1e30f;
+        float d = std::min(distance(l.position, f.camera.target), distance(l.position, f.camera.eye));
+        return std::max(0.f, d - l.range) - l.range * 0.05f * std::min(l.intensity, 10.f);
+    };
+    std::stable_sort(f.lights.begin(), f.lights.end(), [&](const LightItem& a, const LightItem& b) { return score(a) < score(b); });
+    if (f.lights.size() > FrameData::kMaxLights) f.lights.resize(FrameData::kMaxLights);
 }
 
 FrameData buildFrame(const Scene& scene, const ViewCamera& camera, int width, int height, const BuildOptions& opts) {

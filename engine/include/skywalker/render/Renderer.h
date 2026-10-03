@@ -223,7 +223,8 @@ struct FrameData {
     /// 3 roughness/metallic, 4 GI, 5 reflections, 6 AO, 7 depth, 8 lighting before GI.
     int debugView = 0;
 
-    static constexpr size_t kMaxLights = 16;
+    static constexpr size_t kMaxLights = 1024;       // clustered lighting on surfaces
+    static constexpr size_t kMaxEffectLights = 16;   // the most important ones also light water, particles, fog
     Mat4 viewProjection() const { return projection * view; }
 };
 
@@ -237,8 +238,8 @@ struct BuildOptions {
     std::function<const ResolvedMaterial*(const std::string&)> material;
 };
 
-/// Keeps the kMaxLights lights that matter most for this view (directional first, then the
-/// point/spot lights nearest to what the camera looks at).
+/// Orders lights by importance for this view (directional first, then the point/spot lights
+/// nearest to what the camera looks at) and keeps at most kMaxLights.
 void prioritizeLights(FrameData& f);
 
 /// Converts the scene into a renderer-agnostic frame description.

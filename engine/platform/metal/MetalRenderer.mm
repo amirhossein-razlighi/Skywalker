@@ -40,6 +40,7 @@
 #include "skywalker/core/Log.h"
 #include "skywalker/render/ColorGrading.h"
 #include "skywalker/render/Hdr.h"
+#include "skywalker/render/LightClusters.h"
 #include "skywalker/render/MeshData.h"
 #include "skywalker/render/Renderer.h"
 
@@ -75,6 +76,8 @@ struct FrameUniforms {
     simd_float4 temporal;
     simd_float4 clouds;
     simd_float4 clouds2;
+    simd_float4 cluster;
+    simd_float4 cluster2;
 };
 
 struct DrawUniforms {
@@ -425,8 +428,16 @@ public:
             ensureHdri(frame.environment);
             const Environment& env = frame.environment;
             Cascades cascades = computeCascades(frame);
-            const FrameUniforms base = frameUniforms(frame, cascades);
-            std::vector<GPULight> lights = gpuLights(frame);
+            FrameUniforms base = frameUniforms(frame, cascades);
+            // All lights shade surfaces through clusters; the most important few also light
+            // water, particles, fluids and the volumetric fog.
+            std::vector<GPULight> allLights = gpuLights(frame);
+            std::vector<GPULight> lights(allLights.begin(),
+                                         allLights.begin() + static_cast<std::ptrdiff_t>(std::min(allLights.size(), FrameData::kMaxEffectLights)));
+            const LightGrid grid = buildLightGrid(frame);
+            base.cluster = simd_make_float4(static_cast<float>(grid.tilesX), static_cast<float>(grid.tilesY),
+                                            static_cast<float>(grid.slices), std::log(grid.zFar / grid.zNear));
+            base.cluster2 = simd_make_float4(grid.zNear, static_cast<float>(grid.directionalCount), 0, 0);
             const Mat4 vp = frame.viewProjection();
             if (frame.resetHistory || cameraCut(frame)) {
                 historyValid_ = false;
@@ -445,6 +456,9 @@ public:
             cmd.label = @"Skywalker Frame";
             dispatch_semaphore_t sem = inFlight_;
             [cmd addCompletedHandler:^(id<MTLCommandBuffer>) { dispatch_semaphore_signal(sem); }];
+            lightsBuf_ = transient(allLights.data(), allLights.size() * sizeof(GPULight));
+            clusterCellsBuf_ = transient(grid.cells.data(), grid.cells.size() * sizeof(uint32_t));
+            clusterIndexBuf_ = transient(grid.indices.data(), grid.indices.size() * sizeof(uint32_t));
             ensureCloudNoise(cmd);
             encodeEnvironment(cmd, frame, base);
             encodeShadows(cmd, frame, base, cascades);
@@ -952,7 +966,7 @@ private:
         fu.ground = lin(env.ground.xyz(), env.ambient);
         fu.fog = lin(env.fogColor.xyz(), env.fogDensity);
         bool shadows = env.sunElevation > 0.f && env.sunIntensity > 0.f;
-        fu.params = simd_make_float4(env.exposure, static_cast<float>(std::min(frame.lights.size(), FrameData::kMaxLights)),
+        fu.params = simd_make_float4(env.exposure, static_cast<float>(std::min(frame.lights.size(), FrameData::kMaxEffectLights)),
                                      shadows ? 1.f : 0.f, 1.f / static_cast<float>(kShadowAtlas));
         float w = static_cast<float>(std::max(frame.width, 1)), h = static_cast<float>(std::max(frame.height, 1));
         fu.viewport = simd_make_float4(w, h, 1.f / w, 1.f / h);
@@ -1562,7 +1576,9 @@ private:
         // Opaque meshes
         [enc setVertexBytes:&fu length:sizeof(fu) atIndex:2];
         [enc setFragmentBytes:&fu length:sizeof(fu) atIndex:1];
-        [enc setFragmentBytes:lights.data() length:lights.size() * sizeof(GPULight) atIndex:2];
+        [enc setFragmentBuffer:lightsBuf_.buffer offset:lightsBuf_.offset atIndex:2];
+        [enc setFragmentBuffer:clusterCellsBuf_.buffer offset:clusterCellsBuf_.offset atIndex:3];
+        [enc setFragmentBuffer:clusterIndexBuf_.buffer offset:clusterIndexBuf_.offset atIndex:4];
         [enc setFragmentTexture:shadowMap_ atIndex:1];
         [enc setFragmentTexture:envCube_ atIndex:5];
         [enc setFragmentTexture:brdfLut_ atIndex:6];
@@ -2434,6 +2450,7 @@ private:
     id<MTLBuffer> patchVertices_, patchIndices_;
     uint32_t patchIndexCount_ = 0;
     std::unordered_map<uint64_t, InstanceGpu> instanceBuffers_;
+    Alloc lightsBuf_{}, clusterCellsBuf_{}, clusterIndexBuf_{};
     // G-buffer, lighting and temporal targets
     id<MTLTexture> lit_, gbufA_, gbufB_, msaaGbufA_, msaaGbufB_, depthPrev_;
     id<MTLTexture> taa_[2], giRaw_, giHist_[2], ssrRaw_, ssrHist_[2];

@@ -66,8 +66,9 @@ static float3 triplanarNormal(texture2d<float> tex, Triplanar t, float3 N, float
 // Direct (sun + punctual lights) and image-based lighting of a PBR / toon surface, before
 // emission and fog. Shared by meshes, instanced foliage and terrain.
 static float3 shadeSurface(SurfaceData s, float3 Ngeo, float3 worldPos, float2 fragXY, float3 V, bool toon, float rim,
-                           constant FrameUniforms& f, constant GPULight* lights, depth2d<float> shadowAtlas,
-                           texturecube<float> envTex, texture2d<float> brdfLut, texture3d<float> cloudShape) {
+                           constant FrameUniforms& f, const device GPULight* lights, const device uint2* clusterCells,
+                           const device uint* clusterIndices, depth2d<float> shadowAtlas, texturecube<float> envTex,
+                           texture2d<float> brdfLut, texture3d<float> cloudShape) {
     // Sun
     float3 L = -f.sunDir.xyz;
     float sunVisible = L.y > -0.08 ? shadowFactor(worldPos, Ngeo, fragXY, f, shadowAtlas) : 0.0;
@@ -75,9 +76,12 @@ static float3 shadeSurface(SurfaceData s, float3 Ngeo, float3 worldPos, float2 f
     float3 sunRad = f.sunColor.rgb * f.sunDir.w * sunVisible;
     float3 color = toon ? toonLight(s, V, L, sunRad) : directLight(s, V, L, sunRad);
 
-    // Punctual lights
-    int count = int(f.params.y);
-    for (int i = 0; i < count; ++i) {
+    // Punctual lights: directional ones everywhere, point/spot lights from this pixel's cluster.
+    int dirCount = int(f.cluster2.y);
+    uint2 cell = clusterCells[clusterOf(f, fragXY, worldPos)];
+    int total = dirCount + int(cell.y);
+    for (int k = 0; k < total; ++k) {
+        int i = k < dirCount ? k : int(clusterIndices[cell.x + uint(k - dirCount)]);
         GPULight l = lights[i];
         float3 Ll;
         float atten = 1.0;
@@ -148,7 +152,9 @@ fragment MainOut meshFragment(MeshOut in [[stage_in]],
                               bool frontFacing [[front_facing]],
                               constant DrawUniforms& d [[buffer(0)]],
                               constant FrameUniforms& f [[buffer(1)]],
-                              constant GPULight* lights [[buffer(2)]],
+                              const device GPULight* lights [[buffer(2)]],
+                              const device uint2* clusterCells [[buffer(3)]],
+                              const device uint* clusterIndices [[buffer(4)]],
                               texture2d<float> albedoTex [[texture(0)]],
                               depth2d<float> shadowAtlas [[texture(1)]],
                               texture2d<float> normalTex [[texture(2)]],
@@ -243,8 +249,8 @@ fragment MainOut meshFragment(MeshOut in [[stage_in]],
     s.subsurface = d.material3.y;
     bool toon = shading == 1;
 
-    float3 color = shadeSurface(s, Ngeo, in.worldPos, in.position.xy, V, toon, d.material3.z, f, lights, shadowAtlas,
-                                envTex, brdfLut, cloudShape) + emissive;
+    float3 color = shadeSurface(s, Ngeo, in.worldPos, in.position.xy, V, toon, d.material3.z, f, lights, clusterCells,
+                                clusterIndices, shadowAtlas, envTex, brdfLut, cloudShape) + emissive;
     color = applyFog(color, in.worldPos, V, f);
 
 

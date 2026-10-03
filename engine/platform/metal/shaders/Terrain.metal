@@ -131,7 +131,9 @@ static LayerSample sampleLayer(int i, float3 wp, float3 N, float dist, constant 
 fragment MainOut terrainFragment(TerrainOut in [[stage_in]],
                                  constant TerrainUniforms& tu [[buffer(0)]],
                                  constant FrameUniforms& f [[buffer(1)]],
-                                 constant GPULight* lights [[buffer(2)]],
+                                 const device GPULight* lights [[buffer(2)]],
+                                 const device uint2* clusterCells [[buffer(3)]],
+                                 const device uint* clusterIndices [[buffer(4)]],
                                  texture2d<float> normalMap [[texture(0)]],
                                  depth2d<float> shadowAtlas [[texture(1)]],
                                  texture2d<float> weights0 [[texture(2)]],
@@ -222,7 +224,8 @@ fragment MainOut terrainFragment(TerrainOut in [[stage_in]],
     }
     s.clearcoat = 0.0;
     s.subsurface = 0.0;
-    float3 color = shadeSurface(s, Ngeo, wp, in.position.xy, V, false, 0.0, f, lights, shadowAtlas, envTex, brdfLut, cloudShape);
+    float3 color = shadeSurface(s, Ngeo, wp, in.position.xy, V, false, 0.0, f, lights, clusterCells, clusterIndices, shadowAtlas,
+                                envTex, brdfLut, cloudShape);
     if (tu.water.z > 0.5) color = mix(color, float3(1.0, 0.5, 0.1), 0.15);  // selection tint
     color = applyFog(color, wp, V, f);
     return mainOut(float4(color, 1.0), s.albedo, s.ao, N, s.roughness, s.metallic);

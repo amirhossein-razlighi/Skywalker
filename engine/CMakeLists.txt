@@ -24,6 +24,7 @@ set(SKY_ENGINE_SOURCES
     src/world/WorldRuntime.cpp
     src/render/Vegetation.cpp
     src/render/ColorGrading.cpp
+    src/render/LightClusters.cpp
     src/render/MeshFormats.cpp
     src/assets/Fetch.cpp
     src/render/TextureGen.cpp

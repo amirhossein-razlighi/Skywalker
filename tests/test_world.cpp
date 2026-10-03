@@ -162,3 +162,50 @@ TEST_CASE("grading: looks bake valid LUTs and .cube files parse") {
     CHECK(cube->rgb[3] == doctest::Approx(1.f));
     CHECK(!grading::parseCube("LUT_3D_SIZE 2\n0 0 0\n"));
 }
+
+#include "skywalker/render/LightClusters.h"
+
+TEST_CASE("render: light clusters list exactly the lights that can reach them") {
+    FrameData f;
+    f.width = 1600;
+    f.height = 900;
+    f.camera.eye = {0, 2, 10};
+    f.camera.target = {0, 2, 0};
+    f.view = f.camera.view();
+    f.projection = f.camera.projection(16.f / 9.f);
+    LightItem sun;
+    sun.kind = LightItem::Kind::Directional;
+    f.lights.push_back(sun);
+    for (int i = 0; i < 200; ++i) {
+        LightItem l;
+        l.position = {static_cast<float>(i % 20) - 10.f, 1.f, -static_cast<float>(i / 20) * 3.f};
+        l.range = 2.f;
+        f.lights.push_back(l);
+    }
+    LightItem behind;
+    behind.position = {0, 2, 30};  // behind the camera: in no cluster
+    behind.range = 3.f;
+    f.lights.push_back(behind);
+    LightGrid g = buildLightGrid(f);
+    CHECK(g.directionalCount == 1);
+    CHECK(g.cells.size() == g.clusterCount() * 2);
+    size_t refs = 0;
+    for (size_t c = 0; c < g.clusterCount(); ++c) {
+        for (uint32_t k = 0; k < g.cells[c * 2 + 1]; ++k) {
+            uint32_t li = g.indices[g.cells[c * 2] + k];
+            CHECK(li != 0);    // directional lights are not in clusters
+            CHECK(li != 201);  // the light behind the camera is culled
+            ++refs;
+        }
+    }
+    CHECK(refs > 200);
+    // The pixel under a light's center lists that light.
+    const LightItem& probe = f.lights[105];
+    Vec4 h = f.projection * f.view * Vec4(probe.position, 1.f);
+    float px = (h.x / h.w * 0.5f + 0.5f) * f.width, py = (0.5f - h.y / h.w * 0.5f) * f.height;
+    float z = dot(probe.position - f.camera.eye, normalize(f.camera.target - f.camera.eye));
+    int c = g.clusterAt(px, py, f.width, f.height, z);
+    bool found = false;
+    for (uint32_t k = 0; k < g.cells[static_cast<size_t>(c) * 2 + 1]; ++k) found = found || g.indices[g.cells[static_cast<size_t>(c) * 2] + k] == 105;
+    CHECK(found);
+}
