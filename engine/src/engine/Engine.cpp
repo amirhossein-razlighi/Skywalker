@@ -1067,6 +1067,13 @@ void Engine::stopAgentServer() {
         acceptingJobs_ = false;
         failQueuedJobsLocked("the agent server is stopping");
     }
+    // Slow tool work (design apps) runs on connection threads that stop() joins: ask it to end.
+    {
+        std::lock_guard lock(workMutex_);
+        for (auto& w : activeWork_) {
+            if (w->cancel) w->cancel();
+        }
+    }
     server_->stop();
     server_.reset();
     std::lock_guard lock(jobsMutex_);
@@ -1107,12 +1114,25 @@ Json Engine::callToolFromConnection(const std::string& tool, const Json& args, c
     if (!pending->deferred) return out;
 
     std::shared_ptr<DeferredWork> work = std::move(pending->deferred);
+    {
+        std::lock_guard lock(workMutex_);
+        activeWork_.push_back(work);
+    }
+    {
+        std::lock_guard lock(jobsMutex_);
+        if (!acceptingJobs_ && work->cancel) work->cancel();  // the server started stopping meanwhile
+    }
+    auto retire = [this, &work] {
+        std::lock_guard lock(workMutex_);
+        std::erase(activeWork_, work);
+    };
     try {
         if (work->work) work->work();
     } catch (const std::exception& e) {
-        work->finish = nullptr;
+        retire();
         return ToolResult::error(Error::make("internal_error", std::string("tool crashed: ") + e.what())).toMcp();
     }
+    retire();
     std::future<Json> second = post([this, tool, actor, work, abandoned]() -> Json {
         if (abandoned->load()) return ToolResult::error(Error::make("timeout", "request abandoned")).toMcp();
         ToolResult r;

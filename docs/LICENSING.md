@@ -36,3 +36,22 @@ Also decide:
 - A contributor agreement (CLA or DCO), so contributions can be dual-licensed.
 - Trademark policy for the name "Skywalker". It is a well-known term in entertainment, so
   check trademark availability before branding a product with it.
+
+## Third-party
+
+### Design apps (DCC bridge)
+
+Blender, Maya, Houdini and 3ds Max are **not** bundled, linked or redistributed: Skywalker starts
+the copies the user already has installed as separate processes (`docs/DCC.md`), so their
+licenses (Blender: GPL-3.0-or-later; the others: proprietary) do not apply to Skywalker or to
+games made with it. No new third-party dependencies were added.
+
+One licensing consequence to decide before the public release: Python that runs *inside*
+Blender and imports `bpy` is, by the Blender Foundation's long-standing position, subject to the
+GPL. The files that do so (`integrations/blender/skywalker_bridge/*.py` and
+`integrations/dcc/skywalker_dcc/{blender,procedural,tasks}.py`) therefore carry
+`SPDX-License-Identifier: GPL-3.0-or-later`. They are small, self-contained scripts that talk to
+the engine only through processes and sockets, so the engine and editor keep the project license;
+the rest of `integrations/dcc` (which never imports `bpy`) is under the project license. The
+engine embeds these files as data and writes them out to run them; ship their license text with
+any binary distribution.

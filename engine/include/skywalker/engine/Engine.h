@@ -273,6 +273,8 @@ private:
     void failQueuedJobsLocked(const std::string& why);
     void recordToolEvent(std::string_view name, const ToolResult& result, const std::string& actor);
     Json callToolFromConnection(const std::string& tool, const Json& args, const std::string& actor);
+    std::mutex workMutex_;
+    std::vector<std::shared_ptr<DeferredWork>> activeWork_;  // deferred tool work running on connection threads
     int editDepth_ = 0;
     std::deque<std::pair<std::function<Json()>, std::promise<Json>>> jobs_;
     std::unique_ptr<SocketServer> server_;

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# (code that runs inside Blender and uses its Python API follows Blender's license, see docs/LICENSING.md)
 """Skywalker Bridge: lets Skywalker's design agents work inside this Blender session.
 
 * Starts a loopback-only server (token protected, see server.py) that the engine uses to run

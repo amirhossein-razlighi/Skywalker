@@ -529,7 +529,8 @@ Result<Json> Manager::sessionCall(const SessionInfo& s, const std::string& metho
 }
 
 Result<Manager::SessionInfo> Manager::startSession(const AppInfo& blender, bool headless, const std::string& open,
-                                                   const std::string& projectDir, std::chrono::milliseconds wait) {
+                                                   const std::string& projectDir, std::chrono::milliseconds wait,
+                                                   const std::shared_ptr<CancelToken>& cancel) {
     if (auto existing = session(); existing) {
         auto pong = sessionCall(*existing, "ping", Json::object(), std::chrono::seconds(5));
         if (pong) return *existing;  // idempotent: reuse the live session
@@ -565,6 +566,10 @@ Result<Manager::SessionInfo> Manager::startSession(const AppInfo& blender, bool 
 
     const auto deadline = Clock::now() + wait;
     while (Clock::now() < deadline) {
+        if (cancel && cancel->cancelled()) {
+            if (headless) terminateProcess(*pid);
+            return Error::make("cancelled", "cancelled");
+        }
         if (!processAlive(*pid)) {
             return Error::make("session_failed", "Blender exited while starting the session",
                                "see " + log + " for Blender's output");
@@ -574,7 +579,7 @@ Result<Manager::SessionInfo> Manager::startSession(const AppInfo& blender, bool 
             // (busy loading its UI and the model) runs requests, so the first tool call works.
             if (sessionCall(*s, "ping", Json::object(), std::chrono::seconds(5))) {
                 auto left = std::chrono::duration_cast<std::chrono::milliseconds>(deadline - Clock::now());
-                if (sessionCall(*s, "status", Json::object({{"timeout", 60}}), std::max(left, std::chrono::milliseconds(2000)))) return *s;
+                if (sessionCall(*s, "status", Json::object({{"timeout", 60}}), std::max(left, std::chrono::milliseconds(2000)), cancel)) return *s;
             }
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(150));

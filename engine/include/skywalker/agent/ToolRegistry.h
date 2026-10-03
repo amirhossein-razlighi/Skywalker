@@ -35,6 +35,8 @@ struct ToolResult;
 struct DeferredWork {
     std::function<void()> work;
     std::function<ToolResult()> finish;
+    /// Optional, thread-safe: asks `work` to stop early (the agent server is shutting down).
+    std::function<void()> cancel;
 };
 
 struct ToolResult {
@@ -47,7 +49,8 @@ struct ToolResult {
 
     /// Runs the deferred work (if any) inline and returns the final result.
     ToolResult complete();
-    static ToolResult defer(std::function<void()> work, std::function<ToolResult()> finish);
+    static ToolResult defer(std::function<void()> work, std::function<ToolResult()> finish,
+                            std::function<void()> cancel = nullptr);
 
     static ToolResult text(std::string t);
     static ToolResult json(Json payload, std::string summary = {});

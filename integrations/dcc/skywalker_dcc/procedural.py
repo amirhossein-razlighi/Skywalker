@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# (code that runs inside Blender and uses its Python API follows Blender's license, see docs/LICENSING.md)
 """Procedural modeling library (runs inside Blender).
 
 Each recipe builds one mesh object with PBR materials and per-face color variation, sized in

@@ -119,7 +119,8 @@ public:
     /// Starts Blender with the bridge running (`headless` = no window). `open` is a model file to
     /// load first. Returns once the session answers.
     Result<SessionInfo> startSession(const AppInfo& blender, bool headless, const std::string& open,
-                                     const std::string& projectDir, std::chrono::milliseconds wait);
+                                     const std::string& projectDir, std::chrono::milliseconds wait,
+                                     const std::shared_ptr<CancelToken>& cancel = nullptr);
     Status stopSession();
 
     std::string sessionFilePath() const;

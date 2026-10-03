@@ -195,9 +195,16 @@ Json importMeshes(Engine& engine, const std::string& actor, const std::vector<st
         Json item = *r;
         item["file"] = rel;
         Json meta = Json::object();
-        Json tags = Json::array({"dcc"});
-        if (!spec.app.empty()) tags.push(spec.app);
-        for (const auto& t : spec.tags.elements()) tags.push(t);
+        std::vector<std::string> tagList;
+        if (const AssetRecord* existing = engine.assets().find(rel)) tagList = existing->tags;  // re-imports keep the human's tags
+        auto addTag = [&](const std::string& t) {
+            if (!t.empty() && std::find(tagList.begin(), tagList.end(), t) == tagList.end()) tagList.push_back(t);
+        };
+        addTag("dcc");
+        addTag(spec.app);
+        for (const auto& t : spec.tags.elements()) addTag(t.asString());
+        Json tags = Json::array();
+        for (const auto& t : tagList) tags.push(t);
         meta["tags"] = tags;
         if (!spec.description.empty()) meta["description"] = spec.description;
         Json source = spec.source;
@@ -513,7 +520,8 @@ std::shared_ptr<dcc::Manager> addDccTools(Engine& engine, ToolRegistry& reg, std
                             for (const auto& s : st->job.result.get("warnings").elements()) summary += "\nscript warning: " + s.asString();
                         }
                         return ToolResult::json(out, summary);
-                    });
+                    },
+                    [st] { st->cancel->cancel(); });
             }};
         def.openWorld = true;
         reg.add(std::move(def));
@@ -640,6 +648,7 @@ std::shared_ptr<dcc::Manager> addDccTools(Engine& engine, ToolRegistry& reg, std
                 st->import = parseImport(a, "blender", true);
                 if (items.size() > 1 && st->import.place.enabled) st->import.place.spacing = st->import.place.spacing ? st->import.place.spacing : 4;
                 st->import.source = provenance(*blender, "dcc_convert");
+                st->import.source["convertedFrom"] = inRel.empty() ? a.get("path").asString() : inRel;
                 st->extra = Json::object({{"skipped", skipped}});
                 st->alreadyConverted = alreadyDone;
                 st->jobId = mgr->beginJob(baseLabel("convert", *blender), st->cancel);
@@ -692,7 +701,8 @@ std::shared_ptr<dcc::Manager> addDccTools(Engine& engine, ToolRegistry& reg, std
                             out["warnings"] = w;
                         }
                         return ToolResult::json(out, summary);
-                    });
+                    },
+                    [st] { st->cancel->cancel(); });
             }};
         def.openWorld = true;
         reg.add(std::move(def));
@@ -789,7 +799,8 @@ std::shared_ptr<dcc::Manager> addDccTools(Engine& engine, ToolRegistry& reg, std
                             out["warnings"] = w;
                         }
                         return ToolResult::json(out, summary);
-                    });
+                    },
+                    [st] { st->cancel->cancel(); });
             }};
         def.openWorld = true;
         reg.add(std::move(def));
@@ -884,7 +895,15 @@ std::shared_ptr<dcc::Manager> addDccTools(Engine& engine, ToolRegistry& reg, std
                 st->import.source["version"] = mode == "replace" ? 1 : version;
                 if (a.contains("ops")) st->import.source["ops"] = a.get("ops");
                 if (!st->spec.script.empty()) st->import.source["scriptSha"] = shortHash(st->spec.script);
-                st->import.tags = Json::array({"edited"});
+                st->import.tags = Json::array();
+                for (const auto& t : rec->tags) {
+                    if (t != "downloaded") st->import.tags.push(t);
+                }
+                st->import.tags.push("edited");
+                // A derived model keeps the original's attribution and license trail.
+                for (const char* k : {"license", "author", "attribution", "source_page", "url"}) {
+                    if (rec->source.contains(k)) st->import.source[k] = rec->source.get(k);
+                }
                 st->extra = Json::object({{"from", rec->path},
                                           {"output", (srcRel.parent_path() / outName).generic_string()},
                                           {"mode", mode},
@@ -941,7 +960,8 @@ std::shared_ptr<dcc::Manager> addDccTools(Engine& engine, ToolRegistry& reg, std
                         if (st->extra.get("updateReferences").asBool()) summary += ", " + std::to_string(rewired) + " scene reference(s) updated";
                         for (const auto& w : warnings) summary += "\nwarning: " + w;
                         return ToolResult::json(out, summary);
-                    });
+                    },
+                    [st] { st->cancel->cancel(); });
             }};
         def.openWorld = true;
         reg.add(std::move(def));
@@ -1043,7 +1063,8 @@ std::shared_ptr<dcc::Manager> addDccTools(Engine& engine, ToolRegistry& reg, std
                         }
                         for (const auto& w : warnings) summary += "\nwarning: " + w;
                         return ToolResult::json(out, summary);
-                    });
+                    },
+                    [st] { st->cancel->cancel(); });
             }};
         def.openWorld = true;
         reg.add(std::move(def));
@@ -1129,7 +1150,8 @@ std::shared_ptr<dcc::Manager> addDccTools(Engine& engine, ToolRegistry& reg, std
                         else if (st->extra.contains("enableError")) summary += "; enabling failed: " + st->extra.get("enableError").asString();
                         summary += ". In Blender: press N in the 3D viewport, open the Skywalker tab and click Start Bridge.";
                         return ToolResult::json(st->extra, summary);
-                    });
+                    },
+                    [st] { st->cancel->cancel(); });
             }};
         def.openWorld = true;
         reg.add(std::move(def));
@@ -1199,20 +1221,22 @@ std::shared_ptr<dcc::Manager> addDccTools(Engine& engine, ToolRegistry& reg, std
                     open = engine.resolvePath(rec->path);
                 }
                 auto result = std::make_shared<Result<dcc::Manager::SessionInfo>>(Error::make("", ""));
+                auto token = std::make_shared<dcc::CancelToken>();
                 dcc::AppInfo app = *blender;
                 bool headless = a.get("headless").asBool(true);
                 auto wait = std::chrono::seconds(timeoutSeconds(a, 90));
                 std::string projectDir = engine.assets().root();
                 return ToolResult::defer(
-                    [mgr, app, headless, open, projectDir, wait, result] {
-                        *result = mgr->startSession(app, headless, open, projectDir, wait);
+                    [mgr, app, headless, open, projectDir, wait, result, token] {
+                        *result = mgr->startSession(app, headless, open, projectDir, wait, token);
                     },
                     [result]() -> ToolResult {
                         if (!*result) return ToolResult::error((*result).error());
                         const auto& s = **result;
                         return ToolResult::json(Json::object({{"connected", true}, {"mode", s.mode}, {"version", s.version}, {"pid", static_cast<double>(s.pid)}, {"port", s.port}}),
                                                 "Blender " + s.version + " session ready (" + s.mode + ")");
-                    });
+                    },
+                    [token] { token->cancel(); });
             }};
         start.openWorld = true;
         reg.add(std::move(start));
@@ -1251,13 +1275,14 @@ std::shared_ptr<dcc::Manager> addDccTools(Engine& engine, ToolRegistry& reg, std
                 auto s = mgr->session();
                 if (!s) return ToolResult::error(s.error());
                 auto response = std::make_shared<Result<Json>>(Error::make("", ""));
+                auto token = std::make_shared<dcc::CancelToken>();
                 dcc::Manager::SessionInfo si = *s;
                 Json params = Json::object({{"code", a.get("code")}, {"reset", a.get("reset").asBool(false)}, {"undo", a.get("undo").asBool(true)}});
                 int timeout = timeoutSeconds(a, 120);
                 params["timeout"] = timeout;
                 return ToolResult::defer(
-                    [mgr, si, params, timeout, response] {
-                        *response = mgr->sessionCall(si, "exec", params, std::chrono::seconds(timeout + 5));
+                    [mgr, si, params, timeout, response, token] {
+                        *response = mgr->sessionCall(si, "exec", params, std::chrono::seconds(timeout + 5), token);
                     },
                     [response]() -> ToolResult {
                         if (!*response) return ToolResult::error((*response).error());
@@ -1266,7 +1291,8 @@ std::shared_ptr<dcc::Manager> addDccTools(Engine& engine, ToolRegistry& reg, std
                         if (!r.get("stderr").asString().empty()) text += (text.empty() ? "" : "\n") + r.get("stderr").asString();
                         if (!r.get("result").isNull()) text += (text.empty() ? "" : "\n") + std::string("=> ") + r.get("result").dump();
                         return ToolResult::json(r, text.empty() ? "ok" : text);
-                    });
+                    },
+                    [token] { token->cancel(); });
             }};
         exec.openWorld = true;
         reg.add(std::move(exec));
@@ -1297,6 +1323,7 @@ std::shared_ptr<dcc::Manager> addDccTools(Engine& engine, ToolRegistry& reg, std
                 if (!s) return ToolResult::error(s.error());
                 struct Pull {
                     Result<Json> response = Error::make("", "");
+                    std::shared_ptr<dcc::CancelToken> token = std::make_shared<dcc::CancelToken>();
                     std::string name, abs;
                     bool existed = false;
                     ImportSpec import;
@@ -1317,7 +1344,7 @@ std::shared_ptr<dcc::Manager> addDccTools(Engine& engine, ToolRegistry& reg, std
                     [mgr, si, st, dir, names, origin, applyMods, timeout] {
                         if (st->name.empty()) {
                             Json p = names.isArray() ? Json::object({{"names", names}}) : Json::object();
-                            auto sel = mgr->sessionCall(si, "selection", p, std::chrono::seconds(timeout));
+                            auto sel = mgr->sessionCall(si, "selection", p, std::chrono::seconds(timeout), st->token);
                             if (!sel) {
                                 st->response = sel.error();
                                 return;
@@ -1332,7 +1359,7 @@ std::shared_ptr<dcc::Manager> addDccTools(Engine& engine, ToolRegistry& reg, std
                         fs::create_directories(dir, ec);
                         Json p = Json::object({{"path", st->abs}, {"origin", origin}, {"apply_modifiers", applyMods}, {"timeout", timeout}});
                         if (names.isArray()) p["names"] = names;
-                        st->response = mgr->sessionCall(si, "export_selection", p, std::chrono::seconds(timeout + 5));
+                        st->response = mgr->sessionCall(si, "export_selection", p, std::chrono::seconds(timeout + 5), st->token);
                     },
                     [&engine, st, actor, placeExplicit]() -> ToolResult {
                         if (!st->response) return ToolResult::error(st->response.error());
@@ -1351,7 +1378,8 @@ std::shared_ptr<dcc::Manager> addDccTools(Engine& engine, ToolRegistry& reg, std
                         }
                         for (const auto& w : warnings) summary += "\nwarning: " + w;
                         return ToolResult::json(out, summary);
-                    });
+                    },
+                    [st] { st->token->cancel(); });
             }};
         pull.openWorld = true;
         reg.add(std::move(pull));
@@ -1376,17 +1404,19 @@ std::shared_ptr<dcc::Manager> addDccTools(Engine& engine, ToolRegistry& reg, std
                     return ToolResult::error(Error::make("invalid_arguments", rec->path + " is not a mesh"));
                 }
                 auto response = std::make_shared<Result<Json>>(Error::make("", ""));
+                auto token = std::make_shared<dcc::CancelToken>();
                 dcc::Manager::SessionInfo si = *s;
                 int timeout = timeoutSeconds(a, 120);
                 Json params = Json::object({{"path", engine.resolvePath(rec->path)}, {"scale", a.get("scale").asNumber(1.0)}, {"timeout", timeout}});
                 std::string path = rec->path;
                 return ToolResult::defer(
-                    [mgr, si, params, timeout, response] { *response = mgr->sessionCall(si, "import_file", params, std::chrono::seconds(timeout + 5)); },
+                    [mgr, si, params, timeout, response, token] { *response = mgr->sessionCall(si, "import_file", params, std::chrono::seconds(timeout + 5), token); },
                     [response, path]() -> ToolResult {
                         if (!*response) return ToolResult::error((*response).error());
                         Json out = **response;
                         return ToolResult::json(out, "sent " + path + " to Blender: " + std::to_string(out.get("objects").size()) + " object(s)");
-                    });
+                    },
+                    [token] { token->cancel(); });
             }};
         send.openWorld = true;
         reg.add(std::move(send));

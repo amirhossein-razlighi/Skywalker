@@ -59,9 +59,9 @@ const ToolDef* ToolRegistry::find(std::string_view name) const {
     return nullptr;
 }
 
-ToolResult ToolResult::defer(std::function<void()> work, std::function<ToolResult()> finish) {
+ToolResult ToolResult::defer(std::function<void()> work, std::function<ToolResult()> finish, std::function<void()> cancel) {
     ToolResult r;
-    r.deferred = std::make_shared<DeferredWork>(DeferredWork{std::move(work), std::move(finish)});
+    r.deferred = std::make_shared<DeferredWork>(DeferredWork{std::move(work), std::move(finish), std::move(cancel)});
     return r;
 }
 

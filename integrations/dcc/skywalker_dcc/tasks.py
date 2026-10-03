@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# (code that runs inside Blender and uses its Python API follows Blender's license, see docs/LICENSING.md)
 """Tasks the engine runs inside Blender (dcc_convert, dcc_export, dcc_edit_asset, dcc_generate).
 
 Each task receives the JSON parameters the engine wrote (params.json) and records what it

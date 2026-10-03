@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# (code that runs inside Blender and uses its Python API follows Blender's license, see docs/LICENSING.md)
 """Blender toolkit for Skywalker scripts (runs inside Blender, 3.2 or newer).
 
 The functions here are the building blocks of the dcc_convert / dcc_export / dcc_edit_asset /

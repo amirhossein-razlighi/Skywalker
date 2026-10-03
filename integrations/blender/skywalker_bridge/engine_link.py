@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# (code that runs inside Blender and uses its Python API follows Blender's license, see docs/LICENSING.md)
 """Talking back to a running Skywalker editor (the "Send to Skywalker" button).
 
 The editor exposes its tools over a Unix domain socket as an MCP server (newline-delimited

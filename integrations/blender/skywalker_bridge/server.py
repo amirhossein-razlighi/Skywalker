@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# (code that runs inside Blender and uses its Python API follows Blender's license, see docs/LICENSING.md)
 """Skywalker bridge server: a localhost TCP server inside Blender.
 
 Protocol: newline-delimited JSON over TCP, loopback only.

@@ -1026,6 +1026,8 @@ TEST_CASE("dcc blender: generate recipes, then round-trip edit as a new version"
     // Place the original, then decimate it into a new version and re-point the scene at it.
     ToolResult placed = p.call("asset_import", R"({"path":"dcc/generated/Boulder.glb","create_entity":"BoulderEntity"})");
     REQUIRE_FALSE(placed.isError);
+    // The source asset came from somewhere with a license: derived versions keep that trail.
+    REQUIRE_FALSE(p.call("asset_tag", R"J({"asset":"dcc/generated/Boulder.glb","tags":["scenery","dcc"],"source":{"license":"CC-BY-4.0","author":"Ada"}})J").isError);
     r = p.call("dcc_edit_asset", R"({"asset":"dcc/generated/Boulder.glb","ops":[{"op":"decimate","ratio":0.25},{"op":"shade_smooth"}],"update_references":true})");
     INFO(r.content.front().text);
     REQUIRE_FALSE(r.isError);
@@ -1040,6 +1042,11 @@ TEST_CASE("dcc blender: generate recipes, then round-trip edit as a new version"
     CHECK(v2->source.get("tool").asString() == "dcc_edit_asset");
     CHECK(v2->source.get("version").asInt() == 2);
     CHECK(v2->source.get("ops").size() == 2);
+    CHECK(v2->source.get("license").asString() == "CC-BY-4.0");
+    CHECK(v2->source.get("author").asString() == "Ada");
+    std::set<std::string> v2tags(v2->tags.begin(), v2->tags.end());
+    CHECK(v2tags.count("scenery"));
+    CHECK(v2tags.count("edited"));
     const MeshRenderer* mr = p.engine->scene().get<MeshRenderer>(p.engine->scene().find("BoulderEntity"));
     REQUIRE(mr);
     CHECK(mr->mesh == "asset:dcc/generated/Boulder_v2.glb");
@@ -1288,4 +1295,36 @@ TEST_CASE("dcc blender: concurrent agents are served while Blender works") {
     REQUIRE(sj.ok());
     CHECK_FALSE(sj->get("result").get("isError").asBool());
     CHECK(sj->get("result").get("structuredContent").get("result").get("ok").asBool());
+}
+
+TEST_CASE("dcc blender: stopping the agent server cancels running design-app jobs") {
+    REQUIRE_BLENDER();
+    Project p;
+    std::string sock = (fs::temp_directory_path() / ("sky-dcc-stop-" + std::to_string(::getpid()) + ".sock")).string();
+    REQUIRE(p.engine->startAgentServer(sock).ok());
+    auto fd = connectUnixSocket(sock);
+    REQUIRE(fd.ok());
+    std::string resp;
+    std::thread client([&] {
+        writeAll(fd->get(), R"J({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"dcc_run_script","arguments":{"script":"import time\ntime.sleep(60)"}}})J" "\n");
+        LineReader r(fd->get());
+        r.next(resp);
+    });
+    // Pump until the job is registered (its work has started on the connection thread).
+    bool running = false;
+    for (int i = 0; i < 1500 && !running; ++i) {
+        p.engine->update(0.0);
+        std::this_thread::sleep_for(2ms);
+        ToolResult list = p.engine->callTool("dcc_list", Json::object(), "test");
+        running = list.structured.get("jobs").size() > 0;
+    }
+    REQUIRE(running);
+    std::this_thread::sleep_for(800ms);  // Blender is up and sleeping
+    auto t0 = std::chrono::steady_clock::now();
+    p.engine->stopAgentServer();
+    double took = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+    client.join();
+    CHECK(took < 10.0);
+    ToolResult after = p.engine->callTool("dcc_list", Json::object(), "test");
+    CHECK(after.structured.get("jobs").size() == 0);
 }
