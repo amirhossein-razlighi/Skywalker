@@ -69,6 +69,9 @@ public:
     std::function<void(EntityId emitter, int count)> burst;
     /// Water surface height for water_height(); set by the engine (ocean simulation).
     std::function<float(float x, float z)> waterHeight;
+    // Studio builtins/hooks: observes every emitted event (scripts and external emit())
+    // so playtest bots can record deaths, objectives and damage. Optional.
+    std::function<void(const std::string& name, EntityId target, EntityId source)> onEmit;
 
     /// Maximum AST nodes evaluated per handler invocation.
     static constexpr int kBudget = 200000;

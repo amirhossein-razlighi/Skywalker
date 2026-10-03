@@ -34,6 +34,9 @@
 namespace sky {
 
 class SocketServer;
+namespace studio {
+class Studio;
+}
 
 struct EngineConfig {
     RendererBackend renderer = RendererBackend::Auto;
@@ -194,6 +197,11 @@ public:
     /// Height of the water surface at world (x, z), waves included. False if no water covers it.
     bool waterHeight(float x, float z, float& height, Vec3* normal = nullptr);
 
+    // --- Studio (multi-agent roster, board, feedback, loops; docs/STUDIO.md) -----------
+    /// Created on first use from the project's agents/ and studio/ folders. Main thread only.
+    studio::Studio& studio();
+    bool hasStudio() const { return studio_ != nullptr; }
+
     // --- Events (activity feed) -----------------------------------------------------
     void emitEvent(Json event);
     std::vector<Json> drainEvents();
@@ -274,6 +282,7 @@ private:
     int editDepth_ = 0;
     std::deque<std::pair<std::function<Json()>, std::promise<Json>>> jobs_;
     std::unique_ptr<SocketServer> server_;
+    std::unique_ptr<studio::Studio> studio_;
 };
 
 void registerEngineTools(Engine& engine);

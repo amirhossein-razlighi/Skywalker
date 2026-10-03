@@ -35,6 +35,11 @@ set(SKY_ENGINE_SOURCES
     src/agent/SocketServer.cpp
     src/engine/Engine.cpp
     src/engine/Gizmo.cpp
+    # Studio (multi-agent roster, board, feedback, loops, playtests, runner)
+    src/studio/Catalog.cpp
+    src/studio/Studio.cpp
+    src/studio/Playtest.cpp
+    src/agent/StudioTools.cpp
 )
 
 add_library(skywalker_engine STATIC ${SKY_ENGINE_SOURCES})

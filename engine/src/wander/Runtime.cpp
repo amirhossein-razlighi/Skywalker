@@ -298,6 +298,7 @@ private:
             case Stmt::Kind::Emit: {
                 EntityId target = s.extra ? entity(eval(*s.extra), s.loc, "emit receiver") : kNoEntity;
                 rt_.nextPending_.push_back({s.name, target});
+                if (rt_.onEmit) rt_.onEmit(s.name, target, self_);  // Studio hook (playtests)
                 break;
             }
             case Stmt::Kind::Destroy: {
@@ -779,7 +780,10 @@ void Runtime::compileScripts() {
     }
 }
 
-void Runtime::emit(std::string name, EntityId target) { nextPending_.push_back({std::move(name), target}); }
+void Runtime::emit(std::string name, EntityId target) {
+    if (onEmit) onEmit(name, target, kNoEntity);  // Studio hook (playtests)
+    nextPending_.push_back({std::move(name), target});
+}
 
 void Runtime::tick(float dt, const InputState& input) {
     compileScripts();
