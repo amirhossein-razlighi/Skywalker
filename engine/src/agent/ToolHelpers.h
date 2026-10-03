@@ -25,8 +25,13 @@ std::optional<Aabb> subtreeBounds(const Scene& s, EntityId root);
 /// Moves an entity vertically so its bounds rest on the geometry below (recorded edit).
 Status dropToSurface(Engine& engine, EntityId id, float offset = 0.f);
 
+/// Creates an entity for an importMeshAsset() result (a prefab instance for multi-material
+/// models). Call inside engine.edit().
+Status placeImportedMesh(Engine& engine, const Json& imported, const std::string& name, const Json& position, EntityId& out);
+
 void addAssetTools(Engine& engine, ToolRegistry& reg);
 void addWorldTools(Engine& engine, ToolRegistry& reg);
 void addNetworkTools(Engine& engine, ToolRegistry& reg);
+void addFxTools(Engine& engine, ToolRegistry& reg);
 
 }  // namespace sky::tools

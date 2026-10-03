@@ -1,5 +1,6 @@
 #include "skywalker/render/Gltf.h"
 
+#include <algorithm>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -136,7 +137,7 @@ Result<std::vector<uint8_t>> loadUri(const std::string& uri, const std::string& 
 
 }  // namespace
 
-Result<GltfImport> parseGltf(const std::vector<uint8_t>& bytes, const std::string& baseDir, bool normalizeMesh) {
+Result<GltfImport> parseGltf(const std::vector<uint8_t>& bytes, const std::string& baseDir, bool normalizeMesh, int part) {
     Doc d;
     std::vector<uint8_t> glbBin;
     bool haveBin = false;
@@ -178,6 +179,7 @@ Result<GltfImport> parseGltf(const std::vector<uint8_t>& bytes, const std::strin
 
     GltfImport out;
     MeshData& mesh = out.mesh;
+    out.fullBounds = {Vec3(1e30f), Vec3(-1e30f)};
     const Json& nodes = d.json.get("nodes");
     std::function<Status(size_t, const Mat4&, int)> visit = [&](size_t ni, const Mat4& parentM, int depth) -> Status {
         if (depth > 64) return bad("node hierarchy too deep");
@@ -193,6 +195,14 @@ Result<GltfImport> parseGltf(const std::vector<uint8_t>& bytes, const std::strin
                 if (!attrs.contains("POSITION")) continue;
                 auto pos = accessor(d, static_cast<int>(attrs.get("POSITION").asInt()));
                 if (!pos) return pos.error();
+                int material = prim.contains("material") ? static_cast<int>(prim.get("material").asInt()) : -1;
+                if (std::find(out.parts.begin(), out.parts.end(), material) == out.parts.end()) out.parts.push_back(material);
+                for (size_t i = 0; i < pos->count; ++i) {
+                    Vec3 p = world.transformPoint({readComponent(*pos, i, 0), readComponent(*pos, i, 1), readComponent(*pos, i, 2)});
+                    out.fullBounds.min = vmin(out.fullBounds.min, p);
+                    out.fullBounds.max = vmax(out.fullBounds.max, p);
+                }
+                if (part != kGltfAllParts && material != part) continue;
                 Result<View> nrm = attrs.contains("NORMAL") ? accessor(d, static_cast<int>(attrs.get("NORMAL").asInt())) : Result<View>(View{});
                 Result<View> uv = attrs.contains("TEXCOORD_0") ? accessor(d, static_cast<int>(attrs.get("TEXCOORD_0").asInt())) : Result<View>(View{});
                 Result<View> col = attrs.contains("COLOR_0") ? accessor(d, static_cast<int>(attrs.get("COLOR_0").asInt())) : Result<View>(View{});
@@ -248,76 +258,84 @@ Result<GltfImport> parseGltf(const std::vector<uint8_t>& bytes, const std::strin
         if (r >= nodes.size()) return bad("scene references a missing node");
         if (Status s = visit(r, Mat4{}, 0); !s) return s.error();
     }
-    if (mesh.indices.empty()) return bad("no triangle geometry found");
+    if (mesh.indices.empty()) {
+        return bad(part == kGltfAllParts ? "no triangle geometry found" : "material " + std::to_string(part) + " has no geometry");
+    }
 
     mesh::computeMissingNormals(mesh);
     mesh.computeBounds();
-    if (normalizeMesh) mesh::normalizeToUnit(mesh);
+    if (normalizeMesh) mesh::normalizeToUnit(mesh, out.fullBounds);
 
-    // First material -> base color / PBR / texture.
-    const Json& mats = d.json.get("materials");
-    out.materialCount = mats.size();
-    if (mats.size()) {
-        const Json& pbr = mats[0].get("pbrMetallicRoughness");
-        const Json& bc = pbr.get("baseColorFactor");
-        if (bc.size() == 4) out.baseColor = {bc[0].asFloat(), bc[1].asFloat(), bc[2].asFloat(), bc[3].asFloat()};
-        out.metallic = pbr.get("metallicFactor").asFloat(1.f);
-        out.roughness = pbr.get("roughnessFactor").asFloat(1.f);
-        const Json& em = mats[0].get("emissiveFactor");
-        if (em.size() == 3) out.emissive = {em[0].asFloat(), em[1].asFloat(), em[2].asFloat(), 1.f};
-        // Texture reference -> encoded image bytes (embedded bufferView, data URI or file).
-        auto image = [&](const Json& ref, int* sourceOut = nullptr) {
-            GltfImport::ImageData outImg;
-            if (!ref.isObject()) return outImg;
-            const Json& textures = d.json.get("textures");
-            auto ti = static_cast<size_t>(ref.get("index").asInt(-1));
-            if (ti >= textures.size()) return outImg;
-            int source = static_cast<int>(textures[ti].get("source").asInt(-1));
-            if (sourceOut) *sourceOut = source;
-            const Json& images = d.json.get("images");
-            if (source < 0 || static_cast<size_t>(source) >= images.size()) return outImg;
-            const Json& img = images[static_cast<size_t>(source)];
-            if (img.contains("bufferView")) {
-                const Json& bv = d.json.get("bufferViews")[static_cast<size_t>(img.get("bufferView").asInt())];
-                size_t bi = static_cast<size_t>(bv.get("buffer").asInt());
-                size_t off = static_cast<size_t>(bv.get("byteOffset").asInt()), len = static_cast<size_t>(bv.get("byteLength").asInt());
-                if (bi < d.buffers.size() && off + len <= d.buffers[bi].size()) {
-                    outImg.bytes.assign(d.buffers[bi].begin() + static_cast<std::ptrdiff_t>(off),
-                                        d.buffers[bi].begin() + static_cast<std::ptrdiff_t>(off + len));
-                    outImg.mime = img.get("mimeType").asString("image/png");
-                }
-            } else if (img.contains("uri")) {
-                auto data = loadUri(img.get("uri").asString(), baseDir);
-                if (data) {
-                    outImg.bytes = std::move(data.value());
-                    std::string u = str::lower(img.get("uri").asString());
-                    outImg.mime = (u.find(".jpg") != std::string::npos || u.find(".jpeg") != std::string::npos ||
-                                   u.find("image/jpeg") != std::string::npos) ? "image/jpeg" : "image/png";
-                }
+    // Images: embedded bytes are decoded here; external files are only referenced (by URI).
+    for (const auto& img : d.json.get("images").elements()) {
+        GltfImport::ImageData im;
+        if (img.contains("bufferView")) {
+            const Json& bv = d.json.get("bufferViews")[static_cast<size_t>(img.get("bufferView").asInt())];
+            size_t bi = static_cast<size_t>(bv.get("buffer").asInt());
+            size_t off = static_cast<size_t>(bv.get("byteOffset").asInt()), len = static_cast<size_t>(bv.get("byteLength").asInt());
+            if (bi < d.buffers.size() && off + len <= d.buffers[bi].size()) {
+                im.bytes.assign(d.buffers[bi].begin() + static_cast<std::ptrdiff_t>(off),
+                                d.buffers[bi].begin() + static_cast<std::ptrdiff_t>(off + len));
             }
-            return outImg;
-        };
-        auto base = image(pbr.get("baseColorTexture"));
-        out.textureBytes = std::move(base.bytes);
-        out.textureMime = base.mime;
-        out.normalMap = image(mats[0].get("normalTexture"));
-        out.normalScale = mats[0].get("normalTexture").get("scale").asFloat(1.f);
-        int mrSource = -1, occSource = -2;
-        out.metallicRoughnessMap = image(pbr.get("metallicRoughnessTexture"), &mrSource);
-        (void)image(mats[0].get("occlusionTexture"), &occSource);
-        if (mrSource >= 0 && mrSource == occSource) {
-            out.occlusionStrength = mats[0].get("occlusionTexture").get("strength").asFloat(1.f);
+            im.mime = img.get("mimeType").asString("image/png");
+        } else if (img.contains("uri")) {
+            std::string uri = img.get("uri").asString();
+            std::string u = str::lower(uri);
+            im.mime = (u.find(".jpg") != std::string::npos || u.find(".jpeg") != std::string::npos ||
+                       u.find("image/jpeg") != std::string::npos) ? "image/jpeg" : "image/png";
+            if (str::startsWith(uri, "data:")) {
+                if (auto data = loadUri(uri, baseDir)) im.bytes = std::move(data.value());
+            } else {
+                im.uri = uri;
+            }
         }
-        out.emissiveMap = image(mats[0].get("emissiveTexture"));
-        if (!out.emissiveMap.empty() && out.emissive.x + out.emissive.y + out.emissive.z <= 0.f) out.emissive = {1, 1, 1, 1};
+        out.images.push_back(std::move(im));
     }
+    auto imageOf = [&](const Json& ref) -> int {
+        if (!ref.isObject()) return -1;
+        const Json& textures = d.json.get("textures");
+        auto ti = static_cast<size_t>(ref.get("index").asInt(-1));
+        if (ti >= textures.size()) return -1;
+        int source = static_cast<int>(textures[ti].get("source").asInt(-1));
+        return source >= 0 && static_cast<size_t>(source) < out.images.size() ? source : -1;
+    };
+    for (const auto& mj : d.json.get("materials").elements()) {
+        GltfImport::Material m;
+        m.name = mj.get("name").asString();
+        const Json& pbr = mj.get("pbrMetallicRoughness");
+        const Json& bc = pbr.get("baseColorFactor");
+        if (bc.size() == 4) m.baseColor = {bc[0].asFloat(), bc[1].asFloat(), bc[2].asFloat(), bc[3].asFloat()};
+        m.metallic = pbr.get("metallicFactor").asFloat(1.f);
+        m.roughness = pbr.get("roughnessFactor").asFloat(1.f);
+        const Json& em = mj.get("emissiveFactor");
+        if (em.size() == 3) m.emissive = {em[0].asFloat(), em[1].asFloat(), em[2].asFloat(), 1.f};
+        m.emissive.w = mj.get("extensions").get("KHR_materials_emissive_strength").get("emissiveStrength").asFloat(1.f);
+        m.baseColorImage = imageOf(pbr.get("baseColorTexture"));
+        m.normalImage = imageOf(mj.get("normalTexture"));
+        m.normalScale = mj.get("normalTexture").get("scale").asFloat(1.f);
+        m.metallicRoughnessImage = imageOf(pbr.get("metallicRoughnessTexture"));
+        int occ = imageOf(mj.get("occlusionTexture"));
+        if (m.metallicRoughnessImage >= 0 && m.metallicRoughnessImage == occ) {
+            m.occlusionStrength = mj.get("occlusionTexture").get("strength").asFloat(1.f);
+        } else if (m.metallicRoughnessImage >= 0 && occ < 0 &&
+                   str::lower(out.images[static_cast<size_t>(m.metallicRoughnessImage)].uri).find("_arm") != std::string::npos) {
+            m.occlusionStrength = 1.f;  // "ARM" maps (AO/rough/metal) pack occlusion in R without declaring it
+        }
+        m.emissiveImage = imageOf(mj.get("emissiveTexture"));
+        if (m.emissiveImage >= 0 && m.emissive.x + m.emissive.y + m.emissive.z <= 0.f) m.emissive = {1, 1, 1, m.emissive.w};
+        m.alphaMode = mj.get("alphaMode").asString("OPAQUE");
+        m.alphaCutoff = mj.get("alphaCutoff").asFloat(0.5f);
+        m.doubleSided = mj.get("doubleSided").asBool(false);
+        out.materials.push_back(std::move(m));
+    }
+    out.materialCount = out.materials.size();
     return out;
 }
 
-Result<GltfImport> loadGltf(const std::string& path, bool normalizeMesh) {
+Result<GltfImport> loadGltf(const std::string& path, bool normalizeMesh, int part) {
     std::vector<uint8_t> bytes;
     if (!readFile(path, bytes)) return Error::make("io_error", "cannot read " + path);
-    return parseGltf(bytes, fs::path(path).parent_path().string(), normalizeMesh);
+    return parseGltf(bytes, fs::path(path).parent_path().string(), normalizeMesh, part);
 }
 
 

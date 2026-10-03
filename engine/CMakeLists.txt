@@ -16,6 +16,9 @@ set(SKY_ENGINE_SOURCES
     src/render/NullRenderer.cpp
     src/render/Annotate.cpp
     src/render/Gltf.cpp
+    src/render/Hdr.cpp
+    src/fx/Particles.cpp
+    src/fx/Ocean.cpp
     src/render/MeshFormats.cpp
     src/assets/Fetch.cpp
     src/render/TextureGen.cpp
@@ -27,6 +30,7 @@ set(SKY_ENGINE_SOURCES
     src/agent/AssetTools.cpp
     src/agent/WorldTools.cpp
     src/agent/NetworkTools.cpp
+    src/agent/FxTools.cpp
     src/agent/McpServer.cpp
     src/agent/SocketServer.cpp
     src/engine/Engine.cpp

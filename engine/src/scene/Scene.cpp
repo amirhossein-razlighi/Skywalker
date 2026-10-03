@@ -55,6 +55,9 @@ void Scene::registerKinds() {
     kinds_.push_back(makeReflectedKind<MeshRenderer>());
     kinds_.push_back(makeReflectedKind<Light>());
     kinds_.push_back(makeReflectedKind<Camera>());
+    kinds_.push_back(makeReflectedKind<ParticleEmitter>());
+    kinds_.push_back(makeReflectedKind<Water>());
+    kinds_.push_back(makeReflectedKind<FluidVolume>());
 }
 
 const ComponentKind* Scene::componentKind(std::string_view n) const {

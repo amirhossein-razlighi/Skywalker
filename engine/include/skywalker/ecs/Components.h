@@ -36,7 +36,7 @@ struct MeshRenderer {
     std::string material;    // optional material asset (*.mat.json); overrides the inline values
     bool unlit = false;      // flat shading without lighting (2D, UI, stylized)
     // Advanced surface (PBR maps, stylization). The same fields exist on material assets.
-    std::string shading = "pbr";  // pbr | toon | unlit
+    std::string shading = "pbr";  // pbr | toon | unlit | water
     std::string normalMap;        // tangent-space normal map (linear), project-relative
     std::string ormMap;           // R = occlusion, G = roughness, B = metallic (glTF convention)
     std::string emissiveMap;      // multiplied with `emissive`
@@ -50,6 +50,7 @@ struct MeshRenderer {
     Vec4 outlineColor{0.04f, 0.04f, 0.06f, 1.f};
     bool doubleSided = false;
     bool castShadows = true;
+    float alphaCutoff = 0.f;      // > 0: alpha-tested cutout (foliage, fences, sails); pixels below are cut
 
     static const TypeInfo& type();
     static const std::vector<std::string>& primitives();
@@ -72,6 +73,110 @@ struct Camera {
     bool orthographic = false;
     float orthoSize = 5.f;
     bool primary = true;
+
+    static const TypeInfo& type();
+};
+
+/// A particle emitter (fire, smoke, embers, sparks, rain, snow, mist, magic...). Simulated
+/// by the engine (deterministic in play mode, live preview while editing) and rendered as
+/// soft, sorted, HDR particles. Start from a preset with the fx_create tool.
+struct ParticleEmitter {
+    std::string preset;            // the preset it was made from (informational)
+    bool emitting = true;
+    std::string look = "glow";     // glow | flame | smoke | spark | rain | snow | mist
+    float rate = 20.f;             // particles per second
+    int burst = 0;                 // particles emitted at once when the emitter starts (explosions)
+    int maxParticles = 600;
+    float lifetime = 2.f;          // seconds
+    float lifetimeJitter = 0.3f;   // fraction
+    std::string shape = "point";   // point | sphere | box | disc | cone
+    Vec3 shapeSize{0.2f, 0.2f, 0.2f};
+    Vec3 direction{0.f, 1.f, 0.f}; // local emission direction
+    float speed = 1.f;
+    float speedJitter = 0.3f;      // fraction
+    float spread = 15.f;           // cone half-angle (degrees) around direction
+    float gravity = 0.f;           // m/s^2 downwards; negative = buoyant (hot gas rises)
+    float drag = 0.5f;             // velocity damping per second
+    float turbulence = 0.5f;       // curl-noise swirl strength (m/s)
+    float turbulenceScale = 1.f;   // swirl size (m)
+    float wind = 1.f;              // how much the environment wind carries particles
+    float sizeStart = 0.3f;
+    float sizeEnd = 0.6f;
+    float sizeJitter = 0.2f;       // fraction
+    Vec4 colorStart{1.f, 0.85f, 0.55f, 1.f};
+    Vec4 colorEnd{1.f, 0.35f, 0.1f, 0.f};
+    float intensity = 1.f;         // HDR brightness (emissive looks)
+    float stretch = 0.f;           // streak length along velocity (seconds of motion)
+    float spin = 0.f;              // random rotation speed (degrees/s)
+    float softness = 0.4f;         // soft-particle fade where they meet geometry (m)
+    bool worldSpace = true;        // particles stay where they were emitted when the emitter moves
+    bool collide = false;          // stop at floorHeight
+    float floorHeight = 0.f;       // world y of the collision plane
+    float bounce = 0.f;            // 0 = die on impact, >0 = bounce
+    int splash = 0;                // droplets spawned per impact (rain)
+    float light = 0.f;             // the emitter lights the scene (flickers with the simulation)
+    Vec4 lightColor{1.f, 0.6f, 0.3f, 1.f};
+    float lightRange = 8.f;
+    bool prewarm = true;           // start fully developed (a fire that is already burning)
+    int seed = 0;
+
+    static const TypeInfo& type();
+};
+
+/// A volumetric fluid simulation (fire, smoke, steam, explosions): a 3D Eulerian solver on
+/// the GPU (fuel -> heat + soot, buoyancy, vorticity confinement, pressure projection),
+/// rendered by ray marching with blackbody flame colors and lit, self-shadowed smoke.
+/// The box sits on the entity: origin at the bottom center, `size` in meters.
+struct FluidVolume {
+    std::string preset;
+    bool emitting = true;
+    Vec3 size{1.6f, 3.2f, 1.6f};    // simulation box (m)
+    int resolution = 96;            // cells along the longest side
+    Vec3 sourceOffset{0.f, 0.15f, 0.f};  // source center, from the bottom center (m)
+    float sourceRadius = 0.32f;     // m
+    float fuel = 1.f;               // fuel fed per second (fire); 0 = pure smoke/steam source
+    float heat = 1.f;               // heat released by burning fuel / injected directly
+    float smoke = 0.5f;             // soot produced (dark smoke)
+    float buoyancy = 1.f;           // how fast hot gas rises
+    float vorticity = 0.4f;         // swirl that makes flames lick and smoke curl
+    float turbulence = 0.5f;        // noise in the source flow
+    float burnRate = 2.f;           // how fast fuel burns (flame height)
+    float cooling = 1.2f;           // how fast heat fades
+    float smokeFade = 0.25f;        // how fast smoke thins out
+    float speed = 0.6f;             // initial upward speed at the source (m/s)
+    float wind = 1.f;               // environment wind influence
+    float flameIntensity = 1.f;     // brightness of the fire
+    float flameTemperature = 1600.f;  // Kelvin at full heat: color from blackbody (1000 red .. 2500 yellow-white)
+    Vec4 smokeColor{0.16f, 0.15f, 0.14f, 1.f};
+    float smokeDensity = 1.f;
+    float light = 5.f;              // light cast on the scene by the fire
+    Vec4 lightColor{1.f, 0.62f, 0.32f, 1.f};
+    float lightRange = 10.f;
+    float burst = 0.f;              // seconds of heavy fuel injection at start (explosions)
+    int seed = 0;
+
+    static const TypeInfo& type();
+};
+
+/// A body of water with a spectral (FFT) ocean simulation: wind-driven waves with choppy
+/// crests, whitecaps, shore foam, refraction, depth color and reflections. The entity's y
+/// is the water level; size 0 = an endless ocean.
+struct Water {
+    float windSpeed = 8.f;         // m/s: wave height grows with it
+    float windDirection = 30.f;    // degrees, 0 = waves travel toward +Z
+    float choppiness = 1.2f;       // sharp crests (0 = rolling swell)
+    float waveScale = 1.f;         // amplitude multiplier
+    float patchSize = 220.f;       // largest simulated wavelength (m)
+    float size = 0.f;              // square extent in meters (0 = endless)
+    float depth = 60.f;            // water depth for wave dispersion (shallow water slows waves)
+    Vec4 deepColor{0.015f, 0.07f, 0.1f, 1.f};    // light scattered in deep water
+    Vec4 shallowColor{0.12f, 0.5f, 0.45f, 1.f};  // tint of the transmitted light in shallows
+    float clarity = 6.f;           // meters you can see into the water
+    float foam = 1.f;              // whitecaps + shoreline foam
+    float reflections = 1.f;
+    float refraction = 1.f;
+    float roughness = 0.04f;       // micro-surface roughness (sun glints)
+    int seed = 1;
 
     static const TypeInfo& type();
 };
@@ -117,7 +222,10 @@ struct Environment {
     float contrast = 1.05f;
     float vignette = 0.22f;
     // Sky, atmosphere, lighting quality
-    std::string skyMode = "gradient";  // gradient | atmosphere
+    std::string skyMode = "gradient";  // gradient | atmosphere | hdri
+    std::string hdri;                  // equirectangular .hdr panorama (skyMode "hdri"), project-relative
+    float hdriRotation = 0.f;          // degrees around the vertical axis
+    float hdriIntensity = 1.f;         // panorama brightness (sky and image-based light)
     float clouds = 0.f;                // procedural cloud cover 0..1
     float stars = 0.f;                 // night-sky stars 0..1
     float sunSize = 1.f;               // sun/moon disc size multiplier
@@ -129,6 +237,11 @@ struct Environment {
     std::string tonemap = "aces";      // aces | agx | neutral | filmic | none
     float temperature = 0.f;           // white balance: -1 cool .. +1 warm
     float tint = 0.f;                  // -1 green .. +1 magenta
+    float shadowDistance = 0.f;        // sun-shadow range in meters (0 = automatic)
+    float godRays = 0.f;               // volumetric light: sun shafts and lamp cones through the air (0 = off)
+    float haze = 0.02f;                // density of the air for volumetric light (dust, mist)
+    float windSpeed = 2.f;             // m/s: carries smoke, rain, snow and particles
+    float windDirection = 60.f;        // degrees, 0 = blowing toward +Z
 
     Vec3 sunDirection() const;  // direction light travels (from sun towards ground)
     static const TypeInfo& type();

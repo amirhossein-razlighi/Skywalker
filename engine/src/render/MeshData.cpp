@@ -321,8 +321,12 @@ void computeMissingNormals(MeshData& m) {
 
 void normalizeToUnit(MeshData& m) {
     m.computeBounds();
-    Vec3 c = m.bounds.center();
-    Vec3 e = m.bounds.max - m.bounds.min;
+    normalizeToUnit(m, m.bounds);
+}
+
+void normalizeToUnit(MeshData& m, const Aabb& reference) {
+    Vec3 c = reference.center();
+    Vec3 e = reference.max - reference.min;
     float s = 1.f / std::max({e.x, e.y, e.z, 1e-6f});
     for (size_t i = 0; i < m.vertices.size(); i += MeshData::kFloatsPerVertex) {
         m.vertices[i] = (m.vertices[i] - c.x) * s;

@@ -213,6 +213,11 @@ Json enumeration(std::initializer_list<const char*> values, std::string d) {
     for (const char* s : values) v.push(s);
     return Json::object({{"type", "string"}, {"enum", v}, {"description", std::move(d)}});
 }
+Json enumeration(const std::vector<std::string>& values, std::string d) {
+    Json v = Json::array();
+    for (const auto& s : values) v.push(s);
+    return Json::object({{"type", "string"}, {"enum", v}, {"description", std::move(d)}});
+}
 Json any(std::string d) { return Json::object({{"description", std::move(d)}}); }
 Json array(Json items, std::string d) {
     return Json::object({{"type", "array"}, {"items", std::move(items)}, {"description", std::move(d)}});

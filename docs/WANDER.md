@@ -65,7 +65,7 @@ end
 | Operators | `+ - * / %`, `< <= > >= == !=`, `and or not`; `"text" + anything` concatenates |
 | Built-ins | `self`, `dt`, `time`, `frame`, `pi` |
 | Properties | `e.position e.rotation e.scale e.color e.name e.id e.enabled`, `e.<component>.<field>`, `e.<var>`, `.x/.y/.z`, `.r/.g/.b/.a` |
-| Functions | `find nearest count tagged exists spawn distance direction forward length normalize dot cross vec color sin cos tan abs sqrt floor ceil round sign min max clamp lerp random chance key str` |
+| Functions | `find nearest count tagged exists spawn distance direction forward length normalize dot cross vec color sin cos tan abs sqrt floor ceil round sign min max clamp lerp random chance key str burst water_height` |
 | Comments | `-- …`, `// …`, `# …` (a `#` followed by a space) |
 
 Conventions: meters; +Y up; entities face −Z; rotations are Euler degrees `[pitch, yaw, roll]`.
@@ -81,6 +81,12 @@ Conventions: meters; +Y up; entities face −Z; rotations are Euler degrees `[pi
 - `spawn(mesh, pos?, name?)` creates a mesh entity (`"cube"`, `"asset:models/tree.glb"`);
   `spawn("prefab:prefabs/coin.prefab.json", pos)` instantiates a whole prefab — children,
   components and behaviors included — and returns its root.
+- `burst(n)` emits n particles from self's `particles` component right now (`burst(e, n)`
+  for another emitter): explosions, muzzle flashes, impacts. Combine with `spawn` of an
+  `explosion` prefab for one-off effects.
+- `water_height(x, z)` (or `water_height(pos)`) is the height of the animated FFT water at
+  that point — the same surface that is rendered. A floating crate:
+  `self.position = (self.position.x, water_height(self.position) - 0.2, self.position.z)`.
 - A runtime error aborts that handler invocation and is reported. After 5 errors the
   script is disabled.
 - Replacing a behavior while playing restarts its instance state.

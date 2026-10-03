@@ -178,6 +178,8 @@ struct OutlinerRow: View {
     private var icon: String {
         let c = entity.components
         if c.contains("camera") { return "video" }
+        if c.contains("particles") { return "flame" }
+        if c.contains("water") { return "water.waves" }
         if c.contains("light") { return "lightbulb" }
         if c.contains("mesh") { return "cube" }
         return "circle.dotted"
@@ -186,6 +188,8 @@ struct OutlinerRow: View {
     private var tint: Color {
         let c = entity.components
         if c.contains("camera") { return Theme.textDim }
+        if c.contains("particles") { return Theme.warning }
+        if c.contains("water") { return Theme.accent }
         if c.contains("light") { return Theme.warning }
         if c.contains("mesh") { return Theme.accent }
         return Theme.textFaint
@@ -209,6 +213,19 @@ struct AddEntityMenu: View {
                 Button("Spot Light") { add(["name": "Spot Light", "position": .vec3(0, 3, 0), "rotation": .vec3(-90, 0, 0), "components": ["light": ["kind": "spot", "intensity": 8]]]) }
                 Button("Directional Light") { add(["name": "Directional Light", "position": .vec3(0, 4, 0), "rotation": .vec3(-50, 30, 0), "components": ["light": ["kind": "directional", "intensity": 1]]]) }
             }
+            Section("Effects") {
+                ForEach([("Campfire", "campfire"), ("Torch", "torch"), ("Smoke", "smoke"), ("Sparks", "sparks"),
+                         ("Rain", "rain"), ("Snow", "snow"), ("Mist", "mist"), ("Fireflies", "fireflies"),
+                         ("Explosion", "explosion")], id: \.1) { item in
+                    Button(item.0) { effect(item.1, y: item.1 == "rain" || item.1 == "snow" ? 12 : 0) }
+                }
+            }
+            Section("Water") {
+                ForEach([("Ocean", "ocean"), ("Calm Sea", "calm_sea"), ("Stormy Sea", "storm"), ("Lake", "lake"),
+                         ("Pool", "pool")], id: \.1) { item in
+                    Button(item.0) { effect(item.1, y: 0) }
+                }
+            }
             Button("Camera") { add(["name": "Camera", "position": .vec3(0, 2, 6), "components": ["camera": ["fov": 55]]]) }
             Button("Empty") { add(["name": "Empty"]) }
         } label: {
@@ -223,5 +240,10 @@ struct AddEntityMenu: View {
     private func add(_ args: JSON) {
         let r = engine.call("entity_create", args)
         if let id = r.structured["id"].number { engine.selection = [UInt64(id)] }
+    }
+
+    private func effect(_ preset: String, y: Double) {
+        let r = engine.call("fx_create", ["effect": .string(preset), "position": .vec3(0, y, 0)])
+        if let id = r.structured["entity"].number { engine.selection = [UInt64(id)] }
     }
 }

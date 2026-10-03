@@ -28,6 +28,7 @@
 #include <unordered_set>
 
 #include "skywalker/core/Log.h"
+#include "skywalker/render/Hdr.h"
 #include "skywalker/render/MeshData.h"
 #include "skywalker/render/Renderer.h"
 
@@ -57,6 +58,7 @@ struct FrameUniforms {
     simd_float4 viewport;
     simd_float4 sky;
     simd_float4 extra;
+    simd_float4 hdri;
 };
 
 struct DrawUniforms {
@@ -69,6 +71,7 @@ struct DrawUniforms {
     simd_float4 material3;
     simd_float4 maps;
     simd_float4 outlineColor;
+    simd_float4 material4;
 };
 
 struct PostUniforms {
@@ -86,6 +89,29 @@ struct AOUniforms {
 
 struct EnvUniforms {
     simd_float4 face;
+};
+
+struct WaterUniforms {
+    simd_float4 levelSize;  // x = level, y = size (0 endless), zw = center
+    simd_float4 deep;       // rgb linear
+    simd_float4 shallow;    // rgb linear
+    simd_float4 params;     // x = clarity, y = foam, z = reflections, w = refraction
+    simd_float4 params2;    // x = roughness, y = 1 / N, z = endless, w = unused
+    simd_float4 patch;      // xyz = cascade tile sizes (m)
+    simd_float4 origin;     // xz = grid origin (endless)
+};
+
+struct FluidParams {
+    simd_float4 dims, step, source, feed, physics, decay, wind;
+};
+
+struct VolumeUniforms {
+    simd_float4x4 model, invModel;
+    simd_float4 size, flame, smokeColor, glow;
+};
+
+struct VolumetricUniforms {
+    simd_float4 params;
 };
 
 struct GPULight {
@@ -157,7 +183,9 @@ Cascades computeCascades(const FrameData& frame) {
     float aspect = static_cast<float>(frame.width) / static_cast<float>(std::max(frame.height, 1));
     float n = std::max(cam.nearPlane, 0.05f);
     float viewDist = distance(cam.eye, cam.target);
-    float far = std::min(cam.farPlane, std::clamp(viewDist * 3.5f + 25.f, 35.f, 260.f));
+    float far = frame.environment.shadowDistance > 0.f
+                    ? std::min(cam.farPlane, frame.environment.shadowDistance)
+                    : std::min(cam.farPlane, std::clamp(viewDist * 3.5f + 25.f, 35.f, 260.f));
     float tanY = std::tan(radians(cam.fovDeg) * 0.5f), tanX = tanY * aspect;
     Vec3 dir = frame.environment.sunDirection();
     float prev = n;
@@ -202,6 +230,23 @@ struct GpuMesh {
 };
 
 class MetalRenderer final : public Renderer {
+    struct OceanGpu {
+        id<MTLTexture> disp[OceanCascades::kCascades];
+        id<MTLTexture> slope[OceanCascades::kCascades];
+        uint64_t version = 0;
+    };
+    struct GridMesh {
+        id<MTLBuffer> vertices, indices;
+        uint32_t indexCount = 0;
+    };
+    struct FluidGpu {
+        id<MTLTexture> vel[2], scal[2], tmpA, tmpB, curl, div, pressure[2];
+        int nx = 0, ny = 0, nz = 0;
+        float cell = 0;
+        double lastTime = -1;
+        double age = 0;  // seconds simulated
+    };
+
 public:
     bool init() {
         device_ = MTLCreateSystemDefaultDevice();
@@ -294,6 +339,7 @@ public:
     Status render(const FrameData& frame) override {
         @autoreleasepool {
             ensureTargets(frame.width, frame.height);
+            ensureHdri(frame.environment);
             Cascades cascades = computeCascades(frame);
             FrameUniforms fu = frameUniforms(frame, cascades);
             std::vector<GPULight> lights = gpuLights(frame);
@@ -304,6 +350,8 @@ public:
             encodeShadows(cmd, frame, fu, cascades);
             encodeMain(cmd, frame, fu, lights);
             encodeAO(cmd, frame);
+            encodeEffects(cmd, frame, fu, lights);
+            encodeVolumetrics(cmd, frame, fu, lights);
             encodePost(cmd, frame);
             encodeOverlays(cmd, frame, fu);
             [cmd commit];
@@ -388,17 +436,22 @@ private:
                                      "gridVertex", "gridFragment", "presentFragment", "outlineVertex",
                                      "outlineFragment", "overlayFragment", "bloomPrefilter", "bloomDown", "bloomUp",
                                      "compositeFragment", "envSkyFragment", "envPrefilterFragment", "brdfLutFragment",
-                                     "ssaoFragment", "aoBlurFragment"}) {
+                                     "ssaoFragment", "aoBlurFragment", "shadowAlphaVertex", "shadowAlphaFragment",
+                                     "waterVertex", "waterFragment", "particleVertex", "particleFragment",
+                                     "volumeVertex", "volumeFragment", "fluidAdvect", "fluidCorrect", "fluidCombust",
+                                     "fluidCurl", "fluidForces", "fluidDivergence", "fluidJacobi", "fluidProject", "volumetricFragment"}) {
             if (!fn(required)) {
                 return Error::make("shader_missing_function", std::string("shader source must define ") + required);
             }
         }
 
-        enum class Blend { None, Alpha, Additive };
+        enum class Blend { None, Alpha, Additive, Premultiplied };
         // `mainPass` pipelines render into the scene pass: HDR color + HDR indirect light.
         auto make = [&](const char* vs, const char* fs, MTLPixelFormat color, NSUInteger samples, Blend blend,
-                        bool depth, NSError** err, bool mainPass = false) -> id<MTLRenderPipelineState> {
+                        bool depth, NSError** err, bool mainPass = false,
+                        bool alphaToCoverage = false) -> id<MTLRenderPipelineState> {
             MTLRenderPipelineDescriptor* d = [MTLRenderPipelineDescriptor new];
+            d.alphaToCoverageEnabled = alphaToCoverage;
             d.vertexFunction = fn(vs);
             d.fragmentFunction = fs ? fn(fs) : nil;
             d.rasterSampleCount = samples;
@@ -410,6 +463,12 @@ private:
                     ca.destinationRGBBlendFactor = MTLBlendFactorOne;
                     ca.sourceAlphaBlendFactor = MTLBlendFactorOne;
                     ca.destinationAlphaBlendFactor = MTLBlendFactorOne;
+                } else if (blend == Blend::Premultiplied) {
+                    ca.blendingEnabled = YES;
+                    ca.sourceRGBBlendFactor = MTLBlendFactorOne;
+                    ca.destinationRGBBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
+                    ca.sourceAlphaBlendFactor = MTLBlendFactorOne;
+                    ca.destinationAlphaBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
                 } else if (blend == Blend::Alpha) {
                     ca.blendingEnabled = YES;
                     ca.sourceRGBBlendFactor = MTLBlendFactorSourceAlpha;
@@ -442,7 +501,29 @@ private:
         id<MTLRenderPipelineState> brdf = envPrefilter ? make("fullscreenVertex", "brdfLutFragment", MTLPixelFormatRG16Float, 1, Blend::None, false, &e) : nil;
         id<MTLRenderPipelineState> ssao = brdf ? make("fullscreenVertex", "ssaoFragment", kAOFormat, 1, Blend::None, false, &e) : nil;
         id<MTLRenderPipelineState> aoBlur = ssao ? make("fullscreenVertex", "aoBlurFragment", kAOFormat, 1, Blend::None, false, &e) : nil;
-        if (!aoBlur) {
+        // Alpha-tested cutouts: alpha-to-coverage gives soft, MSAA-resolved foliage edges.
+        id<MTLRenderPipelineState> cutout = aoBlur ? make("meshVertex", "meshFragment", kHDRFormat, kSamples, Blend::None, true, &e, true, true) : nil;
+        id<MTLRenderPipelineState> shadowAlpha = cutout ? make("shadowAlphaVertex", "shadowAlphaFragment", MTLPixelFormatInvalid, 1, Blend::None, true, &e) : nil;
+        // Water: single-sample pass over the resolved scene (refraction/SSR read copies of it).
+        id<MTLRenderPipelineState> water = shadowAlpha ? make("waterVertex", "waterFragment", kHDRFormat, 1, Blend::None, true, &e, true) : nil;
+        // Particles: one sorted stream, premultiplied alpha (additive looks output alpha 0).
+        id<MTLRenderPipelineState> particles = water ? make("particleVertex", "particleFragment", kHDRFormat, 1, Blend::Premultiplied, false, &e, true) : nil;
+        id<MTLRenderPipelineState> volume = particles ? make("volumeVertex", "volumeFragment", kHDRFormat, 1, Blend::Premultiplied, false, &e, true) : nil;
+        id<MTLRenderPipelineState> volumetric = volume ? make("fullscreenVertex", "volumetricFragment", kHDRFormat, 1, Blend::None, false, &e) : nil;
+        if (!volumetric) volume = nil;
+        if (volume) {
+            for (const char* k : {"fluidAdvect", "fluidCorrect", "fluidCombust", "fluidCurl", "fluidForces", "fluidDivergence",
+                                  "fluidJacobi", "fluidProject"}) {
+                id<MTLFunction> f = fn(k);
+                id<MTLComputePipelineState> cps = f ? [device_ newComputePipelineStateWithFunction:f error:&e] : nil;
+                if (!cps) {
+                    volume = nil;
+                    break;
+                }
+                fluidKernels_[k] = cps;
+            }
+        }
+        if (!volume) {
             return Error::make("pipeline_error", e ? std::string(e.localizedDescription.UTF8String) : "pipeline creation failed");
         }
         skyPipeline_ = sky;
@@ -462,6 +543,12 @@ private:
         brdfPipeline_ = brdf;
         ssaoPipeline_ = ssao;
         aoBlurPipeline_ = aoBlur;
+        meshCutoutPipeline_ = cutout;
+        shadowAlphaPipeline_ = shadowAlpha;
+        waterPipeline_ = water;
+        particlePipeline_ = particles;
+        volumePipeline_ = volume;
+        volumetricPipeline_ = volumetric;
         return {};
     }
 
@@ -513,6 +600,9 @@ private:
                                                                  levels:NSMakeRange(i, 1)
                                                                  slices:NSMakeRange(0, 1)]);
         }
+        sceneCopy_ = target2D(kHDRFormat, w, h, MTLTextureUsageShaderRead);
+        volumetric_ = target2D(kHDRFormat, hw, hh, rt);
+        depthCopy_ = target2D(kDepthFormat, w, h, MTLTextureUsageShaderRead);
         msaaColor_ = targetMSAA(kHDRFormat, w, h);
         msaaAmbient_ = targetMSAA(kHDRFormat, w, h);
         msaaDepth_ = targetMSAA(kDepthFormat, w, h);
@@ -564,6 +654,50 @@ private:
         return tex;
     }
 
+    /// Equirectangular .hdr panorama -> RGBA16F texture with mips (sky backdrop + env bake).
+    void ensureHdri(const Environment& env) {
+        std::string path = env.skyMode == "hdri" ? env.hdri : std::string();
+        if (path == hdriPath_) return;
+        hdriPath_ = path;
+        hdri_ = nil;
+        if (path.empty()) return;
+        auto img = loadHdr(path);
+        if (!img) {
+            log::warn("render", "hdri '" + path + "': " + img.error().message);
+            return;
+        }
+        const NSUInteger w = static_cast<NSUInteger>(img->width), h = static_cast<NSUInteger>(img->height);
+        MTLTextureDescriptor* d = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA16Float
+                                                                                     width:w
+                                                                                    height:h
+                                                                                 mipmapped:YES];
+        d.usage = MTLTextureUsageShaderRead;
+        d.storageMode = MTLStorageModePrivate;
+        id<MTLTexture> tex = [device_ newTextureWithDescriptor:d];
+        id<MTLBuffer> staging = [device_ newBufferWithLength:w * h * 8 options:MTLResourceStorageModeShared];
+        auto* dst = static_cast<__fp16*>(staging.contents);
+        const float* src = img->rgb.data();
+        for (size_t i = 0, n = static_cast<size_t>(w) * h; i < n; ++i) {
+            for (int c = 0; c < 3; ++c) dst[i * 4 + c] = static_cast<__fp16>(std::min(src[i * 3 + c], 60000.f));
+            dst[i * 4 + 3] = static_cast<__fp16>(1.f);
+        }
+        id<MTLCommandBuffer> cmd = [queue_ commandBuffer];
+        id<MTLBlitCommandEncoder> blit = [cmd blitCommandEncoder];
+        [blit copyFromBuffer:staging
+                   sourceOffset:0
+              sourceBytesPerRow:w * 8
+            sourceBytesPerImage:w * h * 8
+                     sourceSize:MTLSizeMake(w, h, 1)
+                      toTexture:tex
+               destinationSlice:0
+               destinationLevel:0
+              destinationOrigin:MTLOriginMake(0, 0, 0)];
+        [blit generateMipmapsForTexture:tex];
+        [blit endEncoding];
+        [cmd commit];
+        hdri_ = tex;
+    }
+
     FrameUniforms frameUniforms(const FrameData& frame, const Cascades& cascades) const {
         const Environment& env = frame.environment;
         Mat4 vp = frame.viewProjection();
@@ -585,8 +719,14 @@ private:
                                      shadows ? 1.f : 0.f, 1.f / static_cast<float>(kShadowAtlas));
         float w = static_cast<float>(std::max(frame.width, 1)), h = static_cast<float>(std::max(frame.height, 1));
         fu.viewport = simd_make_float4(w, h, 1.f / w, 1.f / h);
-        fu.sky = simd_make_float4(env.skyMode == "atmosphere" ? 1.f : 0.f, env.clouds, env.stars, env.reflections);
+        float mode = env.skyMode == "atmosphere" ? 1.f : 0.f;
+        if (env.skyMode == "hdri") mode = hdri_ ? 2.f : 1.f;  // no panorama loaded: fall back to the atmosphere
+        fu.sky = simd_make_float4(mode, env.clouds, env.stars, env.reflections);
         fu.extra = simd_make_float4(env.fogHeight, env.shadowSoftness, static_cast<float>(kEnvMips - 1), 0.f);
+        // hdri: x = rotation (radians), y = intensity, z = mip level for 128 px cube faces, w = mip count
+        float envLod = hdri_ ? std::max(0.f, std::log2(static_cast<float>(hdri_.width) / (4.f * kEnvSize))) : 0.f;
+        fu.hdri = simd_make_float4(radians(env.hdriRotation), env.hdriIntensity, envLod,
+                                   hdri_ ? static_cast<float>(hdri_.mipmapLevelCount) : 0.f);
         return fu;
     }
 
@@ -619,18 +759,20 @@ private:
         du.material3 = simd_make_float4(s.clearcoat, s.subsurface, s.rim, s.outline);
         du.maps = maps;
         du.outlineColor = lin(s.outlineColor);
+        du.material4 = simd_make_float4(s.alphaCutoff, 0, 0, 0);
         return du;
     }
 
     // --- Environment (image-based lighting) ------------------------------------------------
     std::string environmentKey(const FrameData& frame) const {
         const Environment& e = frame.environment;
-        char buf[512];
+        char buf[1024];
         Vec3 d = e.sunDirection();
-        std::snprintf(buf, sizeof(buf), "%.3f %.3f %.3f|%.3f %.3f %.3f %.3f|%.3f %.3f %.3f|%.3f %.3f %.3f|%.3f %.3f %.3f %.3f|%.3f %.3f %.3f %.4f|%s %.2f %.2f %.2f",
+        std::snprintf(buf, sizeof(buf), "%.3f %.3f %.3f|%.3f %.3f %.3f %.3f|%.3f %.3f %.3f|%.3f %.3f %.3f|%.3f %.3f %.3f %.3f|%.3f %.3f %.3f %.4f|%s %.2f %.2f %.2f|%s %.3f %.3f",
                       d.x, d.y, d.z, e.sunColor.x, e.sunColor.y, e.sunColor.z, e.sunIntensity, e.skyTop.x, e.skyTop.y, e.skyTop.z,
                       e.skyHorizon.x, e.skyHorizon.y, e.skyHorizon.z, e.ground.x, e.ground.y, e.ground.z, e.ambient,
-                      e.fogColor.x, e.fogColor.y, e.fogColor.z, e.fogDensity, e.skyMode.c_str(), e.clouds, e.stars, e.sunSize);
+                      e.fogColor.x, e.fogColor.y, e.fogColor.z, e.fogDensity, e.skyMode.c_str(), e.clouds, e.stars, e.sunSize,
+                      e.hdri.c_str(), e.hdriRotation, e.hdriIntensity);
         return buf;
     }
 
@@ -660,6 +802,7 @@ private:
             EnvUniforms eu{simd_make_float4(static_cast<float>(face), 0, kEnvSize, 0)};
             [enc setFragmentBytes:&envFu length:sizeof(envFu) atIndex:0];
             [enc setFragmentBytes:&eu length:sizeof(eu) atIndex:1];
+            [enc setFragmentTexture:(hdri_ ?: white_) atIndex:0];
             [enc drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:3];
             [enc endEncoding];
         }
@@ -716,6 +859,12 @@ private:
                     const GpuMesh* m = mesh(d.mesh);
                     if (!m) continue;
                     DrawUniforms du = drawUniforms(d);
+                    id<MTLTexture> cutTex = d.surface.alphaCutoff > 0.f ? texture(d.surface.texture, true) : nil;
+                    [enc setRenderPipelineState:cutTex ? shadowAlphaPipeline_ : shadowPipeline_];
+                    if (cutTex) {
+                        [enc setFragmentBytes:&du length:sizeof(du) atIndex:0];
+                        [enc setFragmentTexture:cutTex atIndex:0];
+                    }
                     [enc setVertexBuffer:m->vertices offset:0 atIndex:0];
                     [enc setVertexBytes:&du length:sizeof(du) atIndex:1];
                     [enc drawIndexedPrimitives:MTLPrimitiveTypeTriangle
@@ -801,6 +950,7 @@ private:
         [enc setRenderPipelineState:skyPipeline_];
         [enc setDepthStencilState:depthNone_];
         [enc setFragmentBytes:&fu length:sizeof(fu) atIndex:0];
+        [enc setFragmentTexture:(hdri_ ?: white_) atIndex:0];
         [enc drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:3];
 
         // Opaque meshes
@@ -813,6 +963,7 @@ private:
         [enc setRenderPipelineState:meshPipeline_];
         [enc setDepthStencilState:depthWrite_];
         std::vector<const DrawItem*> blended, outlined;
+        bool cutoutBound = false;
         const Frustum frustum(frame.viewProjection());
         culled_ = 0;
         for (const DrawItem& d : frame.draws) {
@@ -825,6 +976,11 @@ private:
                 continue;
             }
             if (d.surface.outline > 0.f) outlined.push_back(&d);
+            bool cut = d.surface.alphaCutoff > 0.f;
+            if (cut != cutoutBound) {
+                [enc setRenderPipelineState:cut ? meshCutoutPipeline_ : meshPipeline_];
+                cutoutBound = cut;
+            }
             drawMesh(enc, d);
         }
 
@@ -870,6 +1026,467 @@ private:
             [enc drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:6];
         }
 
+        [enc endEncoding];
+    }
+
+    // --- Effects: FFT water and particles (single-sample, over the resolved scene) -----------
+    static GridMesh makeGrid(id<MTLDevice> device, const std::vector<float>& coords, bool square) {
+        // coords: 1D sample positions per axis; the grid is their cartesian product.
+        const auto n = static_cast<uint32_t>(coords.size());
+        std::vector<float> v;
+        v.reserve(n * n * 2);
+        for (uint32_t z = 0; z < n; ++z) {
+            for (uint32_t x = 0; x < n; ++x) {
+                v.push_back(coords[x]);
+                v.push_back(coords[z]);
+            }
+        }
+        std::vector<uint32_t> idx;
+        idx.reserve((n - 1) * (n - 1) * 6);
+        for (uint32_t z = 0; z + 1 < n; ++z) {
+            for (uint32_t x = 0; x + 1 < n; ++x) {
+                uint32_t a = z * n + x, b = a + 1, c = a + n, d = c + 1;
+                idx.insert(idx.end(), {a, c, b, b, c, d});
+            }
+        }
+        (void)square;
+        GridMesh g;
+        g.vertices = [device newBufferWithBytes:v.data() length:v.size() * sizeof(float) options:MTLResourceStorageModeShared];
+        g.indices = [device newBufferWithBytes:idx.data() length:idx.size() * sizeof(uint32_t) options:MTLResourceStorageModeShared];
+        g.indexCount = static_cast<uint32_t>(idx.size());
+        return g;
+    }
+
+    void ensureGrids() {
+        if (endlessGrid_.vertices) return;
+        // Endless ocean: dense near the camera (0.3 m), cells growing ~6% per ring out past the horizon.
+        std::vector<float> side{0.f};
+        float step = 0.3f, at = 0.f;
+        while (at < 25000.f) {
+            at += step;
+            side.push_back(at);
+            step *= 1.061f;
+        }
+        std::vector<float> coords;
+        for (size_t i = side.size(); i-- > 1;) coords.push_back(-side[i]);
+        coords.insert(coords.end(), side.begin(), side.end());
+        endlessGrid_ = makeGrid(device_, coords, false);
+        std::vector<float> unit;
+        for (int i = 0; i <= 160; ++i) unit.push_back(static_cast<float>(i) / 160.f - 0.5f);
+        unitGrid_ = makeGrid(device_, unit, true);
+    }
+
+    OceanGpu& oceanTextures(const WaterItem& w) {
+        OceanGpu& g = oceans_[w.entity];
+        const OceanCascades& o = *w.ocean;
+        const auto N = static_cast<NSUInteger>(o.resolution);
+        if (!g.disp[0] || g.disp[0].width != N) {
+            for (int c = 0; c < OceanCascades::kCascades; ++c) {
+                MTLTextureDescriptor* d = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA16Float
+                                                                                             width:N
+                                                                                            height:N
+                                                                                         mipmapped:YES];
+                d.usage = MTLTextureUsageShaderRead;
+                d.storageMode = MTLStorageModePrivate;
+                g.disp[c] = [device_ newTextureWithDescriptor:d];
+                g.slope[c] = [device_ newTextureWithDescriptor:d];
+            }
+            g.version = 0;
+        }
+        if (g.version == o.version) return g;
+        g.version = o.version;
+        const NSUInteger texels = N * N * 4;
+        id<MTLBuffer> staging = [device_ newBufferWithLength:texels * 2 * 2 * OceanCascades::kCascades
+                                                     options:MTLResourceStorageModeShared];
+        auto* dst = static_cast<__fp16*>(staging.contents);
+        id<MTLCommandBuffer> cmd = [queue_ commandBuffer];
+        id<MTLBlitCommandEncoder> blit = [cmd blitCommandEncoder];
+        NSUInteger offset = 0;
+        for (int c = 0; c < OceanCascades::kCascades; ++c) {
+            for (int which = 0; which < 2; ++which) {
+                const std::vector<float>& src = which ? o.slope[c] : o.displacement[c];
+                for (NSUInteger i = 0; i < texels; ++i) dst[offset / 2 + i] = static_cast<__fp16>(src[i]);
+                [blit copyFromBuffer:staging
+                           sourceOffset:offset
+                      sourceBytesPerRow:N * 8
+                    sourceBytesPerImage:N * N * 8
+                             sourceSize:MTLSizeMake(N, N, 1)
+                              toTexture:which ? g.slope[c] : g.disp[c]
+                       destinationSlice:0
+                       destinationLevel:0
+                      destinationOrigin:MTLOriginMake(0, 0, 0)];
+                offset += texels * 2;
+            }
+            [blit generateMipmapsForTexture:g.disp[c]];
+            [blit generateMipmapsForTexture:g.slope[c]];
+        }
+        [blit endEncoding];
+        [cmd commit];  // same queue: completes before the frame that samples it
+        return g;
+    }
+
+    // --- Volumetric fluids ---------------------------------------------------------------
+    id<MTLTexture> volumeTexture(int nx, int ny, int nz, MTLPixelFormat format) {
+        MTLTextureDescriptor* d = [MTLTextureDescriptor new];
+        d.textureType = MTLTextureType3D;
+        d.pixelFormat = format;
+        d.width = static_cast<NSUInteger>(nx);
+        d.height = static_cast<NSUInteger>(ny);
+        d.depth = static_cast<NSUInteger>(nz);
+        d.storageMode = MTLStorageModePrivate;
+        d.usage = MTLTextureUsageShaderRead | MTLTextureUsageShaderWrite;
+        return [device_ newTextureWithDescriptor:d];
+    }
+
+    void clearVolume(id<MTLCommandBuffer> cmd, id<MTLTexture> t) {
+        // Zero a private 3D texture with a blit from a zeroed buffer.
+        NSUInteger bpp = t.pixelFormat == MTLPixelFormatR32Float ? 4 : 8;
+        NSUInteger row = t.width * bpp, image = row * t.height;
+        id<MTLBuffer> zeros = [device_ newBufferWithLength:image * t.depth options:MTLResourceStorageModePrivate];
+        id<MTLBlitCommandEncoder> b = [cmd blitCommandEncoder];
+        [b fillBuffer:zeros range:NSMakeRange(0, zeros.length) value:0];
+        [b copyFromBuffer:zeros
+                   sourceOffset:0
+              sourceBytesPerRow:row
+            sourceBytesPerImage:image
+                     sourceSize:MTLSizeMake(t.width, t.height, t.depth)
+                      toTexture:t
+               destinationSlice:0
+               destinationLevel:0
+              destinationOrigin:MTLOriginMake(0, 0, 0)];
+        [b endEncoding];
+    }
+
+    FluidGpu& fluidFor(id<MTLCommandBuffer> cmd, const VolumeItem& v) {
+        const FluidVolume& p = v.params;
+        float longest = std::max({p.size.x, p.size.y, p.size.z, 0.01f});
+        int res = std::clamp(p.resolution, 16, 192);
+        float cell = longest / static_cast<float>(res);
+        int nx = std::clamp(static_cast<int>(std::round(p.size.x / cell)), 8, 192);
+        int ny = std::clamp(static_cast<int>(std::round(p.size.y / cell)), 8, 192);
+        int nz = std::clamp(static_cast<int>(std::round(p.size.z / cell)), 8, 192);
+        FluidGpu& g = fluids_[v.entity];
+        if (g.nx != nx || g.ny != ny || g.nz != nz) {
+            g = FluidGpu{};
+            g.nx = nx;
+            g.ny = ny;
+            g.nz = nz;
+            for (int i = 0; i < 2; ++i) {
+                g.vel[i] = volumeTexture(nx, ny, nz, MTLPixelFormatRGBA16Float);
+                g.scal[i] = volumeTexture(nx, ny, nz, MTLPixelFormatRGBA16Float);
+                g.pressure[i] = volumeTexture(nx, ny, nz, MTLPixelFormatR32Float);
+            }
+            g.tmpA = volumeTexture(nx, ny, nz, MTLPixelFormatRGBA16Float);
+            g.tmpB = volumeTexture(nx, ny, nz, MTLPixelFormatRGBA16Float);
+            g.curl = volumeTexture(nx, ny, nz, MTLPixelFormatRGBA16Float);
+            g.div = volumeTexture(nx, ny, nz, MTLPixelFormatR32Float);
+            for (int i = 0; i < 2; ++i) {
+                clearVolume(cmd, g.vel[i]);
+                clearVolume(cmd, g.scal[i]);
+                clearVolume(cmd, g.pressure[i]);
+            }
+        }
+        g.cell = cell;
+        return g;
+    }
+
+    void dispatch(id<MTLComputeCommandEncoder> enc, const char* kernel, const FluidGpu& g) {
+        id<MTLComputePipelineState> ps = fluidKernels_[kernel];
+        [enc setComputePipelineState:ps];
+        MTLSize tg = MTLSizeMake(8, 8, 4);
+        [enc dispatchThreadgroups:MTLSizeMake((static_cast<NSUInteger>(g.nx) + 7) / 8, (static_cast<NSUInteger>(g.ny) + 7) / 8,
+                                              (static_cast<NSUInteger>(g.nz) + 3) / 4)
+            threadsPerThreadgroup:tg];
+    }
+
+    void fluidStep(id<MTLCommandBuffer> cmd, FluidGpu& g, const VolumeItem& v, float dt, float time) {
+        const FluidVolume& p = v.params;
+        float inv = 1.f / g.cell;
+        Vec3 src{p.sourceOffset.x + p.size.x * 0.5f, p.sourceOffset.y, p.sourceOffset.z + p.size.z * 0.5f};
+        Vec3 windLocal = v.model.inverse().transformDir(v.wind) * inv;
+        float burst = (p.burst > 0.f && g.age < p.burst) ? 6.f : 1.f;
+        bool feeding = p.emitting || (p.burst > 0.f && g.age < p.burst);
+        FluidParams fp{};
+        fp.dims = simd_make_float4(g.nx, g.ny, g.nz, g.cell);
+        fp.step = simd_make_float4(dt, time, static_cast<float>(p.seed) * 13.7f + static_cast<float>(v.entity), burst);
+        fp.source = simd_make_float4(src.x * inv - 0.5f, src.y * inv - 0.5f, src.z * inv - 0.5f, p.sourceRadius * inv);
+        fp.feed = simd_make_float4(p.fuel, p.heat, p.smoke, p.speed * inv);
+        fp.physics = simd_make_float4(p.buoyancy, p.vorticity, p.turbulence, p.burnRate);
+        fp.decay = simd_make_float4(p.cooling, p.smokeFade, feeding ? 1.f : 0.f, 0.f);
+        fp.wind = simd_make_float4(windLocal.x, windLocal.y, windLocal.z, 0.f);
+        float fwd = 1.f, bwd = -1.f;
+
+        id<MTLComputeCommandEncoder> enc = [cmd computeCommandEncoder];
+        enc.label = @"Fluid step";
+        [enc setBytes:&fp length:sizeof(fp) atIndex:0];
+        // Advect velocity and scalars (MacCormack), each with the old velocity field.
+        for (int field = 0; field < 2; ++field) {
+            id<MTLTexture> srcT = field == 0 ? g.vel[0] : g.scal[0];
+            id<MTLTexture> dstT = field == 0 ? g.vel[1] : g.scal[1];
+            [enc setTexture:srcT atIndex:0];
+            [enc setTexture:g.vel[0] atIndex:1];
+            [enc setTexture:g.tmpA atIndex:2];
+            [enc setBytes:&fwd length:sizeof(float) atIndex:1];
+            dispatch(enc, "fluidAdvect", g);
+            [enc setTexture:g.tmpA atIndex:0];
+            [enc setTexture:g.tmpB atIndex:2];
+            [enc setBytes:&bwd length:sizeof(float) atIndex:1];
+            dispatch(enc, "fluidAdvect", g);
+            [enc setTexture:srcT atIndex:0];
+            [enc setTexture:g.vel[0] atIndex:1];
+            [enc setTexture:g.tmpA atIndex:2];
+            [enc setTexture:g.tmpB atIndex:3];
+            [enc setTexture:dstT atIndex:4];
+            dispatch(enc, "fluidCorrect", g);
+        }
+        // Combustion & sources: scal[1] -> scal[0]
+        [enc setTexture:g.scal[1] atIndex:0];
+        [enc setTexture:g.scal[0] atIndex:1];
+        dispatch(enc, "fluidCombust", g);
+        // Vorticity, forces: vel[1] -> vel[0]
+        [enc setTexture:g.vel[1] atIndex:0];
+        [enc setTexture:g.curl atIndex:1];
+        dispatch(enc, "fluidCurl", g);
+        [enc setTexture:g.vel[1] atIndex:0];
+        [enc setTexture:g.curl atIndex:1];
+        [enc setTexture:g.scal[0] atIndex:2];
+        [enc setTexture:g.vel[0] atIndex:3];
+        dispatch(enc, "fluidForces", g);
+        // Pressure projection: vel[0] -> vel[1] -> swap
+        [enc setTexture:g.vel[0] atIndex:0];
+        [enc setTexture:g.div atIndex:1];
+        dispatch(enc, "fluidDivergence", g);
+        for (int it = 0; it < 32; ++it) {
+            [enc setTexture:g.pressure[it & 1] atIndex:0];
+            [enc setTexture:g.div atIndex:1];
+            [enc setTexture:g.pressure[(it + 1) & 1] atIndex:2];
+            dispatch(enc, "fluidJacobi", g);
+        }
+        [enc setTexture:g.vel[0] atIndex:0];
+        [enc setTexture:g.pressure[0] atIndex:1];
+        [enc setTexture:g.vel[1] atIndex:2];
+        dispatch(enc, "fluidProject", g);
+        [enc endEncoding];
+        std::swap(g.vel[0], g.vel[1]);  // projected velocity is now vel[0]; scalars are in scal[0]
+        g.age += dt;
+    }
+
+    void simulateFluids(id<MTLCommandBuffer> cmd, const FrameData& frame) {
+        std::vector<EntityId> live;
+        for (const VolumeItem& v : frame.volumes) {
+            live.push_back(v.entity);
+            if (fluidKernels_.empty()) continue;
+            FluidGpu& g = fluidFor(cmd, v);
+            double now = frame.time;
+            if (g.lastTime < 0 || now < g.lastTime - 1e-4 || now - g.lastTime > 2.0) {
+                // New or time jumped (play/stop): restart and pre-simulate so the fire is already burning.
+                for (int i = 0; i < 2; ++i) {
+                    clearVolume(cmd, g.vel[i]);
+                    clearVolume(cmd, g.scal[i]);
+                    clearVolume(cmd, g.pressure[i]);
+                }
+                g.age = 0;
+                int warm = v.params.burst > 0.f ? 0 : 75;
+                for (int i = 0; i < warm; ++i) fluidStep(cmd, g, v, 1.f / 30.f, static_cast<float>(now) - (warm - i) / 30.f);
+                g.lastTime = now;
+                continue;
+            }
+            double dt = now - g.lastTime;
+            if (dt <= 1e-5) continue;
+            g.lastTime = now;
+            int steps = std::clamp(static_cast<int>(std::ceil(dt * 30.0)), 1, 4);
+            float h = static_cast<float>(std::min(dt, 4.0 / 30.0) / steps);
+            for (int i = 0; i < steps; ++i) fluidStep(cmd, g, v, h, static_cast<float>(now - dt + h * (i + 1)));
+        }
+        std::erase_if(fluids_, [&](const auto& kv) { return std::find(live.begin(), live.end(), kv.first) == live.end(); });
+    }
+
+    void encodeVolumes(id<MTLCommandBuffer> cmd, const FrameData& frame, const FrameUniforms& fu, const std::vector<GPULight>& lights) {
+        const GpuMesh* cube = mesh("cube");
+        if (!cube) return;
+        MTLRenderPassDescriptor* rp = [MTLRenderPassDescriptor renderPassDescriptor];
+        rp.colorAttachments[0].texture = hdr_;
+        rp.colorAttachments[0].loadAction = MTLLoadActionLoad;
+        rp.colorAttachments[0].storeAction = MTLStoreActionStore;
+        rp.colorAttachments[1].texture = ambient_;
+        rp.colorAttachments[1].loadAction = MTLLoadActionLoad;
+        rp.colorAttachments[1].storeAction = MTLStoreActionStore;
+        id<MTLRenderCommandEncoder> enc = [cmd renderCommandEncoderWithDescriptor:rp];
+        enc.label = @"Volumes";
+        [enc setRenderPipelineState:volumePipeline_];
+        [enc setCullMode:MTLCullModeFront];  // back faces: works with the camera inside the box too
+        [enc setFrontFacingWinding:MTLWindingCounterClockwise];
+        [enc setVertexBuffer:cube->vertices offset:0 atIndex:0];
+        [enc setVertexBytes:&fu length:sizeof(fu) atIndex:2];
+        [enc setFragmentBytes:&fu length:sizeof(fu) atIndex:1];
+        [enc setFragmentBytes:lights.data() length:lights.size() * sizeof(GPULight) atIndex:2];
+        [enc setFragmentTexture:envCube_ atIndex:5];
+        [enc setFragmentTexture:depthCopy_ atIndex:7];
+        // Far volumes first.
+        std::vector<const VolumeItem*> order;
+        for (const auto& v : frame.volumes) order.push_back(&v);
+        Vec3 eye = frame.camera.eye;
+        std::sort(order.begin(), order.end(), [&](const VolumeItem* a, const VolumeItem* b) {
+            return distance(eye, a->model.translation()) > distance(eye, b->model.translation());
+        });
+        for (const VolumeItem* v : order) {
+            auto it = fluids_.find(v->entity);
+            if (it == fluids_.end()) continue;
+            const FluidVolume& p = v->params;
+            VolumeUniforms vu{};
+            vu.model = toSimd(v->model);
+            vu.invModel = toSimd(v->model.inverse());
+            vu.size = simd_make_float4(p.size.x, p.size.y, p.size.z, 0.f);
+            float steps = std::clamp(static_cast<float>(std::max({it->second.nx, it->second.ny, it->second.nz})) * 1.25f, 48.f, 200.f);
+            vu.flame = simd_make_float4(p.flameIntensity, p.flameTemperature, p.smokeDensity, steps);
+            vu.smokeColor = lin(p.smokeColor);
+            simd_float4 lc = lin(p.lightColor);
+            vu.glow = simd_make_float4(lc.x * p.light, lc.y * p.light, lc.z * p.light, static_cast<float>(frameIndex_ % 64));
+            [enc setVertexBytes:&vu length:sizeof(vu) atIndex:1];
+            [enc setFragmentBytes:&vu length:sizeof(vu) atIndex:0];
+            [enc setFragmentTexture:it->second.scal[0] atIndex:0];
+            [enc drawIndexedPrimitives:MTLPrimitiveTypeTriangle
+                            indexCount:cube->indexCount
+                             indexType:MTLIndexTypeUInt32
+                           indexBuffer:cube->indices
+                     indexBufferOffset:0];
+        }
+        [enc endEncoding];
+    }
+
+    void encodeEffects(id<MTLCommandBuffer> cmd, const FrameData& frame, const FrameUniforms& fu,
+                       const std::vector<GPULight>& lights) {
+        bool anyWater = false;
+        for (const auto& w : frame.water) anyWater = anyWater || (w.ocean && w.ocean->resolution > 0);
+        if (!anyWater && frame.particles.empty() && frame.volumes.empty()) {
+            oceans_.clear();
+            fluids_.clear();
+            return;
+        }
+        simulateFluids(cmd, frame);
+        // Copies of the opaque scene: water refracts/reflects them; particles fade against depth.
+        id<MTLBlitCommandEncoder> blit = [cmd blitCommandEncoder];
+        if (anyWater) [blit copyFromTexture:hdr_ toTexture:sceneCopy_];
+        [blit copyFromTexture:depthResolved_ toTexture:depthCopy_];
+        [blit endEncoding];
+
+        if (anyWater) {
+            ensureGrids();
+            MTLRenderPassDescriptor* rp = [MTLRenderPassDescriptor renderPassDescriptor];
+            rp.colorAttachments[0].texture = hdr_;
+            rp.colorAttachments[0].loadAction = MTLLoadActionLoad;
+            rp.colorAttachments[0].storeAction = MTLStoreActionStore;
+            rp.colorAttachments[1].texture = ambient_;
+            rp.colorAttachments[1].loadAction = MTLLoadActionLoad;
+            rp.colorAttachments[1].storeAction = MTLStoreActionStore;
+            rp.depthAttachment.texture = depthResolved_;
+            rp.depthAttachment.loadAction = MTLLoadActionLoad;
+            rp.depthAttachment.storeAction = MTLStoreActionStore;
+            id<MTLRenderCommandEncoder> enc = [cmd renderCommandEncoderWithDescriptor:rp];
+            enc.label = @"Water";
+            [enc setRenderPipelineState:waterPipeline_];
+            [enc setDepthStencilState:depthWrite_];
+            [enc setCullMode:MTLCullModeNone];
+            [enc setFrontFacingWinding:MTLWindingCounterClockwise];
+            [enc setVertexBytes:&fu length:sizeof(fu) atIndex:2];
+            [enc setFragmentBytes:&fu length:sizeof(fu) atIndex:1];
+            [enc setFragmentBytes:lights.data() length:lights.size() * sizeof(GPULight) atIndex:2];
+            [enc setFragmentTexture:shadowMap_ atIndex:1];
+            [enc setFragmentTexture:envCube_ atIndex:5];
+            [enc setFragmentTexture:sceneCopy_ atIndex:6];
+            [enc setFragmentTexture:depthCopy_ atIndex:7];
+            [enc setFragmentTexture:(hdri_ ?: white_) atIndex:14];
+            std::vector<EntityId> live;
+            for (const WaterItem& w : frame.water) {
+                if (!w.ocean || w.ocean->resolution == 0) continue;
+                live.push_back(w.entity);
+                OceanGpu& g = oceanTextures(w);
+                WaterUniforms wu{};
+                bool endless = w.size <= 0.f;
+                wu.levelSize = simd_make_float4(w.level, w.size, w.center.x, w.center.y);
+                wu.deep = lin(w.deepColor);
+                wu.shallow = lin(w.shallowColor);
+                wu.params = simd_make_float4(w.clarity, w.foam, w.reflections, w.refraction);
+                wu.params2 = simd_make_float4(w.roughness, 1.f / static_cast<float>(w.ocean->resolution), endless ? 1.f : 0.f, 0.f);
+                wu.patch = simd_make_float4(w.ocean->patchSize[0], w.ocean->patchSize[1], w.ocean->patchSize[2], 0.f);
+                const float snap = 0.6f;  // whole grid cells, so the mesh does not swim
+                wu.origin = simd_make_float4(std::round(frame.camera.eye.x / snap) * snap, 0.f,
+                                             std::round(frame.camera.eye.z / snap) * snap, 0.f);
+                const GridMesh& grid = endless ? endlessGrid_ : unitGrid_;
+                [enc setVertexBuffer:grid.vertices offset:0 atIndex:0];
+                [enc setVertexBytes:&wu length:sizeof(wu) atIndex:1];
+                [enc setFragmentBytes:&wu length:sizeof(wu) atIndex:0];
+                for (int c = 0; c < OceanCascades::kCascades; ++c) {
+                    [enc setVertexTexture:g.disp[c] atIndex:static_cast<NSUInteger>(c)];
+                    [enc setFragmentTexture:g.slope[c] atIndex:static_cast<NSUInteger>(8 + c)];
+                    [enc setFragmentTexture:g.disp[c] atIndex:static_cast<NSUInteger>(11 + c)];
+                }
+                [enc drawIndexedPrimitives:MTLPrimitiveTypeTriangle
+                                indexCount:grid.indexCount
+                                 indexType:MTLIndexTypeUInt32
+                               indexBuffer:grid.indices
+                         indexBufferOffset:0];
+            }
+            [enc endEncoding];
+            std::erase_if(oceans_, [&](const auto& kv) { return std::find(live.begin(), live.end(), kv.first) == live.end(); });
+            // Particles must fade against the water surface too.
+            blit = [cmd blitCommandEncoder];
+            [blit copyFromTexture:depthResolved_ toTexture:depthCopy_];
+            [blit endEncoding];
+        }
+
+        if (!frame.volumes.empty() && volumePipeline_) encodeVolumes(cmd, frame, fu, lights);
+
+        if (!frame.particles.empty()) {
+            id<MTLBuffer> instances = [device_ newBufferWithBytes:frame.particles.data()
+                                                           length:frame.particles.size() * sizeof(ParticleInstance)
+                                                          options:MTLResourceStorageModeShared];
+            MTLRenderPassDescriptor* rp = [MTLRenderPassDescriptor renderPassDescriptor];
+            rp.colorAttachments[0].texture = hdr_;
+            rp.colorAttachments[0].loadAction = MTLLoadActionLoad;
+            rp.colorAttachments[0].storeAction = MTLStoreActionStore;
+            rp.colorAttachments[1].texture = ambient_;
+            rp.colorAttachments[1].loadAction = MTLLoadActionLoad;
+            rp.colorAttachments[1].storeAction = MTLStoreActionStore;
+            id<MTLRenderCommandEncoder> enc = [cmd renderCommandEncoderWithDescriptor:rp];
+            enc.label = @"Particles";
+            [enc setRenderPipelineState:particlePipeline_];
+            [enc setCullMode:MTLCullModeNone];
+            [enc setVertexBuffer:instances offset:0 atIndex:0];
+            [enc setVertexBytes:&fu length:sizeof(fu) atIndex:1];
+            [enc setFragmentBytes:&fu length:sizeof(fu) atIndex:1];
+            [enc setFragmentBytes:lights.data() length:lights.size() * sizeof(GPULight) atIndex:2];
+            [enc setFragmentTexture:shadowMap_ atIndex:1];
+            [enc setFragmentTexture:envCube_ atIndex:5];
+            [enc setFragmentTexture:depthCopy_ atIndex:7];
+            [enc drawPrimitives:MTLPrimitiveTypeTriangle
+                    vertexStart:0
+                    vertexCount:6
+                  instanceCount:frame.particles.size()];
+            [enc endEncoding];
+        }
+    }
+
+    void encodeVolumetrics(id<MTLCommandBuffer> cmd, const FrameData& frame, const FrameUniforms& fu,
+                           const std::vector<GPULight>& lights) {
+        volumetricActive_ = frame.environment.godRays > 0.001f && frame.environment.haze > 0.f;
+        if (!volumetricActive_) return;
+        VolumetricUniforms vu{};
+        vu.params = simd_make_float4(frame.environment.godRays, frame.environment.haze,
+                                     std::min(frame.camera.farPlane, 300.f), static_cast<float>(frameIndex_ % 64));
+        MTLRenderPassDescriptor* rp = [MTLRenderPassDescriptor renderPassDescriptor];
+        rp.colorAttachments[0].texture = volumetric_;
+        rp.colorAttachments[0].loadAction = MTLLoadActionDontCare;
+        rp.colorAttachments[0].storeAction = MTLStoreActionStore;
+        id<MTLRenderCommandEncoder> enc = [cmd renderCommandEncoderWithDescriptor:rp];
+        enc.label = @"Volumetric light";
+        [enc setRenderPipelineState:volumetricPipeline_];
+        [enc setFragmentBytes:&fu length:sizeof(fu) atIndex:0];
+        [enc setFragmentBytes:&vu length:sizeof(vu) atIndex:1];
+        [enc setFragmentBytes:lights.data() length:lights.size() * sizeof(GPULight) atIndex:2];
+        [enc setFragmentTexture:depthResolved_ atIndex:0];
+        [enc setFragmentTexture:shadowMap_ atIndex:1];
+        [enc drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:3];
         [enc endEncoding];
     }
 
@@ -950,7 +1567,7 @@ private:
         pu.params2 = simd_make_float4(env.contrast, env.vignette,
                                       static_cast<float>(frame.width) / static_cast<float>(std::max(frame.height, 1)),
                                       tonemapIndex(env.tonemap));
-        pu.grade = simd_make_float4(env.temperature, env.tint, 0, 0);
+        pu.grade = simd_make_float4(env.temperature, env.tint, volumetricActive_ ? 1.f : 0.f, 0);
         const size_t levels = bloomViews_.size();
         if (env.bloomIntensity > 0.001f && levels > 0) {
             pu.texel = simd_make_float4(1.f / hdr_.width, 1.f / hdr_.height, 0, 0);
@@ -968,7 +1585,7 @@ private:
         }
         pu.texel = simd_make_float4(1.f / hdr_.width, 1.f / hdr_.height, aoActive_ ? env.ao : 0.f,
                                     static_cast<float>(frameIndex_ % 64));
-        fullscreen(cmd, compositePipeline_, resolve_, {hdr_, levels ? bloomViews_[0] : hdr_, ambient_, aoBlurred_}, &pu,
+        fullscreen(cmd, compositePipeline_, resolve_, {hdr_, levels ? bloomViews_[0] : hdr_, ambient_, aoBlurred_, volumetric_}, &pu,
                    sizeof(pu), false, @"Composite");
     }
 
@@ -978,7 +1595,13 @@ private:
     id<MTLRenderPipelineState> skyPipeline_, meshPipeline_, meshBlendPipeline_, gridPipeline_, shadowPipeline_,
         presentPipeline_, outlinePipeline_, overlayPipeline_, bloomPrefilterPipeline_, bloomDownPipeline_,
         bloomUpPipeline_, compositePipeline_, envSkyPipeline_, envPrefilterPipeline_, brdfPipeline_, ssaoPipeline_,
-        aoBlurPipeline_;
+        aoBlurPipeline_, meshCutoutPipeline_, shadowAlphaPipeline_, waterPipeline_, particlePipeline_, volumePipeline_, volumetricPipeline_;
+    id<MTLTexture> volumetric_;
+    std::unordered_map<std::string, id<MTLComputePipelineState>> fluidKernels_;
+    std::unordered_map<EntityId, FluidGpu> fluids_;
+    id<MTLTexture> sceneCopy_, depthCopy_;
+    std::unordered_map<EntityId, OceanGpu> oceans_;
+    GridMesh endlessGrid_, unitGrid_;
     id<MTLTexture> hdr_, ambient_, bloom_, depthResolved_, aoRaw_, aoBlurred_;
     std::vector<id<MTLTexture>> bloomViews_;
     id<MTLTexture> skyCube_, envCube_, brdfLut_;
@@ -988,11 +1611,14 @@ private:
     id<MTLCommandBuffer> lastCommand_;
     std::unordered_map<std::string, GpuMesh> meshes_;
     std::unordered_map<std::string, id<MTLTexture>> textures_;
+    std::string hdriPath_;
+    id<MTLTexture> hdri_;
     std::unordered_set<std::string> warnedMeshes_;
     std::string source_;
     size_t culled_ = 0;
     uint64_t frameIndex_ = 0;
     bool aoActive_ = false;
+    bool volumetricActive_ = false;
 };
 
 }  // namespace

@@ -25,7 +25,7 @@
   - GUID `.meta` sidecars, tags, descriptions and generator provenance;
   - search, usage queries, safe moves, rendered previews.
 - **Formats:** glTF 2.0 / GLB import; material assets; prefabs, including Wander `spawn("prefab:…")`.
-- **World tools:** `raycast`, `place_on_surface`, `scatter`, `viewport_multi`, `sim_trace`, `perf_stats`. 54 tools in total.
+- **World tools:** `raycast`, `place_on_surface`, `scatter`, `viewport_multi`, `sim_trace`, `perf_stats`. 57 tools in total.
 - **Rendering:** PBR maps, triplanar, clearcoat/subsurface, toon + outlines, IBL, 4 shadow cascades, SSAO, atmospheric sky with clouds and stars, height fog, AgX/neutral/filmic tonemapping; procedural PBR textures (`texture_generate`, 21 kinds) and material presets.
 - **Import:** PLY (ascii/binary, vertex colors), STL, OBJ + MTL, glTF maps; `asset_download` for licensed web assets (zip packs, multi-file glTF), credits and provenance.
 - **Brand:** app icon, glyph, favicon, lockups, `docs/BRAND.md`.

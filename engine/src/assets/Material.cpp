@@ -24,8 +24,9 @@ const TypeInfo& MaterialAsset::type() {
             SKY_FIELD_RANGE(MaterialAsset, tilingU, Float, "Texture repeats along U", 0.01f, 1000.f),
             SKY_FIELD_RANGE(MaterialAsset, tilingV, Float, "Texture repeats along V", 0.01f, 1000.f),
             SKY_FIELD(MaterialAsset, unlit, Bool, "Ignore lighting (flat look for 2D / UI / stylized)"),
-            SKY_FIELD_ENUM(MaterialAsset, shading, "pbr = physically based, toon = cel bands + crisp highlights, unlit = flat",
-                           "pbr", "toon", "unlit"),
+            SKY_FIELD_ENUM(MaterialAsset, shading,
+                           "pbr = physically based, toon = cel bands + crisp highlights, unlit = flat, water = animated waves",
+                           "pbr", "toon", "unlit", "water"),
             SKY_FIELD(MaterialAsset, normalMap, String, "Normal map (png), project-relative"),
             SKY_FIELD(MaterialAsset, ormMap, String, "Occlusion/roughness/metallic map (R/G/B), project-relative"),
             SKY_FIELD(MaterialAsset, emissiveMap, String, "Emission map, multiplied with emissive"),
@@ -38,6 +39,8 @@ const TypeInfo& MaterialAsset::type() {
             SKY_FIELD(MaterialAsset, outlineColor, Color, "Outline color"),
             SKY_FIELD(MaterialAsset, doubleSided, Bool, "Render both faces"),
             SKY_FIELD_RANGE(MaterialAsset, occlusionStrength, Float, "Ambient occlusion from the ORM map's red channel", 0.f, 1.f),
+            SKY_FIELD_RANGE(MaterialAsset, alphaCutoff, Float, "Alpha-tested cutout threshold (foliage, sails, fences); 0 = off",
+                            0.f, 1.f),
         }};
     return info;
 }
@@ -63,6 +66,7 @@ Surface toSurface(const MaterialAsset& m) {
     s.outlineColor = m.outlineColor;
     s.doubleSided = m.doubleSided;
     s.occlusionStrength = m.occlusionStrength;
+    s.alphaCutoff = m.alphaCutoff;
     return s;
 }
 
@@ -87,7 +91,7 @@ Result<MaterialAsset> materialPreset(const std::string& name) {
         {"ceramic", R"({"color":"#f4f1ea","metallic":0,"roughness":0.12,"clearcoat":0.6})"},
         {"car_paint", R"({"color":"#b01622","metallic":0.6,"roughness":0.38,"clearcoat":1})"},
         {"glass", R"({"color":"#d8ecff38","metallic":0,"roughness":0.03,"doubleSided":true})"},
-        {"water", R"({"color":"#2a6a8a99","metallic":0,"roughness":0.05})"},
+        {"water", R"({"color":"#0d3a4a","metallic":0,"roughness":0.04,"shading":"water"})"},
         {"ice", R"({"color":"#cdeaffcc","metallic":0,"roughness":0.08,"subsurface":0.6})"},
         {"skin", R"({"color":"#e7b192","metallic":0,"roughness":0.55,"subsurface":0.7})"},
         {"wax", R"({"color":"#f1e7cf","metallic":0,"roughness":0.35,"subsurface":0.9})"},

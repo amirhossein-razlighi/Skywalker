@@ -85,6 +85,7 @@ Json integer(std::string description);
 Json boolean(std::string description);
 Json vec3(std::string description);
 Json enumeration(std::initializer_list<const char*> values, std::string description);
+Json enumeration(const std::vector<std::string>& values, std::string description);
 Json any(std::string description);
 Json array(Json items, std::string description);
 /// An entity reference: numeric id or name.

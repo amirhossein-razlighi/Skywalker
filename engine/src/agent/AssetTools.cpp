@@ -51,6 +51,28 @@ Json materialSchema(bool requirePath) {
 
 }  // namespace
 
+Status placeImportedMesh(Engine& engine, const Json& imported, const std::string& name, const Json& position, EntityId& out) {
+    if (imported.contains("prefab")) {
+        PrefabPlacement pl;
+        pl.name = name;
+        if (position.isArray() && position.size() == 3) {
+            pl.hasPosition = true;
+            pl.position = {position[0].asFloat(), position[1].asFloat(), position[2].asFloat()};
+        }
+        auto id = engine.instantiatePrefabAsset(imported.get("prefab").asString(), pl);
+        if (!id) return id.error();
+        out = *id;
+        return {};
+    }
+    out = engine.scene().create(name);
+    Json m = Json::object({{"mesh", imported.get("mesh")}});
+    if (imported.contains("material")) m["material"] = imported.get("material");
+    if (imported.get("vertexColors").asBool()) m["color"] = "#ffffff";
+    Status s = engine.scene().patchComponent(out, "mesh", m);
+    if (s && position.isArray()) s = engine.scene().patchComponent(out, "transform", Json::object({{"position", position}}));
+    return s;
+}
+
 void addAssetTools(Engine& engine, ToolRegistry& reg) {
     reg.add({"asset_list", "List assets",
              "Search the project's assets (meshes, textures, materials, prefabs, scenes, audio...) by type, tag or "
@@ -161,15 +183,7 @@ void addAssetTools(Engine& engine, ToolRegistry& reg) {
                  if (a.contains("create_entity") && rec->type == AssetType::Mesh) {
                      EntityId id = kNoEntity;
                      Status st = engine.edit(ctx.actor, "Place " + a.get("create_entity").asString(), [&]() -> Status {
-                         id = engine.scene().create(a.get("create_entity").asString());
-                         Json m = Json::object({{"mesh", result.get("mesh")}});
-                         if (result.contains("material")) m["material"] = result.get("material");
-                         if (result.get("vertexColors").asBool()) m["color"] = "#ffffff";
-                         Status s = engine.scene().patchComponent(id, "mesh", m);
-                         if (s && a.contains("position")) {
-                             s = engine.scene().patchComponent(id, "transform", Json::object({{"position", a.get("position")}}));
-                         }
-                         return s;
+                         return placeImportedMesh(engine, result, a.get("create_entity").asString(), a.get("position"), id);
                      });
                      if (!st) return fail(st);
                      result["entity"] = id;
@@ -430,6 +444,7 @@ void addAssetTools(Engine& engine, ToolRegistry& reg) {
              object({{"prefab", string("Prefab path")},
                      {"position", vec3("World position (default origin)")},
                      {"yaw", number("Rotation around Y in degrees")},
+                     {"rotation", vec3("Full rotation in degrees (x, y, z); overrides yaw")},
                      {"scale", number("Uniform scale multiplier (default 1)")},
                      {"parent", entity("Parent entity")},
                      {"name", string("Name for the instance root")},
@@ -452,6 +467,11 @@ void addAssetTools(Engine& engine, ToolRegistry& reg) {
                      auto r = engine.instantiatePrefabAsset(a.get("prefab").asString(), p);
                      if (!r) return r.error();
                      root = *r;
+                     if (a.contains("rotation")) {
+                         if (Status s = engine.scene().patchComponent(root, "transform", Json::object({{"rotation", a.get("rotation")}})); !s) {
+                             return s;
+                         }
+                     }
                      if (a.get("on_surface").asBool()) return dropToSurface(engine, root);
                      return {};
                  });

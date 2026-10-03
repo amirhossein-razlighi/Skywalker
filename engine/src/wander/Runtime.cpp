@@ -675,6 +675,33 @@ private:
         }
         if (f == "chance") return Value::boolean(rt_.rng_.nextFloat() < n(0));
         if (f == "key") return Value::boolean(input_.held.count(str::lower(s(0))) != 0);
+        if (f == "burst") {
+            // burst(n) from self's particles, or burst(entity, n)
+            EntityId target = self_;
+            double count = 0;
+            if (a.size() == 2) {
+                target = entity(a[0], e.args[0]->loc, "burst() argument 1");
+                count = n(1);
+            } else {
+                count = n(0);
+            }
+            if (!scene_.get<ParticleEmitter>(target)) fail(e.loc, "burst(): the entity has no particles component");
+            if (rt_.burst) rt_.burst(target, static_cast<int>(std::clamp(count, 0.0, 20000.0)));
+            return {};
+        }
+        if (f == "water_height") {
+            // water_height(x, z) or water_height(position)
+            float x, z;
+            if (a.size() == 1) {
+                Vec3 p = v(0);
+                x = p.x;
+                z = p.z;
+            } else {
+                x = static_cast<float>(n(0));
+                z = static_cast<float>(n(1));
+            }
+            return Value::number(rt_.waterHeight ? rt_.waterHeight(x, z) : 0.0);
+        }
         if (f == "str") return Value::string(toText(a[0]));
         if (f == "spawn") {
             if (++rt_.spawnedThisTick_ > 256) fail(e.loc, "too many spawns in one tick (limit 256)");

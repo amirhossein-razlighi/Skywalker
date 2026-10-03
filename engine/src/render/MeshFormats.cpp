@@ -53,6 +53,18 @@ void zUpToYUp(MeshData& m) {
     m.computeBounds();
 }
 
+Aabb zUpToYUp(const Aabb& b) { return {{b.min.x, b.min.z, -b.max.y}, {b.max.x, b.max.z, -b.min.y}}; }
+
+std::pair<std::string, int> splitPart(const std::string& ref) {
+    size_t hash = ref.rfind('#');
+    if (hash == std::string::npos) return {ref, -2};
+    try {
+        return {ref.substr(0, hash), std::stoi(ref.substr(hash + 1))};
+    } catch (...) {
+        return {ref.substr(0, hash), -2};
+    }
+}
+
 // ---------------------------------------------------------------------------------------
 // OBJ + MTL
 // ---------------------------------------------------------------------------------------
@@ -403,9 +415,15 @@ bool isMeshFile(const std::string& path) {
 Result<MeshData> loadMeshFile(const std::string& path, const LoadOptions& options) {
     std::string e = lowerExt(path);
     Result<MeshData> r = Error::make("unsupported", "unsupported mesh format: " + path, "supported: .glb .gltf .obj .ply .stl");
+    Aabb reference;
+    bool haveReference = false;
     if (e == ".glb" || e == ".gltf") {
-        auto g = loadGltf(path, false);
+        auto g = loadGltf(path, false, options.part);
         if (!g) return g.error();
+        if (options.part != kGltfAllParts) {  // normalize parts with the whole model's bounds
+            reference = g->fullBounds;
+            haveReference = true;
+        }
         r = std::move(g.value().mesh);
     } else if (e == ".obj") {
         r = loadObj(path, false);
@@ -415,8 +433,14 @@ Result<MeshData> loadMeshFile(const std::string& path, const LoadOptions& option
         r = e == ".ply" ? parsePly(bytes, false) : parseStl(bytes, false);
     }
     if (!r) return r;
-    if (options.zUp) zUpToYUp(r.value());
-    if (options.normalize) normalizeToUnit(r.value());
+    if (options.zUp) {
+        zUpToYUp(r.value());
+        reference = zUpToYUp(reference);
+    }
+    if (options.normalize) {
+        if (haveReference) normalizeToUnit(r.value(), reference);
+        else normalizeToUnit(r.value());
+    }
     return r;
 }
 

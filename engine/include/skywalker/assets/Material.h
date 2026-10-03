@@ -22,7 +22,7 @@ struct MaterialAsset {
     float tilingU = 1.f;
     float tilingV = 1.f;
     bool unlit = false;  // flat color/texture, no lighting (UI, 2D, stylized looks)
-    std::string shading = "pbr";  // pbr | toon | unlit
+    std::string shading = "pbr";  // pbr | toon | unlit | water
     std::string normalMap;
     std::string ormMap;
     std::string emissiveMap;
@@ -35,6 +35,7 @@ struct MaterialAsset {
     Vec4 outlineColor{0.04f, 0.04f, 0.06f, 1.f};
     bool doubleSided = false;
     float occlusionStrength = 1.f;  // how much the ORM map's red channel darkens indirect light
+    float alphaCutoff = 0.f;        // > 0: alpha-tested cutout (foliage, sails, fences)
 
     static const TypeInfo& type();
 };

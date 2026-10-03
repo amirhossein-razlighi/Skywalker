@@ -56,7 +56,7 @@ struct OrbitCamera {
     Json toJson() const;
 };
 
-enum class Shading : uint8_t { Pbr = 0, Toon = 1, Unlit = 2 };
+enum class Shading : uint8_t { Pbr = 0, Toon = 1, Unlit = 2, Water = 3 };
 Shading shadingFromString(std::string_view s);
 
 /// How a surface looks: the inline MeshRenderer fields or a material asset, resolved.
@@ -81,6 +81,7 @@ struct Surface {
     Vec4 outlineColor{0.04f, 0.04f, 0.06f, 1.f};
     bool doubleSided = false;
     float occlusionStrength = 1.f;
+    float alphaCutoff = 0.f;  // > 0: alpha-tested cutout
 };
 
 struct DrawItem {
@@ -110,6 +111,55 @@ struct OverlayItem {
     Vec4 color;
 };
 
+/// One particle as the GPU sees it (world space, linear HDR color). 16 floats.
+struct ParticleInstance {
+    float position[3];
+    float size;      // diameter (m)
+    float color[4];  // linear rgb (pre-multiplied by intensity for emissive looks), a = opacity
+    float velocity[3];
+    float rotation;  // radians
+    float age;       // 0..1 of its life
+    float look;      // ParticleLook
+    float seed;      // 0..1, per-particle variation
+    float softness;  // soft-particle fade distance (m)
+};
+static_assert(sizeof(ParticleInstance) == 16 * sizeof(float));
+
+enum class ParticleLook : int { Glow = 0, Flame = 1, Smoke = 2, Spark = 3, Rain = 4, Snow = 5, Mist = 6, Splash = 7 };
+
+/// The engine's FFT ocean simulation for one water body, at the frame's time.
+struct OceanCascades {
+    static constexpr int kCascades = 3;
+    int resolution = 0;                          // N: each cascade is N x N texels
+    float patchSize[kCascades] = {};             // meters covered by one tile
+    std::vector<float> displacement[kCascades];  // N*N*4: dx, height, dz, jacobian (foam where < 1)
+    std::vector<float> slope[kCascades];         // N*N*4: dh/dx, dh/dz, 0, 0
+    uint64_t version = 0;                        // changes whenever the data changes
+};
+
+struct WaterItem {
+    EntityId entity = kNoEntity;
+    float level = 0.f;
+    Vec2 center{0, 0};
+    float size = 0.f;  // 0 = endless
+    Vec4 deepColor{0.015f, 0.07f, 0.1f, 1.f};
+    Vec4 shallowColor{0.12f, 0.5f, 0.45f, 1.f};
+    float clarity = 6.f;
+    float foam = 1.f;
+    float reflections = 1.f;
+    float refraction = 1.f;
+    float roughness = 0.04f;
+    std::shared_ptr<const OceanCascades> ocean;
+};
+
+/// A volumetric fluid to simulate (on the GPU) and ray-march this frame.
+struct VolumeItem {
+    EntityId entity = kNoEntity;
+    Mat4 model;           // bottom-center origin, unscaled (size below)
+    FluidVolume params;
+    Vec3 wind{0, 0, 0};   // environment wind in world space (m/s), already scaled by params.wind
+};
+
 struct FrameData {
     int width = 0;
     int height = 0;
@@ -120,6 +170,9 @@ struct FrameData {
     std::vector<DrawItem> draws;
     std::vector<LightItem> lights;  // up to kMaxLights are used
     std::vector<OverlayItem> overlays;
+    std::vector<ParticleInstance> particles;  // sorted back to front
+    std::vector<WaterItem> water;
+    std::vector<VolumeItem> volumes;
     bool drawGrid = true;
     float time = 0;
 
@@ -136,6 +189,10 @@ struct BuildOptions {
     /// Resolves MeshRenderer::material paths (provided by the engine's asset system).
     std::function<const ResolvedMaterial*(const std::string&)> material;
 };
+
+/// Keeps the kMaxLights lights that matter most for this view (directional first, then the
+/// point/spot lights nearest to what the camera looks at).
+void prioritizeLights(FrameData& f);
 
 /// Converts the scene into a renderer-agnostic frame description.
 FrameData buildFrame(const Scene& scene, const ViewCamera& camera, int width, int height, const BuildOptions& opts);

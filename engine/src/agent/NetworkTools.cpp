@@ -42,7 +42,7 @@ std::string extOf(const std::string& name) {
 /// File kinds we accept from the web: meshes and their side files, images, audio, license texts.
 bool allowedFile(const std::string& name) {
     static const std::set<std::string> ok{".glb", ".gltf", ".bin", ".obj", ".mtl", ".ply", ".stl", ".png", ".jpg",
-                                          ".jpeg", ".wav", ".mp3", ".ogg", ".m4a", ".txt", ".md"};
+                                          ".jpeg", ".hdr", ".wav", ".mp3", ".ogg", ".m4a", ".txt", ".md"};
     return ok.count(extOf(name)) > 0;
 }
 
@@ -84,7 +84,7 @@ std::string safeRelative(std::string uri) {
 void addNetworkTools(Engine& engine, ToolRegistry& reg) {
     ToolDef def{
         "asset_download", "Download asset from the web",
-        "Download an openly licensed asset (3D model .glb/.gltf/.obj/.ply/.stl, texture, audio, or a .zip pack of "
+        "Download an openly licensed asset (3D model .glb/.gltf/.obj/.ply/.stl, texture, .hdr sky panorama, audio, or a .zip pack of "
         "them) from a URL into the project, record its license and author, add it to CREDITS.md, and (for models) "
         "import it — optionally placing it in the scene. Multi-file glTF and OBJ+MTL dependencies are fetched "
         "automatically. RULES: only use assets whose license allows this project's use (CC0, CC-BY with "
@@ -97,6 +97,12 @@ void addNetworkTools(Engine& engine, ToolRegistry& reg) {
                 {"source_page", string("Page the asset was found on (for credits)")},
                 {"attribution", string("Exact attribution text required by the license, if any")},
                 {"folder", string("Project folder to save into (default downloads/<name>)")},
+                {"include", Json::object({{"type", "object"},
+                                          {"additionalProperties", Json::object({{"type", "string"}})},
+                                          {"description",
+                                           "Extra files of a multi-file asset as {\"relative/path\": \"url\"} — for libraries "
+                                           "that host a model's textures/buffers elsewhere (e.g. Poly Haven's file API lists them "
+                                           "under `include`)."}})},
                 {"import", boolean("Import models after download (default true)")},
                 {"normalize", boolean("Scale models to fit 1 m (default true); false keeps real-world units")},
                 {"z_up", boolean("The model is Z-up (CAD, scans, some exporters) — rotate to Y-up")},
@@ -170,9 +176,20 @@ void addNetworkTools(Engine& engine, ToolRegistry& reg) {
             } else {
                 if (!allowedFile(name)) {
                     return ToolResult::error(Error::make("unsupported_file", "won't download '" + name + "' (unsupported type)",
-                                                         "models: .glb .gltf .obj .ply .stl (or a .zip of them); images: .png .jpg; audio"));
+                                                         "models: .glb .gltf .obj .ply .stl (or a .zip of them); images: .png .jpg .hdr; audio"));
                 }
                 if (Status s = save(name, resp->body); !s) return fail(s);
+                // Explicitly listed side files first, so relative fetches below find them in place.
+                for (const auto& [rel, src] : a.get("include").members()) {
+                    std::string safe = safeRelative(rel);
+                    if (safe.empty() || !allowedFile(safe) || !src.isString()) {
+                        skipped.push_back(rel);
+                        continue;
+                    }
+                    auto side = net::get(src.asString(), kMaxDownload);
+                    if (!side) return ToolResult::error(side.error());
+                    if (Status s = save(safe, side->body); !s) return fail(s);
+                }
                 if (extOf(name) == ".gltf") {
                     auto j = Json::parse(std::string_view(reinterpret_cast<const char*>(resp->body.data()), resp->body.size()));
                     if (j) {
@@ -220,9 +237,22 @@ void addNetworkTools(Engine& engine, ToolRegistry& reg) {
             {
                 std::string creditsPath = engine.resolvePath("CREDITS.md");
                 bool exists = fs::exists(creditsPath, ec);
-                std::ofstream cf(creditsPath, std::ios::app);
-                if (!exists) cf << "# Credits\n\nThird-party assets used in this project (maintained by `asset_download`).\n\n";
-                cf << credits << "\n";
+                std::string existing;
+                if (exists) {
+                    std::ifstream in(creditsPath);
+                    std::stringstream ss;
+                    ss << in.rdbuf();
+                    existing = ss.str();
+                }
+                // Re-downloading the same asset (fresh checkout, rebuilt scene) doesn't duplicate its credit.
+                std::string key = "**" + stem + "**";
+                std::string where = a.get("source_page").asString(url);
+                bool known = existing.find(key) != std::string::npos && existing.find(where) != std::string::npos;
+                if (!known) {
+                    std::ofstream cf(creditsPath, std::ios::app);
+                    if (!exists) cf << "# Credits\n\nThird-party assets used in this project (maintained by `asset_download`).\n\n";
+                    cf << credits << "\n";
+                }
             }
 
             Json result = Json::object({{"license", license}, {"credits", credits}});
@@ -253,15 +283,7 @@ void addNetworkTools(Engine& engine, ToolRegistry& reg) {
                     if (a.contains("create_entity")) {
                         EntityId id = kNoEntity;
                         Status st = engine.edit(ctx.actor, "Place " + a.get("create_entity").asString(), [&]() -> Status {
-                            id = engine.scene().create(a.get("create_entity").asString());
-                            Json m = Json::object({{"mesh", imp->get("mesh")}});
-                            if (imp->contains("material")) m["material"] = imp->get("material");
-                            if (imp->get("vertexColors").asBool()) m["color"] = "#ffffff";
-                            Status s = engine.scene().patchComponent(id, "mesh", m);
-                            if (s && a.contains("position")) {
-                                s = engine.scene().patchComponent(id, "transform", Json::object({{"position", a.get("position")}}));
-                            }
-                            return s;
+                            return placeImportedMesh(engine, *imp, a.get("create_entity").asString(), a.get("position"), id);
                         });
                         if (!st) return fail(st);
                         result["entity"] = id;

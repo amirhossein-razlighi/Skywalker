@@ -19,9 +19,9 @@ interface the editor uses.
 
 ## Highlights
 
-- **One tool surface for everyone.** 54 typed, schema-validated tools (scene, entities,
-  world/spatial, behaviors, simulation, viewport, lighting, history, assets, materials,
-  prefabs, shaders). The editor UI, the
+- **One tool surface for everyone.** 57 typed, schema-validated tools (scene, entities,
+  world/spatial, behaviors, simulation, viewport, lighting, effects, history, assets,
+  materials, prefabs, shaders). The editor UI, the
   in-editor agents and external agents over **MCP** all use them. Errors come with
   `did you mean …?` hints. → [docs/TOOLS.md](docs/TOOLS.md)
 - **Agents can see.** `viewport_capture` returns a PNG plus every visible entity's screen
@@ -55,7 +55,14 @@ interface the editor uses.
   4-cascade soft shadows, SSAO, an atmospheric sky with clouds and stars, height fog, bloom
   and AgX/ACES/neutral tonemapping. Or flip a material to `toon` with outlines. Agents can
   generate seamless PBR textures (`texture_generate`) and start from material presets.
-  → [docs/RENDERING.md](docs/RENDERING.md)
+  Photographed HDRI skies light the scene. → [docs/RENDERING.md](docs/RENDERING.md)
+- **Simulated effects.** Fire, smoke, steam and explosions as a real GPU fluid simulation
+  (3D Eulerian solver: combustion, buoyancy, vorticity, pressure projection), ray-marched with
+  blackbody flames and lit, self-shadowed smoke. An FFT ocean (JONSWAP wind waves, choppy
+  crests, persistent whitecaps, shore surf, caustics, refraction, depth color, screen-space
+  reflections) that gameplay can query, so boats ride the waves you see. Volumetric light
+  shafts. Deterministic particles for embers, rain with splashes, snow, mist and sparks.
+  One `fx_create` call from a preset; `burst()` / `water_height()` in Wander.
 - **Generative assets ready.** `asset_request` / `asset_complete` route 3D, texture,
   sprite, audio, music and video requests to generators and record what prompt made each file.
 - **Pro editor.** Outliner, details with reflected properties and scrubbable fields,

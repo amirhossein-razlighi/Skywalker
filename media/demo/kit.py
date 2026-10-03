@@ -127,7 +127,9 @@ class Builder:
             label = {"scene_new": "New scene", "scatter": f"Scatter {args.get('group', '')}".strip(),
                      "texture_generate": f"Texture: {args.get('kind', '')}", "material_create": "Material",
                      "prefab_create": f"Prefab {os.path.basename(args.get('path', ''))}", "environment_update": "Lighting & sky",
-                     "scene_save": "Save scene"}.get(tool, tool)
+                     "scene_save": "Save scene",
+                     "asset_download": f"Download {os.path.basename(args.get('folder', '') or args.get('url', ''))} ({args.get('license', '')})",
+                     "asset_import": f"Import {os.path.basename(args.get('path', ''))}"}.get(tool, tool)
             self.studio.record(self.who, label, tool)
         if self.studio.pace and tool not in ("entity_get", "scene_query", "asset_list", "raycast"):
             time.sleep(self.studio.pace * 0.5)

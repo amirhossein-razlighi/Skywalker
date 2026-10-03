@@ -1,17 +1,62 @@
 [
-  {"id": "01_intro", "text": "This is Skywalker. A game engine built for AI agents."},
-  {"id": "02_challenge", "text": "We gave a crew of AI agents twelve game ideas, and filmed them building every one, live, inside the editor."},
-  {"id": "03_crew", "text": "A director plans. A level designer builds. A lighting artist sets the mood. A gameplay programmer brings it to life. Every edit is real, attributed, and undoable."},
-  {"id": "04_horror", "text": "Horror. Fog that pools on the ground, a lantern that flickers, and three hundred meters down, something with a light of its own."},
-  {"id": "05_cozy", "text": "Or something cozy. A cabin on a snowy night. A harvest fair at golden hour. An aurora over the igloo."},
-  {"id": "06_action", "text": "Shooters, where every bolt, drone, and explosion is a prefab, spawned by a few lines of Wander."},
-  {"id": "07_play", "text": "Platformers in three D and two D. And a kart race under the floodlights."},
-  {"id": "08_art", "text": "And pure atmosphere. A zen garden in the morning mist. A neon alley in the rain."},
-  {"id": "09_render", "text": "Under the hood, a new renderer. Physically based materials, image based lighting, soft shadows, ambient occlusion, and a real sky, from afternoon to starlight. Or flip it to toon."},
-  {"id": "10_textures", "text": "Agents generate seamless textures on demand. Bricks, wood, rust, marble, scales."},
-  {"id": "11_assets", "text": "Everything is an asset they can search, preview, reuse, and scatter. Import models from glTF, OBJ, PLY, and STL."},
-  {"id": "12_download", "text": "They can even fetch openly licensed models from the web, with your approval. Licenses and credits are tracked for you."},
-  {"id": "13_agents", "text": "Design your crew. Their roles, instructions, permissions, and memory. Run them alone, together, or in parallel."},
-  {"id": "14_connect", "text": "Bring Claude, GPT, or a model on your own machine. Through MCP, any agent can drive the engine."},
-  {"id": "15_outro", "text": "Twelve games. One crew. Skywalker."}
+  {
+    "id": "01_intro",
+    "text": "This is Skywalker. A game engine built for AI agents."
+  },
+  {
+    "id": "02_challenge",
+    "text": "We gave a crew of AI agents a stack of game ideas, and filmed them building every one, live, inside the editor."
+  },
+  {
+    "id": "03_crew",
+    "text": "A director plans. A level designer builds. A lighting artist sets the mood. A gameplay programmer brings it to life. Every edit is real, attributed, and undoable."
+  },
+  {
+    "id": "04_horror",
+    "text": "Horror. Fog that pools on the ground, a lantern that flickers, and three hundred meters down, something with a light of its own."
+  },
+  {
+    "id": "05_cozy",
+    "text": "Or something cozy. A cabin on a snowy night. A harvest fair at golden hour. An aurora over the igloo."
+  },
+  {
+    "id": "06_action",
+    "text": "Shooters, where every bolt, drone, and explosion is a prefab, spawned by a few lines of Wander."
+  },
+  {
+    "id": "07_play",
+    "text": "Platformers in three D and two D. And a kart race under the floodlights."
+  },
+  {
+    "id": "08_art",
+    "text": "And pure atmosphere. A zen garden in the morning mist. A neon alley in the rain."
+  },
+  {
+    "id": "09_render",
+    "text": "Under the hood, a new renderer. Physically based materials, image based lighting, soft shadows, ambient occlusion, and a real sky, from afternoon to starlight. Or flip it to toon."
+  },
+  {
+    "id": "10_textures",
+    "text": "Agents generate seamless textures on demand. Bricks, wood, rust, marble, scales."
+  },
+  {
+    "id": "11_assets",
+    "text": "Everything is an asset they can search, preview, reuse, and scatter. Import models from glTF, OBJ, PLY, and STL."
+  },
+  {
+    "id": "12_download",
+    "text": "They can even fetch openly licensed models from the web, with your approval. Licenses and credits are tracked for you."
+  },
+  {
+    "id": "13_agents",
+    "text": "Design your crew. Their roles, instructions, permissions, and memory. Run them alone, together, or in parallel."
+  },
+  {
+    "id": "14_connect",
+    "text": "Bring Claude, GPT, or a model on your own machine. Through MCP, any agent can drive the engine."
+  },
+  {
+    "id": "15_outro",
+    "text": "Any game. One crew. Skywalker."
+  }
 ]

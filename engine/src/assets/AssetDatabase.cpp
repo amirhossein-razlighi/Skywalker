@@ -47,7 +47,7 @@ AssetType assetTypeForPath(std::string_view path) {
     if (ends(".sky.json")) return AssetType::Scene;
     if (ends(".agent.json")) return AssetType::Agent;
     if (ends(".obj") || ends(".glb") || ends(".gltf") || ends(".ply") || ends(".stl")) return AssetType::Mesh;
-    if (ends(".png") || ends(".jpg") || ends(".jpeg")) return AssetType::Texture;
+    if (ends(".png") || ends(".jpg") || ends(".jpeg") || ends(".hdr")) return AssetType::Texture;
     if (ends(".wav") || ends(".mp3") || ends(".ogg") || ends(".m4a") || ends(".flac")) return AssetType::Audio;
     if (ends(".mp4") || ends(".mov") || ends(".webm")) return AssetType::Video;
     if (ends(".wander")) return AssetType::Script;
@@ -215,6 +215,7 @@ AssetRecord* AssetDatabase::findMutable(std::string_view ref) {
     if (str::startsWith(r, "asset:")) r.remove_prefix(6);
     if (str::startsWith(r, "prefab:")) r.remove_prefix(7);
     if (str::startsWith(r, "guid:")) r.remove_prefix(5);
+    if (size_t hash = r.find('#'); hash != std::string_view::npos) r = r.substr(0, hash);  // "model.gltf#2": part of a model
     if (auto g = byGuid_.find(std::string(r)); g != byGuid_.end()) return &records_[g->second];
     std::string rel = relative(std::string(r));
     if (auto it = records_.find(rel.empty() ? std::string(r) : rel); it != records_.end()) return &it->second;
@@ -248,7 +249,7 @@ Result<const AssetRecord*> AssetDatabase::registerFile(std::string_view path) {
     if (!fs::exists(absolute(rel), ec)) return Error::make("not_found", "no such file: " + rel);
     if (assetTypeForPath(rel) == AssetType::Unknown) {
         return Error::make("unsupported", "unsupported asset type: " + rel,
-                           "supported: .obj .glb .gltf .ply .stl .png .jpg .mat.json .prefab.json .sky.json .wav .mp3 .ogg .wander");
+                           "supported: .obj .glb .gltf .ply .stl .png .jpg .hdr .mat.json .prefab.json .sky.json .wav .mp3 .ogg .wander");
     }
     refresh();
     AssetRecord* r = findMutable(rel);

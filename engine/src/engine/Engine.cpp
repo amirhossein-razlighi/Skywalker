@@ -1,16 +1,20 @@
 #include "skywalker/engine/Engine.h"
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <cstdlib>
 #include <filesystem>
 #include <cstring>
 #include <fstream>
+#include <set>
 #include <sstream>
+#include <unordered_map>
 
 #include "skywalker/agent/SocketServer.h"
 #include "skywalker/core/Log.h"
 #include "skywalker/core/Strings.h"
+#include "skywalker/assets/Prefab.h"
 #include "skywalker/render/Gltf.h"
 #include "skywalker/render/MeshData.h"
 
@@ -53,6 +57,11 @@ Engine::Engine(EngineConfig config)
         placement.position = position;
         placement.name = name;
         return instantiatePrefabAsset(ref, placement);
+    };
+    runtime_->burst = [this](EntityId e, int count) { particles_.burst(e, count); };
+    runtime_->waterHeight = [this](float x, float z) {
+        float h = 0;
+        return waterHeight(x, z, h) ? h : 0.f;
     };
     registerEngineTools(*this);
     log::info("engine", std::string("Skywalker ") + SKY_VERSION_STRING + " ready (renderer: " + renderer_->info().backend +
@@ -142,6 +151,7 @@ void Engine::play() {
         playSnapshot_ = scene_->toJson();
         runtime_->reset(/*keepQueuedEvents=*/true);
         accumulator_ = 0;
+        particles_.reset();  // play sessions replay exactly
     }
     playState_ = PlayState::Playing;
     emitEvent(Json::object({{"type", "play_state"}, {"state", "playing"}}));
@@ -161,6 +171,7 @@ void Engine::stop() {
     scene_->setObserver(obs);
     playSnapshot_ = Json();
     runtime_->reset();
+    particles_.reset();
     input_ = {};
     std::erase_if(selection_, [&](EntityId id) { return !scene_->exists(id); });
     emitEvent(Json::object({{"type", "play_state"}, {"state", "editing"}}));
@@ -173,6 +184,7 @@ void Engine::step(int ticks) {
     }
     for (int i = 0; i < ticks; ++i) {
         runtime_->tick(kFixedDt, input_);
+        particles_.update(*scene_, static_cast<float>(kFixedDt));
         input_.pressed.clear();
         input_.clicked.clear();
     }
@@ -195,6 +207,11 @@ void Engine::update(double seconds) {
     // While the user drags an object or a gizmo handle, an undo transaction is open;
     // agent jobs wait until it is committed so their edits are never attributed to it.
     if (!drag_.entity && !gizmoDrag_) pump();
+    if (playState_ == PlayState::Editing) {  // live preview of fire, rain, waves while building
+        float dt = static_cast<float>(std::min(seconds, 0.1));
+        previewTime_ += dt;
+        particles_.update(*scene_, dt);
+    }
     if (playState_ != PlayState::Playing) return;
     accumulator_ += std::min(seconds, 0.25);  // avoid spiral of death after stalls
     int ticks = 0;
@@ -203,6 +220,29 @@ void Engine::update(double seconds) {
         ++ticks;
     }
     if (ticks) step(ticks);
+}
+
+double Engine::effectsTime() const { return playState_ == PlayState::Editing ? previewTime_ : runtime_->time(); }
+
+fx::Ocean& Engine::oceanFor(EntityId e, const Water& w) {
+    fx::Ocean& ocean = oceans_[e];
+    ocean.configure(w);
+    ocean.evaluate(effectsTime());
+    return ocean;
+}
+
+bool Engine::waterHeight(float x, float z, float& height, Vec3* normal) {
+    for (EntityId e : scene_->entities()) {
+        const Water* w = scene_->get<Water>(e);
+        if (!w || !scene_->isActive(e)) continue;
+        Vec3 c = scene_->worldMatrix(e).translation();
+        if (w->size > 0.f && (std::fabs(x - c.x) > w->size * 0.5f || std::fabs(z - c.z) > w->size * 0.5f)) continue;
+        fx::Ocean& ocean = oceanFor(e, *w);
+        height = c.y + ocean.height(x, z);
+        if (normal) *normal = ocean.normal(x, z);
+        return true;
+    }
+    return false;
 }
 
 std::vector<Json> Engine::recentMessages(size_t max) const {
@@ -250,13 +290,40 @@ FrameData Engine::frame(const CaptureOptions& opts) {
     BuildOptions bo;
     bo.editorOverlays = opts.editorOverlays && playState_ == PlayState::Editing;
     bo.selection = selection_;
-    bo.time = static_cast<float>(runtime_->time());
+    bo.time = static_cast<float>(effectsTime());  // animates water, fluids and skies while editing too
     bo.material = [this](const std::string& path) { return resolveMaterial(path); };
     for (EntityId e : scene_->entities()) {
         if (const auto* m = scene_->get<MeshRenderer>(e)) ensureMeshUploaded(m->mesh);
     }
     FrameData f = buildFrame(*scene_, view, opts.width, opts.height, bo);
     if (!opts.fog) f.environment.fogDensity = 0;
+    // Effects: simulated particles (+ the light fires cast) and FFT water.
+    particles_.gather(*scene_, view, f.particles, f.lights);
+    prioritizeLights(f);
+    std::vector<EntityId> waterIds;
+    for (EntityId e : scene_->entities()) {
+        const Water* w = scene_->get<Water>(e);
+        if (!w) continue;
+        waterIds.push_back(e);
+        if (!scene_->isActive(e)) continue;
+        fx::Ocean& ocean = oceanFor(e, *w);
+        Mat4 m = scene_->worldMatrix(e);
+        WaterItem wi;
+        wi.entity = e;
+        wi.level = m.translation().y;
+        wi.center = {m.translation().x, m.translation().z};
+        wi.size = w->size;
+        wi.deepColor = w->deepColor;
+        wi.shallowColor = w->shallowColor;
+        wi.clarity = w->clarity;
+        wi.foam = w->foam;
+        wi.reflections = w->reflections;
+        wi.refraction = w->refraction;
+        wi.roughness = w->roughness;
+        wi.ocean = ocean.cascades();
+        f.water.push_back(std::move(wi));
+    }
+    std::erase_if(oceans_, [&](const auto& kv) { return std::find(waterIds.begin(), waterIds.end(), kv.first) == waterIds.end(); });
     resolveTexturePaths(f);
     if (bo.editorOverlays && selection_.size() == 1 && scene_->exists(selection_[0]) && !opts.annotate) {
         GizmoFrame gf = Gizmo::frameFor(scene_->worldMatrix(selection_[0]), view, gizmo_.local);
@@ -484,6 +551,12 @@ AssetRequest& Engine::addAssetRequest(AssetRequest req) {
 // ---------------------------------------------------------------------------
 
 namespace {
+size_t gltfMaterialCount(const std::vector<int>& parts, size_t materials) {
+    size_t n = 0;
+    for (int p : parts) n += p >= 0 && static_cast<size_t>(p) < materials;
+    return n;
+}
+
 std::string stripAssetPrefix(const std::string& ref) {
     for (const char* p : {"asset:", "prefab:"}) {
         if (ref.rfind(p, 0) == 0) return ref.substr(std::strlen(p));
@@ -496,11 +569,22 @@ std::vector<std::string> Engine::refreshAssets() {
     std::vector<std::string> changed = assets_->refresh();
     for (const auto& path : changed) {
         switch (assetTypeForPath(path)) {
-            case AssetType::Mesh:
-                renderer_->invalidate("asset:" + path);
-                cpuMeshes_.erase("asset:" + path);
-                scene_->assetBounds.erase("asset:" + path);
+            case AssetType::Mesh: {
+                std::string key = "asset:" + path;
+                std::vector<std::string> keys{key};
+                for (const auto& [k, v] : cpuMeshes_) {
+                    if (str::startsWith(k, key + "#")) keys.push_back(k);  // parts of a multi-material model
+                }
+                for (const auto& [k, v] : scene_->assetBounds) {
+                    if (str::startsWith(k, key + "#")) keys.push_back(k);
+                }
+                for (const auto& k : keys) {
+                    renderer_->invalidate(k);
+                    cpuMeshes_.erase(k);
+                    scene_->assetBounds.erase(k);
+                }
                 break;
+            }
             case AssetType::Texture: renderer_->invalidate(resolvePath(path)); break;
             case AssetType::Material: materials_.erase(path); break;
             case AssetType::Prefab: prefabs_.erase(path); break;
@@ -522,11 +606,13 @@ const MeshData* Engine::cpuMesh(const std::string& key) {
     if (key.rfind("asset:", 0) == 0) {
         // Re-import with the options recorded when the asset was imported.
         mesh::LoadOptions lo;
-        if (const AssetRecord* rec = assets_->find(key.substr(6))) {
+        auto [file, part] = mesh::splitPart(key.substr(6));
+        lo.part = part;
+        if (const AssetRecord* rec = assets_->find(file)) {
             lo.normalize = rec->importSettings.get("normalize").asBool(true);
             lo.zUp = rec->importSettings.get("zUp").asBool(false);
         }
-        data = mesh::loadMeshFile(resolvePath(key.substr(6)), lo);
+        data = mesh::loadMeshFile(resolvePath(file), lo);
     } else {
         data = mesh::primitive(key);
     }
@@ -551,37 +637,116 @@ Result<Json> Engine::importMeshAsset(const std::string& path, const MeshImportOp
         auto g = loadGltf(resolvePath(rel), false);
         if (!g) return g.error();
         mesh = std::move(g->mesh);
-        // glTF materials become a project material (+ extracted texture) next to the mesh.
+        // glTF materials become project materials next to the mesh. External images are
+        // referenced where they are; embedded ones are extracted once.
         fs::path base = fs::path(rel);
         std::string stem = base.stem().string();
         std::string dir = base.parent_path().generic_string();
         auto join = [&](const std::string& name) { return dir.empty() ? name : dir + "/" + name; };
-        MaterialAsset m;
-        m.color = g->baseColor;
-        m.metallic = g->metallic;
-        m.roughness = std::max(0.02f, g->roughness);
-        m.emissive = g->emissive;
-        auto extract = [&](const std::vector<uint8_t>& bytes, const std::string& suffix) {
-            std::string texPath = join(stem + suffix);
-            std::ofstream tf(resolvePath(texPath), std::ios::binary);
-            tf.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
-            return texPath;
+        std::unordered_map<int, std::string> texPaths;
+        auto texPath = [&](int image) -> std::string {
+            if (image < 0 || static_cast<size_t>(image) >= g->images.size()) return "";
+            if (auto it = texPaths.find(image); it != texPaths.end()) return it->second;
+            const GltfImport::ImageData& im = g->images[static_cast<size_t>(image)];
+            std::string out;
+            if (!im.uri.empty()) {
+                std::string u = fs::path(im.uri).lexically_normal().generic_string();
+                if (!u.empty() && u[0] != '/' && u.rfind("..", 0) != 0) out = join(u);
+            } else if (!im.empty()) {
+                out = join(stem + "_img" + std::to_string(image) + im.extension());
+                std::ofstream tf(resolvePath(out), std::ios::binary);
+                tf.write(reinterpret_cast<const char*>(im.bytes.data()), static_cast<std::streamsize>(im.bytes.size()));
+            }
+            return texPaths[image] = out;
         };
-        if (!g->textureBytes.empty()) {
-            m.texture = extract(g->textureBytes, g->textureMime == "image/jpeg" ? "_albedo.jpg" : "_albedo.png");
-        }
-        if (!g->normalMap.empty()) {
-            m.normalMap = extract(g->normalMap.bytes, std::string("_normal") + g->normalMap.extension());
-            m.normalStrength = g->normalScale;
-        }
-        if (!g->metallicRoughnessMap.empty()) {
-            m.ormMap = extract(g->metallicRoughnessMap.bytes, std::string("_orm") + g->metallicRoughnessMap.extension());
-            m.occlusionStrength = g->occlusionStrength;
-        }
-        if (!g->emissiveMap.empty()) m.emissiveMap = extract(g->emissiveMap.bytes, std::string("_emissive") + g->emissiveMap.extension());
-        if (g->materialCount > 0 || !g->textureBytes.empty()) {
-            materialPath = join(stem + ".mat.json");
-            if (Status st = saveMaterial(resolvePath(materialPath), m); !st) return st.error();
+        auto toMaterial = [&](const GltfImport::Material& gm) {
+            MaterialAsset m;
+            m.color = gm.baseColor;
+            m.metallic = gm.metallic;
+            m.roughness = std::max(0.02f, gm.roughness);
+            m.emissive = gm.emissive;
+            m.texture = texPath(gm.baseColorImage);
+            m.normalMap = texPath(gm.normalImage);
+            m.normalStrength = gm.normalScale;
+            m.ormMap = texPath(gm.metallicRoughnessImage);
+            m.occlusionStrength = gm.occlusionStrength;
+            m.emissiveMap = texPath(gm.emissiveImage);
+            m.doubleSided = gm.doubleSided;
+            if (gm.alphaMode == "MASK") m.alphaCutoff = std::clamp(gm.alphaCutoff, 0.01f, 1.f);
+            // BLEND with an opaque factor: textured transparency (decals, foliage cards) -> soft cutout.
+            if (gm.alphaMode == "BLEND" && gm.baseColor.w >= 0.999f && gm.baseColorImage >= 0) m.alphaCutoff = 0.3f;
+            return m;
+        };
+        std::vector<int> parts = g->parts;
+        if (parts.size() <= 1) {
+            if (!parts.empty() && parts[0] >= 0 && static_cast<size_t>(parts[0]) < g->materials.size()) {
+                materialPath = join(stem + ".mat.json");
+                if (Status st = saveMaterial(resolvePath(materialPath), toMaterial(g->materials[static_cast<size_t>(parts[0])])); !st) {
+                    return st.error();
+                }
+            }
+        } else {
+            // One entity per material: write the materials, upload each part, save a prefab.
+            Json children = Json::array();
+            Json partList = Json::array();
+            std::set<std::string> usedNames;
+            Aabb reference = mesh.bounds;
+            if (options.zUp) reference = mesh::zUpToYUp(reference);
+            for (int part : parts) {
+                const GltfImport::Material* gm =
+                    part >= 0 && static_cast<size_t>(part) < g->materials.size() ? &g->materials[static_cast<size_t>(part)] : nullptr;
+                std::string name = gm ? gm->name : "";
+                // "ship_2k" + "ship_hull" -> "hull": drop the model-name prefix (any shorter "_" prefix of the stem).
+                for (std::string pre = stem; !pre.empty();) {
+                    if (str::startsWith(name, pre + "_") && name.size() > pre.size() + 1) {
+                        name = name.substr(pre.size() + 1);
+                        break;
+                    }
+                    size_t cut = pre.rfind('_');
+                    pre = cut == std::string::npos ? std::string() : pre.substr(0, cut);
+                }
+                for (char& c : name) {
+                    if (!std::isalnum(static_cast<unsigned char>(c)) && c != '-' && c != '_') c = '_';
+                }
+                if (name.empty()) name = part >= 0 ? "material" + std::to_string(part) : "default";
+                while (!usedNames.insert(name).second) name += "_" + std::to_string(part);
+                std::string partMat;
+                if (gm) {
+                    partMat = join(stem + "_" + name + ".mat.json");
+                    if (Status st = saveMaterial(resolvePath(partMat), toMaterial(*gm)); !st) return st.error();
+                }
+                auto pm = loadGltf(resolvePath(rel), false, part);
+                if (!pm) return pm.error();
+                MeshData partMesh = std::move(pm->mesh);
+                if (options.zUp) mesh::zUpToYUp(partMesh);
+                if (options.normalize) mesh::normalizeToUnit(partMesh, reference);
+                std::string key = "asset:" + rel + "#" + std::to_string(part);
+                if (Status s = renderer_->uploadMesh(key, partMesh); !s) return s.error();
+                scene_->assetBounds[key] = partMesh.bounds;
+                cpuMeshes_[key] = std::make_shared<MeshData>(std::move(partMesh));
+                Json meshJ = Json::object({{"mesh", key}});
+                if (!partMat.empty()) meshJ["material"] = partMat;
+                children.push(Json::object({{"name", name},
+                                            {"enabled", true},
+                                            {"components", Json::object({{"mesh", meshJ}})}}));
+                partList.push(Json::object({{"name", name}, {"mesh", key}, {"material", partMat}}));
+            }
+            Json prefab = Json::object(
+                {{"format", "skywalker.prefab"},
+                 {"version", 1},
+                 {"name", stem},
+                 {"root", Json::object({{"name", stem},
+                                        {"enabled", true},
+                                        {"components", Json::object({{"transform", Json::object()}})},
+                                        {"children", children}})}});
+            std::string prefabPath = join(stem + ".prefab.json");
+            if (Status st = savePrefab(resolvePath(prefabPath), prefab); !st) return st.error();
+            prefabs_.erase(prefabPath);
+            result["prefab"] = prefabPath;
+            result["parts"] = partList;
+            if (gltfMaterialCount(parts, g->materials.size()) > 0) {
+                materialPath = partList[size_t{0}].get("material").asString();
+            }
         }
         result["primitives"] = g->primitiveCount;
     } else if (lower.size() > 4 && lower.rfind(".obj") == lower.size() - 4) {
@@ -616,6 +781,7 @@ Result<Json> Engine::importMeshAsset(const std::string& path, const MeshImportOp
     refreshAssets();
     Json settings = Json::object({{"normalize", options.normalize}, {"zUp", options.zUp}, {"vertexColors", mesh.hasVertexColors}});
     if (!materialPath.empty()) settings["material"] = materialPath;
+    if (result.contains("prefab")) settings["prefab"] = result.get("prefab");
     if (auto reg = assets_->registerFile(resolvePath(rel)); reg) (void)assets_->updateMeta(rel, Json::object({{"import", settings}}));
     result["mesh"] = key;
     result["triangles"] = mesh.indices.size() / 3;
@@ -623,12 +789,14 @@ Result<Json> Engine::importMeshAsset(const std::string& path, const MeshImportOp
     {
         Vec3 e = mesh.bounds.max - mesh.bounds.min;
         result["size"] = reflect::vec3ToJson(e);
+        result["bounds"] = Json::object({{"min", reflect::vec3ToJson(mesh.bounds.min)}, {"max", reflect::vec3ToJson(mesh.bounds.max)}});
     }
     if (!materialPath.empty()) result["material"] = materialPath;
     return result;
 }
 
 void Engine::resolveTexturePaths(FrameData& f) const {
+    if (!f.environment.hdri.empty()) f.environment.hdri = resolvePath(f.environment.hdri);
     for (auto& d : f.draws) {
         for (std::string* p : {&d.surface.texture, &d.surface.normalMap, &d.surface.ormMap, &d.surface.emissiveMap}) {
             if (!p->empty()) *p = resolvePath(*p);
@@ -686,6 +854,7 @@ size_t Engine::rewriteAssetReferences(const std::string& from, const std::string
         if (!m) continue;
         Json patch = Json::object();
         if (m->mesh == "asset:" + from) patch["mesh"] = "asset:" + to;
+        if (str::startsWith(m->mesh, "asset:" + from + "#")) patch["mesh"] = "asset:" + to + m->mesh.substr(6 + from.size());
         if (m->texture == from) patch["texture"] = to;
         if (m->material == from) patch["material"] = to;
         if (patch.size()) {
@@ -700,7 +869,10 @@ std::vector<EntityId> Engine::assetUsage(const std::string& path) const {
     std::vector<EntityId> out;
     for (EntityId e : scene_->entities()) {
         const MeshRenderer* m = scene_->get<MeshRenderer>(e);
-        if (m && (m->mesh == "asset:" + path || m->texture == path || m->material == path)) out.push_back(e);
+        if (m && (m->mesh == "asset:" + path || str::startsWith(m->mesh, "asset:" + path + "#") || m->texture == path ||
+                  m->material == path)) {
+            out.push_back(e);
+        }
     }
     return out;
 }

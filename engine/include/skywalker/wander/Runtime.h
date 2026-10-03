@@ -65,6 +65,11 @@ public:
     /// Instantiates "prefab:path" for spawn(); set by the engine (asset system).
     std::function<Result<EntityId>(const std::string& ref, Vec3 position, const std::string& name)> spawnPrefab;
 
+    /// Particle bursts for burst(); set by the engine (effects system).
+    std::function<void(EntityId emitter, int count)> burst;
+    /// Water surface height for water_height(); set by the engine (ocean simulation).
+    std::function<float(float x, float z)> waterHeight;
+
     /// Maximum AST nodes evaluated per handler invocation.
     static constexpr int kBudget = 200000;
 

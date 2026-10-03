@@ -45,6 +45,10 @@ Result<MeshData> loadObj(const std::string& path, bool normalize = true);
 void computeMissingNormals(MeshData& m);
 /// Recentres and scales to fit a unit cube.
 void normalizeToUnit(MeshData& m);
+/// Same fit, computed from `reference` (e.g. the whole model when `m` is one of its parts).
+void normalizeToUnit(MeshData& m, const Aabb& reference);
+/// Bounds after zUpToYUp.
+Aabb zUpToYUp(const Aabb& b);
 /// Material found next to an imported mesh (OBJ .mtl). Texture paths are absolute.
 struct ImportedMaterial {
     bool present = false;
@@ -74,7 +78,10 @@ void zUpToYUp(MeshData& m);
 struct LoadOptions {
     bool normalize = true;
     bool zUp = false;
+    int part = -2;  // glTF: one material's triangles (see Gltf.h); -2 = the whole model
 };
+/// "model.gltf#3" -> {"model.gltf", 3}; no fragment -> part -2.
+std::pair<std::string, int> splitPart(const std::string& ref);
 /// Loads .obj / .ply / .stl / .glb / .gltf by extension (geometry only; see Gltf.h and
 /// loadObjWithMaterial for materials).
 Result<MeshData> loadMeshFile(const std::string& path, bool normalize = true);

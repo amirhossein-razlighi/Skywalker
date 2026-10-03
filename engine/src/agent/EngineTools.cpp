@@ -9,6 +9,7 @@
 #include "skywalker/engine/Engine.h"
 #include "skywalker/wander/Compiler.h"
 #include "ToolHelpers.h"
+#include "skywalker/render/Hdr.h"
 
 namespace sky {
 
@@ -502,6 +503,8 @@ void addSceneTools(Engine& engine, ToolRegistry& reg) {
              [] {
                  Json s = reflect::schema(Environment::type());
                  s["properties"]["preset"] = enumeration({"noon", "sunset", "night", "overcast", "studio"}, "Lighting preset");
+                 s["properties"]["align_sun_to_hdri"] =
+                     boolean("Point the sun (direction of light and shadows) at the brightest spot of the hdri panorama");
                  s["description"] = Json();
                  s.erase("description");
                  return s;
@@ -513,7 +516,21 @@ void addSceneTools(Engine& engine, ToolRegistry& reg) {
                          if (Status s = engine.scene().patchEnvironment(presetPatch(a.get("preset").asString())); !s) return s;
                          patch.erase("preset");
                      }
-                     return patch.size() ? engine.scene().patchEnvironment(patch) : Status{};
+                     patch.erase("align_sun_to_hdri");
+                     if (Status s = patch.size() ? engine.scene().patchEnvironment(patch) : Status{}; !s) return s;
+                     if (!a.get("align_sun_to_hdri").asBool()) return {};
+                     Environment& env = engine.scene().environment();
+                     if (env.hdri.empty()) return Error::make("invalid_arguments", "align_sun_to_hdri needs `hdri` set");
+                     auto img = loadHdr(engine.resolvePath(env.hdri));
+                     if (!img) return img.error();
+                     float x, y, z;
+                     if (!hdrSunDirection(*img, x, y, z)) return Error::make("no_sun", "the panorama has no bright spot");
+                     // Panorama rotation turns the image around +Y; apply it to the found direction.
+                     float r = radians(env.hdriRotation), c = std::cos(r), sn = std::sin(r);
+                     // u shifts by +rot: the sun appears at phi - rot.
+                     float rx = x * c - (-z) * sn, rz = -(x * sn + (-z) * c);
+                     return engine.scene().patchEnvironment(Json::object(
+                         {{"sunAzimuth", degrees(std::atan2(rx, rz))}, {"sunElevation", degrees(std::asin(std::clamp(y, -1.f, 1.f)))}}));
                  });
                  if (!st) return fail(st);
                  return ToolResult::json(reflect::toJson(&engine.scene().environment(), Environment::type()), "environment:");
@@ -672,6 +689,7 @@ void addViewTools(Engine& engine, ToolRegistry& reg) {
                      {"camera_entity", schema::entity("Render from this camera entity")},
                      {"eye", vec3("Custom camera position")},
                      {"target", vec3("Custom look-at point (with eye)")},
+                     {"fov", number("Vertical field of view in degrees for the custom view (lens: 25 tele .. 90 wide)")},
                      {"annotate", boolean("Draw entity id labels (default true)")},
                      {"overlays", boolean("Editor grid & selection highlight (default true)")},
                      {"include_image", boolean("Return the image (default true); false = only the entity list")},
@@ -692,6 +710,7 @@ void addViewTools(Engine& engine, ToolRegistry& reg) {
                      o.customView = engine.camera().toView();
                      o.customView.eye = eye;
                      if (reflect::jsonToVec3(a.get("target"), target)) o.customView.target = target;
+                     if (a.contains("fov")) o.customView.fovDeg = std::clamp(a.get("fov").asFloat(), 5.f, 150.f);
                  }
                  o.annotate = a.get("annotate").asBool(true);
                  o.editorOverlays = a.get("overlays").asBool(true);
@@ -1031,6 +1050,7 @@ void registerEngineTools(Engine& engine) {
     tools::addAssetTools(engine, reg);
     tools::addWorldTools(engine, reg);
     tools::addNetworkTools(engine, reg);
+    tools::addFxTools(engine, reg);
 }
 
 }  // namespace sky

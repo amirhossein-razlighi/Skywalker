@@ -74,3 +74,6 @@ Testing/
 DerivedData/
 *.xcodeproj/
 .DS_Store
+
+# Downloaded third-party assets (re-fetched by the showcase builds; credits stay in CREDITS.md)
+examples/*/downloads/

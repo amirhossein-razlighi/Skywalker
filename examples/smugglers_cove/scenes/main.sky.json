@@ -1,0 +1,7398 @@
+{
+  "format": "skywalker.scene",
+  "version": 1,
+  "name": "Smuggler's Cove",
+  "seed": 1,
+  "environment": {
+    "skyTop": "#4d7ac7",
+    "skyHorizon": "#bdcce0",
+    "ground": "#4d4f54",
+    "ambient": 0.45,
+    "sunAzimuth": 144.0882,
+    "sunElevation": 10,
+    "sunColor": "#ffc890",
+    "sunIntensity": 3.6,
+    "fogColor": "#c99d78",
+    "fogDensity": 7e-04,
+    "exposure": 1,
+    "showGrid": false,
+    "bloomIntensity": 0.35,
+    "bloomThreshold": 1.6,
+    "saturation": 1.15,
+    "contrast": 1.12,
+    "vignette": 0.28,
+    "skyMode": "hdri",
+    "hdri": "downloads/hdri/wasteland_clouds_puresky_4k.hdr",
+    "hdriRotation": 0,
+    "hdriIntensity": 1,
+    "clouds": 0,
+    "stars": 0,
+    "sunSize": 1,
+    "fogHeight": 0.05,
+    "reflections": 1,
+    "ao": 1,
+    "aoRadius": 0.6,
+    "shadowSoftness": 1.2,
+    "tonemap": "agx",
+    "temperature": 0.15,
+    "tint": 0,
+    "shadowDistance": 180,
+    "windSpeed": 2,
+    "windDirection": 60
+  },
+  "entities": [
+    {
+      "id": 1,
+      "name": "Sea",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "water": {
+          "windSpeed": 6.5,
+          "windDirection": 200,
+          "choppiness": 1.25,
+          "waveScale": 0.8,
+          "patchSize": 160,
+          "size": 0,
+          "depth": 40,
+          "deepColor": "#04202a",
+          "shallowColor": "#2aa898",
+          "clarity": 7,
+          "foam": 1.2,
+          "reflections": 1,
+          "refraction": 1,
+          "roughness": 0.03,
+          "seed": 1
+        }
+      }
+    },
+    {
+      "id": 2,
+      "name": "Island",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "terrain"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            -8,
+            -52
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            184,
+            24,
+            100
+          ]
+        },
+        "mesh": {
+          "mesh": "sphere",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "materials/coast_sand_01.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 3,
+      "name": "Hill",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "terrain"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -34,
+            -14,
+            -82
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            112,
+            52,
+            68
+          ]
+        },
+        "mesh": {
+          "mesh": "sphere",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "materials/aerial_grass_rock.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 4,
+      "name": "Sea Cliffs 1",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "cliff"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -30,
+            -2.5,
+            -112
+          ],
+          "rotation": [
+            0,
+            4,
+            0
+          ],
+          "scale": [
+            2.3,
+            2.3,
+            2.3
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/coastal_cliff_01/coastal_cliff_01_2k.gltf",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/coastal_cliff_01/coastal_cliff_01_2k.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 5,
+      "name": "Sea Cliffs 2",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "cliff"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            70,
+            -2.5,
+            -104
+          ],
+          "rotation": [
+            0,
+            -14,
+            0
+          ],
+          "scale": [
+            2,
+            2,
+            2
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/coastal_cliff_01/coastal_cliff_01_2k.gltf",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/coastal_cliff_01/coastal_cliff_01_2k.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 6,
+      "name": "Sea Cliffs 3",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "cliff"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -118,
+            -2.5,
+            -60
+          ],
+          "rotation": [
+            0,
+            68,
+            0
+          ],
+          "scale": [
+            2.1,
+            2.1,
+            2.1
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/coastal_cliff_01/coastal_cliff_01_2k.gltf",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/coastal_cliff_01/coastal_cliff_01_2k.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 7,
+      "name": "Jetty",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "pier"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -10,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "id": 8,
+      "name": "Jetty Deck",
+      "parent": 7,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            1.61,
+            9
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            3,
+            0.18,
+            52
+          ]
+        },
+        "mesh": {
+          "mesh": "cube",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "materials/old_planks_02.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 9,
+      "name": "Jetty Stringer -1",
+      "parent": 7,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -1.35,
+            1.35,
+            9
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            0.28,
+            0.32,
+            52
+          ]
+        },
+        "mesh": {
+          "mesh": "cube",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "materials/rough_wood.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 10,
+      "name": "Jetty Stringer 1",
+      "parent": 7,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            1.35,
+            1.35,
+            9
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            0.28,
+            0.32,
+            52
+          ]
+        },
+        "mesh": {
+          "mesh": "cube",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "materials/rough_wood.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 11,
+      "name": "Jetty Post 1L",
+      "parent": 7,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -1.55,
+            0.2,
+            -16
+          ],
+          "rotation": [
+            1.118,
+            82.356,
+            1.753
+          ],
+          "scale": [
+            0.32,
+            5.4,
+            0.32
+          ]
+        },
+        "mesh": {
+          "mesh": "cylinder",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "materials/rough_wood.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 12,
+      "name": "Jetty Post 1R",
+      "parent": 7,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            1.55,
+            0.2,
+            -16
+          ],
+          "rotation": [
+            -1.534,
+            193.321,
+            0.414
+          ],
+          "scale": [
+            0.32,
+            5.4,
+            0.32
+          ]
+        },
+        "mesh": {
+          "mesh": "cylinder",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "materials/rough_wood.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 13,
+      "name": "Jetty Post 2L",
+      "parent": 7,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -1.55,
+            -0.275,
+            -12
+          ],
+          "rotation": [
+            0.101,
+            196.913,
+            -0.224
+          ],
+          "scale": [
+            0.32,
+            4.45,
+            0.32
+          ]
+        },
+        "mesh": {
+          "mesh": "cylinder",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "materials/rough_wood.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 14,
+      "name": "Jetty Post 2R",
+      "parent": 7,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            1.55,
+            -0.275,
+            -12
+          ],
+          "rotation": [
+            0.616,
+            129.995,
+            1.597
+          ],
+          "scale": [
+            0.32,
+            4.45,
+            0.32
+          ]
+        },
+        "mesh": {
+          "mesh": "cylinder",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "materials/rough_wood.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 15,
+      "name": "Jetty Post 3L",
+      "parent": 7,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -1.55,
+            -0.275,
+            -8
+          ],
+          "rotation": [
+            -0.116,
+            151.935,
+            0.833
+          ],
+          "scale": [
+            0.32,
+            4.45,
+            0.32
+          ]
+        },
+        "mesh": {
+          "mesh": "cylinder",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "materials/rough_wood.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 16,
+      "name": "Jetty Post 3R",
+      "parent": 7,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            1.55,
+            -0.275,
+            -8
+          ],
+          "rotation": [
+            1.176,
+            163.182,
+            0.794
+          ],
+          "scale": [
+            0.32,
+            4.45,
+            0.32
+          ]
+        },
+        "mesh": {
+          "mesh": "cylinder",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "materials/rough_wood.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 17,
+      "name": "Jetty Post 4L",
+      "parent": 7,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -1.55,
+            0.2,
+            -4
+          ],
+          "rotation": [
+            -1.994,
+            1.088,
+            1.827
+          ],
+          "scale": [
+            0.32,
+            5.4,
+            0.32
+          ]
+        },
+        "mesh": {
+          "mesh": "cylinder",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "materials/rough_wood.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 18,
+      "name": "Jetty Post 4R",
+      "parent": 7,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            1.55,
+            0.2,
+            -4
+          ],
+          "rotation": [
+            0.154,
+            195.145,
+            1.206
+          ],
+          "scale": [
+            0.32,
+            5.4,
+            0.32
+          ]
+        },
+        "mesh": {
+          "mesh": "cylinder",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "materials/rough_wood.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 19,
+      "name": "Jetty Post 5L",
+      "parent": 7,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -1.55,
+            -0.275,
+            0
+          ],
+          "rotation": [
+            0.576,
+            69.632,
+            -0.486
+          ],
+          "scale": [
+            0.32,
+            4.45,
+            0.32
+          ]
+        },
+        "mesh": {
+          "mesh": "cylinder",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "materials/rough_wood.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 20,
+      "name": "Jetty Post 5R",
+      "parent": 7,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            1.55,
+            -0.275,
+            0
+          ],
+          "rotation": [
+            1.234,
+            72.097,
+            1.328
+          ],
+          "scale": [
+            0.32,
+            4.45,
+            0.32
+          ]
+        },
+        "mesh": {
+          "mesh": "cylinder",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "materials/rough_wood.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 21,
+      "name": "Jetty Post 6L",
+      "parent": 7,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -1.55,
+            -0.275,
+            4
+          ],
+          "rotation": [
+            -0.41,
+            174.893,
+            1.537
+          ],
+          "scale": [
+            0.32,
+            4.45,
+            0.32
+          ]
+        },
+        "mesh": {
+          "mesh": "cylinder",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "materials/rough_wood.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 22,
+      "name": "Jetty Post 6R",
+      "parent": 7,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            1.55,
+            -0.275,
+            4
+          ],
+          "rotation": [
+            -0.393,
+            258.907,
+            -0.525
+          ],
+          "scale": [
+            0.32,
+            4.45,
+            0.32
+          ]
+        },
+        "mesh": {
+          "mesh": "cylinder",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "materials/rough_wood.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 23,
+      "name": "Jetty Post 7L",
+      "parent": 7,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -1.55,
+            0.2,
+            8
+          ],
+          "rotation": [
+            -0.067,
+            326.107,
+            1.866
+          ],
+          "scale": [
+            0.32,
+            5.4,
+            0.32
+          ]
+        },
+        "mesh": {
+          "mesh": "cylinder",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "materials/rough_wood.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 24,
+      "name": "Jetty Post 7R",
+      "parent": 7,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            1.55,
+            0.2,
+            8
+          ],
+          "rotation": [
+            0.922,
+            76.059,
+            -1.302
+          ],
+          "scale": [
+            0.32,
+            5.4,
+            0.32
+          ]
+        },
+        "mesh": {
+          "mesh": "cylinder",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "materials/rough_wood.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 25,
+      "name": "Jetty Post 8L",
+      "parent": 7,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -1.55,
+            -0.275,
+            12
+          ],
+          "rotation": [
+            -1.504,
+            17.661,
+            1.361
+          ],
+          "scale": [
+            0.32,
+            4.45,
+            0.32
+          ]
+        },
+        "mesh": {
+          "mesh": "cylinder",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "materials/rough_wood.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 26,
+      "name": "Jetty Post 8R",
+      "parent": 7,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            1.55,
+            -0.275,
+            12
+          ],
+          "rotation": [
+            -1.741,
+            81.02,
+            1.748
+          ],
+          "scale": [
+            0.32,
+            4.45,
+            0.32
+          ]
+        },
+        "mesh": {
+          "mesh": "cylinder",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "materials/rough_wood.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 27,
+      "name": "Jetty Post 9L",
+      "parent": 7,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -1.55,
+            -0.275,
+            16
+          ],
+          "rotation": [
+            0.003,
+            266.797,
+            1.729
+          ],
+          "scale": [
+            0.32,
+            4.45,
+            0.32
+          ]
+        },
+        "mesh": {
+          "mesh": "cylinder",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "materials/rough_wood.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 28,
+      "name": "Jetty Post 9R",
+      "parent": 7,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            1.55,
+            -0.275,
+            16
+          ],
+          "rotation": [
+            -1.407,
+            65.907,
+            0.701
+          ],
+          "scale": [
+            0.32,
+            4.45,
+            0.32
+          ]
+        },
+        "mesh": {
+          "mesh": "cylinder",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "materials/rough_wood.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 29,
+      "name": "Jetty Post 10L",
+      "parent": 7,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -1.55,
+            0.2,
+            20
+          ],
+          "rotation": [
+            1.62,
+            170.33,
+            0.134
+          ],
+          "scale": [
+            0.32,
+            5.4,
+            0.32
+          ]
+        },
+        "mesh": {
+          "mesh": "cylinder",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "materials/rough_wood.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 30,
+      "name": "Jetty Post 10R",
+      "parent": 7,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            1.55,
+            0.2,
+            20
+          ],
+          "rotation": [
+            -0.008,
+            280.313,
+            -0.026
+          ],
+          "scale": [
+            0.32,
+            5.4,
+            0.32
+          ]
+        },
+        "mesh": {
+          "mesh": "cylinder",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "materials/rough_wood.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 31,
+      "name": "Jetty Post 11L",
+      "parent": 7,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -1.55,
+            -0.275,
+            24
+          ],
+          "rotation": [
+            -1.069,
+            199.249,
+            -0.642
+          ],
+          "scale": [
+            0.32,
+            4.45,
+            0.32
+          ]
+        },
+        "mesh": {
+          "mesh": "cylinder",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "materials/rough_wood.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 32,
+      "name": "Jetty Post 11R",
+      "parent": 7,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            1.55,
+            -0.275,
+            24
+          ],
+          "rotation": [
+            0.094,
+            97.374,
+            1.626
+          ],
+          "scale": [
+            0.32,
+            4.45,
+            0.32
+          ]
+        },
+        "mesh": {
+          "mesh": "cylinder",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "materials/rough_wood.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 33,
+      "name": "Jetty Post 12L",
+      "parent": 7,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -1.55,
+            -0.275,
+            28
+          ],
+          "rotation": [
+            -1.834,
+            50.573,
+            -0.093
+          ],
+          "scale": [
+            0.32,
+            4.45,
+            0.32
+          ]
+        },
+        "mesh": {
+          "mesh": "cylinder",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "materials/rough_wood.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 34,
+      "name": "Jetty Post 12R",
+      "parent": 7,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            1.55,
+            -0.275,
+            28
+          ],
+          "rotation": [
+            0.048,
+            343.19,
+            0.686
+          ],
+          "scale": [
+            0.32,
+            4.45,
+            0.32
+          ]
+        },
+        "mesh": {
+          "mesh": "cylinder",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "materials/rough_wood.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 35,
+      "name": "Jetty Post 13L",
+      "parent": 7,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -1.55,
+            0.2,
+            32
+          ],
+          "rotation": [
+            0.821,
+            162.625,
+            0.764
+          ],
+          "scale": [
+            0.32,
+            5.4,
+            0.32
+          ]
+        },
+        "mesh": {
+          "mesh": "cylinder",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "materials/rough_wood.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 36,
+      "name": "Jetty Post 13R",
+      "parent": 7,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            1.55,
+            0.2,
+            32
+          ],
+          "rotation": [
+            1.867,
+            25.299,
+            1.823
+          ],
+          "scale": [
+            0.32,
+            5.4,
+            0.32
+          ]
+        },
+        "mesh": {
+          "mesh": "cylinder",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "materials/rough_wood.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 37,
+      "name": "Jetty Post 14L",
+      "parent": 7,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -1.55,
+            -0.275,
+            36
+          ],
+          "rotation": [
+            -1.113,
+            8.4,
+            1.408
+          ],
+          "scale": [
+            0.32,
+            4.45,
+            0.32
+          ]
+        },
+        "mesh": {
+          "mesh": "cylinder",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "materials/rough_wood.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 38,
+      "name": "Jetty Post 14R",
+      "parent": 7,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            1.55,
+            -0.275,
+            36
+          ],
+          "rotation": [
+            1.886,
+            123.977,
+            0.608
+          ],
+          "scale": [
+            0.32,
+            4.45,
+            0.32
+          ]
+        },
+        "mesh": {
+          "mesh": "cylinder",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "materials/rough_wood.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 39,
+      "name": "Jetty Ladder",
+      "parent": 7,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            1.75,
+            0.25,
+            33
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            0.6,
+            2.9,
+            0.08
+          ]
+        },
+        "mesh": {
+          "mesh": "cube",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "materials/rough_wood.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 40,
+      "name": "The Gilded Gull",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            22,
+            0,
+            40
+          ],
+          "rotation": [
+            0,
+            200,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      },
+      "behaviors": [
+        {
+          "name": "Ride the waves",
+          "intent": "Float on the simulated sea: sit at the water height under the hull, pitch with the waves along the keel and roll with them across it.",
+          "source": "\non tick\n  let bow = water_height(22.0 - 12, 40.0 - 4)\n  let stern = water_height(22.0 + 12, 40.0 + 4)\n  let port = water_height(22.0 - 1.5, 40.0 + 4)\n  let starboard = water_height(22.0 + 1.5, 40.0 - 4)\n  let mid = (bow + stern + port + starboard) / 4\n  self.position = (22.0, mid * 0.8 - 0.1, 40.0)\n  self.rotation = ((port - starboard) * 4, 200 + sin(time * 0.11) * 1.5, (bow - stern) * 2.2)\nend",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 41,
+      "name": "hull",
+      "parent": 40,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/dutch_ship_large_01/dutch_ship_large_01_2k.gltf#0",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/dutch_ship_large_01/dutch_ship_large_01_2k_hull.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 42,
+      "name": "rigging",
+      "parent": 40,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/dutch_ship_large_01/dutch_ship_large_01_2k.gltf#1",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/dutch_ship_large_01/dutch_ship_large_01_2k_rigging.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 43,
+      "name": "sails",
+      "parent": 40,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/dutch_ship_large_01/dutch_ship_large_01_2k.gltf#2",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/dutch_ship_large_01/dutch_ship_large_01_2k_sails.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 44,
+      "name": "Navy Sloop",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -95,
+            0,
+            120
+          ],
+          "rotation": [
+            0,
+            70,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      },
+      "behaviors": [
+        {
+          "name": "Patrol",
+          "intent": "Sail slowly across the mouth of the cove, riding the waves.",
+          "source": "\non tick\n  let x = -95 + time * 1.4\n  let z = 120 - time * 0.35\n  self.position = (x, water_height(x, z) * 0.8 - 0.1, z)\n  self.rotation = ((water_height(x + 2, z) - water_height(x - 2, z)) * 6, 70, (water_height(x, z + 9) - water_height(x, z - 9)) * 3)\nend",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 45,
+      "name": "rigging",
+      "parent": 44,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/dutch_ship_medium/dutch_ship_medium_2k.gltf#0",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/dutch_ship_medium/dutch_ship_medium_2k_rigging.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 46,
+      "name": "hull",
+      "parent": 44,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/dutch_ship_medium/dutch_ship_medium_2k.gltf#1",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/dutch_ship_medium/dutch_ship_medium_2k_hull.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 47,
+      "name": "sails",
+      "parent": 44,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/dutch_ship_medium/dutch_ship_medium_2k.gltf#2",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/dutch_ship_medium/dutch_ship_medium_2k_sails.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 48,
+      "name": "Old Jacaranda",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -28,
+            9.838,
+            -70
+          ],
+          "rotation": [
+            0,
+            40,
+            0
+          ],
+          "scale": [
+            0.85,
+            0.85,
+            0.85
+          ]
+        }
+      }
+    },
+    {
+      "id": 49,
+      "name": "branches",
+      "parent": 48,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/jacaranda_tree/jacaranda_tree_2k.gltf#0",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/jacaranda_tree/jacaranda_tree_2k_branches.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 50,
+      "name": "trunk",
+      "parent": 48,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/jacaranda_tree/jacaranda_tree_2k.gltf#1",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/jacaranda_tree/jacaranda_tree_2k_trunk.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 51,
+      "name": "leaves",
+      "parent": 48,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/jacaranda_tree/jacaranda_tree_2k.gltf#2",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/jacaranda_tree/jacaranda_tree_2k_leaves.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 52,
+      "name": "Shore Rock 1",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "rock"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            68.707,
+            -0.8412,
+            -39.8755
+          ],
+          "rotation": [
+            0,
+            86.287,
+            0
+          ],
+          "scale": [
+            2.4033,
+            2.4033,
+            2.4033
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/rock_face_02/rock_face_02_2k.gltf",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/rock_face_02/rock_face_02_2k.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 53,
+      "name": "Shore Rock 2",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "rock"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            42.0302,
+            -0.9752,
+            -22.8923
+          ],
+          "rotation": [
+            0,
+            53.623,
+            0
+          ],
+          "scale": [
+            2.8664,
+            2.8664,
+            2.8664
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/boulder_01/boulder_01_2k.gltf",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/boulder_01/boulder_01_2k.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 54,
+      "name": "Shore Rock 3",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "rock"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            48.1048,
+            -0.6422,
+            -22.8128
+          ],
+          "rotation": [
+            0,
+            203.412,
+            0
+          ],
+          "scale": [
+            1.835,
+            1.835,
+            1.835
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/boulder_01/boulder_01_2k.gltf",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/boulder_01/boulder_01_2k.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 55,
+      "name": "Shore Rock 4",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "rock"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -54.0111,
+            -1.0994,
+            -28.9978
+          ],
+          "rotation": [
+            0,
+            144.242,
+            0
+          ],
+          "scale": [
+            3.1411,
+            3.1411,
+            3.1411
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/rock_face_02/rock_face_02_2k.gltf",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/rock_face_02/rock_face_02_2k.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 56,
+      "name": "Shore Rock 5",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "rock"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -49.8156,
+            0.0324,
+            -30.9619
+          ],
+          "rotation": [
+            0,
+            75.089,
+            0
+          ],
+          "scale": [
+            1.9276,
+            1.9276,
+            1.9276
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/boulder_01/boulder_01_2k.gltf",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/boulder_01/boulder_01_2k.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 57,
+      "name": "Shore Rock 6",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "rock"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            38.4818,
+            -0.0192,
+            -24.4557
+          ],
+          "rotation": [
+            0,
+            347.483,
+            0
+          ],
+          "scale": [
+            1.8976,
+            1.8976,
+            1.8976
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/boulder_01/boulder_01_2k.gltf",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/boulder_01/boulder_01_2k.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 58,
+      "name": "Shore Rock 7",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "rock"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -59.3778,
+            -0.6077,
+            -37.6511
+          ],
+          "rotation": [
+            0,
+            108.774,
+            0
+          ],
+          "scale": [
+            3.1163,
+            3.1163,
+            3.1163
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/rock_face_02/rock_face_02_2k.gltf",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/rock_face_02/rock_face_02_2k.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 59,
+      "name": "Shore Rock 8",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "rock"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            24.6886,
+            -0.75,
+            -17.2374
+          ],
+          "rotation": [
+            0,
+            340.939,
+            0
+          ],
+          "scale": [
+            2.1427,
+            2.1427,
+            2.1427
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/boulder_01/boulder_01_2k.gltf",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/boulder_01/boulder_01_2k.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 60,
+      "name": "Shore Rock 9",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "rock"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            27.8451,
+            -0.815,
+            -18.1682
+          ],
+          "rotation": [
+            0,
+            36.922,
+            0
+          ],
+          "scale": [
+            2.3401,
+            2.3401,
+            2.3401
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/boulder_01/boulder_01_2k.gltf",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/boulder_01/boulder_01_2k.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 61,
+      "name": "Shore Rock 10",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "rock"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -40.1547,
+            -0.9957,
+            -19.6991
+          ],
+          "rotation": [
+            0,
+            79.566,
+            0
+          ],
+          "scale": [
+            2.8448,
+            2.8448,
+            2.8448
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/rock_face_02/rock_face_02_2k.gltf",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/rock_face_02/rock_face_02_2k.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 62,
+      "name": "Shore Rock 11",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "rock"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            38.0803,
+            -1.0031,
+            -21.7022
+          ],
+          "rotation": [
+            0,
+            187.59,
+            0
+          ],
+          "scale": [
+            3.1487,
+            3.1487,
+            3.1487
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/boulder_01/boulder_01_2k.gltf",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/boulder_01/boulder_01_2k.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 63,
+      "name": "Shore Rock 12",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "rock"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -60.8654,
+            -0.5019,
+            -31.32
+          ],
+          "rotation": [
+            0,
+            323.892,
+            0
+          ],
+          "scale": [
+            1.4341,
+            1.4341,
+            1.4341
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/boulder_01/boulder_01_2k.gltf",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/boulder_01/boulder_01_2k.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 64,
+      "name": "Shore Rock 13",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "rock"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -51.2934,
+            -0.2528,
+            -29.7231
+          ],
+          "rotation": [
+            0,
+            14.258,
+            0
+          ],
+          "scale": [
+            1.8223,
+            1.8223,
+            1.8223
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/rock_face_02/rock_face_02_2k.gltf",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/rock_face_02/rock_face_02_2k.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 65,
+      "name": "Shore Rock 14",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "rock"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -44.3818,
+            -0.5994,
+            -20.817
+          ],
+          "rotation": [
+            0,
+            232.408,
+            0
+          ],
+          "scale": [
+            1.7126,
+            1.7126,
+            1.7126
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/boulder_01/boulder_01_2k.gltf",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/boulder_01/boulder_01_2k.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 66,
+      "name": "Shore Rock 15",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "rock"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            11.6694,
+            -0.2457,
+            -17.1476
+          ],
+          "rotation": [
+            0,
+            325.527,
+            0
+          ],
+          "scale": [
+            1.9791,
+            1.9791,
+            1.9791
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/boulder_01/boulder_01_2k.gltf",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/boulder_01/boulder_01_2k.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 67,
+      "name": "Shore Rock 16",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "rock"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -60.8816,
+            -0.085,
+            -40.0343
+          ],
+          "rotation": [
+            0,
+            292.511,
+            0
+          ],
+          "scale": [
+            1.6914,
+            1.6914,
+            1.6914
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/rock_face_02/rock_face_02_2k.gltf",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/rock_face_02/rock_face_02_2k.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 68,
+      "name": "Shore Rock 17",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "rock"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            29.421,
+            0.0559,
+            -21.6107
+          ],
+          "rotation": [
+            0,
+            50.295,
+            0
+          ],
+          "scale": [
+            1.8002,
+            1.8002,
+            1.8002
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/boulder_01/boulder_01_2k.gltf",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/boulder_01/boulder_01_2k.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 69,
+      "name": "Shore Rock 18",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "rock"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            16.9723,
+            -0.7077,
+            -15.0992
+          ],
+          "rotation": [
+            0,
+            171.761,
+            0
+          ],
+          "scale": [
+            2.0221,
+            2.0221,
+            2.0221
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/boulder_01/boulder_01_2k.gltf",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/boulder_01/boulder_01_2k.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 70,
+      "name": "Brush 1",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "plant"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -16.4195,
+            10.515,
+            -81.2713
+          ],
+          "rotation": [
+            0,
+            307.763,
+            0
+          ],
+          "scale": [
+            1.8959,
+            1.8959,
+            1.8959
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/shrub_02/shrub_02_2k.gltf",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/shrub_02/shrub_02_2k.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 71,
+      "name": "Brush 2",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "plant"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -32.3147,
+            11.593,
+            -86.8773
+          ],
+          "rotation": [
+            0,
+            148.509,
+            0
+          ],
+          "scale": [
+            1.7848,
+            1.7848,
+            1.7848
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/fern_02/fern_02_2k.gltf",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/fern_02/fern_02_2k.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 72,
+      "name": "Brush 4",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "plant"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -34.7277,
+            11.336,
+            -88.6533
+          ],
+          "rotation": [
+            0,
+            72.675,
+            0
+          ],
+          "scale": [
+            1.4785,
+            1.4785,
+            1.4785
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/shrub_02/shrub_02_2k.gltf",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/shrub_02/shrub_02_2k.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 73,
+      "name": "Brush 5",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "plant"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            29.5029,
+            2.677,
+            -66.6368
+          ],
+          "rotation": [
+            0,
+            10.237,
+            0
+          ],
+          "scale": [
+            1.8634,
+            1.8634,
+            1.8634
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/fern_02/fern_02_2k.gltf",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/fern_02/fern_02_2k.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 74,
+      "name": "Brush 7",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "plant"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -46.568,
+            2.148,
+            -46.7578
+          ],
+          "rotation": [
+            0,
+            182.522,
+            0
+          ],
+          "scale": [
+            1.7092,
+            1.7092,
+            1.7092
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/shrub_02/shrub_02_2k.gltf",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/shrub_02/shrub_02_2k.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 75,
+      "name": "Brush 8",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "plant"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -41.6951,
+            2.128,
+            -39.2314
+          ],
+          "rotation": [
+            0,
+            34.934,
+            0
+          ],
+          "scale": [
+            1.4406,
+            1.4406,
+            1.4406
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/fern_02/fern_02_2k.gltf",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/fern_02/fern_02_2k.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 76,
+      "name": "Brush 9",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "plant"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            13.1697,
+            2.73,
+            -72.0157
+          ],
+          "rotation": [
+            0,
+            69.6,
+            0
+          ],
+          "scale": [
+            1.4566,
+            1.4566,
+            1.4566
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/fern_02/fern_02_2k.gltf",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/fern_02/fern_02_2k.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 77,
+      "name": "Brush 10",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "plant"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -14.5553,
+            9.027,
+            -72.1835
+          ],
+          "rotation": [
+            0,
+            232.74,
+            0
+          ],
+          "scale": [
+            1.2236,
+            1.2236,
+            1.2236
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/shrub_02/shrub_02_2k.gltf",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/shrub_02/shrub_02_2k.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 78,
+      "name": "Brush 11",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "plant"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -17.6794,
+            3.103,
+            -37.1721
+          ],
+          "rotation": [
+            0,
+            54.965,
+            0
+          ],
+          "scale": [
+            1.5998,
+            1.5998,
+            1.5998
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/fern_02/fern_02_2k.gltf",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/fern_02/fern_02_2k.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 79,
+      "name": "Brush 12",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "plant"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -53.5696,
+            5.191,
+            -62.7077
+          ],
+          "rotation": [
+            0,
+            190.065,
+            0
+          ],
+          "scale": [
+            1.2194,
+            1.2194,
+            1.2194
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/fern_02/fern_02_2k.gltf",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/fern_02/fern_02_2k.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 80,
+      "name": "Brush 13",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "plant"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            37.8744,
+            2.466,
+            -40.6395
+          ],
+          "rotation": [
+            0,
+            182.309,
+            0
+          ],
+          "scale": [
+            1.5484,
+            1.5484,
+            1.5484
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/shrub_02/shrub_02_2k.gltf",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/shrub_02/shrub_02_2k.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 81,
+      "name": "Brush 14",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "plant"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -35.1621,
+            2.988,
+            -51.9056
+          ],
+          "rotation": [
+            0,
+            24.899,
+            0
+          ],
+          "scale": [
+            1.2185,
+            1.2185,
+            1.2185
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/fern_02/fern_02_2k.gltf",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/fern_02/fern_02_2k.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 82,
+      "name": "Brush 15",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "plant"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -30.8626,
+            11.785,
+            -83.2837
+          ],
+          "rotation": [
+            0,
+            280.533,
+            0
+          ],
+          "scale": [
+            1.3505,
+            1.3505,
+            1.3505
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/fern_02/fern_02_2k.gltf",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/fern_02/fern_02_2k.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 83,
+      "name": "Brush 16",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "plant"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -45.6995,
+            1.572,
+            -36.2041
+          ],
+          "rotation": [
+            0,
+            77.039,
+            0
+          ],
+          "scale": [
+            1.2591,
+            1.2591,
+            1.2591
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/shrub_02/shrub_02_2k.gltf",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/shrub_02/shrub_02_2k.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 84,
+      "name": "Brush 17",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "plant"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -18.8198,
+            3.611,
+            -53.9048
+          ],
+          "rotation": [
+            0,
+            118.722,
+            0
+          ],
+          "scale": [
+            1.793,
+            1.793,
+            1.793
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/fern_02/fern_02_2k.gltf",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/fern_02/fern_02_2k.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 85,
+      "name": "Brush 18",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "plant"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -33.3571,
+            11.377,
+            -88.391
+          ],
+          "rotation": [
+            0,
+            334.659,
+            0
+          ],
+          "scale": [
+            1.8256,
+            1.8256,
+            1.8256
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/fern_02/fern_02_2k.gltf",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/fern_02/fern_02_2k.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 86,
+      "name": "Brush 19",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "plant"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -68.5736,
+            6.153,
+            -85.1934
+          ],
+          "rotation": [
+            0,
+            158.077,
+            0
+          ],
+          "scale": [
+            1.3056,
+            1.3056,
+            1.3056
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/shrub_02/shrub_02_2k.gltf",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/shrub_02/shrub_02_2k.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 87,
+      "name": "Brush 20",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "plant"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -7.9058,
+            7.081,
+            -70.4811
+          ],
+          "rotation": [
+            0,
+            339.397,
+            0
+          ],
+          "scale": [
+            1.4904,
+            1.4904,
+            1.4904
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/fern_02/fern_02_2k.gltf",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/fern_02/fern_02_2k.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 88,
+      "name": "Brush 21",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "plant"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -42.1348,
+            11.399,
+            -78.1451
+          ],
+          "rotation": [
+            0,
+            192.009,
+            0
+          ],
+          "scale": [
+            1.6228,
+            1.6228,
+            1.6228
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/fern_02/fern_02_2k.gltf",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/fern_02/fern_02_2k.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 89,
+      "name": "Brush 22",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "plant"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -9.4661,
+            7.516,
+            -70.5936
+          ],
+          "rotation": [
+            0,
+            235.061,
+            0
+          ],
+          "scale": [
+            1.3208,
+            1.3208,
+            1.3208
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/shrub_02/shrub_02_2k.gltf",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/shrub_02/shrub_02_2k.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 90,
+      "name": "Brush 23",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "plant"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -20.7934,
+            10.407,
+            -74.2839
+          ],
+          "rotation": [
+            0,
+            284.073,
+            0
+          ],
+          "scale": [
+            1.2966,
+            1.2966,
+            1.2966
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/fern_02/fern_02_2k.gltf",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/fern_02/fern_02_2k.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 91,
+      "name": "Brush 24",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "plant"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -42.2258,
+            5.603,
+            -60.5334
+          ],
+          "rotation": [
+            0,
+            247.288,
+            0
+          ],
+          "scale": [
+            1.2328,
+            1.2328,
+            1.2328
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/fern_02/fern_02_2k.gltf",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/fern_02/fern_02_2k.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 92,
+      "name": "Brush 25",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "plant"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            1.5494,
+            3.886,
+            -51.7072
+          ],
+          "rotation": [
+            0,
+            267.075,
+            0
+          ],
+          "scale": [
+            1.2652,
+            1.2652,
+            1.2652
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/shrub_02/shrub_02_2k.gltf",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/shrub_02/shrub_02_2k.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 93,
+      "name": "Brush 26",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "plant"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -11.967,
+            4.491,
+            -62.4552
+          ],
+          "rotation": [
+            0,
+            183.283,
+            0
+          ],
+          "scale": [
+            1.8015,
+            1.8015,
+            1.8015
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/fern_02/fern_02_2k.gltf",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/fern_02/fern_02_2k.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 94,
+      "name": "Brush 27",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "plant"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -20.8047,
+            11.106,
+            -83.6549
+          ],
+          "rotation": [
+            0,
+            294.288,
+            0
+          ],
+          "scale": [
+            1.289,
+            1.289,
+            1.289
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/fern_02/fern_02_2k.gltf",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/fern_02/fern_02_2k.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 95,
+      "name": "Brush 28",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "plant"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            26.2841,
+            2.789,
+            -36.9167
+          ],
+          "rotation": [
+            0,
+            186.425,
+            0
+          ],
+          "scale": [
+            1.3458,
+            1.3458,
+            1.3458
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/shrub_02/shrub_02_2k.gltf",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/shrub_02/shrub_02_2k.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 96,
+      "name": "Brush 30",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "plant"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -31.8631,
+            3.134,
+            -51.8466
+          ],
+          "rotation": [
+            0,
+            262.901,
+            0
+          ],
+          "scale": [
+            1.7244,
+            1.7244,
+            1.7244
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/fern_02/fern_02_2k.gltf",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/fern_02/fern_02_2k.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 97,
+      "name": "Brush 31",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "plant"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -51.06,
+            10.589,
+            -80.7978
+          ],
+          "rotation": [
+            0,
+            253.623,
+            0
+          ],
+          "scale": [
+            1.3067,
+            1.3067,
+            1.3067
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/shrub_02/shrub_02_2k.gltf",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/shrub_02/shrub_02_2k.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 98,
+      "name": "Brush 33",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "plant"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -2.6959,
+            7.14,
+            -77.8134
+          ],
+          "rotation": [
+            0,
+            36.448,
+            0
+          ],
+          "scale": [
+            1.3295,
+            1.3295,
+            1.3295
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/fern_02/fern_02_2k.gltf",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/fern_02/fern_02_2k.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 99,
+      "name": "Brush 34",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "plant"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -24.892,
+            6.96,
+            -62.9589
+          ],
+          "rotation": [
+            0,
+            51.728,
+            0
+          ],
+          "scale": [
+            1.1458,
+            1.1458,
+            1.1458
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/shrub_02/shrub_02_2k.gltf",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/shrub_02/shrub_02_2k.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 100,
+      "name": "Fire Pit",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            2,
+            1.679,
+            -22
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/stone_fire_pit/stone_fire_pit_2k.gltf",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/stone_fire_pit/stone_fire_pit_2k.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 101,
+      "name": "Treasure Chest",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "loot"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -1.2,
+            1.288,
+            -20.5
+          ],
+          "rotation": [
+            0,
+            25,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/treasure_chest/treasure_chest_2k.gltf",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/treasure_chest/treasure_chest_2k.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 102,
+      "name": "Rum Barrels",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -17,
+            1.308,
+            -22
+          ],
+          "rotation": [
+            0,
+            80,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "id": 103,
+      "name": "barrel01",
+      "parent": 102,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/wooden_barrels_01/wooden_barrels_01_2k.gltf#0",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/wooden_barrels_01/wooden_barrels_01_2k_barrel01.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 104,
+      "name": "barrel02",
+      "parent": 102,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/wooden_barrels_01/wooden_barrels_01_2k.gltf#1",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/wooden_barrels_01/wooden_barrels_01_2k_barrel02.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 105,
+      "name": "pieces",
+      "parent": 102,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/wooden_barrels_01/wooden_barrels_01_2k.gltf#2",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/wooden_barrels_01/wooden_barrels_01_2k_pieces.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 106,
+      "name": "Crate 1",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -14.5,
+            0.672,
+            -18.5
+          ],
+          "rotation": [
+            0,
+            10,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/wooden_crate_02/wooden_crate_02_2k.gltf",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/wooden_crate_02/wooden_crate_02_2k.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 107,
+      "name": "Crate 2",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -13.6,
+            0.92,
+            -19.6
+          ],
+          "rotation": [
+            0,
+            40,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/wooden_crate_01/wooden_crate_01_2k.gltf",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/wooden_crate_01/wooden_crate_01_2k.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 108,
+      "name": "Crate 3",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            6,
+            2.037,
+            -25
+          ],
+          "rotation": [
+            0,
+            -20,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/wooden_crate_02/wooden_crate_02_2k.gltf",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/wooden_crate_02/wooden_crate_02_2k.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 109,
+      "name": "Crate 4",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -3.5,
+            2.052,
+            -25
+          ],
+          "rotation": [
+            0,
+            70,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/wooden_crate_01/wooden_crate_01_2k.gltf",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/wooden_crate_01/wooden_crate_01_2k.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 110,
+      "name": "Bucket",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -1,
+            1.986,
+            -24.5
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/wooden_bucket_01/wooden_bucket_01_2k.gltf",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/wooden_bucket_01/wooden_bucket_01_2k.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 111,
+      "name": "Shore Cannon 1",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "cannon"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            14,
+            2.002,
+            -26
+          ],
+          "rotation": [
+            0,
+            200,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/cannon_01/cannon_01_2k.gltf",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/cannon_01/cannon_01_2k.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 112,
+      "name": "Shore Cannon 2",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "cannon"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            19,
+            1.77,
+            -25.4
+          ],
+          "rotation": [
+            0,
+            192,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/cannon_01/cannon_01_2k.gltf",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/cannon_01/cannon_01_2k.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 113,
+      "name": "Shore Cannon 3",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "cannon"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            24,
+            1.504,
+            -24.8
+          ],
+          "rotation": [
+            0,
+            184,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/cannon_01/cannon_01_2k.gltf",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/cannon_01/cannon_01_2k.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 114,
+      "name": "Pier Lantern 1",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -8.45,
+            2.9,
+            -16
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "id": 115,
+      "name": "01",
+      "parent": 114,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/wooden_lantern_01/wooden_lantern_01_2k.gltf#0",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/wooden_lantern_01/wooden_lantern_01_2k_01.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 116,
+      "name": "glass",
+      "parent": 114,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/wooden_lantern_01/wooden_lantern_01_2k.gltf#1",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/wooden_lantern_01/wooden_lantern_01_2k_glass.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 117,
+      "name": "Pier Lantern Light 1",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "lantern_light"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -8.45,
+            3.25,
+            -16
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "light": {
+          "kind": "point",
+          "color": "#ffb060",
+          "intensity": 3,
+          "range": 8,
+          "spotAngle": 35
+        }
+      },
+      "behaviors": [
+        {
+          "name": "Flicker",
+          "intent": "Flicker like a candle in a sea breeze.",
+          "source": "\non tick\n  self.light.intensity = 2.8 + sin(time * 11 + self.id) * 0.25 + random() * 0.5\nend",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 118,
+      "name": "Pier Lantern 2",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -8.45,
+            2.9,
+            -4
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "id": 119,
+      "name": "01",
+      "parent": 118,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/wooden_lantern_01/wooden_lantern_01_2k.gltf#0",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/wooden_lantern_01/wooden_lantern_01_2k_01.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 120,
+      "name": "glass",
+      "parent": 118,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/wooden_lantern_01/wooden_lantern_01_2k.gltf#1",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/wooden_lantern_01/wooden_lantern_01_2k_glass.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 121,
+      "name": "Pier Lantern Light 2",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "lantern_light"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -8.45,
+            3.25,
+            -4
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "light": {
+          "kind": "point",
+          "color": "#ffb060",
+          "intensity": 3,
+          "range": 8,
+          "spotAngle": 35
+        }
+      },
+      "behaviors": [
+        {
+          "name": "Flicker",
+          "intent": "Flicker like a candle in a sea breeze.",
+          "source": "\non tick\n  self.light.intensity = 2.8 + sin(time * 11 + self.id) * 0.25 + random() * 0.5\nend",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 122,
+      "name": "Pier Lantern 3",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -8.45,
+            2.9,
+            8
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "id": 123,
+      "name": "01",
+      "parent": 122,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/wooden_lantern_01/wooden_lantern_01_2k.gltf#0",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/wooden_lantern_01/wooden_lantern_01_2k_01.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 124,
+      "name": "glass",
+      "parent": 122,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/wooden_lantern_01/wooden_lantern_01_2k.gltf#1",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/wooden_lantern_01/wooden_lantern_01_2k_glass.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 125,
+      "name": "Pier Lantern Light 3",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "lantern_light"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -8.45,
+            3.25,
+            8
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "light": {
+          "kind": "point",
+          "color": "#ffb060",
+          "intensity": 3,
+          "range": 8,
+          "spotAngle": 35
+        }
+      },
+      "behaviors": [
+        {
+          "name": "Flicker",
+          "intent": "Flicker like a candle in a sea breeze.",
+          "source": "\non tick\n  self.light.intensity = 2.8 + sin(time * 11 + self.id) * 0.25 + random() * 0.5\nend",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 126,
+      "name": "Pier Lantern 4",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -8.45,
+            2.9,
+            20
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "id": 127,
+      "name": "01",
+      "parent": 126,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/wooden_lantern_01/wooden_lantern_01_2k.gltf#0",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/wooden_lantern_01/wooden_lantern_01_2k_01.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 128,
+      "name": "glass",
+      "parent": 126,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/wooden_lantern_01/wooden_lantern_01_2k.gltf#1",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/wooden_lantern_01/wooden_lantern_01_2k_glass.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 129,
+      "name": "Pier Lantern Light 4",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "lantern_light"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -8.45,
+            3.25,
+            20
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "light": {
+          "kind": "point",
+          "color": "#ffb060",
+          "intensity": 3,
+          "range": 8,
+          "spotAngle": 35
+        }
+      },
+      "behaviors": [
+        {
+          "name": "Flicker",
+          "intent": "Flicker like a candle in a sea breeze.",
+          "source": "\non tick\n  self.light.intensity = 2.8 + sin(time * 11 + self.id) * 0.25 + random() * 0.5\nend",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 130,
+      "name": "Pier Lantern 5",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -8.45,
+            2.9,
+            32
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "id": 131,
+      "name": "01",
+      "parent": 130,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/wooden_lantern_01/wooden_lantern_01_2k.gltf#0",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/wooden_lantern_01/wooden_lantern_01_2k_01.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 132,
+      "name": "glass",
+      "parent": 130,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/wooden_lantern_01/wooden_lantern_01_2k.gltf#1",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/wooden_lantern_01/wooden_lantern_01_2k_glass.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 133,
+      "name": "Pier Lantern Light 5",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "lantern_light"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -8.45,
+            3.25,
+            32
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "light": {
+          "kind": "point",
+          "color": "#ffb060",
+          "intensity": 3,
+          "range": 8,
+          "spotAngle": 35
+        }
+      },
+      "behaviors": [
+        {
+          "name": "Flicker",
+          "intent": "Flicker like a candle in a sea breeze.",
+          "source": "\non tick\n  self.light.intensity = 2.8 + sin(time * 11 + self.id) * 0.25 + random() * 0.5\nend",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 134,
+      "name": "Camp Lantern",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -1,
+            2.522,
+            -20.6
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "id": 135,
+      "name": "01",
+      "parent": 134,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/wooden_lantern_01/wooden_lantern_01_2k.gltf#0",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/wooden_lantern_01/wooden_lantern_01_2k_01.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 136,
+      "name": "glass",
+      "parent": 134,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "mesh": {
+          "mesh": "asset:downloads/wooden_lantern_01/wooden_lantern_01_2k.gltf#1",
+          "color": "#ccccd1",
+          "metallic": 0,
+          "roughness": 0.55,
+          "emissive": "#000000",
+          "texture": "",
+          "visible": true,
+          "billboard": false,
+          "material": "downloads/wooden_lantern_01/wooden_lantern_01_2k_glass.mat.json",
+          "unlit": false,
+          "shading": "pbr",
+          "normalMap": "",
+          "ormMap": "",
+          "emissiveMap": "",
+          "normalStrength": 1,
+          "tiling": 1,
+          "triplanar": false,
+          "clearcoat": 0,
+          "subsurface": 0,
+          "rim": 0,
+          "outline": 0,
+          "outlineColor": "#0a0a0f",
+          "doubleSided": false,
+          "castShadows": true,
+          "alphaCutoff": 0
+        }
+      }
+    },
+    {
+      "id": 137,
+      "name": "Camp Lantern Light",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -1,
+            2.679,
+            -20.6
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "light": {
+          "kind": "point",
+          "color": "#ffb060",
+          "intensity": 2.2,
+          "range": 6,
+          "spotAngle": 35
+        }
+      }
+    },
+    {
+      "id": 138,
+      "name": "Campfire",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            2,
+            1.699,
+            -22
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "id": 139,
+      "name": "Fire",
+      "parent": 138,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "fluid": {
+          "preset": "volume_fire",
+          "emitting": true,
+          "size": [
+            2,
+            2.8,
+            2
+          ],
+          "resolution": 100,
+          "sourceOffset": [
+            0,
+            0.1,
+            0
+          ],
+          "sourceRadius": 0.55,
+          "fuel": 1.5,
+          "heat": 1,
+          "smoke": 0.5,
+          "buoyancy": 0.55,
+          "vorticity": 1.1,
+          "turbulence": 1.4,
+          "burnRate": 5,
+          "cooling": 4.5,
+          "smokeFade": 0.3,
+          "speed": 0.2,
+          "wind": 1,
+          "flameIntensity": 1.1,
+          "flameTemperature": 1750,
+          "smokeColor": "#2a2725",
+          "smokeDensity": 0.9,
+          "light": 5,
+          "lightColor": "#ffa055",
+          "lightRange": 10,
+          "burst": 0,
+          "seed": 0
+        }
+      }
+    },
+    {
+      "id": 140,
+      "name": "Embers",
+      "parent": 138,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            0.3,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "particles": {
+          "preset": "embers",
+          "emitting": true,
+          "look": "glow",
+          "rate": 12,
+          "burst": 0,
+          "maxParticles": 200,
+          "lifetime": 2.6,
+          "lifetimeJitter": 0.5,
+          "shape": "disc",
+          "shapeSize": [
+            0.5,
+            0,
+            0.5
+          ],
+          "direction": [
+            0,
+            1,
+            0
+          ],
+          "speed": 1.9,
+          "speedJitter": 0.5,
+          "spread": 25,
+          "gravity": -1,
+          "drag": 0.7,
+          "turbulence": 1.8,
+          "turbulenceScale": 0.7,
+          "wind": 1,
+          "sizeStart": 0.022,
+          "sizeEnd": 0.008,
+          "sizeJitter": 0.2,
+          "colorStart": "#ffb44a",
+          "colorEnd": "#ff3c0a00",
+          "intensity": 9,
+          "stretch": 0.02,
+          "spin": 0,
+          "softness": 0.05,
+          "worldSpace": true,
+          "collide": false,
+          "floorHeight": 0,
+          "bounce": 0,
+          "splash": 0,
+          "light": 0,
+          "lightColor": "#ff994d",
+          "lightRange": 12,
+          "prewarm": true,
+          "seed": 0
+        }
+      }
+    },
+    {
+      "id": 141,
+      "name": "Player Camera",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            -14,
+            4.5,
+            -30
+          ],
+          "rotation": [
+            -8,
+            160,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "camera": {
+          "fov": 52,
+          "nearPlane": 0.1,
+          "farPlane": 500,
+          "orthographic": false,
+          "orthoSize": 5,
+          "primary": true
+        }
+      }
+    }
+  ]
+}

@@ -7,6 +7,7 @@
 #include "skywalker/core/Strings.h"
 #include "skywalker/engine/Engine.h"
 #include "skywalker/render/Gltf.h"
+#include "skywalker/render/Hdr.h"
 
 using namespace sky;
 namespace fs = std::filesystem;
@@ -132,9 +133,11 @@ TEST_CASE("assets: glTF binary parsing applies node transforms and material") {
     CHECK(g->mesh.indices.size() == 3);
     CHECK(g->mesh.bounds.min.x == doctest::Approx(5));  // node translation applied
     CHECK(g->mesh.bounds.max.x == doctest::Approx(7));
-    CHECK(g->baseColor.x == doctest::Approx(1));
-    CHECK(g->baseColor.y == doctest::Approx(0));
-    CHECK(g->metallic == doctest::Approx(0.25));
+    REQUIRE(g->materials.size() == 1);
+    CHECK(g->materials[0].baseColor.x == doctest::Approx(1));
+    CHECK(g->materials[0].baseColor.y == doctest::Approx(0));
+    CHECK(g->materials[0].metallic == doctest::Approx(0.25));
+    CHECK(g->parts == std::vector<int>{0});
 
     std::vector<uint8_t> garbage = {'g', 'l', 'T', 'F', 2, 0, 0, 0};
     CHECK_FALSE(parseGltf(garbage, ".", false));
@@ -365,4 +368,90 @@ TEST_CASE("rendering: HDR emissive colors survive a save/load round trip") {
     call(*e, "scene_save", R"({"path":"scenes/hdr.sky.json"})");
     call(*e, "scene_load", R"({"path":"scenes/hdr.sky.json"})");
     CHECK(e->scene().get<MeshRenderer>(e->scene().find("Cube"))->emissive.w == doctest::Approx(6));
+}
+
+namespace {
+
+/// Two triangles with different materials (the second alpha-masked), external texture,
+/// embedded data-URI buffer: a typical multi-material model from an asset library.
+std::string twoMaterialGltf() {
+    const float pos[18] = {0, 0, 0, 1, 0, 0, 0, 1, 0, 10, 0, 0, 11, 0, 0, 10, 1, 0};
+    std::string b64 = str::base64Encode(pos, sizeof(pos));
+    return R"({"asset":{"version":"2.0"},"scene":0,"scenes":[{"nodes":[0]}],"nodes":[{"mesh":0}],
+        "meshes":[{"primitives":[{"attributes":{"POSITION":0},"material":0},{"attributes":{"POSITION":1},"material":1}]}],
+        "materials":[{"name":"crate_wood","pbrMetallicRoughness":{"baseColorFactor":[0.5,0.3,0.1,1]}},
+                     {"name":"crate_leaves","alphaMode":"MASK","alphaCutoff":0.4,"doubleSided":true,
+                      "pbrMetallicRoughness":{"baseColorTexture":{"index":0},"metallicRoughnessTexture":{"index":1}}}],
+        "textures":[{"source":0},{"source":1}],
+        "images":[{"uri":"textures/leaves_diff.png"},{"uri":"textures/leaves_arm.png"}],
+        "buffers":[{"byteLength":72,"uri":"data:application/octet-stream;base64,)" + b64 + R"("}],
+        "bufferViews":[{"buffer":0,"byteOffset":0,"byteLength":36},{"buffer":0,"byteOffset":36,"byteLength":36}],
+        "accessors":[{"bufferView":0,"componentType":5126,"count":3,"type":"VEC3"},
+                     {"bufferView":1,"componentType":5126,"count":3,"type":"VEC3"}]})";
+}
+
+}  // namespace
+
+TEST_CASE("assets: multi-material glTF imports as parts + a prefab") {
+    TempProject p("parts");
+    p.write("models/crate/crate.gltf", twoMaterialGltf());
+    std::string text = twoMaterialGltf();
+    auto parsed = parseGltf(std::vector<uint8_t>(text.begin(), text.end()), ".", false, 1);
+    REQUIRE(parsed);
+    CHECK(parsed->mesh.indices.size() == 3);                  // only material 1's triangle
+    CHECK(parsed->fullBounds.max.x == doctest::Approx(11));   // but bounds of the whole model
+    CHECK(parsed->parts == std::vector<int>{0, 1});
+    CHECK(parsed->materials[1].occlusionStrength == doctest::Approx(1));  // "_arm" map packs AO
+
+    auto e = makeEngine(p);
+    Json r = call(*e, "asset_import", R"({"path":"models/crate/crate.gltf","normalize":false,"create_entity":"Crate","position":[0,0,5]})");
+    CHECK(r.get("prefab").asString() == "models/crate/crate.prefab.json");
+    REQUIRE(r.get("parts").size() == 2);
+    CHECK(r.get("parts")[size_t{1}].get("mesh").asString() == "asset:models/crate/crate.gltf#1");
+    CHECK(r.get("parts")[size_t{1}].get("material").asString() == "models/crate/crate_leaves.mat.json");
+    const ResolvedMaterial* leaves = e->resolveMaterial("models/crate/crate_leaves.mat.json");
+    REQUIRE(leaves);
+    CHECK(leaves->alphaCutoff == doctest::Approx(0.4));
+    CHECK(leaves->doubleSided);
+    CHECK(leaves->texture == "models/crate/textures/leaves_diff.png");  // external images are referenced in place
+
+    EntityId crate = e->scene().find("Crate");
+    REQUIRE(crate);
+    REQUIRE(e->scene().children(crate).size() == 2);
+    EntityId part = e->scene().children(crate)[1];
+    CHECK(e->scene().get<MeshRenderer>(part)->mesh == "asset:models/crate/crate.gltf#1");
+    // Parts reload from disk on demand (fresh cache) with the recorded import settings.
+    const MeshData* m = e->cpuMesh("asset:models/crate/crate.gltf#1");
+    REQUIRE(m);
+    CHECK(m->bounds.min.x == doctest::Approx(10));
+    Json info = call(*e, "asset_info", R"({"asset":"models/crate/crate.gltf"})");
+    CHECK(info.get("usedBy").size() == 2);
+}
+
+TEST_CASE("assets: Radiance .hdr panoramas decode (flat and RLE)") {
+    auto header = [](int w, int h) {
+        std::string s = "#?RADIANCE\nFORMAT=32-bit_rle_rgbe\n\n-Y " + std::to_string(h) + " +X " + std::to_string(w) + "\n";
+        return std::vector<uint8_t>(s.begin(), s.end());
+    };
+    // Flat: 2x1 pixels, (1,1,1) and (0.5, 0.25, 0)
+    auto flat = header(2, 1);
+    for (uint8_t b : {128, 128, 128, 129, 128, 64, 0, 128}) flat.push_back(b);
+    auto a = parseHdr(flat);
+    REQUIRE_MESSAGE(a, (a ? "" : a.error().message));
+    CHECK(a->rgb[0] == doctest::Approx(1.0).epsilon(0.01));
+    CHECK(a->rgb[3] == doctest::Approx(0.5).epsilon(0.01));
+    CHECK(a->rgb[4] == doctest::Approx(0.25).epsilon(0.02));
+    // RLE: 8x1, every channel a run of 8 -> all pixels (2, 2, 2)
+    auto rle = header(8, 1);
+    for (uint8_t b : {2, 2, 0, 8}) rle.push_back(b);
+    for (uint8_t v : {128, 128, 128, 130}) {
+        rle.push_back(128 + 8);
+        rle.push_back(v);
+    }
+    auto b = parseHdr(rle);
+    REQUIRE_MESSAGE(b, (b ? "" : b.error().message));
+    CHECK(b->width == 8);
+    CHECK(b->rgb[7 * 3 + 2] == doctest::Approx(2.0).epsilon(0.01));
+    std::vector<uint8_t> junk = {'n', 'o', 'p', 'e'};
+    CHECK_FALSE(parseHdr(junk));
 }

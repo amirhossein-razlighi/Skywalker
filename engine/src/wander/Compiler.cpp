@@ -185,6 +185,7 @@ const std::unordered_map<std::string, FnSig>& functions() {
         {"abs", {1, 1}},      {"sqrt", {1, 1}},      {"floor", {1, 1}},     {"ceil", {1, 1}},
         {"round", {1, 1}},    {"sign", {1, 1}},      {"min", {2, 2}},       {"max", {2, 2}},
         {"clamp", {3, 3}},    {"lerp", {3, 3}},      {"random", {0, 2}},    {"chance", {1, 1}},
+        {"burst", {1, 2}},    {"water_height", {1, 2}},
         {"vec", {3, 3}},      {"color", {3, 4}},     {"length", {1, 1}},    {"normalize", {1, 1}},
         {"dot", {2, 2}},      {"cross", {2, 2}},     {"key", {1, 1}},       {"exists", {1, 1}},
         {"str", {1, 1}},      {"spawn", {1, 3}},     {"tagged", {2, 2}},    {"forward", {1, 1}},
@@ -935,6 +936,9 @@ Functions:  find(name) nearest(tag) count(tag) tagged(e, tag) exists(e) spawn(me
             distance(a, b) direction(a, b) forward(e) length(v) normalize(v) dot(a, b) cross(a, b)
             vec(x, y, z) color(r, g, b, a?) sin cos tan abs sqrt floor ceil round sign min max
             clamp(x, lo, hi) lerp(a, b, t) random() random(hi) random(lo, hi) chance(p) key(name) str(v)
+Effects:    burst(n) / burst(e, n) emits n particles now (particles component; explosions, muzzle flashes)
+            water_height(x, z) / water_height(pos): the animated water surface height (boats, buoyancy)
+            e.particles.rate / .emitting / .colorStart ... and e.water.windSpeed ... like any component
 Comments:   -- comment   // comment   # comment (a '#' followed by a space)
 Rules:      no while-loops (every handler always terminates); randomness is seeded (replayable);
             entities are -Z forward; rotations are Euler degrees (pitch X, yaw Y, roll Z).

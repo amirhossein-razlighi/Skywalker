@@ -109,7 +109,23 @@ bool sceneCamera(const Scene& scene, ViewCamera& out, EntityId preferred) {
 Shading shadingFromString(std::string_view s) {
     if (s == "toon") return Shading::Toon;
     if (s == "unlit") return Shading::Unlit;
+    if (s == "water") return Shading::Water;
     return Shading::Pbr;
+}
+
+void prioritizeLights(FrameData& f) {
+    // The GPU takes kMaxLights: keep directional lights, then the point/spot lights whose
+    // influence sphere is closest to what the camera looks at (stable order for ties).
+    if (f.lights.size() > FrameData::kMaxLights) {
+        auto score = [&](const LightItem& l) {
+            if (l.kind == LightItem::Kind::Directional) return -1e30f;
+            float d = std::min(distance(l.position, f.camera.target), distance(l.position, f.camera.eye));
+            return std::max(0.f, d - l.range) - l.range * 0.05f * std::min(l.intensity, 10.f);
+        };
+        std::stable_sort(f.lights.begin(), f.lights.end(),
+                         [&](const LightItem& a, const LightItem& b) { return score(a) < score(b); });
+        f.lights.resize(FrameData::kMaxLights);
+    }
 }
 
 FrameData buildFrame(const Scene& scene, const ViewCamera& camera, int width, int height, const BuildOptions& opts) {
@@ -150,10 +166,13 @@ FrameData buildFrame(const Scene& scene, const ViewCamera& camera, int width, in
             s.outline = m->outline;
             s.outlineColor = m->outlineColor;
             s.doubleSided = m->doubleSided;
+            s.alphaCutoff = m->alphaCutoff;
             if (!m->material.empty() && opts.material) {
                 if (const ResolvedMaterial* mat = opts.material(m->material)) {
                     s = *mat;
                     if (m->unlit) s.shading = Shading::Unlit;
+                    s.doubleSided = s.doubleSided || m->doubleSided;
+                    if (s.alphaCutoff <= 0.f) s.alphaCutoff = m->alphaCutoff;
                     if (m->outline > 0.f && s.outline <= 0.f) {
                         s.outline = m->outline;
                         s.outlineColor = m->outlineColor;
@@ -176,6 +195,30 @@ FrameData buildFrame(const Scene& scene, const ViewCamera& camera, int width, in
             d.worldBounds = scene.localBounds(e).transformed(d.model);
             f.draws.push_back(std::move(d));
         }
+        if (const FluidVolume* v = scene.get<FluidVolume>(e)) {
+            VolumeItem vi;
+            vi.entity = e;
+            Vec3 scl{length(world.transformDir({1, 0, 0})), length(world.transformDir({0, 1, 0})), length(world.transformDir({0, 0, 1}))};
+            // Keep position and rotation; the entity's scale multiplies the box size.
+            vi.model = world * Mat4::scale({1.f / std::max(scl.x, 1e-6f), 1.f / std::max(scl.y, 1e-6f), 1.f / std::max(scl.z, 1e-6f)});
+            vi.params = *v;
+            vi.params.size = {v->size.x * scl.x, v->size.y * scl.y, v->size.z * scl.z};
+            float wa = radians(scene.environment().windDirection);
+            vi.wind = Vec3{std::sin(wa), 0.f, std::cos(wa)} * (scene.environment().windSpeed * v->wind);
+            f.volumes.push_back(vi);
+            if (v->light > 0.f && (v->emitting || v->burst > 0.f)) {
+                // The fire lights its surroundings; it flickers like the flames above it.
+                float t = opts.time + static_cast<float>(e) * 1.3f;
+                float flicker = 0.82f + 0.1f * std::sin(t * 11.3f) + 0.06f * std::sin(t * 23.7f + 1.f) + 0.04f * std::sin(t * 41.f);
+                LightItem li;
+                li.kind = LightItem::Kind::Point;
+                li.position = world.transformPoint(v->sourceOffset + Vec3{0, v->size.y * 0.18f, 0});
+                li.color = v->lightColor.xyz();
+                li.intensity = v->light * flicker;
+                li.range = v->lightRange;
+                f.lights.push_back(li);
+            }
+        }
         if (const Light* l = scene.get<Light>(e); l && l->intensity > 0.f) {
             LightItem li;
             li.kind = l->kind == "directional" ? LightItem::Kind::Directional
@@ -190,18 +233,7 @@ FrameData buildFrame(const Scene& scene, const ViewCamera& camera, int width, in
             f.lights.push_back(li);
         }
     }
-    // The GPU takes kMaxLights: keep directional lights, then the point/spot lights whose
-    // influence sphere is closest to what the camera looks at (stable order for ties).
-    if (f.lights.size() > FrameData::kMaxLights) {
-        auto score = [&](const LightItem& l) {
-            if (l.kind == LightItem::Kind::Directional) return -1e30f;
-            float d = std::min(distance(l.position, f.camera.target), distance(l.position, f.camera.eye));
-            return std::max(0.f, d - l.range) - l.range * 0.05f * std::min(l.intensity, 10.f);
-        };
-        std::stable_sort(f.lights.begin(), f.lights.end(),
-                         [&](const LightItem& a, const LightItem& b) { return score(a) < score(b); });
-        f.lights.resize(FrameData::kMaxLights);
-    }
+    prioritizeLights(f);
     return f;
 }
 

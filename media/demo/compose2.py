@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Composites the Skywalker showcase video: 12 crew-built games (engine footage), the live
+"""Composites the Skywalker showcase video: crew-built games (engine footage), the live
 build timelapses recorded from the editor, feature footage, motion graphics, Kokoro
 voiceover and procedural music  ->  1920x1080 H.264 MP4.
 
@@ -239,11 +239,13 @@ def seg_challenge(t, dur):
     im = shot(g, s, 1.0 + (t - k * step)).convert("RGBA")
     d = ImageDraw.Draw(im)
     a = ease(t / 0.4)
-    d.rounded_rectangle([W - 420, 48, W - 56, 150], 26, fill=(12, 13, 18, int(210 * a)))
-    text(d, (W - 392, 60), f"game {k + 1} of 12", 22, "Medium", DIM, alpha=a)
-    text(d, (W - 392, 90), META[g]["title"], 38, "Bold", INK, alpha=a)
-    d.rounded_rectangle([56, 48, 760, 100], 26, fill=(12, 13, 18, int(205 * a)))
-    text(d, (84, 60), "12 games · built by AI agents · live in the editor", 26, "Semibold", INK, alpha=a)
+    title = META[g]["title"]
+    tw = d.textlength(title, font=font(38, "Bold"))
+    d.rounded_rectangle([W - 112 - tw, 48, W - 56, 150], 26, fill=(12, 13, 18, int(210 * a)))
+    text(d, (W - 84 - tw, 60), META[g]["genre"], 22, "Medium", DIM, alpha=a)
+    text(d, (W - 84 - tw, 90), title, 38, "Bold", INK, alpha=a)
+    d.rounded_rectangle([56, 48, 640, 100], 26, fill=(12, 13, 18, int(205 * a)))
+    text(d, (84, 60), "Built by AI agents · live in the editor", 26, "Semibold", INK, alpha=a)
     return im.convert("RGB")
 
 
@@ -251,7 +253,7 @@ ALL_EDITS = sorted(((g, e) for g in GAMES for e in REC[g]["edits"]), key=lambda 
 
 
 def seg_crew(t, dur):
-    """All twelve live builds at once (4x3), with a crew activity ticker."""
+    """Every live build at once (4x3 grid), with a crew activity ticker."""
     p = min(1.0, max(0.0, 0.12 + 0.88 * (t - 0.3) / (dur - 1.4)))
     im = Image.new("RGBA", (W, H), (9, 10, 14, 255))
     tw, th, gap = 440, 248, 14
@@ -276,7 +278,7 @@ def seg_crew(t, dur):
     d = ImageDraw.Draw(im)
     a = ease(t / 0.4)
     text(d, (x0, 56), "Live in the editor", 40, "Bold", INK, alpha=a)
-    text(d, (x0 + 360, 66), "12 builds · 5 agents · every edit attributed and undoable", 26, "Medium", DIM, alpha=a)
+    text(d, (x0 + 360, 66), "5 agents · every edit attributed and undoable", 26, "Medium", DIM, alpha=a)
     text(d, (W - x0, 52), f"{done}", 52, "Bold", INK, "ra", mono=True, alpha=a)
     text(d, (W - x0, 108), "edits", 20, "Medium", DIM, "ra", alpha=a)
     # Ticker: latest edits across all builds
@@ -560,7 +562,7 @@ def seg_connect(t, dur):
         icon = rgba(os.path.join(BRAND, "icon", "app-icon-256.png"), h=150)
         im.alpha_composite(fade_alpha(icon, ha), (W // 2 + 505, 470))
         text(d, (W // 2 + 580, 660), "Skywalker", 40, "Bold", INK, "mm", alpha=ha)
-        text(d, (W // 2 + 580, 708), "54 tools · live editor or headless", 24, "Regular", DIM, "mm", alpha=ha)
+        text(d, (W // 2 + 580, 708), "57 tools · live editor or headless", 24, "Regular", DIM, "mm", alpha=ha)
     ta = ease((t - 2.4) / 0.5)
     if ta > 0:
         cmd = "$ claude mcp add skywalker -- skywalker mcp --attach"
@@ -582,7 +584,7 @@ def seg_outro(t, dur):
     bg.alpha_composite(fade_alpha(icon, a), (x0, y0))
     bg.alpha_composite(fade_alpha(wm, a), (x0 + icon.width + 30, y0 + (icon.height - wm.height) // 2))
     b = ease((t - 0.8) / 0.6)
-    text(d, (W // 2, 700), "Twelve games. One crew.", 56, "Semibold", (240, 236, 255), "mm", alpha=b)
+    text(d, (W // 2, 700), "Any game. One crew.", 56, "Semibold", (240, 236, 255), "mm", alpha=b)
     c = ease((t - 1.6) / 0.6)
     text(d, (W // 2, 800), "C++ engine · Metal · Swift editor · MCP · Wander", 28, "Regular", DIM, "mm", alpha=c)
     fade = ease((t - (dur - 0.9)) / 0.9)
