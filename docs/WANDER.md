@@ -90,3 +90,9 @@ Conventions: meters; +Y up; entities face −Z; rotations are Euler degrees `[pi
 - A runtime error aborts that handler invocation and is reported. After 5 errors the
   script is disabled.
 - Replacing a behavior while playing restarts its instance state.
+- Physics and navigation (see [PHYSICS.md](PHYSICS.md)): `on collide "name|tag"`,
+  `on trigger_enter`, `on trigger_exit` (with `other`, `contact_point`, `contact_normal`,
+  `impact`); `push impulse torque velocity raycast overlap_sphere` (then `hit_point`,
+  `hit_normal`, `hit_distance`); `walk jump grounded` for characters; `navigate
+  stop_navigation arrived path_length` for nav agents (`on event "arrived"`). Contacts from a
+  physics step are delivered on the next tick.

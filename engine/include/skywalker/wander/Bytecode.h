@@ -84,7 +84,11 @@ enum class Op : uint8_t {
 const char* opName(Op op);
 
 /// Environment values for LoadEnv.
-enum class Env : uint16_t { Dt, Time, Frame, Other, State, StateTime };
+enum class Env : uint16_t {
+    Dt, Time, Frame, Other, State, StateTime,
+    ContactPoint, ContactNormal, Impact,  // collide / trigger handlers
+    HitPoint, HitNormal, HitDistance,     // the last raycast() in this handler run
+};
 
 struct Ins {
     Op op = Op::Nop;

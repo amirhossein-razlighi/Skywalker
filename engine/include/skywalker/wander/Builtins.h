@@ -43,6 +43,7 @@
 #include <vector>
 
 #include "skywalker/core/Random.h"
+#include "skywalker/input/InputState.h"
 #include "skywalker/wander/Ast.h"
 #include "skywalker/wander/Value.h"
 
@@ -55,11 +56,8 @@ namespace sky::wander {
 class Runtime;
 struct ExecState;
 
-struct InputState {
-    std::set<std::string> held;     // keys currently held ("w", "space", "left", ...)
-    std::set<std::string> pressed;  // keys pressed since last tick
-    std::vector<uint64_t> clicked;  // entities clicked since last tick
-};
+/// Raw devices plus the evaluated input actions (see skywalker/input/InputState.h).
+using InputState = input::InputState;
 
 struct BuiltinDef;
 
@@ -215,6 +213,8 @@ private:
 /// Registers the core library (math, vectors, entities, lists, maps, strings, input, ...).
 /// Called once by BuiltinRegistry::global().
 void registerCoreBuiltins(BuiltinRegistry& reg);
+/// Audio, input actions, physics, characters and navigation (through Runtime hooks).
+void registerSystemBuiltins(BuiltinRegistry& reg);
 
 /// Interned names (vars, properties, events). Ids are process-wide and stable.
 uint32_t intern(std::string_view name);

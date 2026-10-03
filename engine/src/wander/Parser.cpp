@@ -18,6 +18,10 @@ const char* toString(Trigger t) {
         case Trigger::Click: return "click";
         case Trigger::Enter: return "enter";
         case Trigger::Exit: return "exit";
+        case Trigger::Action: return "action";
+        case Trigger::Collide: return "collide";
+        case Trigger::TriggerEnter: return "trigger_enter";
+        case Trigger::TriggerExit: return "trigger_exit";
     }
     return "?";
 }
@@ -627,16 +631,21 @@ private:
             h.trigger = Trigger::Enter;
         } else if (t.text == "exit") {
             h.trigger = Trigger::Exit;
-        } else if (t.text == "event" || t.text == "key") {
-            h.trigger = t.text == "event" ? Trigger::Event : Trigger::Key;
+        } else if (t.text == "event" || t.text == "key" || t.text == "action") {
+            h.trigger = t.text == "event" ? Trigger::Event : t.text == "key" ? Trigger::Key : Trigger::Action;
             if (peek().kind != Tok::String) {
-                error(peek().loc, "expected_string", "'on " + t.text + "' needs a quoted name, e.g. on " + t.text +
-                                                         (t.text == "key" ? " \"space\"" : " \"door_opened\""));
+                error(peek().loc, "expected_string",
+                      "'on " + t.text + "' needs a quoted name, e.g. on " + t.text +
+                          (t.text == "key" ? " \"space\"" : t.text == "action" ? " \"jump\"" : " \"door_opened\""));
             } else {
                 h.argument = next().text;
             }
         } else if (t.text == "click") {
             h.trigger = Trigger::Click;
+        } else if (t.text == "collide" || t.text == "trigger_enter" || t.text == "trigger_exit") {
+            // Physics contacts, optionally filtered by the other entity's name or tag.
+            h.trigger = t.text == "collide" ? Trigger::Collide : t.text == "trigger_enter" ? Trigger::TriggerEnter : Trigger::TriggerExit;
+            if (peek().kind == Tok::String) h.argument = next().text;
         } else {
             // A trigger word registered by an engine subsystem (`on contact`), checked by the compiler.
             h.trigger = Trigger::Event;

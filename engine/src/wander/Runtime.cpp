@@ -641,6 +641,7 @@ Value getField(ExecState& st, const Value& obj, const FieldRef& f, SourceLoc loc
         case FieldType::Enum: return Value::string(*reinterpret_cast<const std::string*>(base));
         case FieldType::Vec3: return Value::vec(*reinterpret_cast<const Vec3*>(base));
         case FieldType::Color: return Value::color(*reinterpret_cast<const Vec4*>(base));
+        case FieldType::Json: return fromJson(*reinterpret_cast<const Json*>(base));
     }
     return {};
 }
@@ -676,7 +677,8 @@ void setField(ExecState& st, const Value& obj, const FieldRef& f, const Value& v
                 *reinterpret_cast<Vec4*>(base) = v.c();
                 return;
             case FieldType::String:
-            case FieldType::Enum: break;  // validated through reflection below
+            case FieldType::Enum:
+            case FieldType::Json: break;  // validated through reflection below
         }
     }
     // Missing component (added on assignment, like the inspector) or validated string fields.
@@ -792,6 +794,12 @@ bool interpret(ExecState& st, int protoIndex, Value* R, size_t& pc, Outcome& out
                         R[in.a] = Value::number(br ? br->stateTime : 0.0);
                         break;
                     }
+                    case Env::ContactPoint: R[in.a] = st.contact ? Value::vec(st.contact->point) : Value(); break;
+                    case Env::ContactNormal: R[in.a] = st.contact ? Value::vec(st.contact->normal) : Value(); break;
+                    case Env::Impact: R[in.a] = Value::number(st.contact ? st.contact->speed : 0.0); break;
+                    case Env::HitPoint: R[in.a] = st.lastHit ? Value::vec(st.lastHit->point) : Value(); break;
+                    case Env::HitNormal: R[in.a] = st.lastHit ? Value::vec(st.lastHit->normal) : Value(); break;
+                    case Env::HitDistance: R[in.a] = st.lastHit ? Value::number(st.lastHit->distance) : Value(); break;
                 }
                 break;
             case Op::GetVar: R[in.a] = varRef(st, in.b); break;
@@ -1165,6 +1173,8 @@ void Runtime::reset(bool keepQueuedEvents) {
     frame_ = 0;
     impl_->pending.clear();
     if (!keepQueuedEvents) impl_->nextPending.clear();
+    impl_->contacts.clear();
+    impl_->nextContacts.clear();
     impl_->instances.clear();
     impl_->vars.clear();
     impl_->toDestroy.clear();
@@ -1267,7 +1277,10 @@ void Runtime::compileScripts() {
     if (impl_->compileCache.size() > 4096) impl_->compileCache.clear();  // bound memory in long sessions
 }
 
+void Runtime::queueContact(const Contact& contact) { impl_->nextContacts.push_back(contact); }
+
 void Runtime::emit(std::string name, EntityId target, Value payload, EntityId other) {
+    if (onEmit) onEmit(name, target, other);  // Studio hook (playtests)
     if (impl_->nextPending.size() >= kMaxPendingEvents) return;
     PendingEvent e;
     e.sym = intern(name);
@@ -1368,8 +1381,11 @@ struct Scheduler {
         st.other = other;
         st.dt = dt;
         st.input = &input;
+        st.contact = contact;
         return st;
     }
+
+    const Runtime::Contact* contact = nullptr;  // the contact being delivered (collide/trigger handlers)
 
     // Runs a proto as the top frame; handles errors, waits and state changes.
     void run(Instance& inst, int behavior, int handler, int proto, std::vector<Value>* resumeRegs, size_t pc,
@@ -1413,6 +1429,7 @@ struct Scheduler {
                 co.byFrames = out.waitFrames;
                 co.remaining = out.waitAmount;
                 co.other = other;
+                if (contact) co.contact = *contact;
                 inst.coroutines.push_back(std::move(co));
             }
         }
@@ -1529,7 +1546,10 @@ struct Scheduler {
             --n;
             if (!alive(inst)) return;
             // A state change since it started cancels state-owned coroutines (erased above).
+            const Runtime::Contact* saved = contact;
+            contact = co.contact ? &*co.contact : nullptr;
             run(inst, co.behavior, co.handler, co.proto, &co.regs, co.pc, {}, co.other);
+            contact = saved;
         }
     }
 
@@ -1538,6 +1558,14 @@ struct Scheduler {
             if (c.behavior == behavior && c.handler == handler) return true;
         }
         return false;
+    }
+
+    bool contactMatches(EntityId other, const std::string& filter) const {
+        if (filter.empty()) return true;
+        const EntityRecord* r = scene.record(other);
+        if (!r) return false;
+        if (str::lower(r->name) == str::lower(filter)) return true;
+        return std::find(r->tags.begin(), r->tags.end(), filter) != r->tags.end();
     }
 
     template <typename Pred>
@@ -1574,8 +1602,23 @@ struct Scheduler {
             fire(inst, [&](const HandlerInfo& h) { return h.trigger == Trigger::Event && h.sym == ev.sym; }, ev.payload,
                  ev.other);
         }
+        // Physics contacts, filtered by the other entity's name or tag.
+        Runtime::Contact probe;
+        probe.self = inst.entity;
+        auto [cBegin, cEnd] = std::equal_range(impl.contacts.begin(), impl.contacts.end(), probe,
+                                               [](const Runtime::Contact& x, const Runtime::Contact& y) { return x.self < y.self; });
+        for (auto c = cBegin; c != cEnd; ++c) {
+            contact = &*c;
+            fire(inst, [&](const HandlerInfo& h) { return h.trigger == c->trigger && contactMatches(c->other, h.argument); }, Value(),
+                 c->other);
+            contact = nullptr;
+        }
         for (const auto& key : input.pressed) {
             fire(inst, [&](const HandlerInfo& h) { return h.trigger == Trigger::Key && h.argument == key; });
+        }
+        for (const auto& [name, action] : input.actions) {
+            if (!action.pressed) continue;
+            fire(inst, [&](const HandlerInfo& h) { return h.trigger == Trigger::Action && h.argument == name; });
         }
         for (EntityId clicked : input.clicked) {
             if (clicked == inst.entity) fire(inst, [](const HandlerInfo& h) { return h.trigger == Trigger::Click; });
@@ -1611,6 +1654,11 @@ void Runtime::tick(float dt, const InputState& input) {
     impl.input = &input;
     impl.pending = std::move(impl.nextPending);
     impl.nextPending.clear();
+    // Contacts from the last physics step, grouped by receiver (stable: the producer's order).
+    impl.contacts = std::move(impl.nextContacts);
+    impl.nextContacts.clear();
+    std::stable_sort(impl.contacts.begin(), impl.contacts.end(),
+                     [](const Contact& x, const Contact& y) { return x.self < y.self; });
     impl.spawnedThisTick = 0;
 
     // Pick up var edits made between ticks (tools, agents, the inspector).

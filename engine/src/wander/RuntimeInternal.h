@@ -4,6 +4,7 @@
 
 #include <map>
 #include <memory>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -69,6 +70,7 @@ struct Coroutine {
     bool byFrames = false;
     double remaining = 0;  // seconds or frames
     EntityId other = kNoEntity;
+    std::optional<Runtime::Contact> contact;  // collide/trigger handlers keep their contact across waits
 };
 
 struct Instance {
@@ -115,6 +117,8 @@ struct ExecState {
     int depth = 0;
     const InputState* input = nullptr;
     TestHooks* test = nullptr;
+    const Runtime::Contact* contact = nullptr;  // collide/trigger handlers
+    std::optional<RayHitInfo> lastHit;          // the last raycast() in this run
     const std::string* scriptName = nullptr;  // for log messages
 
     ExecState(Runtime& r, Runtime::Impl& i, Scene& s) : rt(r), impl(i), scene(s) {}
@@ -125,6 +129,8 @@ struct Runtime::Impl {
     std::unordered_map<EntityId, VarTable> vars;
     std::vector<PendingEvent> pending;
     std::vector<PendingEvent> nextPending;
+    std::vector<Runtime::Contact> contacts;      // physics contacts delivered this tick (sorted by receiver)
+    std::vector<Runtime::Contact> nextContacts;  // queued by the physics step for the next tick
     std::vector<RuntimeMessage> messages;
     std::vector<EntityId> toDestroy;
     int spawnedThisTick = 0;

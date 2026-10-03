@@ -274,7 +274,10 @@ private:
             s += h.argument;
         } else {
             s += toString(h.trigger);
-            if (h.trigger == Trigger::Event || h.trigger == Trigger::Key) s += " \"" + escape(h.argument, false) + "\"";
+            if (h.trigger == Trigger::Event || h.trigger == Trigger::Key || h.trigger == Trigger::Action ||
+                !h.argument.empty()) {
+                s += " \"" + escape(h.argument, false) + "\"";
+            }
         }
         if (!h.binding.empty()) s += " with " + h.binding;
         line(indent, s);

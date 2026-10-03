@@ -29,6 +29,7 @@
 #include "skywalker/wander/Builtins.h"
 #include "skywalker/wander/Bytecode.h"
 #include "skywalker/wander/Compiler.h"
+#include "skywalker/wander/PhysicsHooks.h"
 
 namespace sky::wander {
 
@@ -100,6 +101,32 @@ public:
 
     /// Instantiates "prefab:path" for spawn(); set by the engine (asset system).
     std::function<Result<EntityId>(const std::string& ref, Vec3 position, const std::string& name)> spawnPrefab;
+
+    // --- Engine hooks used by builtins and tools ------------------------------------------
+    /// Studio: observes every emitted event (scripts and external emit()) so playtest bots
+    /// can record deaths, objectives and damage. Optional.
+    std::function<void(const std::string& name, EntityId target, EntityId source)> onEmit;
+    /// Audio (set by the engine's audio system). Each returns an error message, "" on success.
+    std::function<std::string(EntityId entity)> playAudio;                                    // play(e)
+    std::function<void(EntityId entity)> stopAudio;                                           // stop_sound(e)
+    std::function<std::string(const std::string& clip, float volume, EntityId at)> playSound;  // play_sound(path, volume?)
+    std::function<std::string(const std::string& clip, float fadeSeconds)> playMusic;         // music(path, fade?)
+    std::function<void(const std::string& bus, float volume)> setBusVolume;                   // set_volume(bus, v)
+    /// Physics, character and navigation services behind push(), raycast(), walk(),
+    /// navigate()...; installed by the engine (null = those builtins report an error).
+    PhysicsHooks* physics = nullptr;
+    /// A contact from the physics step. Delivered on the next tick to `self`'s
+    /// `on collide` / `on trigger_enter` / `on trigger_exit` handlers whose filter matches
+    /// `other` (name or tag); `other`, `contact_point`, `contact_normal` and `impact` describe it.
+    struct Contact {
+        Trigger trigger = Trigger::Collide;
+        EntityId self = kNoEntity;
+        EntityId other = kNoEntity;
+        Vec3 point;
+        Vec3 normal;      // pointing away from `other`, toward `self`
+        float speed = 0;  // approach speed along the normal (m/s)
+    };
+    void queueContact(const Contact& contact);
 
     // --- Services for builtins (CallContext::service<T>()) ---------------------------
     template <typename T>

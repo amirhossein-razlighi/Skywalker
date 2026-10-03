@@ -715,7 +715,9 @@ private:
         return nullptr;
     }
     std::vector<std::string> visibleNames() {
-        std::vector<std::string> out{"self", "other", "dt", "time", "frame", "pi", "state", "state_time"};
+        std::vector<std::string> out{"self",          "other",         "dt",     "time",      "frame",
+                                     "pi",            "state",         "state_time", "contact_point", "contact_normal",
+                                     "impact",        "hit_point",     "hit_normal", "hit_distance"};
         for (const auto& b : fn_->blocks) {
             for (const auto& l : b) out.push_back(l.name);
         }
@@ -1926,6 +1928,15 @@ private:
             emit(Op::LoadK, dst, constant(c->value, e.loc), 0, e.loc);
             return c->type;
         }
+        // Contact and raycast details: not reserved, so vars and locals may shadow them.
+        static const std::unordered_map<std::string, std::pair<Env, TypeSet>> details{
+            {"contact_point", {Env::ContactPoint, kTVec | kTNone}}, {"contact_normal", {Env::ContactNormal, kTVec | kTNone}},
+            {"impact", {Env::Impact, kTNumber}},                     {"hit_point", {Env::HitPoint, kTVec | kTNone}},
+            {"hit_normal", {Env::HitNormal, kTVec | kTNone}},        {"hit_distance", {Env::HitDistance, kTNumber | kTNone}}};
+        if (auto it = details.find(n); it != details.end()) {
+            emit(Op::LoadEnv, dst, static_cast<int>(it->second.first), 0, e.loc);
+            return it->second.second;
+        }
         if (fn_->decl && fn_->decl->uses && fn_->decl->uses->count(n)) {
             error(e.loc, "module_as_value", quote(n) + " is a module; call its functions like " + n + ".name(...)");
             return kTAny;
@@ -1968,6 +1979,7 @@ private:
                 case FieldType::Enum: return kTString;
                 case FieldType::Vec3: return kTVec;
                 case FieldType::Color: return kTColor;
+                case FieldType::Json: return kTAny;
             }
         }
         return kTAny;

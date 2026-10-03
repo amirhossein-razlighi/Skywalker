@@ -202,6 +202,15 @@ struct AssetBrowser: View {
         engine.placeAsset(item.path, type: item.type, at: nil)
     }
 
+    /// Opens the asset in a Blender window with the bridge running (dcc_session_start). Bring edits
+    /// back with the Send Selection button in Blender's Skywalker tab, or let an agent pull them.
+    private func openInBlender(_ item: AssetItem) {
+        Task {
+            let r = await engine.callAsync("dcc_session_start", ["headless": false, "open": .string(item.path)], actor: "editor")
+            if r.isError { NSSound.beep() }
+        }
+    }
+
     @ViewBuilder
     private func menu(for item: AssetItem) -> some View {
         if ["mesh", "prefab"].contains(item.type) { Button("Place in Scene") { place(item) } }
@@ -210,6 +219,10 @@ struct AssetBrowser: View {
                 .disabled(engine.selection.isEmpty)
         }
         if item.type == "scene" { Button("Open Scene") { engine.call("scene_load", ["path": .string(item.path)]) } }
+        if item.type == "mesh" {
+            Button("Open in Blender") { openInBlender(item) }
+                .help("Starts Blender with this model and the Skywalker bridge, so agents (and you) can edit it live")
+        }
         Divider()
         Button("Copy Path") {
             NSPasteboard.general.clearContents()

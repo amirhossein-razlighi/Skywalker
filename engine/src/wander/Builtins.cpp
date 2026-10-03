@@ -101,6 +101,7 @@ BuiltinRegistry& BuiltinRegistry::global() {
     static BuiltinRegistry* reg = [] {
         auto* r = new BuiltinRegistry();
         registerCoreBuiltins(*r);
+        registerSystemBuiltins(*r);
         return r;
     }();
     return *reg;

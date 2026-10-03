@@ -137,12 +137,18 @@ struct Stmt {
     Stmt(Kind k, SourceLoc l) : kind(k), loc(l) {}
 };
 
-enum class Trigger { Start, Tick, Event, Key, Click, Enter, Exit };
+enum class Trigger {
+    Start, Tick, Event, Key, Click, Enter, Exit,
+    Action,  // `on action "jump"`: an input action was pressed (input.json)
+    // physics: `on collide "filter"?`, `on trigger_enter "filter"?`, `on trigger_exit "filter"?`
+    // (filter = the other entity's name or one of its tags; `other` names it in the handler)
+    Collide, TriggerEnter, TriggerExit,
+};
 const char* toString(Trigger t);
 
 struct Handler {
     Trigger trigger = Trigger::Tick;
-    std::string argument;  // event/key name, or the registered trigger word (custom)
+    std::string argument;  // event/key/action name, contact filter, or the registered trigger word (custom)
     std::string binding;   // `with <name>` for event payloads (default: data)
     bool custom = false;   // registered trigger word like `on contact` (an event underneath)
     SourceLoc loc;

@@ -17,6 +17,8 @@
 #include "skywalker/assets/Prefab.h"
 #include "skywalker/render/Gltf.h"
 #include "skywalker/render/MeshData.h"
+#include "skywalker/studio/Playtest.h"
+#include "skywalker/studio/Studio.h"
 
 namespace sky {
 
@@ -61,6 +63,43 @@ Engine::Engine(EngineConfig config)
     registerEngineBuiltins();
     runtime_->provide<Engine>(this);  // engine-side Wander builtins reach subsystems through this
     runtime_->setProjectDir(config_.projectDir);
+    world::WorldRuntime::Hooks hooks;
+    hooks.resolvePath = [this](const std::string& p) { return resolvePath(p); };
+    hooks.material = [this](const std::string& p) { return resolveMaterial(p); };
+    hooks.meshBounds = [this](const std::string& key) -> std::optional<Aabb> {
+        ensureMeshUploaded(key);
+        const MeshData* m = cpuMesh(key);
+        if (!m) return std::nullopt;
+        return m->bounds;
+    };
+    hooks.sceneSurface = [this](float x, float z, float top, float bottom, float& y, Vec3& n) {
+        auto hit = raycast(Ray{{x, top, z}, {0, -1, 0}});
+        if (!hit || hit->point.y < bottom) return false;
+        y = hit->point.y;
+        n = hit->normal;
+        return true;
+    };
+    world_ = std::make_unique<world::WorldRuntime>(std::move(hooks));
+    // audio & input builtins and project settings
+    audio_ = std::make_unique<audio::AudioSystem>(audio::AudioSystem::Config{
+        config_.audio, [this](const std::string& path) { return resolvePath(path); }});
+    runtime_->playAudio = [this](EntityId e) { return audio_->playEntity(*scene_, e); };
+    runtime_->stopAudio = [this](EntityId e) { audio_->stopEntity(e); };
+    runtime_->playSound = [this](const std::string& clip, float volume, EntityId at) {
+        std::optional<Vec3> position;
+        if (at != kNoEntity && scene_->exists(at)) position = scene_->worldMatrix(at).translation();
+        return audio_->playOneShot(clip, volume, "sfx", position);
+    };
+    runtime_->playMusic = [this](const std::string& clip, float fade) { return audio_->playMusic(clip, fade); };
+    runtime_->setBusVolume = [this](const std::string& bus, float v) { audio_->setBusVolume(bus, v); };
+    reloadProjectSettings(/*force=*/true);
+    // Physics & navigation: worlds mirror the scene; Wander's physics builtins go through physics_.
+    physics_ = std::make_unique<physics::PhysicsSystem>(
+        *scene_, [this](const std::string& key) { return cpuMesh(key); },
+        [this](const std::string& path) { return resolvePath(path); });
+    nav_ = std::make_unique<nav::NavSystem>(*scene_, *physics_, [this](const std::string& path) { return resolvePath(path); });
+    physics_->setNavigation(nav_.get());
+    runtime_->physics = physics_.get();
     registerEngineTools(*this);
     log::info("engine", std::string("Skywalker ") + SKY_VERSION_STRING + " ready (renderer: " + renderer_->info().backend +
                             " " + renderer_->info().device + ")");
@@ -84,7 +123,35 @@ Engine::~Engine() {
 ToolResult Engine::callTool(std::string_view name, const Json& args, const std::string& actor) {
     ToolContext ctx{actor};
     ToolResult result = tools_.call(name, args, ctx);
+    recordToolEvent(name, result, actor);
+    return result;
+}
+
+Engine::PendingCall Engine::beginTool(std::string_view name, const Json& args, const std::string& actor) {
+    PendingCall call{std::string(name), actor, {}};
+    ToolContext ctx{actor};
+    call.result = tools_.invoke(name, args, ctx);
+    if (!call.result.deferred) recordToolEvent(name, call.result, actor);
+    return call;
+}
+
+ToolResult Engine::finishTool(PendingCall& call) {
+    if (call.result.deferred) {
+        std::shared_ptr<DeferredWork> work = std::move(call.result.deferred);
+        call.result = ToolResult();
+        try {
+            call.result = work->finish ? work->finish() : ToolResult::text("");
+        } catch (const std::exception& e) {
+            call.result = ToolResult::error(Error::make("internal_error", std::string("tool crashed: ") + e.what()));
+        }
+        recordToolEvent(call.tool, call.result, call.actor);
+    }
+    return std::move(call.result);
+}
+
+void Engine::recordToolEvent(std::string_view name, const ToolResult& result, const std::string& actor) {
     const ToolDef* def = tools_.find(name);
+    if (studio_) studio_->noteToolCall(actor, name, !result.isError);  // per-agent tool usage
     std::string summary = result.content.empty() ? "" : result.content.front().text.substr(0, 160);
     emitEvent(Json::object({{"type", "tool"},
                             {"actor", actor},
@@ -92,7 +159,6 @@ ToolResult Engine::callTool(std::string_view name, const Json& args, const std::
                             {"ok", !result.isError},
                             {"mutates", def && def->mutates},
                             {"summary", summary}}));
-    return result;
 }
 
 Status Engine::edit(const std::string& actor, const std::string& label, const std::function<Status()>& fn) {
@@ -151,6 +217,8 @@ void Engine::play() {
         runtime_->reset(/*keepQueuedEvents=*/true);
         accumulator_ = 0;
         particles_.reset();  // play sessions replay exactly
+        physics_->beginPlay();  // the world is built from the scene on the first tick
+        nav_->beginPlay();
     }
     playState_ = PlayState::Playing;
     emitEvent(Json::object({{"type", "play_state"}, {"state", "playing"}}));
@@ -171,7 +239,10 @@ void Engine::stop() {
     playSnapshot_ = Json();
     runtime_->reset();
     particles_.reset();
+    physics_->endPlay();
+    nav_->endPlay();
     input_ = {};
+    audio_->stopAll();
     std::erase_if(selection_, [&](EntityId id) { return !scene_->exists(id); });
     emitEvent(Json::object({{"type", "play_state"}, {"state", "editing"}}));
 }
@@ -182,11 +253,13 @@ void Engine::step(int ticks) {
         pause();
     }
     for (int i = 0; i < ticks; ++i) {
+        actionMap_.evaluate(input_);  // device state + agent input -> actions for this tick
         runtime_->tick(kFixedDt, input_);
+        physics_->step(static_cast<float>(kFixedDt), *runtime_);  // nav steering, bodies, characters, contacts
         particles_.update(*scene_, static_cast<float>(kFixedDt));
-        input_.pressed.clear();
-        input_.clicked.clear();
+        input_.endTick();
     }
+    if (ticks > 0) audio_->update(*scene_, audio::Phase::Playing, ticks * static_cast<double>(kFixedDt), listenerPose());
     for (auto& m : runtime_->drainMessages()) {
         Json j = m.toJson();
         messages_.push_back(j);
@@ -211,7 +284,15 @@ void Engine::update(double seconds) {
         previewTime_ += dt;
         particles_.update(*scene_, dt);
     }
-    if (playState_ != PlayState::Playing) return;
+    settingsTimer_ += seconds;
+    if (settingsTimer_ >= 2.0) {
+        settingsTimer_ = 0;
+        reloadProjectSettings();  // input.json / audio.json edited on disk
+    }
+    if (playState_ != PlayState::Playing) {
+        audio_->update(*scene_, playState_ == PlayState::Paused ? audio::Phase::Paused : audio::Phase::Editing, seconds, std::nullopt);
+        return;
+    }
     accumulator_ += std::min(seconds, 0.25);  // avoid spiral of death after stalls
     int ticks = 0;
     while (accumulator_ >= kFixedDt) {
@@ -295,6 +376,8 @@ FrameData Engine::frame(const CaptureOptions& opts) {
         if (const auto* m = scene_->get<MeshRenderer>(e)) ensureMeshUploaded(m->mesh);
     }
     FrameData f = buildFrame(*scene_, view, opts.width, opts.height, bo);
+    f.samples = opts.samples;
+    f.debugView = opts.debugView;
     if (!opts.fog) f.environment.fogDensity = 0;
     // Effects: simulated particles (+ the light fires cast) and FFT water.
     particles_.gather(*scene_, view, f.particles, f.lights);
@@ -323,6 +406,19 @@ FrameData Engine::frame(const CaptureOptions& opts) {
         f.water.push_back(std::move(wi));
     }
     std::erase_if(oceans_, [&](const auto& kv) { return std::find(waterIds.begin(), waterIds.end(), kv.first) == waterIds.end(); });
+    // Terrain and foliage (resolved texture paths included). Captures generate all foliage
+    // in range; the live viewport streams a few chunks per frame.
+    world_->gather(*scene_, view, f, opts.samples <= 1);
+    {
+        std::vector<std::string> meshes;
+        for (const auto& b : f.instances) {
+            if (std::find(meshes.begin(), meshes.end(), b.mesh) == meshes.end()) meshes.push_back(b.mesh);
+        }
+        for (const auto& m : meshes) ensureMeshUploaded(m);
+        for (auto& t : f.terrains) {
+            t.selected = bo.editorOverlays && std::find(selection_.begin(), selection_.end(), t.entity) != selection_.end();
+        }
+    }
     resolveTexturePaths(f);
     if (bo.editorOverlays && selection_.size() == 1 && scene_->exists(selection_[0]) && !opts.annotate) {
         GizmoFrame gf = Gizmo::frameFor(scene_->worldMatrix(selection_[0]), view, gizmo_.local);
@@ -348,6 +444,7 @@ Status Engine::renderToSurface(void* surface, int width, int height) {
     CaptureOptions opts;
     opts.width = width;
     opts.height = height;
+    opts.samples = 1;  // real time: temporal anti-aliasing across frames
     FrameData f = frame(opts);
     Status s = renderer_->render(f);
     if (s) s = renderer_->present(surface);
@@ -455,6 +552,90 @@ void Engine::endDrag() {
     if (!drag_.entity) return;
     drag_ = {};
     commitEditTransaction();
+}
+
+// ---------------------------------------------------------------------------
+// Audio & input project settings
+// ---------------------------------------------------------------------------
+
+std::optional<audio::ListenerPose> Engine::listenerPose() {
+    ViewCamera cam;
+    if (!sceneCamera(*scene_, cam)) return std::nullopt;
+    audio::ListenerPose pose;
+    pose.position = cam.eye;
+    pose.forward = normalize(cam.target - cam.eye);
+    pose.up = cam.up;
+    return pose;
+}
+
+namespace {
+
+int64_t fileTime(const std::string& path) {
+    std::error_code ec;
+    auto t = fs::last_write_time(path, ec);
+    if (ec) return -1;
+    return std::chrono::duration_cast<std::chrono::nanoseconds>(t.time_since_epoch()).count();
+}
+
+Result<Json> readJson(const std::string& path) {
+    std::ifstream f(path);
+    if (!f) return Error::make("io_error", "cannot read " + path);
+    std::stringstream ss;
+    ss << f.rdbuf();
+    return Json::parse(ss.str());
+}
+
+Status writeText(const std::string& path, const std::string& text) {
+    std::ofstream f(path);
+    if (!f) return Error::make("io_error", "cannot write " + path);
+    f << text << "\n";
+    if (!f) return Error::make("io_error", "cannot write " + path);
+    return {};
+}
+
+}  // namespace
+
+void Engine::reloadProjectSettings(bool force) {
+    const std::string inputPath = resolvePath("input.json"), audioPath = resolvePath("audio.json");
+    const int64_t it = fileTime(inputPath), at = fileTime(audioPath);
+    if (force || it != inputFileTime_) {
+        inputFileTime_ = it;
+        if (it < 0) {
+            actionMap_ = input::ActionMap::defaults();
+        } else if (auto j = readJson(inputPath)) {
+            auto map = input::ActionMap::fromJson(*j);
+            if (map) actionMap_ = std::move(*map);
+            else log::warn("input", "input.json: " + map.error().message);
+        } else {
+            log::warn("input", "input.json: " + j.error().message);
+        }
+    }
+    if (force || at != audioFileTime_) {
+        audioFileTime_ = at;
+        if (at < 0) {
+            audio_->setMix(audio::MixSettings{});
+        } else if (auto j = readJson(audioPath)) {
+            auto mix = audio::MixSettings::fromJson(*j);
+            if (mix) audio_->setMix(*mix);
+            else log::warn("audio", "audio.json: " + mix.error().message);
+        } else {
+            log::warn("audio", "audio.json: " + j.error().message);
+        }
+    }
+}
+
+Status Engine::setAudioMix(const audio::MixSettings& mix) {
+    if (Status s = writeText(resolvePath("audio.json"), mix.toJson().dump(2)); !s) return s;
+    audioFileTime_ = fileTime(resolvePath("audio.json"));
+    audio_->setMix(mix);
+    return {};
+}
+
+Status Engine::setActionMap(input::ActionMap map) {
+    if (Status s = writeText(resolvePath("input.json"), map.toJson().dump(2)); !s) return s;
+    inputFileTime_ = fileTime(resolvePath("input.json"));
+    actionMap_ = std::move(map);
+    return {};
 }
 
 // ---------------------------------------------------------------------------
@@ -588,6 +769,7 @@ std::vector<std::string> Engine::refreshAssets() {
             case AssetType::Texture: renderer_->invalidate(resolvePath(path)); break;
             case AssetType::Material: materials_.erase(path); break;
             case AssetType::Prefab: prefabs_.erase(path); break;
+            case AssetType::Audio: audio_->invalidate(path); break;
             default: break;
         }
     }
@@ -797,6 +979,7 @@ Result<Json> Engine::importMeshAsset(const std::string& path, const MeshImportOp
 
 void Engine::resolveTexturePaths(FrameData& f) const {
     if (!f.environment.hdri.empty()) f.environment.hdri = resolvePath(f.environment.hdri);
+    if (!f.environment.lut.empty()) f.environment.lut = resolvePath(f.environment.lut);
     for (auto& d : f.draws) {
         for (std::string* p : {&d.surface.texture, &d.surface.normalMap, &d.surface.ormMap, &d.surface.emissiveMap}) {
             if (!p->empty()) *p = resolvePath(*p);
@@ -954,6 +1137,11 @@ Result<Image> Engine::assetPreview(const std::string& ref, int size) {
 std::optional<Engine::Hit> Engine::raycast(const Ray& rayIn, const std::vector<EntityId>& exclude) {
     Ray ray{rayIn.origin, normalize(rayIn.dir)};
     std::optional<Hit> best;
+    if (auto th = world_->raycast(*scene_, ray, 1e6f)) {
+        if (std::find(exclude.begin(), exclude.end(), th->entity) == exclude.end()) {
+            best = Hit{th->entity, th->point, th->normal, th->distance};
+        }
+    }
     for (EntityId e : scene_->entities()) {
         if (std::find(exclude.begin(), exclude.end(), e) != exclude.end()) continue;
         const MeshRenderer* m = scene_->get<MeshRenderer>(e);
@@ -993,6 +1181,19 @@ std::optional<Engine::Hit> Engine::raycast(const Ray& rayIn, const std::vector<E
         }
     }
     return best;
+}
+
+// ---------------------------------------------------------------------------
+// Studio
+// ---------------------------------------------------------------------------
+
+studio::Studio& Engine::studio() {
+    if (!studio_) {
+        studio_ = std::make_unique<studio::Studio>(config_.projectDir, [this](Json e) { emitEvent(std::move(e)); });
+        studio_->setPlaytestRunner(
+            [this](const Json& args, const std::string& actor) { return studio::runAndRecordPlaytest(*this, args, actor); });
+    }
+    return *studio_;
 }
 
 // ---------------------------------------------------------------------------
@@ -1046,18 +1247,7 @@ Status Engine::startAgentServer(const std::string& socketPath) {
     fs::create_directories(fs::path(socketPath).parent_path(), ec);
     auto server = std::make_unique<SocketServer>(
         tools_, [this](const std::string& tool, const Json& args, const std::string& actor) {
-            // Called on a connection thread: hop to the main thread and wait. If we give up
-            // waiting, the job is marked abandoned so it can never apply changes later.
-            auto abandoned = std::make_shared<std::atomic<bool>>(false);
-            std::future<Json> f = post([this, tool, args, actor, abandoned] {
-                if (abandoned->load()) return ToolResult::error(Error::make("timeout", "request abandoned")).toMcp();
-                return callTool(tool, args, actor).toMcp();
-            });
-            if (f.wait_for(std::chrono::seconds(120)) != std::future_status::ready) {
-                abandoned->store(true);
-                return ToolResult::error(Error::make("timeout", "the editor did not respond in time")).toMcp();
-            }
-            return f.get();
+            return callToolFromConnection(tool, args, actor);
         });
     if (Status s = server->start(socketPath); !s) return s;
     server_ = std::move(server);
@@ -1074,6 +1264,13 @@ void Engine::stopAgentServer() {
         acceptingJobs_ = false;
         failQueuedJobsLocked("the agent server is stopping");
     }
+    // Slow tool work (design apps) runs on connection threads that stop() joins: ask it to end.
+    {
+        std::lock_guard lock(workMutex_);
+        for (auto& w : activeWork_) {
+            if (w->cancel) w->cancel();
+        }
+    }
     server_->stop();
     server_.reset();
     std::lock_guard lock(jobsMutex_);
@@ -1085,6 +1282,70 @@ void Engine::failQueuedJobsLocked(const std::string& why) {
         promise.set_value(ToolResult::error(Error::make("cancelled", why)).toMcp());
     }
     jobs_.clear();
+}
+
+// Called on a connection thread: hops to the main thread for the engine-touching parts and waits.
+// A tool with slow work (ToolResult::deferred) runs that part right here, so the main thread keeps
+// serving the editor and other agents. If we give up waiting, the job is marked abandoned so it can
+// never apply changes later.
+Json Engine::callToolFromConnection(const std::string& tool, const Json& args, const std::string& actor) {
+    constexpr auto kMainThreadWait = std::chrono::seconds(120);
+    auto abandoned = std::make_shared<std::atomic<bool>>(false);
+    auto pending = std::make_shared<ToolResult>();
+    std::future<Json> first = post([this, tool, args, actor, abandoned, pending]() -> Json {
+        if (abandoned->load()) return ToolResult::error(Error::make("timeout", "request abandoned")).toMcp();
+        ToolContext ctx{actor};
+        ToolResult r = tools_.invoke(tool, args, ctx);
+        if (r.deferred) {
+            *pending = std::move(r);
+            return Json::object({{"deferred", true}});
+        }
+        recordToolEvent(tool, r, actor);
+        return r.toMcp();
+    });
+    if (first.wait_for(kMainThreadWait) != std::future_status::ready) {
+        abandoned->store(true);
+        return ToolResult::error(Error::make("timeout", "the editor did not respond in time")).toMcp();
+    }
+    Json out = first.get();
+    if (!pending->deferred) return out;
+
+    std::shared_ptr<DeferredWork> work = std::move(pending->deferred);
+    {
+        std::lock_guard lock(workMutex_);
+        activeWork_.push_back(work);
+    }
+    {
+        std::lock_guard lock(jobsMutex_);
+        if (!acceptingJobs_ && work->cancel) work->cancel();  // the server started stopping meanwhile
+    }
+    auto retire = [this, &work] {
+        std::lock_guard lock(workMutex_);
+        std::erase(activeWork_, work);
+    };
+    try {
+        if (work->work) work->work();
+    } catch (const std::exception& e) {
+        retire();
+        return ToolResult::error(Error::make("internal_error", std::string("tool crashed: ") + e.what())).toMcp();
+    }
+    retire();
+    std::future<Json> second = post([this, tool, actor, work, abandoned]() -> Json {
+        if (abandoned->load()) return ToolResult::error(Error::make("timeout", "request abandoned")).toMcp();
+        ToolResult r;
+        try {
+            r = work->finish ? work->finish() : ToolResult::text("");
+        } catch (const std::exception& e) {
+            r = ToolResult::error(Error::make("internal_error", std::string("tool crashed: ") + e.what()));
+        }
+        recordToolEvent(tool, r, actor);
+        return r.toMcp();
+    });
+    if (second.wait_for(kMainThreadWait) != std::future_status::ready) {
+        abandoned->store(true);
+        return ToolResult::error(Error::make("timeout", "the editor did not respond in time")).toMcp();
+    }
+    return second.get();
 }
 
 bool Engine::agentServerRunning() const { return server_ != nullptr; }

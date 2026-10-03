@@ -16,6 +16,7 @@ const char* toString(FieldType t) {
         case FieldType::Vec3: return "vec3";
         case FieldType::Color: return "color";
         case FieldType::Enum: return "enum";
+        case FieldType::Json: return "json";
     }
     return "?";
 }
@@ -145,6 +146,7 @@ Json fieldToJson(const void* object, const FieldInfo& f) {
         case FieldType::Enum: return at<std::string>(object, f);
         case FieldType::Vec3: return vec3ToJson(at<Vec3>(object, f));
         case FieldType::Color: return colorToJson(at<Vec4>(object, f));
+        case FieldType::Json: return at<Json>(object, f);
     }
     return {};
 }
@@ -197,6 +199,19 @@ Status fieldFromJson(void* object, const FieldInfo& f, const Json& v, std::strin
             Vec4 out;
             if (!jsonToColor(v, out)) return typeError(context, f, v, "a color like \"#ff8800\" or [r, g, b(, a)]");
             at<Vec4>(object, f) = out;
+            return {};
+        }
+        case FieldType::Json: {
+            // Shallow structural check against the declared schema's top-level type.
+            if (!f.jsonSchema.empty()) {
+                if (auto sch = Json::parse(f.jsonSchema)) {
+                    const std::string want = sch->get("type").asString();
+                    bool ok = want.empty() || (want == "array" && v.isArray()) || (want == "object" && v.isObject()) ||
+                              (want == "string" && v.isString()) || (want == "number" && v.isNumber());
+                    if (!ok) return typeError(context, f, v, "a JSON " + want);
+                }
+            }
+            at<Json>(object, f) = v;
             return {};
         }
     }
@@ -266,6 +281,10 @@ Json schema(const TypeInfo& type) {
                 break;
             case FieldType::Color:
                 p["description"] = "hex string \"#rrggbb[aa]\" or [r,g,b(,a)] in 0..1";
+                break;
+            case FieldType::Json:
+                if (auto sch = Json::parse(f.jsonSchema.empty() ? "{}" : f.jsonSchema)) p = *sch;
+                p["x-sky-json"] = true;
                 break;
         }
         if (!f.doc.empty()) {

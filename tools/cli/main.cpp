@@ -8,6 +8,7 @@
 //                                                    compile Wander, print diagnostics
 //   skywalker call TOOL [JSON] [--scene FILE]        call one tool, print the result
 //   skywalker tools [--markdown]                     list tools
+//   skywalker studio status|agents|board|feedback|loops|run --project DIR ...   (StudioCommand.cpp)
 //   skywalker version
 
 #include <sys/socket.h>
@@ -32,6 +33,8 @@
 #include "skywalker/wander/Runtime.h"
 
 using namespace sky;
+
+int runStudio(const std::vector<std::string>& raw);  // StudioCommand.cpp
 
 namespace {
 
@@ -82,12 +85,14 @@ int usage() {
                  "usage:\n"
                  "  skywalker mcp [--project DIR] [--scene FILE]   MCP server on stdio\n"
                  "  skywalker mcp --attach [SOCKET]                bridge to a running editor\n"
-                 "  skywalker render SCENE -o out.png [--width W] [--height H] [--annotate] [--scene-camera]\n"
+                 "  skywalker render SCENE -o out.png [--width W] [--height H] [--annotate] [--scene-camera] [--samples N]\n"
                  "  skywalker run SCENE [--ticks N] [-o out.png]\n"
                  "  skywalker check FILE.wander [--project DIR] [--disassemble] [--format]\n"
                  "  skywalker call TOOL [JSON] [--scene FILE] [--project DIR] [-o image.png]\n"
                  "  skywalker call TOOL [JSON] --attach [--as NAME] [--socket PATH]   (on the running editor)\n"
                  "  skywalker tools [--markdown]\n"
+                 "  skywalker studio status|agents|board|feedback|loops --project DIR\n"
+                 "  skywalker studio run --project DIR --loop NAME [--iterations N] [--dry-run] [--yes]\n"
                  "  skywalker version\n",
                  SKY_VERSION_STRING);
     return 2;
@@ -179,6 +184,7 @@ int runRender(const Args& args, bool simulate) {
     o.height = std::stoi(args.get("--height", "720"));
     o.annotate = args.has("--annotate");
     o.useSceneCamera = args.has("--scene-camera");
+    o.samples = std::stoi(args.get("--samples", "8"));
     if (!o.useSceneCamera) engine.callTool("camera_set", Json::object({{"frame", "all"}}), "cli");
     auto cap = engine.capture(o);
     if (!cap) {
@@ -339,6 +345,7 @@ int main(int argc, char** argv) {
     if (cmd == "check") return runCheck(args);
     if (cmd == "call") return runCall(args);
     if (cmd == "tools") return runTools(args);
+    if (cmd == "studio") return runStudio(args.raw);
     if (cmd == "version" || cmd == "--version") {
         std::printf("skywalker %s\n", SKY_VERSION_STRING);
         return 0;

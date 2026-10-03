@@ -5,8 +5,10 @@ There are three ways an AI works with Skywalker, and all three use the same
 
 1. **External agents over MCP.** Claude Code, Codex, Cursor, Gemini CLI, or any MCP
    client.
-2. **The in-editor crew ("Cloudlings").** Specialized agents with avatars, roles,
-   autonomy levels and pipelines.
+2. **The studio and its crew ("Cloudlings").** A roster of specialist agents with a task
+   board, feedback, director decisions, playtest bots and loops. It lives in the engine and
+   the project, so the editor's crew, the headless runner (`skywalker studio run`) and
+   external agents all share it. See [STUDIO](STUDIO.md).
 3. **Generators.** Image, 3D, audio, music and video models that fulfill asset requests.
 
 ## 1. MCP
@@ -44,51 +46,75 @@ Generic MCP config (Cursor, Gemini CLI, …):
    `sim_control step`, `sim_input`, `logs`, and finally `sim_control stop`.
 5. If something went wrong, `history` → `undo`.
 
-## 2. The crew
+## 2. The studio and the crew
 
-The crew lives in the editor's **Agents** dock. Each Cloudling has:
+The roster is the project's studio (`agents/<id>.agent.json`), shared by every client. The
+full model — board, feedback, decisions with measured effects, loops, playtests, messages,
+budgets and the headless runner — is in [STUDIO](STUDIO.md). This section covers the editor.
+
+Each agent has:
 
 | Setting | Options |
 |---|---|
-| Role | Creative Director, Level Designer, Gameplay Programmer, Lighting Artist, Writer, Asset Artist, QA Tester. The role becomes part of its system prompt. |
-| Provider and model | Anthropic (Messages API; default `claude-opus-5-5`), or any OpenAI-compatible API: OpenAI, DeepSeek, OpenRouter, Groq, or local Ollama / LM Studio / vLLM / llama.cpp. Keys live in the macOS Keychain. |
+| Role and focus | 24 roles across direction, production, design, engineering, art, audio, writing and QA (creative director, producer, level designer, gameplay/AI/graphics programmer, lighting/VFX/environment artist, sound designer, writer, playtester, critic…), plus a focus ("enemy AI", "onboarding") and tags, so several agents can share a role. The role's mission becomes part of its system prompt. |
+| Provider and model | Anthropic (Messages API; default `claude-opus-5-5`), or any OpenAI-compatible API: OpenAI, DeepSeek, OpenRouter, Groq, or local Ollama / LM Studio / vLLM / llama.cpp. In the editor, keys live in the macOS Keychain; the headless runner reads them from the environment. |
 | Autonomy | *Observe* (read-only tools), *Ask* (each mutating call waits for your Allow/Decline), *Autonomous*. |
-| Permissions | Per tool category (scene, entities, world, assets, behaviors, simulation, viewport, files, rendering, network): *Default* (follow autonomy), *Allow*, *Ask*, or *Off* (the tools are not even offered to the model). Categories come from each tool's `_meta["skywalker/category"]`. **Network** (`asset_download`) asks by default even for autonomous agents. |
+| Permissions | Per tool category (scene, entities, world, assets, behaviors, simulation, viewport, files, rendering, network, studio): *Default* (follow autonomy), *Allow*, *Ask*, or *Off* (the tools are not even offered to the model). Categories come from each tool's `_meta["skywalker/category"]`. **Network** (`asset_download`) asks by default even for autonomous agents; **studio** tools (board, feedback, messages, playtests) are available at every autonomy level. |
 | Mission and instructions | Override the role's mission; add standing instructions such as style guides, naming rules or constraints. |
-| Memory | Long-term notes the agent keeps with `memory_note` / `memory_forget`. They appear in its instructions at the start of every conversation and can be edited in the designer. |
-| Rounds | Max tool rounds per message (default 40). |
-| Usage | Input, cached and output tokens per agent, as reported by the provider. Shown in the chat header and designer. |
+| Reports to | The agent's lead. |
+| Playtester persona | Policy, reaction time, skill, curiosity, patience — used by `playtest_run`. |
+| Memory | Long-term notes kept with `studio_memory`. They appear in the agent's system prompt and can be edited in the designer. |
+| Rounds | Max tool rounds per task (default 40). |
+| Usage | Tokens, estimated cost and tool calls per agent, tracked by the studio (`studio/usage.json`). |
 
-Open the **Agent Designer** from the slider button in a chat header, or in Settings → Crew.
-**Save to Project** writes `agents/<name>.agent.json` (everything but provider ids and keys),
-so a team can commit and share its crew. Settings → Crew lists the project's agent files to load.
+Open the **Agent Designer** from the slider button in a chat header, from a Studio roster
+card, or in Settings → Crew. Edits save automatically to the project's agent file (never API
+keys), so a team can commit and share its studio. Add agents by role or spawn a whole team
+(`starter_crew`, `indie_trio`, `aaa_strike_team`, `narrative_team`, `qa_squad`, `art_team`,
+`audio_team`). A new project starts with the starter crew; crews from earlier editor versions
+are migrated into the project once.
 
 How the crew works together:
-- **Delegation.** The Creative Director gets an extra `crew_delegate` tool, so it can
-  plan, hand tasks to teammates, and review their reports.
-- **Pipelines.** Ordered stages, each a Cloudling plus an instruction. Mark a step
-  *parallel* (branch icon) to run it at the same time as the previous step. Each stage
-  receives the goal plus every earlier stage's report, and parallel agents are told who
-  else is working.
+- **The Studio panel.** Roster with live status, a Kanban board, feedback with the
+  director's verdicts and measured effects, loop timelines and message threads.
+- **Loops.** *Run with Crew* drives a studio loop (`playtest_fix_verify`, `art_pass_with_critic`,
+  `balance_tuning`, `vertical_slice_sprint`, `bug_bash`, or your own) through
+  `studio_loop_start` / `studio_loop_advance`: the engine runs playtests and verification,
+  the crew runs agent stages — in parallel when the stage allows it. Loops replace the
+  earlier pipelines.
+- **Delegation.** Direction and production agents get an extra `crew_delegate` tool in chat,
+  so they can hand a task to a teammate and review the report.
 - **Weave.** From any behavior's intent, Weave asks the gameplay programmer to write,
   check, attach and test the Wander code.
 
 You see agents in action through:
 - presence avatars in the toolbar, with a pulsing dot while working;
 - a toast over the viewport;
-- the Activity feed, which records who did what;
+- the Activity feed, which records who did what (including studio decisions, feedback,
+  playtests and loops);
 - every edit being undoable.
 
-Implementation notes (`editor/Sources/Crew`):
+Implementation notes (`editor/Sources/Crew`, `editor/Sources/Studio`):
+- System prompts and tool permissions come from the engine (`studio_agent_brief`), so the
+  editor, the headless runner and external agents run an agent identically.
 - Provider histories are append-only. Anthropic thinking blocks are echoed back
-  unchanged, and refusals are handled via `stop_reason`.
+  unchanged, and refusals are handled via `stop_reason` (a refused turn's tools never run).
 - Server-side refusal fallback (`fallbacks: "default"`) is enabled on supported Claude
   models.
 - Screenshots go back as `tool_result` images for Anthropic. OpenAI-compatible providers
   receive them as a follow-up user message, if the model supports vision.
-- Each agent runs one loop at a time.
+- Each agent runs one conversation at a time.
 - Tool results are never dropped: if you stop an agent mid-turn, they are delivered with
   the next message.
+
+### External agents as studio members
+
+An MCP client joins the roster by connecting as `<client>/<agent id>` (e.g.
+`skywalker mcp --attach` with client name `claude-code/mira`, or `skywalker call … --attach
+--as claude-code/mira`), or by passing `as: "<agent id>"` on studio calls — which is how
+Claude Code subagents sharing one connection identify themselves. `studio_agent_brief`
+returns the agent's system prompt and permitted tools for any harness, and a loop's
+assignments can be executed by external subagents (see [STUDIO](STUDIO.md#identity-how-external-tools-join)).
 
 ## 3. Generative assets
 

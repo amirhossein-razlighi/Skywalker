@@ -32,6 +32,15 @@ void sky_string_free(char* str);
 /* Tools (same surface as MCP) --------------------------------------------- */
 /* Returns an MCP CallToolResult JSON: {"content":[...],"isError":bool,"structuredContent":{...}} */
 char* sky_call_tool(SkyEngine* engine, const char* name, const char* args_json, const char* actor);
+/* Non-blocking variant for tools that run slow external programs (design apps). Runs the quick part
+ * on the calling (engine) thread. Returns the final result JSON, or NULL when the tool deferred slow
+ * work: then *pending is set. Call sky_pending_run(pending) on ANY thread (it may take seconds), and
+ * afterwards sky_pending_finish on the engine thread, which returns the result JSON and frees it. */
+typedef struct SkyPendingCall SkyPendingCall;
+char* sky_call_tool_begin(SkyEngine* engine, const char* name, const char* args_json, const char* actor,
+                          SkyPendingCall** pending);
+void sky_pending_run(SkyPendingCall* pending);
+char* sky_pending_finish(SkyEngine* engine, SkyPendingCall* pending);
 /* Returns the MCP tools/list payload: {"tools":[{name,title,description,inputSchema,annotations}]} */
 char* sky_tools_list(SkyEngine* engine);
 
@@ -77,8 +86,26 @@ void sky_camera_angles(SkyEngine* engine, float* yaw, float* pitch);
 char* sky_frame_stats(SkyEngine* engine);
 
 /* Game input (forwarded to Wander while playing) ---------------------------- */
-void sky_input_key(SkyEngine* engine, const char* key, int down);
+void sky_input_key(SkyEngine* engine, const char* key, int down); /* "w", "space", "shift", ... */
 void sky_input_click(SkyEngine* engine, uint64_t entity);
+
+/* Mouse while playing. x, y: cursor position in the viewport, 0..1 from the top-left. dx, dy: movement since the
+   last call in pixels, +y DOWN as on screen (the engine flips it). button: 0 left, 1 right, 2 middle. */
+void sky_input_mouse_move(SkyEngine* engine, float x, float y, float dx, float dy);
+void sky_input_mouse_button(SkyEngine* engine, int button, int down);
+void sky_input_scroll(SkyEngine* engine, float dx, float dy);
+
+/* Gamepads. Call once per frame for every connected controller (index 0..3) and once with connected = 0 when one
+   leaves. Sticks -1..1 with +y up, triggers 0..1. `buttons` is a bitmask in this order: bit 0 south (A / Cross),
+   1 east (B / Circle), 2 west (X / Square), 3 north (Y / Triangle), 4 left shoulder, 5 right shoulder, 6 left trigger,
+   7 right trigger, 8 select, 9 start, 10 left stick click, 11 right stick click, 12-15 dpad up/down/left/right,
+   16 guide. */
+typedef struct SkyGamepad {
+    float left_x, left_y, right_x, right_y;
+    float left_trigger, right_trigger;
+    uint32_t buttons;
+} SkyGamepad;
+void sky_input_gamepad(SkyEngine* engine, int index, int connected, const char* name, const SkyGamepad* state);
 
 /* Agent server: MCP over a Unix socket so external agents can attach. ------- */
 /* socket_path may be NULL for the default (~/.skywalker/editor.sock). Returns 0 on success. */

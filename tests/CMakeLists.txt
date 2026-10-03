@@ -28,10 +28,18 @@ set(SKY_TEST_SOURCES
     test_fx.cpp
     test_wander_examples.cpp
     test_wander2.cpp
+    test_world.cpp
+    test_audio.cpp
+    test_input.cpp
+    test_capi_input.cpp
+    test_dcc.cpp
+    test_studio.cpp
+    test_physics.cpp
+    test_nav.cpp
 )
 
 add_executable(skywalker_tests ${SKY_TEST_SOURCES})
-target_link_libraries(skywalker_tests PRIVATE sky::engine doctest::doctest)
+target_link_libraries(skywalker_tests PRIVATE sky::engine sky::capi doctest::doctest)
 target_compile_definitions(skywalker_tests PRIVATE
     SKY_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
 

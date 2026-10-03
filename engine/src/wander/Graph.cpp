@@ -963,13 +963,17 @@ Result<std::string> fromGraph(const Json& g) {
         else if (t == "click") h.trigger = Trigger::Click;
         else if (t == "enter") h.trigger = Trigger::Enter;
         else if (t == "exit") h.trigger = Trigger::Exit;
+        else if (t == "action") h.trigger = Trigger::Action;
+        else if (t == "collide") h.trigger = Trigger::Collide;
+        else if (t == "trigger_enter") h.trigger = Trigger::TriggerEnter;
+        else if (t == "trigger_exit") h.trigger = Trigger::TriggerExit;
         else {
             h.trigger = Trigger::Event;
             h.custom = true;
             h.argument = t;
         }
-        if (!h.custom && (h.trigger == Trigger::Event || h.trigger == Trigger::Key)) {
-            h.argument = j.get("argument").asString();
+        if (!h.custom) h.argument = j.get("argument").asString();
+        if (!h.custom && (h.trigger == Trigger::Event || h.trigger == Trigger::Key || h.trigger == Trigger::Action)) {
             if (h.argument.empty()) {
                 return Error::make("invalid_graph", "handler " + j.get("id").asString() + " (on " + t + ") needs an \"argument\"");
             }
