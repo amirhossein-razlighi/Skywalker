@@ -544,7 +544,7 @@ TEST_CASE("studio: agent runner handles tools, approvals, max_tokens and refusal
         "aurora":[{"tool_calls":[{"name":"entity_create","input":{"name":"Lamp","mesh":"sphere"}},{"name":"scene_overview","input":{}}]},
                   {"tool_calls":[{"name":"entity_create","input":{"name":"Cut"}}],"stop":"max_tokens"},
                   {"text":"Asked for approval; added nothing."}],
-        "stratus":[{"tool_calls":[{"name":"entity_create","input":{"name":"Crate","mesh":"cube"}}]},{"text":"Made a crate."}],
+        "stratus":[{"text":"","stop":"pause_turn"},{"tool_calls":[{"name":"entity_create","input":{"name":"Crate","mesh":"cube"}}]},{"text":"Made a crate."}],
         "nimbus":[{"text":"partial","stop":"refusal"}]}})"));
     auto runAgent = [&](const std::string& id) {
         auto res = studio::runWhilePumping(*e, [&]() -> Result<Json> {
@@ -588,7 +588,7 @@ TEST_CASE("studio: agent runner handles tools, approvals, max_tokens and refusal
 
     Json n = runAgent("nimbus");
     CHECK(n.get("stop").asString() == "refusal");
-    CHECK(e->studio().usage().at("stratus").requests == 2);
+    CHECK(e->studio().usage().at("stratus").requests == 3);  // pause_turn resumed transparently
     CHECK(e->studio().usage().at("stratus").toolCalls >= 1);
 }
 
