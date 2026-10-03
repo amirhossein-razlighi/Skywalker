@@ -33,5 +33,8 @@ void addAssetTools(Engine& engine, ToolRegistry& reg);
 void addWorldTools(Engine& engine, ToolRegistry& reg);
 void addNetworkTools(Engine& engine, ToolRegistry& reg);
 void addFxTools(Engine& engine, ToolRegistry& reg);
+/// physics_* and nav_* tools (PhysicsTools.cpp registers NavTools.cpp too).
+void addPhysicsTools(Engine& engine, ToolRegistry& reg);
+void addNavTools(Engine& engine, ToolRegistry& reg);
 
 }  // namespace sky::tools

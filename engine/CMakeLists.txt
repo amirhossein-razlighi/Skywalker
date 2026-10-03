@@ -43,6 +43,9 @@ set(SKY_ENGINE_SOURCES
     src/physics/PhysicsSystem.cpp
     src/nav/NavMesh.cpp
     src/nav/NavSystem.cpp
+    src/physics/DebugDraw.cpp
+    src/agent/PhysicsTools.cpp
+    src/agent/NavTools.cpp
 )
 
 add_library(skywalker_engine STATIC ${SKY_ENGINE_SOURCES})

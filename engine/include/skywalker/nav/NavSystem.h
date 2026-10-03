@@ -37,8 +37,10 @@ public:
     /// World-space input triangles for the bake and their owner entities.
     void collectGeometry(const BuildSettings& settings, const std::string& mode, std::vector<Vec3>& triangles,
                          std::vector<EntityId>& owners);
-    /// Bakes now with `settings` (from the scene's navmesh component when null).
-    Result<BuildReport> build(const BuildSettings* settings = nullptr);
+    /// Bakes now from the scene's navmesh component (defaults when there is none).
+    Result<BuildReport> build();
+    /// Bakes now with explicit settings and input geometry mode (both | colliders | meshes).
+    Result<BuildReport> build(const BuildSettings& settings, const std::string& geometry);
     /// The current navmesh, baked or loaded on demand (null if there is nothing walkable).
     /// While editing it is refreshed when the scene changes; while playing it is fixed.
     NavMesh* mesh();

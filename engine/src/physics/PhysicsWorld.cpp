@@ -1188,7 +1188,8 @@ void PhysicsWorld::sync(const Scene& scene, float dt) {
 
 void PhysicsWorld::step(Scene& scene, float dt) {
     Impl& m = *impl_;
-    if (!m.enabled || dt <= 0) return;
+    // physics_world.enabled pauses play simulation; what-if worlds (no write-back) always run.
+    if ((!m.enabled && m.options.writeBack) || dt <= 0) return;
     m.lastDt = dt;
     m.stepCharacters(dt);
     JPH::JobSystem& jobs = m.localJobs ? static_cast<JPH::JobSystem&>(*m.localJobs) : sharedJobSystem();
@@ -1461,18 +1462,23 @@ Stats PhysicsWorld::stats() const {
 namespace {
 
 void appendTriangles(const JPH::TransformedShape& ts, int maxTriangles, std::vector<Vec3>& tris) {
-    JPH::Shape::GetTrianglesContext ctx;
     JPH::AABox box = ts.GetWorldSpaceBounds();
     box.ExpandBy(JPH::Vec3::sReplicate(0.01f));
-    ts.GetTrianglesStart(ctx, box, JPH::RVec3::sZero());
+    // Triangles can only be pulled from leaf shapes: flatten compounds / decorated shapes first.
+    JPH::AllHitCollisionCollector<JPH::TransformedShapeCollector> leaves;
+    ts.CollectTransformedShapes(box, leaves);
     constexpr int kBatch = 256;
     JPH::Float3 verts[kBatch * 3];
     int total = 0;
-    while (total < maxTriangles) {
-        int n = ts.GetTrianglesNext(ctx, kBatch, verts);
-        if (n <= 0) break;
-        for (int i = 0; i < n * 3; ++i) tris.push_back({verts[i].x, verts[i].y, verts[i].z});
-        total += n;
+    for (const JPH::TransformedShape& leaf : leaves.mHits) {
+        JPH::Shape::GetTrianglesContext ctx;
+        leaf.GetTrianglesStart(ctx, box, JPH::RVec3::sZero());
+        while (total < maxTriangles) {
+            int n = leaf.GetTrianglesNext(ctx, kBatch, verts);
+            if (n <= 0) break;
+            for (int i = 0; i < n * 3; ++i) tris.push_back({verts[i].x, verts[i].y, verts[i].z});
+            total += n;
+        }
     }
 }
 

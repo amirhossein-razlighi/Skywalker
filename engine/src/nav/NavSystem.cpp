@@ -144,17 +144,26 @@ void NavSystem::collectGeometry(const BuildSettings&, const std::string& mode, s
     }
 }
 
-Result<BuildReport> NavSystem::build(const BuildSettings* override) {
+Result<BuildReport> NavSystem::build() {
     const NavMeshSurface* surf = surfaceOf(scene_);
-    BuildSettings bs = override ? *override : settingsFrom(surf);
+    return build(settingsFrom(surf), surf ? surf->geometry : "both");
+}
+
+Result<BuildReport> NavSystem::build(const BuildSettings& bs, const std::string& geometry) {
     std::vector<Vec3> tris;
     std::vector<EntityId> owners;
-    collectGeometry(bs, surf ? surf->geometry : "both", tris, owners);
+    collectGeometry(bs, geometry, tris, owners);
     auto m = std::make_unique<NavMesh>();
     auto r = m->build(tris, bs);
     if (!r) {
         lastError_ = r.error().message;
         return r.error();
+    }
+    if (crowd_) {  // the crowd points into the old mesh: restart it (agents rejoin on the next update)
+        agents_.clear();
+        dtFreeCrowd(crowd_);
+        crowd_ = nullptr;
+        crowdMaxRadius_ = 0;
     }
     mesh_ = std::move(m);
     checkedRevision_ = scene_.revision();
