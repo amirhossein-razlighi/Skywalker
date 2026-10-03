@@ -8,11 +8,17 @@
 // Frame structure:
 //   0. Environment (only when the sky changes): sky -> cubemap -> GGX-prefiltered mips
 //   1. Shadow pass: 4 sun cascades in a 4096^2 atlas (bounding-sphere fit, texel snapped)
-//   2. Main pass (4x MSAA, resolved): sky, opaque meshes, toon outlines, blended meshes,
-//      selection outline, grid. Writes HDR color + HDR indirect light + resolved depth.
-//   3. SSAO (half resolution) + blur
-//   4. Post: bloom chain, composite (AO on indirect light, white balance, tonemap, grade)
-//   5. Overlays (gizmos) into the LDR target; optional present into a CAMetalLayer
+//   Per sub-sample (1 in real time; N jittered sub-samples for stills/cinematics):
+//   2. Main pass (4x MSAA, memoryless, resolved; jittered projection): sky, opaque meshes,
+//      toon outlines, blended meshes, selection outline, grid. Writes HDR color + G-buffer
+//      (albedo/AO, octahedral normal/roughness/metallic) + depth.
+//   3. SSAO, SSGI and SSR at half resolution (+ temporal accumulation in real time)
+//   4. Lighting resolve: swaps sky-probe indirect light for GI/reflections, applies SSAO
+//   5. Effects over the lit scene: FFT water, fluid volumes, particles
+//   6. Volumetric light (half resolution)
+//   7. Temporal resolve: TAA (real time) or sub-sample accumulation (stills)
+//   8. Post: bloom chain, composite (white balance, tonemap, grade, sharpen), debug views
+//   9. Overlays (gizmos) into the LDR target; optional present into a CAMetalLayer
 
 #import <Foundation/Foundation.h>
 #import <Metal/Metal.h>
@@ -59,6 +65,9 @@ struct FrameUniforms {
     simd_float4 sky;
     simd_float4 extra;
     simd_float4 hdri;
+    simd_float4x4 prevViewProj;
+    simd_float4x4 viewProjNoJitter;
+    simd_float4 temporal;
 };
 
 struct DrawUniforms {
@@ -114,6 +123,18 @@ struct VolumetricUniforms {
     simd_float4 params;
 };
 
+struct SSUniforms {
+    simd_float4 params, params2, texel;
+};
+
+struct ResolveUniforms {
+    simd_float4 params, params2, texel;
+};
+
+struct TemporalUniforms {
+    simd_float4 params, texel;
+};
+
 struct GPULight {
     simd_float4 positionRange;
     simd_float4 colorIntensity;
@@ -124,6 +145,8 @@ struct GPULight {
 constexpr MTLPixelFormat kColorFormat = MTLPixelFormatBGRA8Unorm_sRGB;  // final LDR image
 constexpr MTLPixelFormat kHDRFormat = MTLPixelFormatRGBA16Float;     // scene, ambient, bloom, env
 constexpr MTLPixelFormat kAOFormat = MTLPixelFormatR16Float;
+constexpr MTLPixelFormat kGbufAFormat = MTLPixelFormatRGBA8Unorm_sRGB;  // albedo + material AO
+constexpr MTLPixelFormat kGbufBFormat = MTLPixelFormatRGBA16Float;      // normal (oct) + roughness + metallic/flags
 constexpr int kBloomLevels = 6;
 constexpr MTLPixelFormat kDepthFormat = MTLPixelFormatDepth32Float;
 constexpr NSUInteger kSamples = 4;
@@ -340,22 +363,61 @@ public:
         @autoreleasepool {
             ensureTargets(frame.width, frame.height);
             ensureHdri(frame.environment);
+            const Environment& env = frame.environment;
             Cascades cascades = computeCascades(frame);
-            FrameUniforms fu = frameUniforms(frame, cascades);
+            const FrameUniforms base = frameUniforms(frame, cascades);
             std::vector<GPULight> lights = gpuLights(frame);
+            const Mat4 vp = frame.viewProjection();
+            if (frame.resetHistory || cameraCut(frame)) historyValid_ = false;
+            const int samples = std::clamp(frame.samples, 1, 256);
+            const bool accumulate = samples > 1;
+            const bool jittered = accumulate || env.taa;
+            const float w = static_cast<float>(std::max(frame.width, 1)), h = static_cast<float>(std::max(frame.height, 1));
 
             id<MTLCommandBuffer> cmd = [queue_ commandBuffer];
             cmd.label = @"Skywalker Frame";
-            encodeEnvironment(cmd, frame, fu);
-            encodeShadows(cmd, frame, fu, cascades);
-            encodeMain(cmd, frame, fu, lights);
-            encodeAO(cmd, frame);
-            encodeEffects(cmd, frame, fu, lights);
-            encodeVolumetrics(cmd, frame, fu, lights);
-            encodePost(cmd, frame);
-            encodeOverlays(cmd, frame, fu);
+            encodeEnvironment(cmd, frame, base);
+            encodeShadows(cmd, frame, base, cascades);
+            for (int i = 0; i < samples; ++i) {
+                // Sub-pixel jitter (Halton 2,3): TAA spreads it over frames, stills over sub-samples.
+                Vec2 j = jittered ? halton23(accumulate ? static_cast<uint64_t>(i) : frameIndex_) : Vec2{0, 0};
+                Vec2 jn{j.x * 2.f / w, j.y * 2.f / h};
+                Mat4 jvp = Mat4::translate({jn.x, jn.y, 0.f}) * vp;
+                FrameUniforms fu = base;
+                fu.viewProj = toSimd(jvp);
+                fu.invViewProj = toSimd(jvp.inverse());
+                fu.viewProjNoJitter = toSimd(vp);
+                const bool reproject = accumulate ? i > 0 : historyValid_;
+                fu.prevViewProj = toSimd(accumulate || !historyValid_ ? vp : prevViewProj_);
+                fu.temporal = simd_make_float4(jn.x, jn.y, static_cast<float>(frameIndex_ % 4096), static_cast<float>(i));
+                const uint64_t seed = frameIndex_ * 17 + static_cast<uint64_t>(i);
+                encodeMain(cmd, frame, fu, lights);
+                encodeAO(cmd, frame);
+                encodeScreenSpace(cmd, frame, fu, reproject, accumulate, seed);
+                encodeResolve(cmd, frame, fu);
+                encodeEffects(cmd, frame, fu, lights, i == 0);
+                encodeVolumetrics(cmd, frame, fu, lights, seed);
+                int mode = accumulate ? 2 : (env.taa && historyValid_ ? 1 : 0);
+                encodeTemporal(cmd, frame, fu, mode, 1.f / static_cast<float>(i + 1));
+                id<MTLBlitCommandEncoder> blit = [cmd blitCommandEncoder];
+                [blit copyFromTexture:depthResolved_ toTexture:depthPrev_];
+                [blit endEncoding];
+                if (!accumulate) historyValid_ = true;
+            }
+            if (accumulate) historyValid_ = true;  // the converged still seeds later TAA frames
+            encodePost(cmd, frame, accumulate);
+            if (frame.debugView > 0) {
+                PostUniforms pu{};
+                pu.params = simd_make_float4(static_cast<float>(frame.debugView), 0, 0, 0);
+                fullscreen(cmd, debugViewPipeline_, resolve_, {gbufA_, gbufB_, giOut_, ssrOut_, aoBlurred_, depthResolved_, hdr_},
+                           &pu, sizeof(pu), false, @"Debug view");
+            }
+            encodeOverlays(cmd, frame, base);
             [cmd commit];
             lastCommand_ = cmd;
+            prevViewProj_ = vp;
+            prevEye_ = frame.camera.eye;
+            prevTarget_ = frame.camera.target;
             ++frameIndex_;
             return {};
         }
@@ -420,6 +482,25 @@ public:
     }
 
 private:
+    static float halton(uint64_t i, uint64_t base) {
+        float f = 1.f, r = 0.f;
+        for (uint64_t n = i; n > 0; n /= base) {
+            f /= static_cast<float>(base);
+            r += f * static_cast<float>(n % base);
+        }
+        return r;
+    }
+    /// Sub-pixel offset in pixels (-0.5..0.5), 16-sample Halton(2,3) sequence.
+    static Vec2 halton23(uint64_t i) { return {halton(i % 16 + 1, 2) - 0.5f, halton(i % 16 + 1, 3) - 0.5f}; }
+
+    /// A jump in the camera (a cut) invalidates temporal history.
+    bool cameraCut(const FrameData& frame) const {
+        Vec3 f0 = normalize(prevTarget_ - prevEye_), f1 = normalize(frame.camera.target - frame.camera.eye);
+        float move = distance(prevEye_, frame.camera.eye);
+        float viewDist = std::max(distance(frame.camera.eye, frame.camera.target), 1.f);
+        return move > std::max(2.f, viewDist * 0.35f) || dot(f0, f1) < 0.94f;
+    }
+
     Status buildPipelines(const std::string& source) {
         NSError* error = nil;
         MTLCompileOptions* opts = [MTLCompileOptions new];
@@ -439,7 +520,9 @@ private:
                                      "ssaoFragment", "aoBlurFragment", "shadowAlphaVertex", "shadowAlphaFragment",
                                      "waterVertex", "waterFragment", "particleVertex", "particleFragment",
                                      "volumeVertex", "volumeFragment", "fluidAdvect", "fluidCorrect", "fluidCombust",
-                                     "fluidCurl", "fluidForces", "fluidDivergence", "fluidJacobi", "fluidProject", "volumetricFragment"}) {
+                                     "fluidCurl", "fluidForces", "fluidDivergence", "fluidJacobi", "fluidProject", "volumetricFragment",
+                                     "ssgiFragment", "ssrFragment", "ssTemporalFragment", "lightingResolveFragment",
+                                     "temporalFragment", "debugViewFragment"}) {
             if (!fn(required)) {
                 return Error::make("shader_missing_function", std::string("shader source must define ") + required);
             }
@@ -478,7 +561,15 @@ private:
                 }
             };
             if (color != MTLPixelFormatInvalid) setup(d.colorAttachments[0], color);
-            if (mainPass) setup(d.colorAttachments[1], kHDRFormat);
+            if (mainPass) {
+                // G-buffer: opaque passes write it; blended passes leave it untouched.
+                d.colorAttachments[1].pixelFormat = kGbufAFormat;
+                d.colorAttachments[2].pixelFormat = kGbufBFormat;
+                if (blend != Blend::None) {
+                    d.colorAttachments[1].writeMask = MTLColorWriteMaskNone;
+                    d.colorAttachments[2].writeMask = MTLColorWriteMaskNone;
+                }
+            }
             if (depth) d.depthAttachmentPixelFormat = kDepthFormat;
             return [device_ newRenderPipelineStateWithDescriptor:d error:err];
         };
@@ -505,12 +596,18 @@ private:
         id<MTLRenderPipelineState> cutout = aoBlur ? make("meshVertex", "meshFragment", kHDRFormat, kSamples, Blend::None, true, &e, true, true) : nil;
         id<MTLRenderPipelineState> shadowAlpha = cutout ? make("shadowAlphaVertex", "shadowAlphaFragment", MTLPixelFormatInvalid, 1, Blend::None, true, &e) : nil;
         // Water: single-sample pass over the resolved scene (refraction/SSR read copies of it).
-        id<MTLRenderPipelineState> water = shadowAlpha ? make("waterVertex", "waterFragment", kHDRFormat, 1, Blend::None, true, &e, true) : nil;
+        id<MTLRenderPipelineState> water = shadowAlpha ? make("waterVertex", "waterFragment", kHDRFormat, 1, Blend::None, true, &e) : nil;
         // Particles: one sorted stream, premultiplied alpha (additive looks output alpha 0).
-        id<MTLRenderPipelineState> particles = water ? make("particleVertex", "particleFragment", kHDRFormat, 1, Blend::Premultiplied, false, &e, true) : nil;
-        id<MTLRenderPipelineState> volume = particles ? make("volumeVertex", "volumeFragment", kHDRFormat, 1, Blend::Premultiplied, false, &e, true) : nil;
+        id<MTLRenderPipelineState> particles = water ? make("particleVertex", "particleFragment", kHDRFormat, 1, Blend::Premultiplied, false, &e) : nil;
+        id<MTLRenderPipelineState> volume = particles ? make("volumeVertex", "volumeFragment", kHDRFormat, 1, Blend::Premultiplied, false, &e) : nil;
         id<MTLRenderPipelineState> volumetric = volume ? make("fullscreenVertex", "volumetricFragment", kHDRFormat, 1, Blend::None, false, &e) : nil;
-        if (!volumetric) volume = nil;
+        id<MTLRenderPipelineState> ssgi = volumetric ? make("fullscreenVertex", "ssgiFragment", kHDRFormat, 1, Blend::None, false, &e) : nil;
+        id<MTLRenderPipelineState> ssr = ssgi ? make("fullscreenVertex", "ssrFragment", kHDRFormat, 1, Blend::None, false, &e) : nil;
+        id<MTLRenderPipelineState> ssTemporal = ssr ? make("fullscreenVertex", "ssTemporalFragment", kHDRFormat, 1, Blend::None, false, &e) : nil;
+        id<MTLRenderPipelineState> lightResolve = ssTemporal ? make("fullscreenVertex", "lightingResolveFragment", kHDRFormat, 1, Blend::None, false, &e) : nil;
+        id<MTLRenderPipelineState> temporal = lightResolve ? make("fullscreenVertex", "temporalFragment", kHDRFormat, 1, Blend::None, false, &e) : nil;
+        id<MTLRenderPipelineState> debugView = temporal ? make("fullscreenVertex", "debugViewFragment", kColorFormat, 1, Blend::None, false, &e) : nil;
+        if (!debugView) volume = nil;
         if (volume) {
             for (const char* k : {"fluidAdvect", "fluidCorrect", "fluidCombust", "fluidCurl", "fluidForces", "fluidDivergence",
                                   "fluidJacobi", "fluidProject"}) {
@@ -549,6 +646,12 @@ private:
         particlePipeline_ = particles;
         volumePipeline_ = volume;
         volumetricPipeline_ = volumetric;
+        ssgiPipeline_ = ssgi;
+        ssrPipeline_ = ssr;
+        ssTemporalPipeline_ = ssTemporal;
+        resolvePipeline_ = lightResolve;
+        temporalPipeline_ = temporal;
+        debugViewPipeline_ = debugView;
         return {};
     }
 
@@ -581,7 +684,11 @@ private:
         const MTLTextureUsage rt = MTLTextureUsageRenderTarget | MTLTextureUsageShaderRead;
         resolve_ = target2D(kColorFormat, w, h, rt);
         hdr_ = target2D(kHDRFormat, w, h, rt);
-        ambient_ = target2D(kHDRFormat, w, h, rt);
+        lit_ = target2D(kHDRFormat, w, h, rt);
+        gbufA_ = target2D(kGbufAFormat, w, h, rt);
+        gbufB_ = target2D(kGbufBFormat, w, h, rt);
+        for (auto& t : taa_) t = target2D(kHDRFormat, w, h, rt);
+        historyValid_ = false;
         depthResolved_ = target2D(kDepthFormat, w, h, rt);
         const NSUInteger hw = std::max<NSUInteger>(1, w / 2), hh = std::max<NSUInteger>(1, h / 2);
         aoRaw_ = target2D(kAOFormat, hw, hh, rt);
@@ -604,7 +711,13 @@ private:
         volumetric_ = target2D(kHDRFormat, hw, hh, rt);
         depthCopy_ = target2D(kDepthFormat, w, h, MTLTextureUsageShaderRead);
         msaaColor_ = targetMSAA(kHDRFormat, w, h);
-        msaaAmbient_ = targetMSAA(kHDRFormat, w, h);
+        msaaGbufA_ = targetMSAA(kGbufAFormat, w, h);
+        msaaGbufB_ = targetMSAA(kGbufBFormat, w, h);
+        depthPrev_ = target2D(kDepthFormat, w, h, MTLTextureUsageShaderRead);
+        giRaw_ = target2D(kHDRFormat, hw, hh, rt);
+        ssrRaw_ = target2D(kHDRFormat, hw, hh, rt);
+        for (auto& t : giHist_) t = target2D(kHDRFormat, hw, hh, rt);
+        for (auto& t : ssrHist_) t = target2D(kHDRFormat, hw, hh, rt);
         msaaDepth_ = targetMSAA(kDepthFormat, w, h);
     }
 
@@ -930,11 +1043,16 @@ private:
         rp.colorAttachments[0].loadAction = MTLLoadActionClear;
         rp.colorAttachments[0].clearColor = MTLClearColorMake(0, 0, 0, 1);
         rp.colorAttachments[0].storeAction = MTLStoreActionMultisampleResolve;
-        rp.colorAttachments[1].texture = msaaAmbient_;
-        rp.colorAttachments[1].resolveTexture = ambient_;
+        rp.colorAttachments[1].texture = msaaGbufA_;
+        rp.colorAttachments[1].resolveTexture = gbufA_;
         rp.colorAttachments[1].loadAction = MTLLoadActionClear;
-        rp.colorAttachments[1].clearColor = MTLClearColorMake(0, 0, 0, 0);
+        rp.colorAttachments[1].clearColor = MTLClearColorMake(0, 0, 0, 1);
         rp.colorAttachments[1].storeAction = MTLStoreActionMultisampleResolve;
+        rp.colorAttachments[2].texture = msaaGbufB_;
+        rp.colorAttachments[2].resolveTexture = gbufB_;
+        rp.colorAttachments[2].loadAction = MTLLoadActionClear;
+        rp.colorAttachments[2].clearColor = MTLClearColorMake(0, 0, 1, 4);
+        rp.colorAttachments[2].storeAction = MTLStoreActionMultisampleResolve;
         rp.depthAttachment.texture = msaaDepth_;
         rp.depthAttachment.resolveTexture = depthResolved_;
         rp.depthAttachment.depthResolveFilter = MTLMultisampleDepthResolveFilterSample0;
@@ -1305,12 +1423,9 @@ private:
         const GpuMesh* cube = mesh("cube");
         if (!cube) return;
         MTLRenderPassDescriptor* rp = [MTLRenderPassDescriptor renderPassDescriptor];
-        rp.colorAttachments[0].texture = hdr_;
+        rp.colorAttachments[0].texture = lit_;
         rp.colorAttachments[0].loadAction = MTLLoadActionLoad;
         rp.colorAttachments[0].storeAction = MTLStoreActionStore;
-        rp.colorAttachments[1].texture = ambient_;
-        rp.colorAttachments[1].loadAction = MTLLoadActionLoad;
-        rp.colorAttachments[1].storeAction = MTLStoreActionStore;
         id<MTLRenderCommandEncoder> enc = [cmd renderCommandEncoderWithDescriptor:rp];
         enc.label = @"Volumes";
         [enc setRenderPipelineState:volumePipeline_];
@@ -1355,7 +1470,7 @@ private:
     }
 
     void encodeEffects(id<MTLCommandBuffer> cmd, const FrameData& frame, const FrameUniforms& fu,
-                       const std::vector<GPULight>& lights) {
+                       const std::vector<GPULight>& lights, bool simulate) {
         bool anyWater = false;
         for (const auto& w : frame.water) anyWater = anyWater || (w.ocean && w.ocean->resolution > 0);
         if (!anyWater && frame.particles.empty() && frame.volumes.empty()) {
@@ -1363,22 +1478,19 @@ private:
             fluids_.clear();
             return;
         }
-        simulateFluids(cmd, frame);
+        if (simulate) simulateFluids(cmd, frame);
         // Copies of the opaque scene: water refracts/reflects them; particles fade against depth.
         id<MTLBlitCommandEncoder> blit = [cmd blitCommandEncoder];
-        if (anyWater) [blit copyFromTexture:hdr_ toTexture:sceneCopy_];
+        if (anyWater) [blit copyFromTexture:lit_ toTexture:sceneCopy_];
         [blit copyFromTexture:depthResolved_ toTexture:depthCopy_];
         [blit endEncoding];
 
         if (anyWater) {
             ensureGrids();
             MTLRenderPassDescriptor* rp = [MTLRenderPassDescriptor renderPassDescriptor];
-            rp.colorAttachments[0].texture = hdr_;
+            rp.colorAttachments[0].texture = lit_;
             rp.colorAttachments[0].loadAction = MTLLoadActionLoad;
             rp.colorAttachments[0].storeAction = MTLStoreActionStore;
-            rp.colorAttachments[1].texture = ambient_;
-            rp.colorAttachments[1].loadAction = MTLLoadActionLoad;
-            rp.colorAttachments[1].storeAction = MTLStoreActionStore;
             rp.depthAttachment.texture = depthResolved_;
             rp.depthAttachment.loadAction = MTLLoadActionLoad;
             rp.depthAttachment.storeAction = MTLStoreActionStore;
@@ -1442,12 +1554,9 @@ private:
                                                            length:frame.particles.size() * sizeof(ParticleInstance)
                                                           options:MTLResourceStorageModeShared];
             MTLRenderPassDescriptor* rp = [MTLRenderPassDescriptor renderPassDescriptor];
-            rp.colorAttachments[0].texture = hdr_;
+            rp.colorAttachments[0].texture = lit_;
             rp.colorAttachments[0].loadAction = MTLLoadActionLoad;
             rp.colorAttachments[0].storeAction = MTLStoreActionStore;
-            rp.colorAttachments[1].texture = ambient_;
-            rp.colorAttachments[1].loadAction = MTLLoadActionLoad;
-            rp.colorAttachments[1].storeAction = MTLStoreActionStore;
             id<MTLRenderCommandEncoder> enc = [cmd renderCommandEncoderWithDescriptor:rp];
             enc.label = @"Particles";
             [enc setRenderPipelineState:particlePipeline_];
@@ -1468,12 +1577,12 @@ private:
     }
 
     void encodeVolumetrics(id<MTLCommandBuffer> cmd, const FrameData& frame, const FrameUniforms& fu,
-                           const std::vector<GPULight>& lights) {
+                           const std::vector<GPULight>& lights, uint64_t seed) {
         volumetricActive_ = frame.environment.godRays > 0.001f && frame.environment.haze > 0.f;
         if (!volumetricActive_) return;
         VolumetricUniforms vu{};
         vu.params = simd_make_float4(frame.environment.godRays, frame.environment.haze,
-                                     std::min(frame.camera.farPlane, 300.f), static_cast<float>(frameIndex_ % 64));
+                                     std::min(frame.camera.farPlane, 300.f), static_cast<float>(seed % 64));
         MTLRenderPassDescriptor* rp = [MTLRenderPassDescriptor renderPassDescriptor];
         rp.colorAttachments[0].texture = volumetric_;
         rp.colorAttachments[0].loadAction = MTLLoadActionDontCare;
@@ -1488,6 +1597,86 @@ private:
         [enc setFragmentTexture:shadowMap_ atIndex:1];
         [enc drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:3];
         [enc endEncoding];
+    }
+
+    // --- Screen-space GI and reflections, lighting resolve, temporal resolve -----------------
+    void fullscreenFU(id<MTLCommandBuffer> cmd, id<MTLRenderPipelineState> pso, id<MTLTexture> target,
+                      std::initializer_list<id<MTLTexture>> inputs, const FrameUniforms& fu, const void* uniforms,
+                      size_t size, NSString* label) {
+        MTLRenderPassDescriptor* rp = [MTLRenderPassDescriptor renderPassDescriptor];
+        rp.colorAttachments[0].texture = target;
+        rp.colorAttachments[0].loadAction = MTLLoadActionDontCare;
+        rp.colorAttachments[0].storeAction = MTLStoreActionStore;
+        id<MTLRenderCommandEncoder> enc = [cmd renderCommandEncoderWithDescriptor:rp];
+        enc.label = label;
+        [enc setRenderPipelineState:pso];
+        NSUInteger i = 0;
+        for (id<MTLTexture> t : inputs) [enc setFragmentTexture:t atIndex:i++];
+        [enc setFragmentBytes:&fu length:sizeof(fu) atIndex:0];
+        [enc setFragmentBytes:uniforms length:size atIndex:1];
+        [enc drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:3];
+        [enc endEncoding];
+    }
+
+    void encodeScreenSpace(id<MTLCommandBuffer> cmd, const FrameData& frame, const FrameUniforms& fu, bool reproject,
+                           bool accumulate, uint64_t seed) {
+        const Environment& env = frame.environment;
+        giActive_ = env.gi > 0.001f;
+        ssrActive_ = env.ssr > 0.001f;
+        giOut_ = giRaw_;
+        ssrOut_ = ssrRaw_;
+        if (!giActive_ && !ssrActive_) return;
+        // Radiance for hits: last anti-aliased frame (keeps light bouncing) or this frame's color.
+        id<MTLTexture> radiance = reproject ? taa_[taaCurrent_] : hdr_;
+        const bool temporal = !accumulate && reproject;
+        SSUniforms u{};
+        u.params = simd_make_float4(env.giDistance, 0.35f, accumulate ? 4.f : 3.f, 12.f);
+        u.params2 = simd_make_float4(reproject ? 1.f : 0.f, temporal ? 0.9f : 0.f, 0.65f, static_cast<float>(seed % 1024));
+        u.texel = simd_make_float4(1.f / hdr_.width, 1.f / hdr_.height, 1.f / giRaw_.width, 1.f / giRaw_.height);
+        if (giActive_) {
+            fullscreenFU(cmd, ssgiPipeline_, giRaw_, {depthResolved_, gbufB_, radiance, envCube_}, fu, &u, sizeof(u), @"SSGI");
+            if (temporal) {
+                id<MTLTexture> dst = giHist_[giCurrent_ ^ 1];
+                fullscreenFU(cmd, ssTemporalPipeline_, dst, {giRaw_, giHist_[giCurrent_], depthResolved_, depthPrev_}, fu, &u,
+                             sizeof(u), @"SSGI temporal");
+                giCurrent_ ^= 1;
+                giOut_ = dst;
+            }
+        }
+        if (ssrActive_) {
+            fullscreenFU(cmd, ssrPipeline_, ssrRaw_, {depthResolved_, gbufB_, radiance}, fu, &u, sizeof(u), @"SSR");
+            if (temporal) {
+                id<MTLTexture> dst = ssrHist_[ssrCurrent_ ^ 1];
+                SSUniforms ut = u;
+                ut.params2.y = 0.8f;
+                fullscreenFU(cmd, ssTemporalPipeline_, dst, {ssrRaw_, ssrHist_[ssrCurrent_], depthResolved_, depthPrev_}, fu, &ut,
+                             sizeof(ut), @"SSR temporal");
+                ssrCurrent_ ^= 1;
+                ssrOut_ = dst;
+            }
+        }
+    }
+
+    void encodeResolve(id<MTLCommandBuffer> cmd, const FrameData& frame, const FrameUniforms& fu) {
+        const Environment& env = frame.environment;
+        ResolveUniforms r{};
+        r.params = simd_make_float4(std::min(env.gi, 1.f), env.ssr, env.ao, giActive_ ? 1.f : 0.f);
+        r.params2 = simd_make_float4(ssrActive_ ? 1.f : 0.f, aoActive_ ? 1.f : 0.f, 0, 0);
+        r.texel = simd_make_float4(1.f / hdr_.width, 1.f / hdr_.height, 1.f / giRaw_.width, 1.f / giRaw_.height);
+        fullscreenFU(cmd, resolvePipeline_, lit_,
+                     {hdr_, gbufA_, gbufB_, depthResolved_, aoBlurred_, giOut_, ssrOut_, envCube_, brdfLut_}, fu, &r,
+                     sizeof(r), @"Lighting resolve");
+    }
+
+    void encodeTemporal(id<MTLCommandBuffer> cmd, const FrameData& frame, const FrameUniforms& fu, int mode, float weight) {
+        TemporalUniforms t{};
+        t.params = simd_make_float4(static_cast<float>(mode), weight, 0.9f, volumetricActive_ ? 1.f : 0.f);
+        t.texel = simd_make_float4(1.f / hdr_.width, 1.f / hdr_.height, 1.f / volumetric_.width, 1.f / volumetric_.height);
+        id<MTLTexture> dst = taa_[taaCurrent_ ^ 1];
+        fullscreenFU(cmd, temporalPipeline_, dst, {lit_, volumetric_, taa_[taaCurrent_], depthResolved_}, fu, &t, sizeof(t),
+                     mode == 1 ? @"TAA" : (mode == 2 ? @"Accumulate" : @"Scene resolve"));
+        taaCurrent_ ^= 1;
+        (void)frame;
     }
 
     void encodeAO(id<MTLCommandBuffer> cmd, const FrameData& frame) {
@@ -1560,18 +1749,20 @@ private:
         return 0;
     }
 
-    void encodePost(id<MTLCommandBuffer> cmd, const FrameData& frame) {
+    void encodePost(id<MTLCommandBuffer> cmd, const FrameData& frame, bool accumulated) {
         const Environment& env = frame.environment;
+        id<MTLTexture> src = taa_[taaCurrent_];
         PostUniforms pu{};
         pu.params = simd_make_float4(env.exposure, env.bloomIntensity, env.bloomThreshold, env.saturation);
         pu.params2 = simd_make_float4(env.contrast, env.vignette,
                                       static_cast<float>(frame.width) / static_cast<float>(std::max(frame.height, 1)),
                                       tonemapIndex(env.tonemap));
-        pu.grade = simd_make_float4(env.temperature, env.tint, volumetricActive_ ? 1.f : 0.f, 0);
+        const float sharpen = (env.taa || accumulated) ? env.sharpen * (accumulated ? 0.5f : 1.f) : 0.f;
+        pu.grade = simd_make_float4(env.temperature, env.tint, sharpen, 0);
         const size_t levels = bloomViews_.size();
         if (env.bloomIntensity > 0.001f && levels > 0) {
-            pu.texel = simd_make_float4(1.f / hdr_.width, 1.f / hdr_.height, 0, 0);
-            fullscreen(cmd, bloomPrefilterPipeline_, bloomViews_[0], {hdr_}, &pu, sizeof(pu), false, @"Bloom prefilter");
+            pu.texel = simd_make_float4(1.f / src.width, 1.f / src.height, 0, 0);
+            fullscreen(cmd, bloomPrefilterPipeline_, bloomViews_[0], {src}, &pu, sizeof(pu), false, @"Bloom prefilter");
             for (size_t i = 1; i < levels; ++i) {
                 pu.texel = simd_make_float4(1.f / bloomViews_[i - 1].width, 1.f / bloomViews_[i - 1].height, 0, 0);
                 fullscreen(cmd, bloomDownPipeline_, bloomViews_[i], {bloomViews_[i - 1]}, &pu, sizeof(pu), false, @"Bloom down");
@@ -1583,10 +1774,8 @@ private:
         } else {
             pu.params.y = 0;
         }
-        pu.texel = simd_make_float4(1.f / hdr_.width, 1.f / hdr_.height, aoActive_ ? env.ao : 0.f,
-                                    static_cast<float>(frameIndex_ % 64));
-        fullscreen(cmd, compositePipeline_, resolve_, {hdr_, levels ? bloomViews_[0] : hdr_, ambient_, aoBlurred_, volumetric_}, &pu,
-                   sizeof(pu), false, @"Composite");
+        pu.texel = simd_make_float4(1.f / src.width, 1.f / src.height, 0.f, static_cast<float>(frameIndex_ % 64));
+        fullscreen(cmd, compositePipeline_, resolve_, {src, levels ? bloomViews_[0] : src}, &pu, sizeof(pu), false, @"Composite");
     }
 
     id<MTLDevice> device_;
@@ -1595,19 +1784,28 @@ private:
     id<MTLRenderPipelineState> skyPipeline_, meshPipeline_, meshBlendPipeline_, gridPipeline_, shadowPipeline_,
         presentPipeline_, outlinePipeline_, overlayPipeline_, bloomPrefilterPipeline_, bloomDownPipeline_,
         bloomUpPipeline_, compositePipeline_, envSkyPipeline_, envPrefilterPipeline_, brdfPipeline_, ssaoPipeline_,
-        aoBlurPipeline_, meshCutoutPipeline_, shadowAlphaPipeline_, waterPipeline_, particlePipeline_, volumePipeline_, volumetricPipeline_;
+        aoBlurPipeline_, meshCutoutPipeline_, shadowAlphaPipeline_, waterPipeline_, particlePipeline_, volumePipeline_, volumetricPipeline_,
+        ssgiPipeline_, ssrPipeline_, ssTemporalPipeline_, resolvePipeline_, temporalPipeline_, debugViewPipeline_;
+    // G-buffer, lighting and temporal targets
+    id<MTLTexture> lit_, gbufA_, gbufB_, msaaGbufA_, msaaGbufB_, depthPrev_;
+    id<MTLTexture> taa_[2], giRaw_, giHist_[2], ssrRaw_, ssrHist_[2];
+    id<MTLTexture> giOut_, ssrOut_;
+    int taaCurrent_ = 0, giCurrent_ = 0, ssrCurrent_ = 0;
+    bool historyValid_ = false, giActive_ = false, ssrActive_ = false;
+    Mat4 prevViewProj_;
+    Vec3 prevEye_{0, 0, 0}, prevTarget_{0, 0, -1};
     id<MTLTexture> volumetric_;
     std::unordered_map<std::string, id<MTLComputePipelineState>> fluidKernels_;
     std::unordered_map<EntityId, FluidGpu> fluids_;
     id<MTLTexture> sceneCopy_, depthCopy_;
     std::unordered_map<EntityId, OceanGpu> oceans_;
     GridMesh endlessGrid_, unitGrid_;
-    id<MTLTexture> hdr_, ambient_, bloom_, depthResolved_, aoRaw_, aoBlurred_;
+    id<MTLTexture> hdr_, bloom_, depthResolved_, aoRaw_, aoBlurred_;
     std::vector<id<MTLTexture>> bloomViews_;
     id<MTLTexture> skyCube_, envCube_, brdfLut_;
     std::string envKey_;
     id<MTLDepthStencilState> depthWrite_, depthRead_, depthNone_;
-    id<MTLTexture> resolve_, msaaColor_, msaaAmbient_, msaaDepth_, shadowMap_, white_;
+    id<MTLTexture> resolve_, msaaColor_, msaaDepth_, shadowMap_, white_;
     id<MTLCommandBuffer> lastCommand_;
     std::unordered_map<std::string, GpuMesh> meshes_;
     std::unordered_map<std::string, id<MTLTexture>> textures_;

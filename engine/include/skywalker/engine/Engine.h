@@ -67,6 +67,10 @@ struct CaptureOptions {
     bool editorOverlays = true;
     bool annotate = false;  // draw numbered entity boxes ("set-of-mark" prompting)
     bool fog = true;        // false for analysis views (orthographic/top-down)
+    /// Jittered sub-samples accumulated per capture (supersampled, noise-free GI/reflections).
+    /// 1 = a single real-time frame (temporal AA uses history from previous frames).
+    int samples = 4;
+    int debugView = 0;  // see FrameData::debugView
 };
 
 struct Capture {

@@ -125,10 +125,7 @@ fragment MainOut skyFragment(FullscreenOut in [[stage_in]], constant FrameUnifor
     // Height fog veils the horizon when the fog is dense.
     float fogAmt = saturate(f.fog.w * 60.0) * (1.0 - smoothstep(0.0, 0.35, dir.y));
     c = mix(c, f.fog.rgb, fogAmt);
-    MainOut o;
-    o.color = float4(c, 1.0);  // linear HDR; tonemapped in the composite pass
-    o.ambient = float4(0.0);
-    return o;
+    return mainOutFlat(float4(c, 1.0));  // linear HDR; tonemapped in the composite pass
 }
 
 // ---------------------------------------------------------------------------

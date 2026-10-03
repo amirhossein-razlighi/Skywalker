@@ -175,6 +175,14 @@ struct FrameData {
     std::vector<VolumeItem> volumes;
     bool drawGrid = true;
     float time = 0;
+    /// Jittered sub-samples accumulated into this frame (stills and cinematics: supersampling,
+    /// noise-free GI). 1 = real-time (temporal anti-aliasing across frames).
+    int samples = 1;
+    /// Discards temporal history (camera cuts). Large camera jumps are detected automatically.
+    bool resetHistory = false;
+    /// Buffer visualization instead of the final image: 0 off, 1 albedo, 2 normals,
+    /// 3 roughness/metallic, 4 GI, 5 reflections, 6 AO, 7 depth, 8 lighting before GI.
+    int debugView = 0;
 
     static constexpr size_t kMaxLights = 16;
     Mat4 viewProjection() const { return projection * view; }

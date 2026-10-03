@@ -79,7 +79,7 @@ int usage() {
                  "usage:\n"
                  "  skywalker mcp [--project DIR] [--scene FILE]   MCP server on stdio\n"
                  "  skywalker mcp --attach [SOCKET]                bridge to a running editor\n"
-                 "  skywalker render SCENE -o out.png [--width W] [--height H] [--annotate] [--scene-camera]\n"
+                 "  skywalker render SCENE -o out.png [--width W] [--height H] [--annotate] [--scene-camera] [--samples N]\n"
                  "  skywalker run SCENE [--ticks N] [-o out.png]\n"
                  "  skywalker check FILE.wander\n"
                  "  skywalker call TOOL [JSON] [--scene FILE] [--project DIR] [-o image.png]\n"
@@ -176,6 +176,7 @@ int runRender(const Args& args, bool simulate) {
     o.height = std::stoi(args.get("--height", "720"));
     o.annotate = args.has("--annotate");
     o.useSceneCamera = args.has("--scene-camera");
+    o.samples = std::stoi(args.get("--samples", "8"));
     if (!o.useSceneCamera) engine.callTool("camera_set", Json::object({{"frame", "all"}}), "cli");
     auto cap = engine.capture(o);
     if (!cap) {

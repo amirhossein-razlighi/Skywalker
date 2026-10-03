@@ -232,6 +232,11 @@ struct Environment {
     float fogHeight = 0.f;             // height falloff: > 0 makes fog pool near the ground
     float reflections = 1.f;           // image-based (sky) reflections strength
     float ao = 0.8f;                   // screen-space ambient occlusion strength
+    float gi = 1.f;                    // screen-space global illumination (bounce + emissive light), 0 = off
+    float giDistance = 4.f;            // GI ray length in meters (scaled up with view distance)
+    float ssr = 1.f;                   // screen-space reflections on glossy surfaces, 0 = off
+    bool taa = true;                   // temporal anti-aliasing (jitter + history)
+    float sharpen = 0.35f;             // contrast-adaptive sharpening after temporal filtering
     float aoRadius = 0.6f;             // meters
     float shadowSoftness = 1.f;        // penumbra size multiplier
     std::string tonemap = "aces";      // aces | agx | neutral | filmic | none

@@ -100,12 +100,9 @@ fragment MainOut meshFragment(MeshOut in [[stage_in]],
     float3 emissive = d.emissive.rgb * d.emissive.w;
     if (d.maps.w > 0.5) emissive *= (tri ? sampleTri(emissiveTex, tp) : emissiveTex.sample(materialSampler, uv)).rgb;
 
-    MainOut o;
     int shading = int(d.material.w + 0.5);
     if (shading == 2) {  // unlit: flat color, still emissive
-        o.color = float4(s.albedo + emissive, s.alpha);
-        o.ambient = float4(0.0, 0.0, 0.0, s.alpha);
-        return o;
+        return mainOut(float4(s.albedo + emissive, s.alpha), s.albedo, 1.0, Ngeo, 1.0, kGbufNoLighting);
     }
 
     s.metallic = d.material.x;
@@ -236,11 +233,10 @@ fragment MainOut meshFragment(MeshOut in [[stage_in]],
     float fogAmt = fogFactor(f, in.worldPos);
     float3 fogC = f.fog.rgb + f.sunColor.rgb * f.sunDir.w * pow(saturate(dot(-V, L)), 8.0) * 0.25;
     color = mix(color, fogC, fogAmt);
-    indirect *= 1.0 - fogAmt;
 
-    o.color = float4(color, s.alpha);  // linear HDR
-    o.ambient = float4(indirect, s.alpha);
-    return o;
+    // Toon and legacy water keep their stylized ambient: no screen-space GI/reflections.
+    bool screenSpace = !toon && shading != 3;
+    return mainOut(float4(color, s.alpha), s.albedo, s.ao, s.N, s.roughness, screenSpace ? s.metallic : kGbufNoLighting);
 }
 
 // ---------------------------------------------------------------------------
@@ -263,10 +259,7 @@ vertex float4 outlineVertex(uint vid [[vertex_id]],
 }
 
 fragment MainOut outlineFragment(constant DrawUniforms& d [[buffer(0)]]) {
-    MainOut o;
-    o.color = d.outlineColor;
-    o.ambient = float4(0.0, 0.0, 0.0, 1.0);
-    return o;
+    return mainOutFlat(d.outlineColor);
 }
 
 // ---------------------------------------------------------------------------
@@ -350,8 +343,5 @@ fragment MainOut gridFragment(GridOut in [[stage_in]], constant FrameUniforms& f
     float fade = saturate(1.0 - dist / (40.0 + abs(f.cameraPos.y) * 6.0));
     a *= fade * 0.55;
     if (a < 0.003) discard_fragment();
-    MainOut o;
-    o.color = float4(col, a);
-    o.ambient = float4(0.0, 0.0, 0.0, a);
-    return o;
+    return mainOutFlat(float4(col, a));
 }

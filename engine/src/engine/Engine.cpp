@@ -296,6 +296,8 @@ FrameData Engine::frame(const CaptureOptions& opts) {
         if (const auto* m = scene_->get<MeshRenderer>(e)) ensureMeshUploaded(m->mesh);
     }
     FrameData f = buildFrame(*scene_, view, opts.width, opts.height, bo);
+    f.samples = opts.samples;
+    f.debugView = opts.debugView;
     if (!opts.fog) f.environment.fogDensity = 0;
     // Effects: simulated particles (+ the light fires cast) and FFT water.
     particles_.gather(*scene_, view, f.particles, f.lights);
@@ -349,6 +351,7 @@ Status Engine::renderToSurface(void* surface, int width, int height) {
     CaptureOptions opts;
     opts.width = width;
     opts.height = height;
+    opts.samples = 1;  // real time: temporal anti-aliasing across frames
     FrameData f = frame(opts);
     Status s = renderer_->render(f);
     if (s) s = renderer_->present(surface);

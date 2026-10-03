@@ -13,8 +13,11 @@
 //     (split-sum with a BRDF lookup texture). Diffuse irradiance comes from the
 //     roughest mip.
 //   * Sun shadows: 4 cascades in one atlas, rotated Poisson PCF.
-//   * The main pass writes two targets: lit color and the "indirect" (ambient) part, so
-//     SSAO can darken only indirect light in the composite.
+//   * The main pass (4x MSAA) writes lit color plus a thin G-buffer (albedo + material AO,
+//     octahedral normal + roughness + metallic). A lighting-resolve pass then swaps the
+//     sky-probe indirect light for screen-space GI and reflections and applies SSAO.
+//   * Temporal: sub-pixel jitter every frame; a TAA pass (or N-sample accumulation for
+//     stills) resolves aliasing and the noise of stochastic effects.
 
 #include <metal_stdlib>
 using namespace metal;
@@ -37,6 +40,9 @@ struct FrameUniforms {
     float4 sky;            // x = mode (0 gradient, 1 atmosphere, 2 hdri), y = clouds, z = stars, w = reflections
     float4 extra;          // x = fog height falloff, y = shadow softness, z = env max mip, w = unused
     float4 hdri;           // x = rotation (rad), y = intensity, z = mip for env cube faces, w = mip count
+    float4x4 prevViewProj; // previous frame, unjittered (reprojection)
+    float4x4 viewProjNoJitter;
+    float4 temporal;       // xy = jitter (NDC), z = frame index, w = sub-sample index
 };
 
 struct DrawUniforms {
@@ -91,10 +97,47 @@ struct MeshOut {
     float4 color;
 };
 
+// Main pass outputs: lit HDR color + G-buffer.
+//   gbufA (RGBA8):   rgb = albedo (linear), a = material ambient occlusion
+//   gbufB (RGBA16F): xy = octahedral normal, z = roughness, w = metallic (0..1) or a
+//                    "no screen-space lighting" flag (>= 2: sky, unlit, toon, outlines)
 struct MainOut {
     float4 color [[color(0)]];
-    float4 ambient [[color(1)]];
+    float4 gbufA [[color(1)]];
+    float4 gbufB [[color(2)]];
 };
+
+// Passes drawn over the resolved scene (water, particles, fluids) write color only.
+struct EffectOut {
+    float4 color [[color(0)]];
+};
+
+constant float kGbufNoLighting = 4.0;
+
+static float2 octWrap(float2 v) { return (1.0 - abs(v.yx)) * select(float2(-1.0), float2(1.0), v.xy >= 0.0); }
+
+static float2 octEncode(float3 n) {
+    n /= (abs(n.x) + abs(n.y) + abs(n.z));
+    n.xy = n.z >= 0.0 ? n.xy : octWrap(n.xy);
+    return n.xy;
+}
+
+static float3 octDecode(float2 e) {
+    float3 n = float3(e.x, e.y, 1.0 - abs(e.x) - abs(e.y));
+    float t = saturate(-n.z);
+    n.xy += select(float2(t), float2(-t), n.xy >= 0.0);
+    return normalize(n);
+}
+
+static MainOut mainOut(float4 color, float3 albedo, float ao, float3 N, float roughness, float metallicOrFlag) {
+    MainOut o;
+    o.color = color;
+    o.gbufA = float4(albedo, ao);
+    o.gbufB = float4(octEncode(N), roughness, metallicOrFlag);
+    return o;
+}
+
+static MainOut mainOutFlat(float4 color) { return mainOut(color, float3(0.0), 1.0, float3(0, 1, 0), 1.0, kGbufNoLighting); }
 
 constexpr sampler shadowSampler(coord::normalized, filter::linear, address::clamp_to_edge, compare_func::less_equal);
 constexpr sampler materialSampler(coord::normalized, filter::linear, mip_filter::linear, address::repeat, max_anisotropy(8));

@@ -692,6 +692,11 @@ void addViewTools(Engine& engine, ToolRegistry& reg) {
                      {"fov", number("Vertical field of view in degrees for the custom view (lens: 25 tele .. 90 wide)")},
                      {"annotate", boolean("Draw entity id labels (default true)")},
                      {"overlays", boolean("Editor grid & selection highlight (default true)")},
+                     {"samples", integer("Supersampling: jittered sub-frames accumulated (default 4; 1 = fastest preview, "
+                                         "16-32 = final-quality stills with noise-free GI and reflections)")},
+                     {"debug_view", enumeration({"final", "albedo", "normals", "material", "gi", "reflections", "ao", "depth", "lighting"},
+                                                "Buffer visualization for diagnosing looks: material = roughness (red) / metallic (green), "
+                                                "gi = bounce light, lighting = before screen-space GI/reflections")},
                      {"include_image", boolean("Return the image (default true); false = only the entity list")},
                      {"save_path", string("Also write the PNG to this project-relative path")}}),
              false, false, [&engine](const Json& a, ToolContext&) {
@@ -714,6 +719,12 @@ void addViewTools(Engine& engine, ToolRegistry& reg) {
                  }
                  o.annotate = a.get("annotate").asBool(true);
                  o.editorOverlays = a.get("overlays").asBool(true);
+                 o.samples = static_cast<int>(std::clamp<int64_t>(a.get("samples").asInt(4), 1, 64));
+                 {
+                     static const char* kViews[] = {"final", "albedo", "normals", "material", "gi", "reflections", "ao", "depth", "lighting"};
+                     std::string dv = a.get("debug_view").asString();
+                     for (int i = 0; i < 9; ++i) if (dv == kViews[i]) o.debugView = i;
+                 }
                  auto cap = engine.capture(o);
                  if (!cap) return ToolResult::error(cap.error());
                  Json visible = Json::array();

@@ -93,7 +93,7 @@ static float4 traceSSR(constant FrameUniforms& f, float3 p, float3 R, texture2d<
     return float4(0.0);
 }
 
-fragment MainOut waterFragment(WaterOut in [[stage_in]],
+fragment EffectOut waterFragment(WaterOut in [[stage_in]],
                                constant WaterUniforms& w [[buffer(0)]],
                                constant FrameUniforms& f [[buffer(1)]],
                                constant GPULight* lights [[buffer(2)]],
@@ -214,9 +214,8 @@ fragment MainOut waterFragment(WaterOut in [[stage_in]],
     float fogAmt = fogFactor(f, in.worldPos);
     float3 fogC = f.fog.rgb + f.sunColor.rgb * f.sunDir.w * pow(saturate(dot(-V, L)), 8.0) * 0.25;
     color = mix(color, fogC, fogAmt);
-    MainOut o;
+    EffectOut o;
     o.color = float4(color, 1.0);
-    o.ambient = float4(0.0, 0.0, 0.0, 1.0);
     return o;
 }
 
@@ -312,7 +311,7 @@ static float3 particleLighting(constant FrameUniforms& f, constant GPULight* lig
     return lit;
 }
 
-fragment MainOut particleFragment(ParticleOut in [[stage_in]],
+fragment EffectOut particleFragment(ParticleOut in [[stage_in]],
                                   constant FrameUniforms& f [[buffer(1)]],
                                   constant GPULight* lights [[buffer(2)]],
                                   depth2d<float> shadowAtlas [[texture(1)]],
@@ -391,9 +390,8 @@ fragment MainOut particleFragment(ParticleOut in [[stage_in]],
     } else {
         rgb *= 1.0 - fogAmt;
     }
-    MainOut o;
+    EffectOut o;
     o.color = float4(rgb, a) * soft;
-    o.ambient = float4(0.0, 0.0, 0.0, a * soft);
     return o;
 }
 
@@ -670,7 +668,7 @@ static float3 blackbody(float k) {
     return pow(c, float3(2.2));  // the fit is in sRGB
 }
 
-fragment MainOut volumeFragment(VolumeOut in [[stage_in]],
+fragment EffectOut volumeFragment(VolumeOut in [[stage_in]],
                                 constant VolumeUniforms& u [[buffer(0)]],
                                 constant FrameUniforms& f [[buffer(1)]],
                                 constant GPULight* lights [[buffer(2)]],
@@ -751,8 +749,7 @@ fragment MainOut volumeFragment(VolumeOut in [[stage_in]],
     float3 center = (u.model * float4(0.0, u.size.y * 0.5, 0.0, 1.0)).xyz;
     float fogAmt = fogFactor(f, center);
     C = mix(C, f.fog.rgb * alpha, fogAmt);
-    MainOut o;
+    EffectOut o;
     o.color = float4(C, alpha);
-    o.ambient = float4(0.0, 0.0, 0.0, alpha);
     return o;
 }
