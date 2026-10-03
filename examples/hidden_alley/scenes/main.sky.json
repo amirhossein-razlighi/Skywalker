@@ -47000,7 +47000,7 @@
       "components": {
         "transform": {
           "position": [
-            4.05,
+            2.4,
             0.12,
             12
           ],
@@ -47191,8 +47191,8 @@
       "components": {
         "transform": {
           "position": [
-            3.6,
-            3.6,
+            2.4,
+            3.55,
             12
           ],
           "rotation": [
@@ -47209,9 +47209,9 @@
         "light": {
           "kind": "spot",
           "color": "#ffb46a",
-          "intensity": 14,
-          "range": 14,
-          "spotAngle": 55
+          "intensity": 12,
+          "range": 11,
+          "spotAngle": 32
         }
       }
     },
@@ -47225,7 +47225,7 @@
       "components": {
         "transform": {
           "position": [
-            -4.05,
+            -2.4,
             0.12,
             -6
           ],
@@ -47416,8 +47416,8 @@
       "components": {
         "transform": {
           "position": [
-            -3.6,
-            3.6,
+            -2.4,
+            3.55,
             -6
           ],
           "rotation": [
@@ -47434,9 +47434,9 @@
         "light": {
           "kind": "spot",
           "color": "#ffb46a",
-          "intensity": 14,
-          "range": 14,
-          "spotAngle": 55
+          "intensity": 12,
+          "range": 11,
+          "spotAngle": 32
         }
       },
       "behaviors": [
@@ -47458,7 +47458,7 @@
       "components": {
         "transform": {
           "position": [
-            4.05,
+            2.4,
             0.12,
             -26
           ],
@@ -47649,8 +47649,8 @@
       "components": {
         "transform": {
           "position": [
-            3.6,
-            3.6,
+            2.4,
+            3.55,
             -26
           ],
           "rotation": [
@@ -47667,9 +47667,9 @@
         "light": {
           "kind": "spot",
           "color": "#ffb46a",
-          "intensity": 14,
-          "range": 14,
-          "spotAngle": 55
+          "intensity": 12,
+          "range": 11,
+          "spotAngle": 32
         }
       }
     },

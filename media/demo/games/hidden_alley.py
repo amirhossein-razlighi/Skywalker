@@ -164,9 +164,9 @@ def build(studio):
     # Lamps and the colored glow of the alley.
     for k, zz in enumerate((12, -6, -26)):
         side = 1 if k % 2 == 0 else -1
-        ph.place(pix, A["street_lamp_01"], f"Street Lamp {k + 1}", (side * (HALF - 1.5), 0.12, zz), yaw=90 if side > 0 else -90)
-        pix.light(f"Lamp Light {k + 1}", (side * (HALF - 1.5), 3.55, zz), "#ffb46a", 16, range_=13, kind="spot",
-                  rot=(-90, 0, 0), spot=42, tags=["lamp"])
+        ph.place(pix, A["street_lamp_01"], f"Street Lamp {k + 1}", (side * (HALF - 2.2), 0.12, zz), yaw=90 if side > 0 else -90)
+        pix.light(f"Lamp Light {k + 1}", (side * (HALF - 2.2), 3.55, zz), "#ffb46a", 12, range_=11, kind="spot",
+                  rot=(-90, 0, 0), spot=32, tags=["lamp"])
     for k, (side, zz) in enumerate([(-1, -8), (1, 4), (1, -19)]):
         ph.place(pix, A["security_light"], f"Security Light {k + 1}", (wall_x(side, -0.15), 3.2, zz), yaw=90 if side < 0 else -90)
         pix.light(f"Security Lamp {k + 1}", (wall_x(side, 0.4), 3.0, zz), "#d8e8ff", 10, range_=9, kind="spot", rot=(-90, 0, 0),
@@ -242,7 +242,7 @@ def shots():
 
     def puddle(i, n):  # low over a puddle full of neon
         t = i / (n - 1)
-        return dict(eye=[-0.6 + 0.8 * t, 0.35, 0.5 - 2.5 * t], target=[-1.8, 2.5, -14], fov=48)
+        return dict(eye=[0.2 + 0.4 * t, 0.32, 5.5 - 3.0 * t], target=[-0.6, 2.2, -22], fov=50)
 
     def barrel(i, n):  # orbit the burning barrel and the steam
         t = i / (n - 1)
@@ -251,7 +251,7 @@ def shots():
 
     def crane(i, n):  # rise above the lamps
         t = i / (n - 1)
-        return dict(eye=[0.5, 3 + 9 * t, 10 - 4 * t], target=[0, 0.5 + 1.5 * t, -26], fov=50)
+        return dict(eye=[0.3, 3 + 7 * t, 12 - 3 * t], target=[0, 0.5 + 1.5 * t, -30], fov=50)
 
     return [dict(name="push", frames=180, cam=push, warmup=90),
             dict(name="puddle", frames=150, cam=puddle),

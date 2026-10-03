@@ -1,16 +1,17 @@
 # Demo video pipelines
 
-## Showcase video (12 games) — `out/skywalker-showcase.mp4`
+## Showcase video — `out/skywalker-showcase.mp4`
 
 Everything in the video comes from the engine, the live editor, or the agents' own tool calls.
 
 | Footage | Source |
 |---|---|
-| The 12 games | `games/<id>.py`. Each is built by the crew through engine tools only. The kit (`kit.py`) gives each crew member their own MCP connection, so every edit is attributed (`mcp:Cirro`, `mcp:Aurora`, …). Results live in `examples/<id>`. |
+| The games | `games/<id>.py`. Each is built by the crew through engine tools only. The kit (`kit.py`) gives each crew member their own MCP connection, so every edit is attributed (`mcp:Cirro`, `mcp:Aurora`, …). Results live in `examples/<id>`. |
 | Live builds (timelapse grid) | `record_all.py` launches the editor on each example, starts `record_session.py`, which captures the editor viewport over its MCP socket every 0.25 s, and runs `showcase.py build <id> --attach --pace 1.0 --log edits.jsonl`. The compositor aligns frames and edits by wall clock. |
 | Game shots | `showcase.py footage <id>`: the headless engine plays each game's Wander behaviors while cameras follow `shots()`. |
 | Feature shots | `render_features.py`: a look-dev scene (presets + `texture_generate`), toon vs PBR on Cloudhopper, a time-of-day sweep on Harvest Fair, texture swatches, a `viewport_multi` capture. |
 | Asset previews | `asset_preview` on the games' prefabs. |
+| Photoscanned scenes | `smugglers_cove`, `hidden_alley`, `namaqua_canyon`: CC0 models, textures and HDRI skies from Poly Haven, resolved through its public API (`polyhaven.py`) and downloaded by the crew with `asset_download` (license, author and source land in each project's `CREDITS.md`). Downloads are git-ignored and fetched again on the first build. They also use the simulated effects: GPU fluid fire, FFT water, rain particles, volumetric light. |
 | Voice | Kokoro-82M (`tts.py narration2.json vo/`), voice `af_heart`. |
 | Music | Procedural (`music.py`). |
 | Branding | `assets/brand` (icon and wordmark). |

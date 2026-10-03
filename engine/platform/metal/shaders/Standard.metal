@@ -1379,6 +1379,7 @@ kernel void fluidCombust(texture3d<float, access::read> src [[texture(0)]],
     float flick = noise3(pos * 0.16 + float3(0.0, -time * 1.5, p.step.z)) * noise3(pos * 0.45 + float3(p.step.z, -time * 4.0, 0.0)) * 2.4;
     float inSrc = saturate(1.0 - d / max(r, 0.5)) * flick * p.decay.z;
     float feed = p.feed.x * p.step.w;
+    if (p.step.w > 1.5) inSrc = max(inSrc, saturate(1.0 - d / max(r, 0.5)));  // a blast fills its whole source
     if (feed > 0.0) {
         s.b += inSrc * feed * dt * 9.0;
     } else {
@@ -1397,7 +1398,9 @@ kernel void fluidCombust(texture3d<float, access::read> src [[texture(0)]],
     float3 e = min(pos, p.dims.xyz - pos);
     float wall = saturate(min(min(e.x, e.z), e.y + 4.0) / 3.0) * saturate((p.dims.y - pos.y) / 4.0);
     s.rg *= mix(1.0, wall, saturate(dt * 8.0));
-    s.b = min(s.b, 3.0);
+    s.b = min(s.b, p.step.w > 1.5 ? 8.0 : 3.0);
+    s.rg = min(s.rg, float2(6.0, 4.0));
+    if (any(isnan(s)) || any(isinf(s))) s = float4(0.0);
     dst.write(s, g);
 }
 
@@ -1447,10 +1450,21 @@ kernel void fluidForces(texture3d<float, access::read> vel [[texture(0)]],
     float3 n = float3(noise3(pos * 0.21 + float3(time * 1.7, 0, p.step.z)), noise3(pos * 0.21 + float3(7.1, time * 1.3, 2.0)),
                       noise3(pos * 0.21 + float3(3.3, 1.9, time * 1.9))) - 0.5;
     v += (float3(0.0, p.feed.w, 0.0) - v) * inSrc * saturate(dt * 6.0);
+    if (p.step.w > 1.5) {  // burst (explosions): a violent radial blast from the source
+        float3 out = pos - p.source.xyz;
+        float od = length(out);
+        float blast = saturate(1.0 - od / max(p.source.w * 2.5, 1.0));
+        v += (out / max(od, 1e-3)) * p.feed.w * blast * saturate(dt * 12.0) * 1.5;
+    }
     v += n * p.physics.z * 40.0 * dt * (inSrc + saturate(s.g) * 0.5);
     float gas = saturate(s.r * 2.0 + s.g);
     v += (p.wind.xyz - v) * gas * saturate(dt * 0.8);
     v *= 1.0 - saturate(dt * 0.05);
+    // Stability: never move more than a few cells per step (CFL) and never keep a NaN.
+    float vmax = 2.5 / max(dt, 1e-4);
+    float vl = length(v);
+    if (vl > vmax) v *= vmax / vl;
+    if (any(isnan(v)) || any(isinf(v))) v = float3(0.0);
     dst.write(float4(v, 0.0), g);
 }
 
@@ -1497,6 +1511,10 @@ kernel void fluidProject(texture3d<float, access::read> vel [[texture(0)]],
                                pressureAt(pr, c + int3(0, 0, 1), m, self) - pressureAt(pr, c - int3(0, 0, 1), m, self));
     float3 v = vel.read(g).xyz - grad;
     if (g.y == 0) v.y = max(v.y, 0.0);
+    float vmax = 2.5 / max(p.step.x, 1e-4);
+    float vl = length(v);
+    if (vl > vmax) v *= vmax / vl;
+    if (any(isnan(v)) || any(isinf(v))) v = float3(0.0);
     dst.write(float4(v, 0.0), g);
 }
 

@@ -48,6 +48,14 @@
     "text": "They can even fetch openly licensed models from the web, with your approval. Licenses and credits are tracked for you."
   },
   {
+    "id": "12b_aaa",
+    "text": "And when a scene calls for film-grade assets, the crew fetches them. Photoscanned models and real skies, openly licensed and credited, become a pirate cove at sunset, a rain-soaked alley, and a desert canyon at dusk."
+  },
+  {
+    "id": "12c_sim",
+    "text": "Fire and smoke are real fluid simulations on the GPU. The sea is a spectral wave simulation the galleon actually rides. Rain splashes, embers rise, and light cuts through the air."
+  },
+  {
     "id": "13_agents",
     "text": "Design your crew. Their roles, instructions, permissions, and memory. Run them alone, together, or in parallel."
   },

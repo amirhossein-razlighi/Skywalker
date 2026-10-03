@@ -41,7 +41,8 @@ CREW = {
 }
 GAMES = ["hollow_manor", "abyss", "hearthside", "harvest_fair", "neon_drift", "star_lancer", "cloudhopper",
          "toy_kart_rally", "zen_garden", "cyber_alley", "frostlight", "sky_dash"]
-META = {g: json.load(open(os.path.join(ROOT, "examples", g, "game.json"))) for g in GAMES}
+AAA = ["smugglers_cove", "hidden_alley", "namaqua_canyon"]  # built from downloaded photoscans
+META = {g: json.load(open(os.path.join(ROOT, "examples", g, "game.json"))) for g in GAMES + AAA}
 
 
 @lru_cache(maxsize=None)
@@ -493,6 +494,33 @@ def seg_download(t, dur):
     return bg.convert("RGB")
 
 
+def aaa_shot(game, name, offset=0.0):
+    def f(lt, d):
+        im = game_card(shot(game, name, offset + lt), game, lt, d)
+        return corner_tag(im, "CC0 photoscans · Poly Haven · fetched by Pixel with asset_download", lt, GOLD)
+    return f
+
+
+def seg_aaa(t, dur):
+    q = dur / 6
+    return sequence([(q, aaa_shot("smugglers_cove", "establish", 1.0)), (q, aaa_shot("smugglers_cove", "galleon")),
+                     (q, aaa_shot("hidden_alley", "push", 1.2)), (q, aaa_shot("hidden_alley", "barrel")),
+                     (q, aaa_shot("namaqua_canyon", "aerial", 0.8)), (q, aaa_shot("namaqua_canyon", "camp"))], t)
+
+
+def sim_shot(game, name, label, offset=0.0):
+    return lambda lt, d: corner_tag(shot(game, name, offset + lt), label, lt, (255, 120, 60))
+
+
+def seg_sim(t, dur):
+    q = dur / 5
+    return sequence([(q, sim_shot("smugglers_cove", "camp", "GPU fluid simulation · fire & smoke", 0.5)),
+                     (q, sim_shot("hidden_alley", "barrel", "Fluid fire · particle embers · steam", 1.5)),
+                     (q, sim_shot("smugglers_cove", "battery", "FFT ocean · the galleon rides the simulated waves")),
+                     (q, sim_shot("hidden_alley", "puddle", "Rain with splashes · puddles mirror the neon")),
+                     (q, sim_shot("namaqua_canyon", "trees", "Volumetric light shafts"))], t)
+
+
 def seg_agents(t, dur):
     bg = darken(shot("zen_garden", "pond", t * 0.6).filter(ImageFilter.GaussianBlur(14)), 0.6).convert("RGBA")
     d = ImageDraw.Draw(bg)
@@ -573,7 +601,7 @@ def seg_connect(t, dur):
 
 
 def seg_outro(t, dur):
-    bg = darken(shot("frostlight", "sky", 2 + t * 0.6).filter(ImageFilter.GaussianBlur(10)), 0.45).convert("RGBA")
+    bg = darken(shot("smugglers_cove", "establish", 2 + t * 0.6).filter(ImageFilter.GaussianBlur(10)), 0.45).convert("RGBA")
     d = ImageDraw.Draw(bg)
     a = ease_out(t / 0.8)
     icon = rgba(os.path.join(BRAND, "icon", "app-icon-1024.png"), h=260)
@@ -596,6 +624,7 @@ SEGMENTS = [("01_intro", seg_intro, 0.9, 1.4), ("02_challenge", seg_challenge, 0
             ("04_horror", seg_horror, 0.4, 1.4), ("05_cozy", seg_cozy, 0.3, 1.4), ("06_action", seg_action, 0.3, 1.4),
             ("07_play", seg_play, 0.3, 1.6), ("08_art", seg_art, 0.3, 1.6), ("09_render", seg_render, 0.3, 1.2),
             ("10_textures", seg_textures, 0.3, 1.2), ("11_assets", seg_assets, 0.3, 1.2), ("12_download", seg_download, 0.3, 1.2),
+            ("12b_aaa", seg_aaa, 0.4, 1.4), ("12c_sim", seg_sim, 0.3, 1.4),
             ("13_agents", seg_agents, 0.3, 1.0), ("14_connect", seg_connect, 0.3, 1.2), ("15_outro", seg_outro, 0.6, 2.6)]
 
 timeline = []

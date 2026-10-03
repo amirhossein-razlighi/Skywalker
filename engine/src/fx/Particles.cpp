@@ -436,10 +436,10 @@ const Preset kFluidPresets[] = {
     {"steam_vent", R"({"size":[1.2,4,1.2],"resolution":72,"sourceOffset":[0,0.05,0],"sourceRadius":0.18,"fuel":0,
         "heat":0.9,"smoke":1.0,"buoyancy":0.9,"vorticity":0.5,"turbulence":0.7,"cooling":0.9,"smokeFade":0.55,"speed":1.6,
         "smokeColor":"#dfe4ea","smokeDensity":0.45,"light":0})"},
-    {"explosion_volume", R"({"size":[8,10,8],"resolution":96,"sourceOffset":[0,0.8,0],"sourceRadius":1.6,"fuel":3,
-        "heat":1.6,"smoke":1.2,"buoyancy":1.4,"vorticity":0.8,"turbulence":1.4,"burnRate":1.4,"cooling":0.9,
-        "smokeFade":0.12,"speed":6,"flameIntensity":1.4,"flameTemperature":2000,"smokeColor":"#242120","smokeDensity":1.2,
-        "light":30,"lightColor":"#ff9a4a","lightRange":40,"emitting":false,"burst":0.35})"},
+    {"explosion_volume", R"({"size":[10,12,10],"resolution":110,"sourceOffset":[0,1.2,0],"sourceRadius":1.2,"fuel":4,
+        "heat":1.6,"smoke":3.2,"buoyancy":1.5,"vorticity":2.2,"turbulence":3.0,"burnRate":6.0,"cooling":2.8,
+        "smokeFade":0.06,"speed":9,"flameIntensity":1.4,"flameTemperature":2100,"smokeColor":"#1c1a19","smokeDensity":2.6,
+        "light":30,"lightColor":"#ff9a4a","lightRange":40,"emitting":false,"burst":0.16})"},
 };
 
 // Composite items: {"name", "preset" (particle preset), or "fluid" (fluid preset), "position",

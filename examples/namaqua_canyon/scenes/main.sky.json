@@ -13,7 +13,7 @@
     "sunColor": "#ffb878",
     "sunIntensity": 3.6,
     "fogColor": "#d8a07a",
-    "fogDensity": 0.0012,
+    "fogDensity": 8e-04,
     "exposure": 1.05,
     "showGrid": false,
     "bloomIntensity": 0.35,

@@ -37,6 +37,8 @@
     "temperature": 0.15,
     "tint": 0,
     "shadowDistance": 180,
+    "godRays": 0,
+    "haze": 0.02,
     "windSpeed": 2,
     "windDirection": 60
   },
