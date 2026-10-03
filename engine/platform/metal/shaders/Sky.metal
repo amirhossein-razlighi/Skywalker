@@ -78,8 +78,10 @@ static float3 skyColor(float3 dir, constant FrameUniforms& f, bool withClouds) {
     float3 sky;
     if (f.sky.x > 0.5) {
         sky = atmosphere(dir, toSun, max(f.sunDir.w, 0.05));
-        float below = saturate(-dir.y * 6.0);
-        sky = mix(sky, f.ground.rgb * max(f.sunDir.w, 0.05) * 0.25 * saturate(toSun.y + 0.2), below);
+        // Below the horizon (past the edge of the world): distant haze, not a dark ground.
+        float below = saturate(-dir.y * 3.0);
+        float3 haze = mix(atmosphere(float3(dir.x, 0.0, dir.z), toSun, max(f.sunDir.w, 0.05)), f.fog.rgb * max(f.sunDir.w, 0.05) * 0.4, 0.3);
+        sky = mix(sky, haze * 0.8, below);
     } else {
         float t = saturate(dir.y * 1.4 + 0.05);
         sky = mix(f.skyHorizon.rgb, f.skyTop.rgb, pow(t, 0.6));

@@ -95,7 +95,10 @@ std::vector<FoliageInstance> scatterChunk(const FoliageLayer& layer, int layerIn
 /// Per-entity cache of generated chunks with LRU-ish eviction.
 class FoliageCache {
 public:
-    static constexpr float kChunkSize = 16.f;
+    static constexpr float kChunkSize = 16.f;  // minimum; sparse layers use larger chunks
+    /// Chunk edge (m) holding ~256 instances of a layer: dense grass gets small chunks
+    /// (fine culling, streaming), sparse trees big ones (few draw calls).
+    static float chunkSizeFor(const FoliageLayer& layer);
     /// Returns the chunks of `layerIndex` that are within the layer's cull distance of `eye`
     /// and inside `area` (world xz bounds), generating missing ones (at most `budget` per call).
     std::vector<FoliageChunk> visibleChunks(const FoliageLayer& layer, int layerIndex, uint32_t seed, Vec3 eye,

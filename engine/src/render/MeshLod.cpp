@@ -35,7 +35,13 @@ void buildLods(MeshData& m, int maxLods, size_t minTriangles) {
         float error = 0.f;
         size_t n = meshopt_simplifyWithAttributes(out.data(), source->data(), source->size(), m.vertices.data(), vertexCount,
                                                   stride, attrs.data(), sizeof(float) * 5, weights, 5, nullptr, target, 0.2f,
-                                                  meshopt_SimplifyLockBorder, &error);
+                                                  0, &error);
+        if (n == 0 || n >= source->size() * 7 / 10) {
+            // Disconnected geometry (leaf and grass cards, scanned debris) cannot collapse edges:
+            // sloppy simplification merges nearby vertices regardless of topology.
+            n = meshopt_simplifySloppy(out.data(), source->data(), source->size(), m.vertices.data(), vertexCount, stride, target,
+                                       0.3f, &error);
+        }
         if (n == 0 || n >= source->size() * 9 / 10) break;  // no meaningful reduction left
         out.resize(n);
         meshopt_optimizeVertexCache(out.data(), out.data(), out.size(), vertexCount);

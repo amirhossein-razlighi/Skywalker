@@ -434,6 +434,7 @@ public:
                              {"culledDraws", static_cast<int64_t>(culled_)},
                              {"terrainNodes", static_cast<int64_t>(terrainNodesDrawn_)},
                              {"instancesDrawn", static_cast<int64_t>(instancesDrawn_)},
+                             {"trianglesDrawn", static_cast<int64_t>(lastTriangles_)},
                              {"meshesCached", static_cast<int64_t>(meshes_.size())},
                              {"texturesCached", static_cast<int64_t>(textures_.size())},
                              {"instanceBuffers", static_cast<int64_t>(instanceBuffers_.size())}});
@@ -515,6 +516,7 @@ public:
             ensureCloudNoise(cmd);
             encodeEnvironment(cmd, frame, base);
             lodFrame_ = &frame;
+            trianglesDrawn_ = 0;
             encodeShadows(cmd, frame, base, cascades);
             for (int i = 0; i < samples; ++i) {
                 // Sub-pixel jitter (Halton 2,3): TAA spreads it over frames, stills over sub-samples.
@@ -556,6 +558,7 @@ public:
             lastCommand_ = cmd;
             evictWorldCaches();
             lodFrame_ = nullptr;
+            lastTriangles_ = trianglesDrawn_ / static_cast<uint64_t>(samples);
             prevViewProj_ = vp;
             motionPrevVP_ = vp;
             motionValid_ = true;
@@ -971,11 +974,16 @@ private:
         const Vec3 e = lodFrame_->camera.eye;
         Vec3 c{std::clamp(e.x, b.bounds.min.x, b.bounds.max.x), std::clamp(e.y, b.bounds.min.y, b.bounds.max.y),
                std::clamp(e.z, b.bounds.min.z, b.bounds.max.z)};
-        return std::min(m.lodFor(pixelsPerUnit(*lodFrame_, distance(e, c)) * 1.3f) + bias, m.lodCount - 1);
+        int lod = std::min(m.lodFor(pixelsPerUnit(*lodFrame_, distance(e, c)) * 1.3f) + bias, m.lodCount - 1);
+        // Leaf/grass cards thin out badly when simplified hard: keep the canopy readable
+        // (distant forests should use impostors).
+        if (b.surface.alphaCutoff > 0.f) lod = std::min(lod, 1 + bias);
+        return lod;
     }
 
     void drawLod(id<MTLRenderCommandEncoder> enc, const GpuMesh& m, int lod, NSUInteger instances = 1) {
         lod = std::clamp(lod, 0, m.lodCount - 1);
+        trianglesDrawn_ += static_cast<uint64_t>(m.lodCount_[lod] / 3) * instances;
         [enc drawIndexedPrimitives:MTLPrimitiveTypeTriangle
                         indexCount:m.lodCount_[lod]
                          indexType:MTLIndexTypeUInt32
@@ -2660,6 +2668,7 @@ private:
     std::string source_;
     size_t culled_ = 0;
     size_t terrainNodesDrawn_ = 0, instancesDrawn_ = 0;
+    uint64_t trianglesDrawn_ = 0, lastTriangles_ = 0;
     const FrameData* lodFrame_ = nullptr;  // frame being encoded (LOD selection)
     std::shared_ptr<std::atomic<double>> gpuMs_ = std::make_shared<std::atomic<double>>(0.0);
     uint64_t frameIndex_ = 0;

@@ -336,7 +336,7 @@ const TypeInfo& Environment::type() {
             SKY_FIELD_RANGE(Environment, godRays, Float,
                             "Volumetric light: sun shafts through trees and windows, cones under lamps (0 = off, 1 = natural)",
                             0.f, 8.f),
-            SKY_FIELD_RANGE(Environment, haze, Float, "Air density for volumetric light (0.005 clear .. 0.1 misty)", 0.f, 1.f),
+            SKY_FIELD_RANGE(Environment, haze, Float, "Air density for volumetric light, extinction per meter: 0.0003 clear landscape, 0.002 hazy valley, 0.01-0.03 misty alley or interior", 0.f, 1.f),
             SKY_FIELD_RANGE(Environment, windSpeed, Float, "Wind (m/s) that carries smoke, rain, snow and particles", 0.f, 60.f),
             SKY_FIELD(Environment, windDirection, Float, "Direction the wind blows toward (degrees, 0 = +Z)"),
         }};
