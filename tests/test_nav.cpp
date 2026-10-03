@@ -150,6 +150,34 @@ TEST_CASE("nav: character agents walk through the physics controller; replays ar
     CHECK(std::hypot(a.second.x + 3.f, a.second.z + 6.f) < 0.6f);
 }
 
+TEST_CASE("nav: navigate(self, entity) follows a moving target; stop_navigation stops") {
+    auto e = makeNavEngine();
+    buildLevel(*e);
+    EntityId target = make(*e, R"({"name":"Rabbit","components":{"transform":{"position":[-6,0.5,-4]},"mesh":{"mesh":"sphere"}}})");
+    Json rabbit = Json::array({Json::object({{"name", "Run"}, {"source", R"(behavior Run
+  on tick
+    if time < 3 then
+      move self by (2 * dt, 0, 0)
+    end
+  end
+end)"}})});
+    REQUIRE(e->scene().setBehaviors(target, rabbit));
+    EntityId hound = make(*e, R"({"name":"Hound","components":{"transform":{"position":[-6,0.5,5]},"nav_agent":{"speed":5}}})");
+    Json chase = Json::array({Json::object({{"name", "Chase"}, {"source", R"(behavior Chase
+  on start
+    navigate(self, find("Rabbit"))
+  end
+end)"}})});
+    REQUIRE(e->scene().setBehaviors(hound, chase));
+    e->play();
+    e->step(60 * 10);
+    Vec3 r = e->scene().worldMatrix(target).translation();
+    Vec3 h = e->scene().worldMatrix(hound).translation();
+    CHECK(r.x == doctest::Approx(0.f).epsilon(0.05));      // the rabbit ran 6 m
+    CHECK(std::hypot(h.x - r.x, h.z - r.z) < 0.9f);         // the hound followed it to its new spot
+    CHECK(e->physics().arrived(hound).value_or(false));
+}
+
 TEST_CASE("nav tools: nav_debug draws a top-down map; errors without walkable geometry") {
     auto e = makeNavEngine();
     call(*e, "nav_path", R"({"from": [0, 0, 0], "to": [1, 0, 1]})", false);  // empty scene: no navmesh

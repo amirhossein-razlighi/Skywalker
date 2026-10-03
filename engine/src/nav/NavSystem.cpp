@@ -376,7 +376,7 @@ std::vector<EntityId> NavSystem::update(float dt) {
                 follows_.erase(f);
             } else {
                 Vec3 fp = scene_.worldMatrix(f->second).translation();
-                if (a->autoRepath && distance(fp, a->destination) > 0.5f) a->destination = fp;
+                if (a->autoRepath && distance(fp, a->destination) > std::max(0.2f, a->stoppingDistance)) a->destination = fp;
             }
         }
         if (a->navigating) {

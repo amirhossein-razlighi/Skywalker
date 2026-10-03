@@ -246,6 +246,8 @@ something needs one.
 from Wander (`navigate`), a tool (`entity_update` with `{"nav_agent": {"destination": [...],
 "navigating": true}}`) or the editor. Agents avoid each other (DetourCrowd), are updated in scene
 order (deterministic), receive `on event "arrived"` and set `navigating` to false on arrival.
+`navigate(self, entity)` tracks the entity while walking (with `autoRepath`) and stops once it
+gets there; call it again (every tick or every second) to keep chasing.
 With a `character` component the agent walks the character controller (slopes, steps, physics);
 without one it moves its transform along the navmesh, keeping its height above it.
 
