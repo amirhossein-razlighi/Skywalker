@@ -402,6 +402,32 @@ fragment float4 debugViewFragment(FullscreenOut in [[stage_in]], constant PostUn
     else if (mode == 5) { float4 r = ssr.sample(linearClamp, uv); c = tonemapACES(r.rgb) * r.a; }
     else if (mode == 6) c = float3(ao.sample(linearClamp, uv).r);
     else if (mode == 7) { float d = depthTex.sample(pointClamp, uv); c = float3(pow(saturate(1.0 - d), 0.25)); }
+    else if (mode == 9) {
+        // Sketch: pencil contours from depth/normal discontinuities + cross-hatching by light.
+        float2 tx = p.texel.xy;
+        float d0 = depthTex.sample(pointClamp, uv);
+        float3 n0 = b.w >= 1.5 ? float3(0.0) : octDecode(b.xy);
+        float edge = 0.0;
+        for (int k = 0; k < 4; ++k) {
+            float2 o = (k == 0 ? float2(1, 0) : k == 1 ? float2(-1, 0) : k == 2 ? float2(0, 1) : float2(0, -1)) * tx * 1.2;
+            float d1 = depthTex.sample(pointClamp, uv + o);
+            float4 b1 = gbufB.sample(pointClamp, uv + o);
+            float3 n1 = b1.w >= 1.5 ? float3(0.0) : octDecode(b1.xy);
+            // Depth: relative jump in linear-ish depth; normals: crease angle.
+            float z0 = 1.0 / max(1.0 - d0, 1e-5), z1 = 1.0 / max(1.0 - d1, 1e-5);
+            edge = max(edge, smoothstep(0.015, 0.05, abs(z1 - z0) / max(min(z0, z1), 1e-3)));
+            edge = max(edge, smoothstep(0.5, 0.9, 1.0 - dot(n0, n1)) * (d0 < 1.0 ? 0.7 : 0.0));
+        }
+        float lum = dot(tonemapACES(hdr.sample(linearClamp, uv).rgb), float3(0.3, 0.55, 0.15));
+        float2 px = in.position.xy;
+        float h1 = step(0.5, fract((px.x + px.y) * 0.125));
+        float h2 = step(0.5, fract((px.x - px.y) * 0.125));
+        float hatch = (1.0 - smoothstep(0.2, 0.32, lum)) * (1.0 - h1) * 0.28 + (1.0 - smoothstep(0.06, 0.14, lum)) * (1.0 - h2) * 0.3;
+        float paperGrain = hash12(floor(px)) * 0.04;
+        float3 paper = float3(0.965, 0.955, 0.93) - paperGrain;
+        float3 ink = float3(0.16, 0.17, 0.2);
+        c = mix(paper, ink, saturate(edge * 0.95 + (d0 < 1.0 ? hatch : 0.0)));
+    }
     else c = tonemapACES(hdr.sample(linearClamp, uv).rgb);
     return float4(c, 1.0);
 }

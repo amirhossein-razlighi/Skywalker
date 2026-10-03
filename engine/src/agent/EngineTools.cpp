@@ -635,7 +635,8 @@ void addViewTools(Engine& engine, ToolRegistry& reg) {
                      {"overlays", boolean("Editor grid & selection highlight (default true)")},
                      {"samples", integer("Supersampling: jittered sub-frames accumulated (default 4; 1 = fastest preview, "
                                          "16-32 = final-quality stills with noise-free GI and reflections)")},
-                     {"debug_view", enumeration({"final", "albedo", "normals", "material", "gi", "reflections", "ao", "depth", "lighting"},
+                     {"clay", boolean("Render every surface as matte white clay (judge form and light; film 'sketch to fill' beats)")},
+                     {"debug_view", enumeration({"final", "albedo", "normals", "material", "gi", "reflections", "ao", "depth", "lighting", "sketch"},
                                                 "Buffer visualization for diagnosing looks: material = roughness (red) / metallic (green), "
                                                 "gi = bounce light, lighting = before screen-space GI/reflections")},
                      {"include_image", boolean("Return the image (default true); false = only the entity list")},
@@ -664,9 +665,10 @@ void addViewTools(Engine& engine, ToolRegistry& reg) {
                  o.editorOverlays = a.get("overlays").asBool(true);
                  o.samples = static_cast<int>(std::clamp<int64_t>(a.get("samples").asInt(4), 1, 64));
                  {
-                     static const char* kViews[] = {"final", "albedo", "normals", "material", "gi", "reflections", "ao", "depth", "lighting"};
+                     static const char* kViews[] = {"final", "albedo", "normals", "material", "gi", "reflections", "ao", "depth", "lighting", "sketch"};
                      std::string dv = a.get("debug_view").asString();
-                     for (int i = 0; i < 9; ++i) if (dv == kViews[i]) o.debugView = i;
+                     for (int i = 0; i < 10; ++i) if (dv == kViews[i]) o.debugView = i;
+                     o.clay = a.get("clay").asBool(false);
                  }
                  auto cap = engine.capture(o);
                  if (!cap) return ToolResult::error(cap.error());

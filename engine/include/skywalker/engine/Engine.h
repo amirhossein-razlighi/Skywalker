@@ -86,6 +86,7 @@ struct CaptureOptions {
     /// 1 = a single real-time frame (temporal AA uses history from previous frames).
     int samples = 4;
     int debugView = 0;  // see FrameData::debugView
+    bool clay = false;  // every surface matte white clay (look-dev of form and light; "sketch to fill" films)
 };
 
 struct Capture {

@@ -501,6 +501,26 @@ FrameData Engine::frame(const CaptureOptions& opts) {
             t.selected = bo.editorOverlays && std::find(selection_.begin(), selection_.end(), t.entity) != selection_.end();
         }
     }
+    if (opts.clay) {
+        auto clay = [](Surface& s) {
+            s.color = {0.82f, 0.81f, 0.79f, s.color.w};
+            s.emissive = {0, 0, 0, 1};
+            s.metallic = 0.f;
+            s.roughness = 0.65f;
+            s.texture.clear(), s.normalMap.clear(), s.ormMap.clear(), s.emissiveMap.clear();
+            s.shading = s.shading == Shading::Water ? s.shading : Shading::Pbr;
+        };
+        for (auto& d : f.draws) clay(d.surface);
+        for (auto& b : f.instances) {
+            std::string tex = b.surface.alphaCutoff > 0.f ? b.surface.texture : "";  // keep leaf cut-outs
+            clay(b.surface);
+            b.surface.texture = tex;
+            b.surface.textureAlphaOnly = true;
+        }
+        for (auto& t : f.terrains) {
+            for (auto& l : t.layers) clay(l.surface);
+        }
+    }
     resolveTexturePaths(f);
     if (bo.editorOverlays && selection_.size() == 1 && scene_->exists(selection_[0]) && !opts.annotate) {
         GizmoFrame gf = Gizmo::frameFor(scene_->worldMatrix(selection_[0]), view, gizmo_.local);

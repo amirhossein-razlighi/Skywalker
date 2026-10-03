@@ -550,6 +550,7 @@ public:
             if (frame.debugView > 0) {
                 PostUniforms pu{};
                 pu.params = simd_make_float4(static_cast<float>(frame.debugView), 0, 0, 0);
+                pu.texel = simd_make_float4(1.f / std::max(frame.width, 1), 1.f / std::max(frame.height, 1), 0, 0);
                 fullscreen(cmd, debugViewPipeline_, resolve_, {gbufA_, gbufB_, giOut_, ssrOut_, aoBlurred_, depthResolved_, hdr_},
                            &pu, sizeof(pu), false, @"Debug view");
             }
@@ -1205,7 +1206,7 @@ private:
         du.material3 = simd_make_float4(s.clearcoat, s.subsurface, s.rim, s.outline);
         du.maps = maps;
         du.outlineColor = lin(s.outlineColor);
-        du.material4 = simd_make_float4(s.alphaCutoff, 0, 0, 0);
+        du.material4 = simd_make_float4(s.alphaCutoff, s.textureAlphaOnly ? 1.f : 0.f, 0, 0);
         return du;
     }
 

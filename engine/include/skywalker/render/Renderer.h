@@ -87,6 +87,7 @@ struct Surface {
     bool doubleSided = false;
     float occlusionStrength = 1.f;
     float alphaCutoff = 0.f;  // > 0: alpha-tested cutout
+    bool textureAlphaOnly = false;  // use the base-color texture for its alpha (cut-out) only (clay renders)
 };
 
 struct DrawItem {
@@ -238,7 +239,7 @@ struct FrameData {
     /// Discards temporal history (camera cuts). Large camera jumps are detected automatically.
     bool resetHistory = false;
     /// Buffer visualization instead of the final image: 0 off, 1 albedo, 2 normals,
-    /// 3 roughness/metallic, 4 GI, 5 reflections, 6 AO, 7 depth, 8 lighting before GI.
+    /// 3 roughness/metallic, 4 GI, 5 reflections, 6 AO, 7 depth, 8 lighting before GI, 9 sketch.
     int debugView = 0;
 
     static constexpr size_t kMaxLights = 1024;       // clustered lighting on surfaces
