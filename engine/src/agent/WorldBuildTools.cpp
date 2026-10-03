@@ -123,19 +123,9 @@ Status saveTerrain(Engine& engine, EntityId id, const std::shared_ptr<world::Ter
     engine.world().adopt(id, data, engine.world().sourceKey(s, id));
     // Physics: a matching heightfield collider (16-bit heights next to the terrain file).
     std::string r16 = fs::path(path).replace_extension(".r16").string();
-    const float lo = data->minHeight(), hi = data->maxHeight(), range = std::max(hi - lo, 0.01f);
-    {
-        const int n = data->resolution();
-        std::vector<uint8_t> raw(static_cast<size_t>(n) * n * 2);
-        for (size_t i = 0; i < static_cast<size_t>(n) * n; ++i) {
-            auto v = static_cast<uint16_t>(std::lround(std::clamp((data->heights()[i] - lo) / range, 0.f, 1.f) * 65535.f));
-            raw[i * 2] = static_cast<uint8_t>(v & 0xff);
-            raw[i * 2 + 1] = static_cast<uint8_t>(v >> 8);
-        }
-        std::ofstream f(engine.resolvePath(r16), std::ios::binary);
-        f.write(reinterpret_cast<const char*>(raw.data()), static_cast<std::streamsize>(raw.size()));
-        if (!f) return Error::make("io_error", "cannot write " + r16);
-    }
+    float lo = 0, hi = 0;
+    if (Status st = data->saveHeightmap16(engine.resolvePath(r16), lo, hi); !st) return st;
+    const float range = std::max(hi - lo, 0.01f);
     int res = 8;
     while (res < data->resolution() - 1 && res < 1024) res *= 2;
     Json collider = Json::object({{"shape", "heightfield"},

@@ -89,14 +89,14 @@
         },
         "terrain": {
           "data": "terrain/valley_1.terrain",
-          "size": 1200,
-          "resolution": 1025,
+          "size": 2400,
+          "resolution": 2049,
           "generator": {
             "shape": "valley",
             "seed": 11,
             "minHeight": 0,
-            "maxHeight": 300,
-            "featureSize": 650,
+            "maxHeight": 420,
+            "featureSize": 900,
             "octaves": 7,
             "roughness": 0.5,
             "ridges": 0.7,
@@ -159,15 +159,15 @@
         "collider": {
           "shape": "heightfield",
           "size": [
-            1200,
-            290.2281,
-            1200
+            2400,
+            413.1137,
+            2400
           ],
           "radius": 0.5,
           "height": 1,
           "offset": [
             0,
-            6.8767,
+            11.9115,
             0
           ],
           "rotation": [

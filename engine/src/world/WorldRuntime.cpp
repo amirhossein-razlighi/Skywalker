@@ -72,6 +72,21 @@ std::shared_ptr<TerrainData> WorldRuntime::terrain(const Scene& scene, EntityId 
         TerrainGenParams p = genParamsFromJson(t->generator);
         generate(*data, p);
         autoPaint(*data, t->layers, p.seed);
+        // The data file is a cache of the (deterministic) generator: rebuild a missing one, with
+        // its physics heightmap, so projects can leave large terrain binaries out of git.
+        if (!t->data.empty() && hooks_.resolvePath) {
+            std::string abs = hooks_.resolvePath(t->data);
+            std::error_code ec;
+            if (!fs::exists(abs, ec)) {
+                fs::create_directories(fs::path(abs).parent_path(), ec);
+                float lo = 0, hi = 0;
+                if (data->save(abs) && data->saveHeightmap16(fs::path(abs).replace_extension(".r16").string(), lo, hi)) {
+                    key = sourceKey(scene, e);
+                } else {
+                    log::warn("terrain", "could not write the terrain cache " + abs);
+                }
+            }
+        }
     }
     entry.data = data;
     entry.key = key;

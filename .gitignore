@@ -83,3 +83,7 @@ __pycache__/
 *.pyc
 # Downloaded sample models for manual animation checks (see docs/ANIMATION.md)
 samples/
+
+# Terrain caches (regenerated deterministically from each terrain generator)
+examples/*/terrain/*.terrain
+examples/*/terrain/*.r16
