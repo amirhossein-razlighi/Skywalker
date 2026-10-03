@@ -19,6 +19,7 @@ set(SKY_ENGINE_SOURCES
     src/wander/Reference.cpp
     src/wander/Runtime.cpp
     src/wander/Aot.cpp
+    src/wander/TestRunner.cpp
     src/native/Process.cpp
     src/render/Png.cpp
     src/render/MeshData.cpp

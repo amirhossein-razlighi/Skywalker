@@ -1119,7 +1119,7 @@ bool interpret(ExecState& st, int protoIndex, Value* R, size_t& pc, Outcome& out
                                  displayValue(st.scene, R[in.c + 1]);
                         if (R[in.c].isString()) detail = "left side was \"" + R[in.c].str() + "\", right side was " + displayValue(st.scene, R[in.c + 1]);
                     }
-                    if (st.test->fail) st.test->fail(LOC, K[in.b].str(), detail);
+                    if (st.test->fail) st.test->fail(LOC, "expected " + K[in.b].str(), detail);
                 }
                 break;
             }
@@ -1536,9 +1536,12 @@ struct Scheduler {
         inst.transitionsThisTick = 0;
         checkAlive(inst);
         if (!alive(inst)) return;
-        if (!inst.started) start(inst);
-        if (!alive(inst)) return;
-        resumeCoroutines(inst);
+        // Coroutines created this tick (by `on start` too) first resume next tick.
+        if (!inst.started) {
+            start(inst);
+        } else {
+            resumeCoroutines(inst);
+        }
         for (const auto& ev : impl.pending) {
             if (ev.target != kNoEntity && ev.target != inst.entity) continue;
             fire(inst, [&](const HandlerInfo& h) { return h.trigger == Trigger::Event && h.sym == ev.sym; }, ev.payload,
@@ -1729,9 +1732,8 @@ void driveTest(Runtime& rt, Runtime::Impl& impl, Scene& scene, Runtime::TestDriv
     try {
         out = runProto(st, d.proto, R, d.pc);
     } catch (const RuntimeError& err) {
-        impl.messages.push_back({RuntimeMessage::Kind::Error, d.self, P.name, err.loc.line, err.message, P.file});
         out.kind = Outcome::Kind::Stop;
-        if (d.hooks && d.hooks->fail) d.hooks->fail(err.loc, "runtime error", err.message);
+        if (d.hooks && d.hooks->fail) d.hooks->fail(err.loc, "runtime error in the test: " + err.message, "");
     }
     d.regs.assign(static_cast<size_t>(P.numRegs), Value());
     if (out.kind == Outcome::Kind::Wait) {

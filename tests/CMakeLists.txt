@@ -27,6 +27,7 @@ set(SKY_TEST_SOURCES
     test_import.cpp
     test_fx.cpp
     test_wander_examples.cpp
+    test_wander2.cpp
 )
 
 add_executable(skywalker_tests ${SKY_TEST_SOURCES})

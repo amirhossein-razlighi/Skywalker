@@ -52,7 +52,8 @@ struct TestHooks {
     std::function<void(const std::string& key)> hold;
     std::function<void(const std::string& key)> release;
     std::function<void(EntityId)> click;
-    std::function<void(SourceLoc loc, const std::string& text, const std::string& detail)> fail;
+    /// A failed `expect` ("expected hp == 2", detail: the compared values) or a runtime error.
+    std::function<void(SourceLoc loc, const std::string& message, const std::string& detail)> fail;
     int expectations = 0;
 };
 
