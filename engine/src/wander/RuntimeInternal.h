@@ -197,6 +197,8 @@ Outcome runProto(ExecState& st, int proto, Value* regs, size_t pc);
 /// Executes one instruction in VM semantics (used by native code for its slow paths).
 /// Returns false if the instruction ended the run (outcome filled in).
 bool execOne(ExecState& st, int proto, Value* regs, size_t& pc, Outcome& out);
+/// Executes the straight-line instructions [pc, end). False if the run ended.
+bool execRange(ExecState& st, int proto, Value* regs, size_t& pc, size_t end, Outcome& out);
 
 /// Native code entry (Aot.cpp): runs `proto` natively if compiled code is attached.
 /// Returns false when there is no native code for it (the VM runs it instead).

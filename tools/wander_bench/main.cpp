@@ -1,6 +1,6 @@
 // wander_bench: measures Wander execution speed on representative gameplay workloads.
 //
-//   wander_bench [--ticks N] [--filter NAME] [--native]
+//   wander_bench [--ticks N] [--filter NAME] [--native]   (--native: AOT-compiled behaviors)
 //
 // Every scenario builds a scene of entities running one script and times fixed ticks
 // (1/60 s). Results are printed as a table and as JSON lines (for tracking over time).
@@ -14,7 +14,11 @@
 #include <vector>
 
 #include "skywalker/scene/Scene.h"
+#include "skywalker/wander/Aot.h"
 #include "skywalker/wander/Runtime.h"
+
+#include <filesystem>
+#include <unistd.h>
 
 using namespace sky;
 
@@ -114,10 +118,12 @@ double nowMs() {
 
 int main(int argc, char** argv) {
     int ticks = 120;
+    bool native = false;
     std::string filter;
     for (int i = 1; i < argc; ++i) {
         if (!std::strcmp(argv[i], "--ticks") && i + 1 < argc) ticks = std::atoi(argv[++i]);
         else if (!std::strcmp(argv[i], "--filter") && i + 1 < argc) filter = argv[++i];
+        else if (!std::strcmp(argv[i], "--native")) native = true;
     }
     std::printf("%-14s %10s %12s  %s\n", "scenario", "ms/tick", "entities", "description");
     for (const Scenario& sc : kScenarios) {
@@ -129,7 +135,20 @@ int main(int argc, char** argv) {
         }
         wander::Runtime rt(scene);
         wander::InputState input;
-        for (int i = 0; i < 5; ++i) rt.tick(1.f / 60.f, input);  // warm up (compiles scripts)
+        rt.compileScripts();
+        if (native) {
+            // AOT: compile the scenario's program to native code and run it instead of the VM.
+            auto prog = scene.get<Behavior>(scene.entities().front())->scripts[0].program;
+            wander::AotOptions o;
+            o.cacheDir = (std::filesystem::temp_directory_path() / ("wander_bench_aot_" + std::to_string(::getpid()))).string();
+            auto r = wander::compileNative(*prog, o);
+            if (!r) {
+                std::fprintf(stderr, "  [%s] AOT failed: %s\n", sc.name, r.error().message.c_str());
+            } else {
+                rt.attachNative(prog->hash, r->native);
+            }
+        }
+        for (int i = 0; i < 5; ++i) rt.tick(1.f / 60.f, input);  // warm up
         auto msgs = rt.drainMessages();
         for (const auto& m : msgs) std::fprintf(stderr, "  [%s] %s\n", sc.name, m.text.c_str());
         double t0 = nowMs();

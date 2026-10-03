@@ -754,8 +754,11 @@ void markVarDirty(ExecState& st, int var) {
 
 #define RK(x) (isK(x) ? K[(x)&0x7fff] : R[x])
 
+// Single = true executes from pc until it leaves [pc, stopPc) (one instruction, or a
+// straight-line range for native code); false runs until the proto ends.
 template <bool Single>
-bool interpret(ExecState& st, int protoIndex, Value* R, size_t& pc, Outcome& out) {
+bool interpret(ExecState& st, int protoIndex, Value* R, size_t& pc, Outcome& out, size_t stopPc = 0) {
+    [[maybe_unused]] const size_t startPc = pc;
     const Program& prog = *st.prog;
     const Proto& P = prog.protos[protoIndex];
     const Ins* code = P.code.data();
@@ -1133,7 +1136,9 @@ bool interpret(ExecState& st, int protoIndex, Value* R, size_t& pc, Outcome& out
             }
             case Op::Count: break;
         }
-        if constexpr (Single) return true;
+        if constexpr (Single) {
+            if (pc >= stopPc || pc < startPc) return true;
+        }
     }
 #undef LOC
 }
@@ -1152,7 +1157,11 @@ Outcome runProto(ExecState& st, int proto, Value* regs, size_t pc) {
 }
 
 bool execOne(ExecState& st, int proto, Value* regs, size_t& pc, Outcome& out) {
-    return interpret<true>(st, proto, regs, pc, out);
+    return interpret<true>(st, proto, regs, pc, out, pc + 1);
+}
+
+bool execRange(ExecState& st, int proto, Value* regs, size_t& pc, size_t end, Outcome& out) {
+    return interpret<true>(st, proto, regs, pc, out, end);
 }
 
 // ---------------------------------------------------------------------------

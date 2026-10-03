@@ -45,10 +45,16 @@ extern "C" {
 
 #define SKY_SDK_VERSION 1
 
-#if defined(_WIN32)
-#define SKY_MODULE_EXPORT __declspec(dllexport)
+#ifdef __cplusplus
+#define SKY_EXTERN_C extern "C"
 #else
-#define SKY_MODULE_EXPORT __attribute__((visibility("default")))
+#define SKY_EXTERN_C
+#endif
+/* Marks sky_module_init (and the optional sky_module_shutdown) for export with C linkage. */
+#if defined(_WIN32)
+#define SKY_MODULE_EXPORT SKY_EXTERN_C __declspec(dllexport)
+#else
+#define SKY_MODULE_EXPORT SKY_EXTERN_C __attribute__((visibility("default")))
 #endif
 
 typedef uint64_t SkyEntity; /* 0 = no entity */

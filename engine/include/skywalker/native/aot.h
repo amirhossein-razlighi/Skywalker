@@ -30,6 +30,8 @@ typedef struct SkyAotFrame {
     void* error;           /* set by the host when an instruction failed */
     int32_t proto;         /* proto index */
     uint32_t pc;           /* start pc (0, or a resume point after a wait) */
+    uint64_t self;         /* the entity running this code */
+    double dt;             /* seconds this tick */
 } SkyAotFrame;
 
 typedef struct SkyAotApi {
@@ -38,6 +40,9 @@ typedef struct SkyAotApi {
     /* Executes instruction `pc` with VM semantics. Returns the next pc, or -1 when the run
      * ended (return, wait, go to, stop) or failed; the native function must then return. */
     int64_t (*exec)(SkyAotFrame* f, uint32_t pc);
+    /* Executes the straight-line instructions [pc, end) with VM semantics. Returns end, or
+     * -1 when the run ended or failed. */
+    int64_t (*exec_range)(SkyAotFrame* f, uint32_t pc, uint32_t end);
     /* Truthiness of any value (entities: whether they still exist). */
     int (*truthy)(SkyAotFrame* f, const SkyValue* v);
     /* Records "execution budget exceeded" at pc; always returns -1. */
