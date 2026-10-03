@@ -53,7 +53,7 @@ The crew lives in the editor's **Agents** dock. Each Cloudling has:
 | Role | Creative Director, Level Designer, Gameplay Programmer, Lighting Artist, Writer, Asset Artist, QA Tester. The role becomes part of its system prompt. |
 | Provider and model | Anthropic (Messages API; default `claude-opus-5-5`), or any OpenAI-compatible API: OpenAI, DeepSeek, OpenRouter, Groq, or local Ollama / LM Studio / vLLM / llama.cpp. Keys live in the macOS Keychain. |
 | Autonomy | *Observe* (read-only tools), *Ask* (each mutating call waits for your Allow/Decline), *Autonomous*. |
-| Permissions | Per tool category (scene, entities, world, assets, behaviors, simulation, viewport, files, rendering): *Default* (follow autonomy), *Allow*, *Ask*, or *Off* (the tools are not even offered to the model). Categories come from each tool's `_meta["skywalker/category"]`. |
+| Permissions | Per tool category (scene, entities, world, assets, behaviors, simulation, viewport, files, rendering, network): *Default* (follow autonomy), *Allow*, *Ask*, or *Off* (the tools are not even offered to the model). Categories come from each tool's `_meta["skywalker/category"]`. **Network** (`asset_download`) asks by default even for autonomous agents. |
 | Mission and instructions | Override the role's mission; add standing instructions such as style guides, naming rules or constraints. |
 | Memory | Long-term notes the agent keeps with `memory_note` / `memory_forget`. They appear in its instructions at the start of every conversation and can be edited in the designer. |
 | Rounds | Max tool rounds per message (default 40). |

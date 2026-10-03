@@ -1,0 +1,14 @@
+{
+  "guid": "f46981dd7db578a55f7c252ddcac5d18",
+  "type": "prefab",
+  "tags": [
+    "shooter",
+    "enemy"
+  ],
+  "description": "Homing enemy drone (2 HP, explodes)",
+  "source": {
+    "by": "mcp:director",
+    "fromEntity": "Drone"
+  },
+  "import": {}
+}

@@ -1,0 +1,16 @@
+{
+  "guid": "ceceb30db78b38a527ae0f056a8f8ea8",
+  "type": "texture",
+  "tags": [
+    "generated",
+    "curtain"
+  ],
+  "description": "",
+  "source": {
+    "generator": "texgen",
+    "kind": "curtain",
+    "seed": 1,
+    "by": "mcp:director"
+  },
+  "import": {}
+}

@@ -27,5 +27,6 @@ Status dropToSurface(Engine& engine, EntityId id, float offset = 0.f);
 
 void addAssetTools(Engine& engine, ToolRegistry& reg);
 void addWorldTools(Engine& engine, ToolRegistry& reg);
+void addNetworkTools(Engine& engine, ToolRegistry& reg);
 
 }  // namespace sky::tools

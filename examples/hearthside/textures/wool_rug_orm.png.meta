@@ -1,0 +1,16 @@
+{
+  "guid": "27207db2016107d444346d7019c2c939",
+  "type": "texture",
+  "tags": [
+    "generated",
+    "fabric"
+  ],
+  "description": "",
+  "source": {
+    "generator": "texgen",
+    "kind": "fabric",
+    "seed": 1,
+    "by": "mcp:director"
+  },
+  "import": {}
+}

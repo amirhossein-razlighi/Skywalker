@@ -1,0 +1,16 @@
+{
+  "guid": "e98cf514d42b929f7bd6c08ec621ea82",
+  "type": "texture",
+  "tags": [
+    "generated",
+    "stripes"
+  ],
+  "description": "",
+  "source": {
+    "generator": "texgen",
+    "kind": "stripes",
+    "seed": 1,
+    "by": "mcp:director"
+  },
+  "import": {}
+}

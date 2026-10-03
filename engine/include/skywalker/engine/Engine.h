@@ -155,7 +155,12 @@ public:
     std::vector<std::string> refreshAssets();
     /// Imports a mesh file (.obj/.glb/.gltf). glTF base color + texture become a material
     /// asset next to the mesh. Returns {"mesh": "asset:...", "material": "...?"}.
-    Result<Json> importMeshAsset(const std::string& path);
+    struct MeshImportOptions {
+        bool normalize = true;  // fit a 1 m cube (handy for generated models); false keeps real units
+        bool zUp = false;       // source is Z-up (CAD, scans, some exporters)
+    };
+    Result<Json> importMeshAsset(const std::string& path, const MeshImportOptions& options);
+    Result<Json> importMeshAsset(const std::string& path) { return importMeshAsset(path, MeshImportOptions{}); }
     const ResolvedMaterial* resolveMaterial(const std::string& path);
     Result<Json> loadPrefabAsset(const std::string& path);
     Result<EntityId> instantiatePrefabAsset(const std::string& path, const PrefabPlacement& placement);

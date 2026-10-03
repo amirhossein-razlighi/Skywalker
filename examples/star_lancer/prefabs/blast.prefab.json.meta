@@ -1,0 +1,14 @@
+{
+  "guid": "48bdc6738239546d16e66aced2dab9d4",
+  "type": "prefab",
+  "tags": [
+    "space",
+    "fx"
+  ],
+  "description": "Space explosion",
+  "source": {
+    "by": "mcp:director",
+    "fromEntity": "Blast"
+  },
+  "import": {}
+}

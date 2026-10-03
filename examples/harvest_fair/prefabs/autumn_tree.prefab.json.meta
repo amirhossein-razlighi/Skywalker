@@ -1,0 +1,14 @@
+{
+  "guid": "48bfdcd30230e068be89094186d82739",
+  "type": "prefab",
+  "tags": [
+    "autumn",
+    "nature"
+  ],
+  "description": "Round tree in fall colors",
+  "source": {
+    "by": "mcp:director",
+    "fromEntity": "Autumn Tree"
+  },
+  "import": {}
+}

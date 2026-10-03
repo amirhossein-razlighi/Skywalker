@@ -518,8 +518,18 @@ std::vector<std::string> Engine::refreshAssets() {
 
 const MeshData* Engine::cpuMesh(const std::string& key) {
     if (auto it = cpuMeshes_.find(key); it != cpuMeshes_.end()) return it->second.get();
-    Result<MeshData> data = key.rfind("asset:", 0) == 0 ? mesh::loadMeshFile(resolvePath(key.substr(6)))
-                                                        : mesh::primitive(key);
+    Result<MeshData> data = Error::make("not_found", "no mesh");
+    if (key.rfind("asset:", 0) == 0) {
+        // Re-import with the options recorded when the asset was imported.
+        mesh::LoadOptions lo;
+        if (const AssetRecord* rec = assets_->find(key.substr(6))) {
+            lo.normalize = rec->importSettings.get("normalize").asBool(true);
+            lo.zUp = rec->importSettings.get("zUp").asBool(false);
+        }
+        data = mesh::loadMeshFile(resolvePath(key.substr(6)), lo);
+    } else {
+        data = mesh::primitive(key);
+    }
     if (!data) {
         log::warn("asset", data.error().message);
         cpuMeshes_[key] = nullptr;
@@ -530,7 +540,7 @@ const MeshData* Engine::cpuMesh(const std::string& key) {
     return ptr.get();
 }
 
-Result<Json> Engine::importMeshAsset(const std::string& path) {
+Result<Json> Engine::importMeshAsset(const std::string& path, const MeshImportOptions& options) {
     std::string rel = assets_->relative(resolvePath(path));
     if (rel.empty()) return Error::make("invalid_path", "mesh must be inside the project: " + path);
     std::string lower = str::lower(rel);
@@ -538,7 +548,7 @@ Result<Json> Engine::importMeshAsset(const std::string& path) {
     MeshData mesh;
     std::string materialPath;
     if (lower.size() > 4 && (lower.rfind(".glb") == lower.size() - 4 || lower.rfind(".gltf") == lower.size() - 5)) {
-        auto g = loadGltf(resolvePath(rel));
+        auto g = loadGltf(resolvePath(rel), false);
         if (!g) return g.error();
         mesh = std::move(g->mesh);
         // glTF materials become a project material (+ extracted texture) next to the mesh.
@@ -574,19 +584,46 @@ Result<Json> Engine::importMeshAsset(const std::string& path) {
             if (Status st = saveMaterial(resolvePath(materialPath), m); !st) return st.error();
         }
         result["primitives"] = g->primitiveCount;
+    } else if (lower.size() > 4 && lower.rfind(".obj") == lower.size() - 4) {
+        auto loaded = mesh::loadObjWithMaterial(resolvePath(rel), false);
+        if (!loaded) return loaded.error();
+        mesh = std::move(loaded->mesh);
+        const mesh::ImportedMaterial& im = loaded->material;
+        if (im.present) {  // .mtl -> project material next to the mesh
+            MaterialAsset m;
+            m.color = im.color;
+            m.roughness = im.roughness;
+            m.metallic = im.metallic;
+            m.emissive = im.emissive;
+            m.texture = im.texture.empty() ? "" : assets_->relative(im.texture);
+            m.normalMap = im.normalMap.empty() ? "" : assets_->relative(im.normalMap);
+            fs::path base = fs::path(rel);
+            std::string dir = base.parent_path().generic_string();
+            materialPath = (dir.empty() ? "" : dir + "/") + base.stem().string() + ".mat.json";
+            if (Status st = saveMaterial(resolvePath(materialPath), m); !st) return st.error();
+        }
     } else {
-        auto loaded = mesh::loadObj(resolvePath(rel));
+        auto loaded = mesh::loadMeshFile(resolvePath(rel), false);
         if (!loaded) return loaded.error();
         mesh = std::move(loaded.value());
     }
+    if (options.zUp) mesh::zUpToYUp(mesh);
+    if (options.normalize) mesh::normalizeToUnit(mesh);
     std::string key = "asset:" + rel;
     if (Status s = renderer_->uploadMesh(key, mesh); !s) return s.error();
     scene_->assetBounds[key] = mesh.bounds;
     cpuMeshes_[key] = std::make_shared<MeshData>(mesh);
     refreshAssets();
-    if (!materialPath.empty()) (void)assets_->updateMeta(rel, Json::object({{"import", Json::object({{"material", materialPath}})}}));
+    Json settings = Json::object({{"normalize", options.normalize}, {"zUp", options.zUp}, {"vertexColors", mesh.hasVertexColors}});
+    if (!materialPath.empty()) settings["material"] = materialPath;
+    if (auto reg = assets_->registerFile(resolvePath(rel)); reg) (void)assets_->updateMeta(rel, Json::object({{"import", settings}}));
     result["mesh"] = key;
     result["triangles"] = mesh.indices.size() / 3;
+    result["vertexColors"] = mesh.hasVertexColors;
+    {
+        Vec3 e = mesh.bounds.max - mesh.bounds.min;
+        result["size"] = reflect::vec3ToJson(e);
+    }
     if (!materialPath.empty()) result["material"] = materialPath;
     return result;
 }

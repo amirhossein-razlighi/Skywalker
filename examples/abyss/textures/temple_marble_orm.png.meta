@@ -1,0 +1,16 @@
+{
+  "guid": "6c841aa26a80aaf710f26197015d7a62",
+  "type": "texture",
+  "tags": [
+    "generated",
+    "marble"
+  ],
+  "description": "",
+  "source": {
+    "generator": "texgen",
+    "kind": "marble",
+    "seed": 1,
+    "by": "mcp:director"
+  },
+  "import": {}
+}

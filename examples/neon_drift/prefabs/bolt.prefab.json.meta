@@ -1,0 +1,14 @@
+{
+  "guid": "3d5800de656363e62f88c8af264316ab",
+  "type": "prefab",
+  "tags": [
+    "shooter",
+    "projectile"
+  ],
+  "description": "Player plasma bolt (flies forward, hits enemies)",
+  "source": {
+    "by": "mcp:director",
+    "fromEntity": "Bolt"
+  },
+  "import": {}
+}

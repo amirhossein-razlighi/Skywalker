@@ -1,0 +1,13 @@
+{
+  "guid": "2896f7d65a372e0e58f205e136787627",
+  "type": "material",
+  "tags": [],
+  "description": "glow (procedural PBR)",
+  "source": {
+    "generator": "texgen",
+    "kind": "glow",
+    "seed": 1,
+    "by": "mcp:director"
+  },
+  "import": {}
+}

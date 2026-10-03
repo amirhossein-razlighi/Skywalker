@@ -54,7 +54,7 @@ std::vector<uint8_t> encodePng(const Image& image) {
     }
     uLongf compressedSize = compressBound(static_cast<uLong>(raw.size()));
     std::vector<uint8_t> compressed(compressedSize);
-    if (compress2(compressed.data(), &compressedSize, raw.data(), static_cast<uLong>(raw.size()), 6) != Z_OK) return {};
+    if (compress2(compressed.data(), &compressedSize, raw.data(), static_cast<uLong>(raw.size()), 1) != Z_OK) return {};
     chunk(out, "IDAT", compressed.data(), compressedSize);
     chunk(out, "IEND", nullptr, 0);
     return out;

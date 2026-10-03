@@ -1,0 +1,14 @@
+{
+  "guid": "c1d0e327ee7153f483d06efaf6b42791",
+  "type": "prefab",
+  "tags": [
+    "horror",
+    "nature"
+  ],
+  "description": "Leafless crooked tree",
+  "source": {
+    "by": "mcp:director",
+    "fromEntity": "Dead Tree"
+  },
+  "import": {}
+}

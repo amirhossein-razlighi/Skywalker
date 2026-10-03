@@ -1,0 +1,30 @@
+{
+  "format": "skywalker.material",
+  "version": 1,
+  "color": "#fffffffc",
+  "metallic": 0,
+  "roughness": 0.55,
+  "emissive": [
+    1,
+    1,
+    1,
+    2.2
+  ],
+  "texture": "textures/aurora_curtain_albedo.png",
+  "tilingU": 1,
+  "tilingV": 1,
+  "unlit": true,
+  "shading": "pbr",
+  "normalMap": "",
+  "ormMap": "",
+  "emissiveMap": "textures/aurora_curtain_albedo.png",
+  "normalStrength": 1,
+  "triplanar": false,
+  "clearcoat": 0,
+  "subsurface": 0,
+  "rim": 0,
+  "outline": 0,
+  "outlineColor": "#0a0a0f",
+  "doubleSided": true,
+  "occlusionStrength": 1
+}

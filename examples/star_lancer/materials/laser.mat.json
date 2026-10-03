@@ -1,0 +1,30 @@
+{
+  "format": "skywalker.material",
+  "version": 1,
+  "color": "#000000",
+  "metallic": 0,
+  "roughness": 0.55,
+  "emissive": [
+    1,
+    0.25,
+    0.3,
+    5
+  ],
+  "texture": "",
+  "tilingU": 1,
+  "tilingV": 1,
+  "unlit": true,
+  "shading": "pbr",
+  "normalMap": "",
+  "ormMap": "",
+  "emissiveMap": "",
+  "normalStrength": 1,
+  "triplanar": false,
+  "clearcoat": 0,
+  "subsurface": 0,
+  "rim": 0,
+  "outline": 0,
+  "outlineColor": "#0a0a0f",
+  "doubleSided": false,
+  "occlusionStrength": 1
+}

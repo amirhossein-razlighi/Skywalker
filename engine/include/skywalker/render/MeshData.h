@@ -1,6 +1,6 @@
 #pragma once
-// CPU-side mesh data: procedural primitives and OBJ import (the common output format
-// of 3D-generation models). Backend-independent so it can be unit tested.
+// CPU-side mesh data: procedural primitives and mesh file import (OBJ + MTL, PLY, STL;
+// glTF lives in Gltf.h). Backend-independent so it can be unit tested.
 
 #include <cstdint>
 #include <string>
@@ -12,13 +12,14 @@
 namespace sky {
 
 struct MeshData {
-    static constexpr int kFloatsPerVertex = 8;  // position(3) normal(3) uv(2)
+    static constexpr int kFloatsPerVertex = 12;  // position(3) normal(3) uv(2) color(4)
     std::vector<float> vertices;
     std::vector<uint32_t> indices;
     Aabb bounds;
+    bool hasVertexColors = false;
 
     size_t vertexCount() const { return vertices.size() / kFloatsPerVertex; }
-    void addVertex(Vec3 p, Vec3 n, Vec2 uv);
+    void addVertex(Vec3 p, Vec3 n, Vec2 uv, Vec4 color = {1, 1, 1, 1});
     void computeBounds();
 };
 
@@ -44,8 +45,42 @@ Result<MeshData> loadObj(const std::string& path, bool normalize = true);
 void computeMissingNormals(MeshData& m);
 /// Recentres and scales to fit a unit cube.
 void normalizeToUnit(MeshData& m);
-/// Loads .obj / .glb / .gltf by extension (geometry only; see assets/Gltf.h for materials).
+/// Material found next to an imported mesh (OBJ .mtl). Texture paths are absolute.
+struct ImportedMaterial {
+    bool present = false;
+    Vec4 color{1, 1, 1, 1};
+    float roughness = 0.6f;
+    float metallic = 0.f;
+    Vec4 emissive{0, 0, 0, 1};
+    std::string texture, normalMap;
+};
+
+struct MeshImport {
+    MeshData mesh;
+    ImportedMaterial material;
+};
+
+/// OBJ with its .mtl (first material: Kd/Ks/Ns/Ke/d/map_Kd/map_Bump) and `v x y z r g b`
+/// vertex colors.
+Result<MeshImport> loadObjWithMaterial(const std::string& path, bool normalize = true);
+/// Stanford PLY: ascii / binary little / big endian; positions, normals, UVs, vertex colors,
+/// polygon faces (triangulated). Point clouds without faces are rejected.
+Result<MeshData> parsePly(const std::vector<uint8_t>& bytes, bool normalize = true);
+/// STL: ascii or binary, flat-shaded facets.
+Result<MeshData> parseStl(const std::vector<uint8_t>& bytes, bool normalize = true);
+/// Rotates a Z-up mesh (CAD, scans, Blender exports without conversion) to Y-up.
+void zUpToYUp(MeshData& m);
+
+struct LoadOptions {
+    bool normalize = true;
+    bool zUp = false;
+};
+/// Loads .obj / .ply / .stl / .glb / .gltf by extension (geometry only; see Gltf.h and
+/// loadObjWithMaterial for materials).
 Result<MeshData> loadMeshFile(const std::string& path, bool normalize = true);
+Result<MeshData> loadMeshFile(const std::string& path, const LoadOptions& options);
+/// Extensions loadMeshFile understands.
+bool isMeshFile(const std::string& path);
 
 }  // namespace mesh
 }  // namespace sky

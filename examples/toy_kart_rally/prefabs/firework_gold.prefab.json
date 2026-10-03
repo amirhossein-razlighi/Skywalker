@@ -1,0 +1,826 @@
+{
+  "format": "skywalker.prefab",
+  "version": 1,
+  "name": "Firework Gold",
+  "root": {
+    "name": "Firework Gold",
+    "enabled": true,
+    "tags": [],
+    "vars": {
+      "t": 0
+    },
+    "components": {
+      "transform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      }
+    },
+    "behaviors": [
+      {
+        "name": "Burst",
+        "intent": "Burst outward, sparks drifting down, then gone.",
+        "source": "\non tick\n  self.t = self.t + dt\n  let s = 0.5 + sqrt(self.t) * 5\n  self.scale = (s, s, s)\n  move self by (0, -1.2 * dt, 0)\n  if self.t > 1.6 then\n    destroy self\n  end\nend",
+        "enabled": true
+      }
+    ],
+    "children": [
+      {
+        "name": "Firework Gold Spark 1",
+        "enabled": true,
+        "tags": [],
+        "vars": {},
+        "components": {
+          "transform": {
+            "position": [
+              0.3712,
+              0.9286,
+              0
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              0.12,
+              0.12,
+              0.12
+            ]
+          },
+          "mesh": {
+            "mesh": "sphere",
+            "color": "#000000",
+            "metallic": 0,
+            "roughness": 0.55,
+            "emissive": [
+              1,
+              0.75,
+              0.25,
+              7
+            ],
+            "texture": "",
+            "visible": true,
+            "billboard": false,
+            "material": "",
+            "unlit": true,
+            "shading": "pbr",
+            "normalMap": "",
+            "ormMap": "",
+            "emissiveMap": "",
+            "normalStrength": 1,
+            "tiling": 1,
+            "triplanar": false,
+            "clearcoat": 0,
+            "subsurface": 0,
+            "rim": 0,
+            "outline": 0,
+            "outlineColor": "#0a0a0f",
+            "doubleSided": false,
+            "castShadows": true
+          }
+        }
+      },
+      {
+        "name": "Firework Gold Spark 2",
+        "enabled": true,
+        "tags": [],
+        "vars": {},
+        "components": {
+          "transform": {
+            "position": [
+              -0.4557,
+              0.7857,
+              0.4183
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              0.12,
+              0.12,
+              0.12
+            ]
+          },
+          "mesh": {
+            "mesh": "sphere",
+            "color": "#000000",
+            "metallic": 0,
+            "roughness": 0.55,
+            "emissive": [
+              1,
+              0.75,
+              0.25,
+              7
+            ],
+            "texture": "",
+            "visible": true,
+            "billboard": false,
+            "material": "",
+            "unlit": true,
+            "shading": "pbr",
+            "normalMap": "",
+            "ormMap": "",
+            "emissiveMap": "",
+            "normalStrength": 1,
+            "tiling": 1,
+            "triplanar": false,
+            "clearcoat": 0,
+            "subsurface": 0,
+            "rim": 0,
+            "outline": 0,
+            "outlineColor": "#0a0a0f",
+            "doubleSided": false,
+            "castShadows": true
+          }
+        }
+      },
+      {
+        "name": "Firework Gold Spark 3",
+        "enabled": true,
+        "tags": [],
+        "vars": {},
+        "components": {
+          "transform": {
+            "position": [
+              0.0655,
+              0.6429,
+              -0.7632
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              0.12,
+              0.12,
+              0.12
+            ]
+          },
+          "mesh": {
+            "mesh": "sphere",
+            "color": "#000000",
+            "metallic": 0,
+            "roughness": 0.55,
+            "emissive": [
+              1,
+              0.75,
+              0.25,
+              7
+            ],
+            "texture": "",
+            "visible": true,
+            "billboard": false,
+            "material": "",
+            "unlit": true,
+            "shading": "pbr",
+            "normalMap": "",
+            "ormMap": "",
+            "emissiveMap": "",
+            "normalStrength": 1,
+            "tiling": 1,
+            "triplanar": false,
+            "clearcoat": 0,
+            "subsurface": 0,
+            "rim": 0,
+            "outline": 0,
+            "outlineColor": "#0a0a0f",
+            "doubleSided": false,
+            "castShadows": true
+          }
+        }
+      },
+      {
+        "name": "Firework Gold Spark 4",
+        "enabled": true,
+        "tags": [],
+        "vars": {},
+        "components": {
+          "transform": {
+            "position": [
+              0.5289,
+              0.5,
+              0.6858
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              0.12,
+              0.12,
+              0.12
+            ]
+          },
+          "mesh": {
+            "mesh": "sphere",
+            "color": "#000000",
+            "metallic": 0,
+            "roughness": 0.55,
+            "emissive": [
+              1,
+              0.75,
+              0.25,
+              7
+            ],
+            "texture": "",
+            "visible": true,
+            "billboard": false,
+            "material": "",
+            "unlit": true,
+            "shading": "pbr",
+            "normalMap": "",
+            "ormMap": "",
+            "emissiveMap": "",
+            "normalStrength": 1,
+            "tiling": 1,
+            "triplanar": false,
+            "clearcoat": 0,
+            "subsurface": 0,
+            "rim": 0,
+            "outline": 0,
+            "outlineColor": "#0a0a0f",
+            "doubleSided": false,
+            "castShadows": true
+          }
+        }
+      },
+      {
+        "name": "Firework Gold Spark 5",
+        "enabled": true,
+        "tags": [],
+        "vars": {},
+        "components": {
+          "transform": {
+            "position": [
+              -0.9204,
+              0.3571,
+              -0.1591
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              0.12,
+              0.12,
+              0.12
+            ]
+          },
+          "mesh": {
+            "mesh": "sphere",
+            "color": "#000000",
+            "metallic": 0,
+            "roughness": 0.55,
+            "emissive": [
+              1,
+              0.75,
+              0.25,
+              7
+            ],
+            "texture": "",
+            "visible": true,
+            "billboard": false,
+            "material": "",
+            "unlit": true,
+            "shading": "pbr",
+            "normalMap": "",
+            "ormMap": "",
+            "emissiveMap": "",
+            "normalStrength": 1,
+            "tiling": 1,
+            "triplanar": false,
+            "clearcoat": 0,
+            "subsurface": 0,
+            "rim": 0,
+            "outline": 0,
+            "outlineColor": "#0a0a0f",
+            "doubleSided": false,
+            "castShadows": true
+          }
+        }
+      },
+      {
+        "name": "Firework Gold Spark 6",
+        "enabled": true,
+        "tags": [],
+        "vars": {},
+        "components": {
+          "transform": {
+            "position": [
+              0.8216,
+              0.2143,
+              -0.5282
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              0.12,
+              0.12,
+              0.12
+            ]
+          },
+          "mesh": {
+            "mesh": "sphere",
+            "color": "#000000",
+            "metallic": 0,
+            "roughness": 0.55,
+            "emissive": [
+              1,
+              0.75,
+              0.25,
+              7
+            ],
+            "texture": "",
+            "visible": true,
+            "billboard": false,
+            "material": "",
+            "unlit": true,
+            "shading": "pbr",
+            "normalMap": "",
+            "ormMap": "",
+            "emissiveMap": "",
+            "normalStrength": 1,
+            "tiling": 1,
+            "triplanar": false,
+            "clearcoat": 0,
+            "subsurface": 0,
+            "rim": 0,
+            "outline": 0,
+            "outlineColor": "#0a0a0f",
+            "doubleSided": false,
+            "castShadows": true
+          }
+        }
+      },
+      {
+        "name": "Firework Gold Spark 7",
+        "enabled": true,
+        "tags": [],
+        "vars": {},
+        "components": {
+          "transform": {
+            "position": [
+              -0.2534,
+              0.0714,
+              0.9647
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              0.12,
+              0.12,
+              0.12
+            ]
+          },
+          "mesh": {
+            "mesh": "sphere",
+            "color": "#000000",
+            "metallic": 0,
+            "roughness": 0.55,
+            "emissive": [
+              1,
+              0.75,
+              0.25,
+              7
+            ],
+            "texture": "",
+            "visible": true,
+            "billboard": false,
+            "material": "",
+            "unlit": true,
+            "shading": "pbr",
+            "normalMap": "",
+            "ormMap": "",
+            "emissiveMap": "",
+            "normalStrength": 1,
+            "tiling": 1,
+            "triplanar": false,
+            "clearcoat": 0,
+            "subsurface": 0,
+            "rim": 0,
+            "outline": 0,
+            "outlineColor": "#0a0a0f",
+            "doubleSided": false,
+            "castShadows": true
+          }
+        }
+      },
+      {
+        "name": "Firework Gold Spark 8",
+        "enabled": true,
+        "tags": [],
+        "vars": {},
+        "components": {
+          "transform": {
+            "position": [
+              -0.4657,
+              -0.0714,
+              -0.8821
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              0.12,
+              0.12,
+              0.12
+            ]
+          },
+          "mesh": {
+            "mesh": "sphere",
+            "color": "#000000",
+            "metallic": 0,
+            "roughness": 0.55,
+            "emissive": [
+              1,
+              0.75,
+              0.25,
+              7
+            ],
+            "texture": "",
+            "visible": true,
+            "billboard": false,
+            "material": "",
+            "unlit": true,
+            "shading": "pbr",
+            "normalMap": "",
+            "ormMap": "",
+            "emissiveMap": "",
+            "normalStrength": 1,
+            "tiling": 1,
+            "triplanar": false,
+            "clearcoat": 0,
+            "subsurface": 0,
+            "rim": 0,
+            "outline": 0,
+            "outlineColor": "#0a0a0f",
+            "doubleSided": false,
+            "castShadows": true
+          }
+        }
+      },
+      {
+        "name": "Firework Gold Spark 9",
+        "enabled": true,
+        "tags": [],
+        "vars": {},
+        "components": {
+          "transform": {
+            "position": [
+              0.9201,
+              -0.2143,
+              0.328
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              0.12,
+              0.12,
+              0.12
+            ]
+          },
+          "mesh": {
+            "mesh": "sphere",
+            "color": "#000000",
+            "metallic": 0,
+            "roughness": 0.55,
+            "emissive": [
+              1,
+              0.75,
+              0.25,
+              7
+            ],
+            "texture": "",
+            "visible": true,
+            "billboard": false,
+            "material": "",
+            "unlit": true,
+            "shading": "pbr",
+            "normalMap": "",
+            "ormMap": "",
+            "emissiveMap": "",
+            "normalStrength": 1,
+            "tiling": 1,
+            "triplanar": false,
+            "clearcoat": 0,
+            "subsurface": 0,
+            "rim": 0,
+            "outline": 0,
+            "outlineColor": "#0a0a0f",
+            "doubleSided": false,
+            "castShadows": true
+          }
+        }
+      },
+      {
+        "name": "Firework Gold Spark 10",
+        "enabled": true,
+        "tags": [],
+        "vars": {},
+        "components": {
+          "transform": {
+            "position": [
+              -0.8603,
+              -0.3571,
+              0.3639
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              0.12,
+              0.12,
+              0.12
+            ]
+          },
+          "mesh": {
+            "mesh": "sphere",
+            "color": "#000000",
+            "metallic": 0,
+            "roughness": 0.55,
+            "emissive": [
+              1,
+              0.75,
+              0.25,
+              7
+            ],
+            "texture": "",
+            "visible": true,
+            "billboard": false,
+            "material": "",
+            "unlit": true,
+            "shading": "pbr",
+            "normalMap": "",
+            "ormMap": "",
+            "emissiveMap": "",
+            "normalStrength": 1,
+            "tiling": 1,
+            "triplanar": false,
+            "clearcoat": 0,
+            "subsurface": 0,
+            "rim": 0,
+            "outline": 0,
+            "outlineColor": "#0a0a0f",
+            "doubleSided": false,
+            "castShadows": true
+          }
+        }
+      },
+      {
+        "name": "Firework Gold Spark 11",
+        "enabled": true,
+        "tags": [],
+        "vars": {},
+        "components": {
+          "transform": {
+            "position": [
+              0.3595,
+              -0.5,
+              -0.7879
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              0.12,
+              0.12,
+              0.12
+            ]
+          },
+          "mesh": {
+            "mesh": "sphere",
+            "color": "#000000",
+            "metallic": 0,
+            "roughness": 0.55,
+            "emissive": [
+              1,
+              0.75,
+              0.25,
+              7
+            ],
+            "texture": "",
+            "visible": true,
+            "billboard": false,
+            "material": "",
+            "unlit": true,
+            "shading": "pbr",
+            "normalMap": "",
+            "ormMap": "",
+            "emissiveMap": "",
+            "normalStrength": 1,
+            "tiling": 1,
+            "triplanar": false,
+            "clearcoat": 0,
+            "subsurface": 0,
+            "rim": 0,
+            "outline": 0,
+            "outlineColor": "#0a0a0f",
+            "doubleSided": false,
+            "castShadows": true
+          }
+        }
+      },
+      {
+        "name": "Firework Gold Spark 12",
+        "enabled": true,
+        "tags": [],
+        "vars": {},
+        "components": {
+          "transform": {
+            "position": [
+              0.237,
+              -0.6429,
+              0.7284
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              0.12,
+              0.12,
+              0.12
+            ]
+          },
+          "mesh": {
+            "mesh": "sphere",
+            "color": "#000000",
+            "metallic": 0,
+            "roughness": 0.55,
+            "emissive": [
+              1,
+              0.75,
+              0.25,
+              7
+            ],
+            "texture": "",
+            "visible": true,
+            "billboard": false,
+            "material": "",
+            "unlit": true,
+            "shading": "pbr",
+            "normalMap": "",
+            "ormMap": "",
+            "emissiveMap": "",
+            "normalStrength": 1,
+            "tiling": 1,
+            "triplanar": false,
+            "clearcoat": 0,
+            "subsurface": 0,
+            "rim": 0,
+            "outline": 0,
+            "outlineColor": "#0a0a0f",
+            "doubleSided": false,
+            "castShadows": true
+          }
+        }
+      },
+      {
+        "name": "Firework Gold Spark 13",
+        "enabled": true,
+        "tags": [],
+        "vars": {},
+        "components": {
+          "transform": {
+            "position": [
+              -0.5388,
+              -0.7857,
+              -0.304
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              0.12,
+              0.12,
+              0.12
+            ]
+          },
+          "mesh": {
+            "mesh": "sphere",
+            "color": "#000000",
+            "metallic": 0,
+            "roughness": 0.55,
+            "emissive": [
+              1,
+              0.75,
+              0.25,
+              7
+            ],
+            "texture": "",
+            "visible": true,
+            "billboard": false,
+            "material": "",
+            "unlit": true,
+            "shading": "pbr",
+            "normalMap": "",
+            "ormMap": "",
+            "emissiveMap": "",
+            "normalStrength": 1,
+            "tiling": 1,
+            "triplanar": false,
+            "clearcoat": 0,
+            "subsurface": 0,
+            "rim": 0,
+            "outline": 0,
+            "outlineColor": "#0a0a0f",
+            "doubleSided": false,
+            "castShadows": true
+          }
+        }
+      },
+      {
+        "name": "Firework Gold Spark 14",
+        "enabled": true,
+        "tags": [],
+        "vars": {},
+        "components": {
+          "transform": {
+            "position": [
+              0.3615,
+              -0.9286,
+              -0.0842
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              0.12,
+              0.12,
+              0.12
+            ]
+          },
+          "mesh": {
+            "mesh": "sphere",
+            "color": "#000000",
+            "metallic": 0,
+            "roughness": 0.55,
+            "emissive": [
+              1,
+              0.75,
+              0.25,
+              7
+            ],
+            "texture": "",
+            "visible": true,
+            "billboard": false,
+            "material": "",
+            "unlit": true,
+            "shading": "pbr",
+            "normalMap": "",
+            "ormMap": "",
+            "emissiveMap": "",
+            "normalStrength": 1,
+            "tiling": 1,
+            "triplanar": false,
+            "clearcoat": 0,
+            "subsurface": 0,
+            "rim": 0,
+            "outline": 0,
+            "outlineColor": "#0a0a0f",
+            "doubleSided": false,
+            "castShadows": true
+          }
+        }
+      }
+    ]
+  }
+}

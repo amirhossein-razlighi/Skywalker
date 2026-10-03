@@ -1,5 +1,8 @@
 <p align="center">
-  <img src="assets/brand/logo.svg" alt="Skywalker" width="420">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/brand/logo/horizontal-dark.svg">
+    <img src="assets/brand/logo/horizontal-light.svg" alt="Skywalker" width="520">
+  </picture>
 </p>
 
 <p align="center"><b>A game engine built from the ground up for AI agents — and the people who work with them.</b></p>
@@ -16,7 +19,7 @@ interface the editor uses.
 
 ## Highlights
 
-- **One tool surface for everyone.** 53 typed, schema-validated tools (scene, entities,
+- **One tool surface for everyone.** 54 typed, schema-validated tools (scene, entities,
   world/spatial, behaviors, simulation, viewport, lighting, history, assets, materials,
   prefabs, shaders). The editor UI, the
   in-editor agents and external agents over **MCP** all use them. Errors come with
@@ -40,7 +43,9 @@ interface the editor uses.
   pipelines with parallel stages. Bring Anthropic, any
   OpenAI-compatible API, or local models (Ollama, LM Studio, vLLM).
 - **An asset system agents can use.** Stable GUIDs, tags, descriptions and generator
-  provenance in `.meta` sidecars; glTF/GLB and OBJ import; materials and prefabs as files;
+  provenance in `.meta` sidecars; glTF/GLB, OBJ+MTL, PLY (vertex colors) and STL import;
+  `asset_download` fetches openly licensed models from the web (with your approval, license
+  tracking and an auto-maintained `CREDITS.md`); materials and prefabs as files;
   rendered previews; "who uses this?" queries; safe renames. → [docs/ASSETS.md](docs/ASSETS.md)
 - **Spatial tools.** Triangle-accurate `raycast`, `place_on_surface`, seeded `scatter`
   (forests in one undo step), four-view `viewport_multi`, and `sim_trace` to verify
@@ -113,6 +118,7 @@ build/debug/bin/skywalker render examples/hello_sky/scenes/main.sky.json -o shot
 | [AGENTS](docs/AGENTS.md) | MCP, the crew, Agent Designer, providers, generative assets |
 | [ASSETS](docs/ASSETS.md) | Asset database, glTF, materials, prefabs, spatial tools |
 | [RENDERING](docs/RENDERING.md) | PBR + toon surfaces, IBL, cascaded shadows, SSAO, sky, post, recipes |
+| [BRAND](docs/BRAND.md) | Logo, app icon, colors, typography |
 | [TOOLS](docs/TOOLS.md) | Generated reference of every tool |
 | [DEVELOPMENT](docs/DEVELOPMENT.md) | Building, testing, sanitizers, profiling, conventions |
 | [ROADMAP](docs/ROADMAP.md) | What's next |

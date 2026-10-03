@@ -131,6 +131,7 @@ struct Px {
     float h = 0.5f;  // height, 0..1
     float rough = 0.6f;
     float metal = 0.f;
+    float a = 1.f;  // opacity (soft kinds: glow, curtain)
 };
 
 struct Ctx {
@@ -518,6 +519,35 @@ void genStylized(Ctx& c) {
     });
 }
 
+// Soft, transparent kinds for effects (particles, light pools, fake reflections, auroras, light
+// shafts, steam). Their alpha channel fades to zero; color1 = core, color2 = edge.
+void genGlow(Ctx& c) {
+    forEach(c, [&](float u, float v, Px& o) {
+        float dx = u - 0.5f, dy = v - 0.5f;
+        float d = std::sqrt(dx * dx + dy * dy) * 2.f;
+        float n = fbm(u, v, c.freq, c.freq, 3, c.seed);
+        float a = std::exp(-d * d * 3.5f) * clamp01(1.f - d);
+        a *= 1.f - c.var * 0.35f * (n - 0.5f) * 2.f * d;
+        o.c = mixc(c.c1, c.c2, clamp01(d * 1.2f));
+        o.a = clamp01(a);
+        o.h = 0.5f;
+    });
+}
+
+void genCurtain(Ctx& c) {
+    forEach(c, [&](float u, float v, Px& o) {
+        // Vertical rays: a periodic 1D noise across u, gently varying with height.
+        float rays = fbm(u, v * 0.15f, c.freq * 4, 1, 4, c.seed);
+        rays = sstep(0.3f, 0.75f, rays);
+        float edge = 1.f - sstep(0.9f, 1.f, v);  // crisp-ish lower edge
+        float fade = std::pow(clamp01(v), 1.6f);  // long fade upward
+        o.c = mixc(c.c2, c.c1, clamp01(v * 1.1f));
+        o.c = mixc(o.c, c.c3, sstep(0.75f, 1.f, rays) * c.var * 0.5f);
+        o.a = clamp01(edge * fade * (0.35f + 0.65f * rays));
+        o.h = 0.5f;
+    });
+}
+
 // ---- kind table ------------------------------------------------------------------------
 
 struct KindInfo {
@@ -559,6 +589,8 @@ const KindInfo kKinds[] = {
     {"hexagons", genHexagons, [] { return mk("hexagons", 4, {0.20f, 0.50f, 0.60f, 1}, {0.30f, 0.65f, 0.70f, 1}, {0.05f, 0.10f, 0.12f, 1}, 0.4f); }},
     {"scales", genScales, [] { return mk("scales", 8, {0.15f, 0.50f, 0.35f, 1}, {0.30f, 0.75f, 0.50f, 1}, {0.05f, 0.20f, 0.15f, 1}, 0.35f); }},
     {"stylized", genStylized, [] { return mk("stylized", 3, {0.45f, 0.70f, 0.40f, 1}, {0.70f, 0.85f, 0.45f, 1}, {0.30f, 0.50f, 0.35f, 1}, 0.8f); }},
+    {"glow", genGlow, [] { return mk("glow", 2, {1.f, 1.f, 1.f, 1}, {1.f, 1.f, 1.f, 1}, {1.f, 1.f, 1.f, 1}, 1.f, 0.f, 0.2f); }},
+    {"curtain", genCurtain, [] { return mk("curtain", 3, {0.35f, 1.f, 0.6f, 1}, {0.7f, 0.4f, 1.f, 1}, {1.f, 1.f, 1.f, 1}, 1.f, 0.f, 0.5f); }},
 };
 
 const KindInfo* findKind(const std::string& name) {
@@ -670,7 +702,7 @@ Result<TextureSet> generate(const Params& p) {
             a[0] = toByte(col.r);
             a[1] = toByte(col.g);
             a[2] = toByte(col.b);
-            a[3] = 255;
+            a[3] = toByte(px.a);
             uint8_t* nm = out.normal.at(x, y);
             nm[0] = toByte(nx * 0.5f + 0.5f);
             nm[1] = toByte(ny * 0.5f + 0.5f);

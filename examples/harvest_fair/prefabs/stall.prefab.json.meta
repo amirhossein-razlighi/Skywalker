@@ -1,0 +1,14 @@
+{
+  "guid": "3f7986648028799df39c0e12b6e00490",
+  "type": "prefab",
+  "tags": [
+    "carnival",
+    "building"
+  ],
+  "description": "Striped carnival food stall",
+  "source": {
+    "by": "mcp:director",
+    "fromEntity": "Stall"
+  },
+  "import": {}
+}

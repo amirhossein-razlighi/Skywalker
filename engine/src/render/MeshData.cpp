@@ -1,5 +1,6 @@
 #include "skywalker/render/MeshData.h"
 
+#include <cmath>
 #include <cstdlib>
 #include <fstream>
 #include <map>
@@ -8,8 +9,8 @@
 
 namespace sky {
 
-void MeshData::addVertex(Vec3 p, Vec3 n, Vec2 uv) {
-    vertices.insert(vertices.end(), {p.x, p.y, p.z, n.x, n.y, n.z, uv.x, uv.y});
+void MeshData::addVertex(Vec3 p, Vec3 n, Vec2 uv, Vec4 color) {
+    vertices.insert(vertices.end(), {p.x, p.y, p.z, n.x, n.y, n.z, uv.x, uv.y, color.x, color.y, color.z, color.w});
 }
 
 void MeshData::computeBounds() {
@@ -216,6 +217,7 @@ Result<MeshData> primitive(const std::string& name) {
 
 Result<MeshData> parseObj(const std::string& text, bool normalizeMesh) {
     std::vector<Vec3> positions, normals;
+    std::vector<Vec4> colors;  // optional "v x y z r g b" (sRGB 0..1)
     std::vector<Vec2> uvs;
     MeshData m;
     std::map<std::tuple<int, int, int>, uint32_t> cache;
@@ -238,6 +240,13 @@ Result<MeshData> parseObj(const std::string& text, bool normalizeMesh) {
             Vec3 p;
             ls >> p.x >> p.y >> p.z;
             positions.push_back(p);
+            Vec3 c;
+            if (ls >> c.x >> c.y >> c.z) {
+                auto lin = [](float v) { return v <= 0.04045f ? v / 12.92f : std::pow((v + 0.055f) / 1.055f, 2.4f); };
+                colors.resize(positions.size() - 1, Vec4{1, 1, 1, 1});
+                colors.push_back({lin(c.x), lin(c.y), lin(c.z), 1.f});
+                m.hasVertexColors = true;
+            }
         } else if (tag == "vn") {
             Vec3 n;
             ls >> n.x >> n.y >> n.z;
@@ -270,7 +279,8 @@ Result<MeshData> parseObj(const std::string& text, bool normalizeMesh) {
                 auto it = cache.find(key);
                 if (it == cache.end()) {
                     auto idx = static_cast<uint32_t>(m.vertexCount());
-                    m.addVertex(positions[pv], pn >= 0 ? normals[pn] : Vec3{0, 0, 0}, pt >= 0 ? uvs[pt] : Vec2{0, 0});
+                    m.addVertex(positions[pv], pn >= 0 ? normals[pn] : Vec3{0, 0, 0}, pt >= 0 ? uvs[pt] : Vec2{0, 0},
+                                pv < static_cast<int>(colors.size()) ? colors[pv] : Vec4{1, 1, 1, 1});
                     anyMissingNormal = anyMissingNormal || pn < 0;
                     it = cache.emplace(key, idx).first;
                 }

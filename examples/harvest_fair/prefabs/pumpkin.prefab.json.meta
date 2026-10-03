@@ -1,0 +1,14 @@
+{
+  "guid": "4078364bbc3fb73fc62b14b96a4f4176",
+  "type": "prefab",
+  "tags": [
+    "autumn",
+    "prop"
+  ],
+  "description": "Autumn pumpkin",
+  "source": {
+    "by": "mcp:director",
+    "fromEntity": "Pumpkin"
+  },
+  "import": {}
+}

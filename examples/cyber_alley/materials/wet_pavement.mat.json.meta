@@ -1,0 +1,13 @@
+{
+  "guid": "381eaa07502a25cba28e16809f288662",
+  "type": "material",
+  "tags": [],
+  "description": "tiles (procedural PBR)",
+  "source": {
+    "generator": "texgen",
+    "kind": "tiles",
+    "seed": 1,
+    "by": "mcp:director"
+  },
+  "import": {}
+}

@@ -1,0 +1,14 @@
+{
+  "guid": "e91e339b0a22a4f5c010728931ee4c44",
+  "type": "prefab",
+  "tags": [
+    "fx",
+    "celebration"
+  ],
+  "description": "Pink firework burst",
+  "source": {
+    "by": "mcp:director",
+    "fromEntity": "Firework Pink"
+  },
+  "import": {}
+}

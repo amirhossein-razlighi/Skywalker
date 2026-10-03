@@ -90,7 +90,7 @@ Json ToolRegistry::listJson() const {
                                 {"annotations", Json::object({{"title", t.title},
                                                               {"readOnlyHint", !t.mutates},
                                                               {"destructiveHint", t.destructive},
-                                                              {"openWorldHint", false}})},
+                                                              {"openWorldHint", t.openWorld}})},
                                 // Lets clients group tools / grant permissions per category.
                                 {"_meta", Json::object({{"skywalker/category", t.category}})}}));
     }

@@ -1,0 +1,13 @@
+{
+  "guid": "82773b860c7070d8811d522abac50981",
+  "type": "material",
+  "tags": [],
+  "description": "sand (procedural PBR)",
+  "source": {
+    "generator": "texgen",
+    "kind": "sand",
+    "seed": 1,
+    "by": "mcp:director"
+  },
+  "import": {}
+}

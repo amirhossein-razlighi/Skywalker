@@ -1,0 +1,16 @@
+{
+  "guid": "7ecb5495a4c4b5951fcf96a921d6e364",
+  "type": "texture",
+  "tags": [
+    "generated",
+    "dirt"
+  ],
+  "description": "",
+  "source": {
+    "generator": "texgen",
+    "kind": "dirt",
+    "seed": 1,
+    "by": "mcp:director"
+  },
+  "import": {}
+}

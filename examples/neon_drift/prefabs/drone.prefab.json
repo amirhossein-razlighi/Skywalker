@@ -1,0 +1,351 @@
+{
+  "format": "skywalker.prefab",
+  "version": 1,
+  "name": "Drone",
+  "root": {
+    "name": "Drone",
+    "enabled": true,
+    "tags": [
+      "enemy"
+    ],
+    "vars": {
+      "hp": 2,
+      "speed": 3.4
+    },
+    "components": {
+      "transform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      }
+    },
+    "behaviors": [
+      {
+        "name": "Hunt",
+        "intent": "Home in on the player, spinning; two hits and it bursts.",
+        "source": "\nbehavior Hunt\n  on tick\n    let p = find(\"Player\")\n    if exists(p) then\n      move self toward p at self.speed\n    end\n    rotate self by (0, 200 * dt, 0)\n  end\n  on event \"hit\"\n    self.hp = self.hp - 1\n    self.scale = (1.3, 1.3, 1.3)\n    if self.hp <= 0 then\n      spawn(\"prefab:prefabs/boom.prefab.json\", self.position)\n      emit \"kill\" to find(\"Player\")\n      destroy self\n    end\n  end\nend",
+        "enabled": true
+      }
+    ],
+    "children": [
+      {
+        "name": "Drone Body",
+        "enabled": true,
+        "tags": [],
+        "vars": {},
+        "components": {
+          "transform": {
+            "position": [
+              0,
+              0,
+              0
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              0.9,
+              0.7,
+              0.9
+            ]
+          },
+          "mesh": {
+            "mesh": "sphere",
+            "color": "#ccccd1",
+            "metallic": 0,
+            "roughness": 0.55,
+            "emissive": "#000000",
+            "texture": "",
+            "visible": true,
+            "billboard": false,
+            "material": "materials/hull.mat.json",
+            "unlit": false,
+            "shading": "pbr",
+            "normalMap": "",
+            "ormMap": "",
+            "emissiveMap": "",
+            "normalStrength": 1,
+            "tiling": 1,
+            "triplanar": false,
+            "clearcoat": 0,
+            "subsurface": 0,
+            "rim": 0,
+            "outline": 0,
+            "outlineColor": "#0a0a0f",
+            "doubleSided": false,
+            "castShadows": true
+          }
+        }
+      },
+      {
+        "name": "Drone Eye",
+        "enabled": true,
+        "tags": [],
+        "vars": {},
+        "components": {
+          "transform": {
+            "position": [
+              0,
+              0,
+              0
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1.1,
+              0.5,
+              1.1
+            ]
+          },
+          "mesh": {
+            "mesh": "torus",
+            "color": "#ccccd1",
+            "metallic": 0,
+            "roughness": 0.55,
+            "emissive": "#000000",
+            "texture": "",
+            "visible": true,
+            "billboard": false,
+            "material": "materials/neon_amber.mat.json",
+            "unlit": false,
+            "shading": "pbr",
+            "normalMap": "",
+            "ormMap": "",
+            "emissiveMap": "",
+            "normalStrength": 1,
+            "tiling": 1,
+            "triplanar": false,
+            "clearcoat": 0,
+            "subsurface": 0,
+            "rim": 0,
+            "outline": 0,
+            "outlineColor": "#0a0a0f",
+            "doubleSided": false,
+            "castShadows": true
+          }
+        }
+      },
+      {
+        "name": "Drone Spike 1",
+        "enabled": true,
+        "tags": [],
+        "vars": {},
+        "components": {
+          "transform": {
+            "position": [
+              0.55,
+              0,
+              0
+            ],
+            "rotation": [
+              0,
+              0,
+              -90
+            ],
+            "scale": [
+              0.25,
+              0.5,
+              0.25
+            ]
+          },
+          "mesh": {
+            "mesh": "cone",
+            "color": "#2a1a40",
+            "metallic": 0.9,
+            "roughness": 0.3,
+            "emissive": "#000000",
+            "texture": "",
+            "visible": true,
+            "billboard": false,
+            "material": "",
+            "unlit": false,
+            "shading": "pbr",
+            "normalMap": "",
+            "ormMap": "",
+            "emissiveMap": "",
+            "normalStrength": 1,
+            "tiling": 1,
+            "triplanar": false,
+            "clearcoat": 0,
+            "subsurface": 0,
+            "rim": 0,
+            "outline": 0,
+            "outlineColor": "#0a0a0f",
+            "doubleSided": false,
+            "castShadows": true
+          }
+        }
+      },
+      {
+        "name": "Drone Spike 2",
+        "enabled": true,
+        "tags": [],
+        "vars": {},
+        "components": {
+          "transform": {
+            "position": [
+              0,
+              0,
+              0.55
+            ],
+            "rotation": [
+              0,
+              -90,
+              -90
+            ],
+            "scale": [
+              0.25,
+              0.5,
+              0.25
+            ]
+          },
+          "mesh": {
+            "mesh": "cone",
+            "color": "#2a1a40",
+            "metallic": 0.9,
+            "roughness": 0.3,
+            "emissive": "#000000",
+            "texture": "",
+            "visible": true,
+            "billboard": false,
+            "material": "",
+            "unlit": false,
+            "shading": "pbr",
+            "normalMap": "",
+            "ormMap": "",
+            "emissiveMap": "",
+            "normalStrength": 1,
+            "tiling": 1,
+            "triplanar": false,
+            "clearcoat": 0,
+            "subsurface": 0,
+            "rim": 0,
+            "outline": 0,
+            "outlineColor": "#0a0a0f",
+            "doubleSided": false,
+            "castShadows": true
+          }
+        }
+      },
+      {
+        "name": "Drone Spike 3",
+        "enabled": true,
+        "tags": [],
+        "vars": {},
+        "components": {
+          "transform": {
+            "position": [
+              -0.55,
+              0,
+              0
+            ],
+            "rotation": [
+              0,
+              -180,
+              -90
+            ],
+            "scale": [
+              0.25,
+              0.5,
+              0.25
+            ]
+          },
+          "mesh": {
+            "mesh": "cone",
+            "color": "#2a1a40",
+            "metallic": 0.9,
+            "roughness": 0.3,
+            "emissive": "#000000",
+            "texture": "",
+            "visible": true,
+            "billboard": false,
+            "material": "",
+            "unlit": false,
+            "shading": "pbr",
+            "normalMap": "",
+            "ormMap": "",
+            "emissiveMap": "",
+            "normalStrength": 1,
+            "tiling": 1,
+            "triplanar": false,
+            "clearcoat": 0,
+            "subsurface": 0,
+            "rim": 0,
+            "outline": 0,
+            "outlineColor": "#0a0a0f",
+            "doubleSided": false,
+            "castShadows": true
+          }
+        }
+      },
+      {
+        "name": "Drone Spike 4",
+        "enabled": true,
+        "tags": [],
+        "vars": {},
+        "components": {
+          "transform": {
+            "position": [
+              0,
+              0,
+              -0.55
+            ],
+            "rotation": [
+              0,
+              -270,
+              -90
+            ],
+            "scale": [
+              0.25,
+              0.5,
+              0.25
+            ]
+          },
+          "mesh": {
+            "mesh": "cone",
+            "color": "#2a1a40",
+            "metallic": 0.9,
+            "roughness": 0.3,
+            "emissive": "#000000",
+            "texture": "",
+            "visible": true,
+            "billboard": false,
+            "material": "",
+            "unlit": false,
+            "shading": "pbr",
+            "normalMap": "",
+            "ormMap": "",
+            "emissiveMap": "",
+            "normalStrength": 1,
+            "tiling": 1,
+            "triplanar": false,
+            "clearcoat": 0,
+            "subsurface": 0,
+            "rim": 0,
+            "outline": 0,
+            "outlineColor": "#0a0a0f",
+            "doubleSided": false,
+            "castShadows": true
+          }
+        }
+      }
+    ]
+  }
+}

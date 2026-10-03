@@ -1,0 +1,16 @@
+{
+  "guid": "5c76213aa2bf365bd525da8bc10cd87a",
+  "type": "texture",
+  "tags": [
+    "generated",
+    "bricks"
+  ],
+  "description": "",
+  "source": {
+    "generator": "texgen",
+    "kind": "bricks",
+    "seed": 1,
+    "by": "mcp:director"
+  },
+  "import": {}
+}

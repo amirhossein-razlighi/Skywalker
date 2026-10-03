@@ -1,0 +1,14 @@
+{
+  "guid": "ca60dbf1adf69c3afc6c065475e60353",
+  "type": "prefab",
+  "tags": [
+    "space",
+    "enemy"
+  ],
+  "description": "Enemy raider (sine-wave attacker)",
+  "source": {
+    "by": "mcp:director",
+    "fromEntity": "Raider"
+  },
+  "import": {}
+}

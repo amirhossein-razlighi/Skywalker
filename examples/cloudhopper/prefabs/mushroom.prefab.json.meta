@@ -1,0 +1,14 @@
+{
+  "guid": "432c85e907051c87de664dd98a0c8d46",
+  "type": "prefab",
+  "tags": [
+    "platformer",
+    "decor"
+  ],
+  "description": "Red spotted mushroom",
+  "source": {
+    "by": "mcp:director",
+    "fromEntity": "Mushroom"
+  },
+  "import": {}
+}

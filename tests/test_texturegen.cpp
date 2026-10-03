@@ -77,6 +77,7 @@ TEST_CASE("texgen: every kind generates with matching sizes") {
 
 TEST_CASE("texgen: albedo and normals tile seamlessly") {
     for (const auto& kind : texgen::kinds()) {
+        if (kind == "curtain") continue;  // fades out vertically by design (auroras, light shafts)
         auto r = texgen::generate(small(kind, 128));
         REQUIRE(r.ok());
         const bool hard = kind == "bricks" || kind == "tiles" || kind == "planks" || kind == "cobblestone" ||
@@ -181,4 +182,20 @@ TEST_CASE("texgen: optional PNG sample dump" * doctest::skip(std::getenv("SKY_TE
         CHECK(writePng(r->albedo, std::string(dir) + "/" + kind + "_albedo.png").ok());
         CHECK(writePng(r->normal, std::string(dir) + "/" + kind + "_normal.png").ok());
     }
+}
+
+TEST_CASE("texgen: soft kinds fade to transparent") {
+    for (const char* kind : {"glow", "curtain"}) {
+        INFO(kind);
+        auto r = texgen::generate(small(kind, 64));
+        REQUIRE(r.ok());
+        const Image& a = r->albedo;
+        CHECK(a.at(0, 0)[3] < 20);  // corner (glow) / top (curtain) is nearly transparent
+        int maxAlpha = 0;
+        for (int y = 0; y < a.height; ++y)
+            for (int x = 0; x < a.width; ++x) maxAlpha = std::max(maxAlpha, static_cast<int>(a.at(x, y)[3]));
+        CHECK(maxAlpha > 150);
+    }
+    auto glow = texgen::generate(small("glow", 64));
+    CHECK(glow->albedo.at(32, 32)[3] > 200);  // bright core
 }

@@ -1,0 +1,14 @@
+{
+  "guid": "9434b0277bf283d0bdeef265f250f18d",
+  "type": "prefab",
+  "tags": [
+    "space",
+    "projectile"
+  ],
+  "description": "Red laser bolt",
+  "source": {
+    "by": "mcp:director",
+    "fromEntity": "Laser"
+  },
+  "import": {}
+}

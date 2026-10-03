@@ -16,6 +16,8 @@ set(SKY_ENGINE_SOURCES
     src/render/NullRenderer.cpp
     src/render/Annotate.cpp
     src/render/Gltf.cpp
+    src/render/MeshFormats.cpp
+    src/assets/Fetch.cpp
     src/render/TextureGen.cpp
     src/assets/AssetDatabase.cpp
     src/assets/Material.cpp
@@ -24,6 +26,7 @@ set(SKY_ENGINE_SOURCES
     src/agent/EngineTools.cpp
     src/agent/AssetTools.cpp
     src/agent/WorldTools.cpp
+    src/agent/NetworkTools.cpp
     src/agent/McpServer.cpp
     src/agent/SocketServer.cpp
     src/engine/Engine.cpp
@@ -34,11 +37,12 @@ add_library(skywalker_engine STATIC ${SKY_ENGINE_SOURCES})
 add_library(sky::engine ALIAS skywalker_engine)
 
 find_package(ZLIB REQUIRED)
+find_package(CURL REQUIRED)
 find_package(Threads REQUIRED)
 
 target_include_directories(skywalker_engine PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
-target_link_libraries(skywalker_engine PUBLIC sky::options PRIVATE ZLIB::ZLIB Threads::Threads)
+target_link_libraries(skywalker_engine PUBLIC sky::options PRIVATE ZLIB::ZLIB CURL::libcurl Threads::Threads)
 # Definitions are C-family only (Swift consumers of the C API must not see them).
 target_compile_definitions(skywalker_engine PUBLIC
     $<$<COMPILE_LANGUAGE:C,CXX,OBJCXX>:SKY_VERSION_STRING="${PROJECT_VERSION}">)

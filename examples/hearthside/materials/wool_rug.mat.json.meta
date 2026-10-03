@@ -1,0 +1,13 @@
+{
+  "guid": "6637f19b7f739a6e80deaa8cc1963d1b",
+  "type": "material",
+  "tags": [],
+  "description": "fabric (procedural PBR)",
+  "source": {
+    "generator": "texgen",
+    "kind": "fabric",
+    "seed": 1,
+    "by": "mcp:director"
+  },
+  "import": {}
+}

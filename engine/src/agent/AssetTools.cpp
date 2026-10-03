@@ -126,20 +126,26 @@ void addAssetTools(Engine& engine, ToolRegistry& reg) {
              }});
 
     reg.add({"asset_import", "Import asset",
-             "Register a file placed in the project (e.g. by a generator) as an asset. Meshes (.obj/.glb/.gltf) are "
-             "imported — glTF colors/textures become a material — and can be placed as a new entity right away.",
+             "Register a file placed in the project (e.g. by a generator) as an asset. Meshes (.glb/.gltf/.obj/.ply/.stl) "
+             "are imported — glTF / OBJ+MTL materials become material assets, PLY/OBJ vertex colors are kept — and "
+             "can be placed as a new entity right away. To fetch models from the web use asset_download.",
              "asset",
              object({{"path", string("Project-relative file path")},
                      {"create_entity", string("If set, create an entity with this name using the mesh")},
                      {"position", vec3("Position for the created entity")},
                      {"description", string("What the asset is (helps future searches)")},
-                     {"tags", array(Json::object({{"type", "string"}}), "Tags")}},
+                     {"tags", array(Json::object({{"type", "string"}}), "Tags")},
+                     {"normalize", boolean("Scale meshes to fit 1 m (default true); false keeps real-world units")},
+                     {"z_up", boolean("The mesh is Z-up (CAD, scans, some exporters) — rotate to Y-up")}},
                     {"path"}),
              true, false, [&engine](const Json& a, ToolContext& ctx) {
                  std::string path = a.get("path").asString();
                  Json result = Json::object();
                  if (assetTypeForPath(path) == AssetType::Mesh) {
-                     auto r = engine.importMeshAsset(path);
+                     Engine::MeshImportOptions opts;
+                     opts.normalize = a.get("normalize").asBool(true);
+                     opts.zUp = a.get("z_up").asBool(false);
+                     auto r = engine.importMeshAsset(path, opts);
                      if (!r) return ToolResult::error(r.error());
                      result = r.value();
                  } else {
@@ -158,6 +164,7 @@ void addAssetTools(Engine& engine, ToolRegistry& reg) {
                          id = engine.scene().create(a.get("create_entity").asString());
                          Json m = Json::object({{"mesh", result.get("mesh")}});
                          if (result.contains("material")) m["material"] = result.get("material");
+                         if (result.get("vertexColors").asBool()) m["color"] = "#ffffff";
                          Status s = engine.scene().patchComponent(id, "mesh", m);
                          if (s && a.contains("position")) {
                              s = engine.scene().patchComponent(id, "transform", Json::object({{"position", a.get("position")}}));
@@ -277,7 +284,9 @@ void addAssetTools(Engine& engine, ToolRegistry& reg) {
                  "Procedurally generate a seamless PBR texture set — albedo, normal map and ORM (occlusion/roughness/"
                  "metallic) — for realistic or stylized surfaces: bricks, planks, cobblestone, rock, rust, marble, "
                  "fabric, scales, ... With create_material it also writes a ready material (triplanar by default, so it "
-                 "works on scaled primitives without stretching). Colors override the kind's defaults.",
+                 "works on scaled primitives without stretching). Colors override the kind's defaults. The soft kinds "
+                 "`glow` (radial) and `curtain` (vertical rays fading upward) have transparent edges and make self-lit "
+                 "effect materials: particles, light pools, fake reflections, auroras, light shafts, steam.",
                  "asset",
                  object({{"kind", Json::object({{"type", "string"}, {"enum", kinds}, {"description", "Pattern"}})},
                          {"name", string("Base path without extension, e.g. textures/old_bricks")},
@@ -292,7 +301,8 @@ void addAssetTools(Engine& engine, ToolRegistry& reg) {
                          {"variation", number("Color / height variation 0..1")},
                          {"bump", number("Normal strength (default 1)")},
                          {"create_material", boolean("Also create materials/<name>.mat.json using the maps (default true)")},
-                         {"tiling", number("Material repeats per meter (triplanar) — default 0.5")}},
+                         {"tiling", number("Material repeats per meter (triplanar) — default 0.5")},
+                         {"glow", number("Emission strength for the soft effect kinds glow / curtain (default 1.5)")}},
                         {"kind", "name"}),
                  true, false, [&engine](const Json& a, ToolContext& ctx) {
                      texgen::Params p = texgen::defaults(a.get("kind").asString());
@@ -339,6 +349,16 @@ void addAssetTools(Engine& engine, ToolRegistry& reg) {
                          m.metallic = 1.f;  // the ORM map carries the real values
                          m.triplanar = true;
                          m.tilingU = m.tilingV = a.get("tiling").asFloat(0.5f);
+                         if (p.kind == "glow" || p.kind == "curtain") {
+                             // Effect material: soft alpha, self-lit, visible from both sides.
+                             m = MaterialAsset{};
+                             m.texture = albedo;
+                             m.emissiveMap = albedo;
+                             m.color = {1, 1, 1, 0.99f};
+                             m.emissive = {1, 1, 1, a.get("glow").asFloat(1.5f)};
+                             m.unlit = true;
+                             m.doubleSided = true;
+                         }
                          std::string stem = fs::path(base).filename().string();
                          std::string matPath = "materials/" + stem + ".mat.json";
                          fs::create_directories(fs::path(engine.resolvePath(matPath)).parent_path(), ec);

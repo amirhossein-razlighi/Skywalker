@@ -195,8 +195,11 @@ Result<GltfImport> parseGltf(const std::vector<uint8_t>& bytes, const std::strin
                 if (!pos) return pos.error();
                 Result<View> nrm = attrs.contains("NORMAL") ? accessor(d, static_cast<int>(attrs.get("NORMAL").asInt())) : Result<View>(View{});
                 Result<View> uv = attrs.contains("TEXCOORD_0") ? accessor(d, static_cast<int>(attrs.get("TEXCOORD_0").asInt())) : Result<View>(View{});
+                Result<View> col = attrs.contains("COLOR_0") ? accessor(d, static_cast<int>(attrs.get("COLOR_0").asInt())) : Result<View>(View{});
                 if (!nrm) return nrm.error();
                 if (!uv) return uv.error();
+                if (!col) return col.error();
+                if (col->data) mesh.hasVertexColors = true;
                 auto base = static_cast<uint32_t>(mesh.vertexCount());
                 for (size_t i = 0; i < pos->count; ++i) {
                     Vec3 p = world.transformPoint({readComponent(*pos, i, 0), readComponent(*pos, i, 1), readComponent(*pos, i, 2)});
@@ -206,7 +209,12 @@ Result<GltfImport> parseGltf(const std::vector<uint8_t>& bytes, const std::strin
                     }
                     Vec2 t{0, 0};
                     if (uv->data && i < uv->count) t = {readComponent(*uv, i, 0), readComponent(*uv, i, 1)};
-                    mesh.addVertex(p, n, t);
+                    Vec4 c{1, 1, 1, 1};  // COLOR_0 is linear (unlike authored sRGB colors)
+                    if (col->data && i < col->count) {
+                        c = {readComponent(*col, i, 0), readComponent(*col, i, 1), readComponent(*col, i, 2),
+                             col->components == 4 ? readComponent(*col, i, 3) : 1.f};
+                    }
+                    mesh.addVertex(p, n, t, c);
                 }
                 if (prim.contains("indices")) {
                     auto idx = accessor(d, static_cast<int>(prim.get("indices").asInt()));
@@ -312,16 +320,6 @@ Result<GltfImport> loadGltf(const std::string& path, bool normalizeMesh) {
     return parseGltf(bytes, fs::path(path).parent_path().string(), normalizeMesh);
 }
 
-namespace mesh {
-Result<MeshData> loadMeshFile(const std::string& path, bool normalizeMesh) {
-    std::string lower = str::lower(path);
-    if (lower.size() > 4 && (lower.rfind(".glb") == lower.size() - 4 || lower.rfind(".gltf") == lower.size() - 5)) {
-        auto g = loadGltf(path, normalizeMesh);
-        if (!g) return g.error();
-        return std::move(g.value().mesh);
-    }
-    return loadObj(path, normalizeMesh);
-}
-}  // namespace mesh
+
 
 }  // namespace sky

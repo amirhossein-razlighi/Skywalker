@@ -1,0 +1,14 @@
+{
+  "guid": "da009646baa76d1a932d89ddbb4c08e3",
+  "type": "prefab",
+  "tags": [
+    "shooter",
+    "fx"
+  ],
+  "description": "Neon explosion burst",
+  "source": {
+    "by": "mcp:director",
+    "fromEntity": "Boom"
+  },
+  "import": {}
+}

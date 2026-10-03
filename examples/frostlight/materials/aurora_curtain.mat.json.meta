@@ -1,0 +1,13 @@
+{
+  "guid": "51da80b00978bdedab947d2ba9bf69d4",
+  "type": "material",
+  "tags": [],
+  "description": "curtain (procedural PBR)",
+  "source": {
+    "generator": "texgen",
+    "kind": "curtain",
+    "seed": 1,
+    "by": "mcp:director"
+  },
+  "import": {}
+}

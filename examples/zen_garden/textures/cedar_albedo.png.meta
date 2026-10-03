@@ -1,0 +1,16 @@
+{
+  "guid": "57ea026e918ce6be4355c47ebee4d1df",
+  "type": "texture",
+  "tags": [
+    "generated",
+    "wood"
+  ],
+  "description": "",
+  "source": {
+    "generator": "texgen",
+    "kind": "wood",
+    "seed": 1,
+    "by": "mcp:director"
+  },
+  "import": {}
+}

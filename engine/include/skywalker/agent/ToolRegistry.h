@@ -46,11 +46,14 @@ struct ToolDef {
     std::string name;
     std::string title;
     std::string description;
-    std::string category;  // scene, entity, wander, sim, view, history, asset, render
+    std::string category;  // scene, entity, world, wander, sim, view, history, asset, render, network
     Json inputSchema;
     bool mutates = false;
     bool destructive = false;
     std::function<ToolResult(const Json& args, ToolContext& ctx)> handler;
+    /// Reaches outside the project (e.g. the internet). MCP clients and the in-editor crew
+    /// ask the human before running these.
+    bool openWorld = false;
 };
 
 class ToolRegistry {

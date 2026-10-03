@@ -1,0 +1,13 @@
+{
+  "guid": "8c6cf0995f90a0b34ecdab8be42dd126",
+  "type": "material",
+  "tags": [],
+  "description": "grass (procedural PBR)",
+  "source": {
+    "generator": "texgen",
+    "kind": "grass",
+    "seed": 1,
+    "by": "mcp:director"
+  },
+  "import": {}
+}

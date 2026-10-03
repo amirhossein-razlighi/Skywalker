@@ -1,0 +1,16 @@
+{
+  "guid": "f0b6ea7bcf4535cddd87680730893c80",
+  "type": "texture",
+  "tags": [
+    "generated",
+    "metal_brushed"
+  ],
+  "description": "",
+  "source": {
+    "generator": "texgen",
+    "kind": "metal_brushed",
+    "seed": 1,
+    "by": "mcp:director"
+  },
+  "import": {}
+}

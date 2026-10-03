@@ -1,0 +1,16 @@
+{
+  "guid": "83a4cbbc998f6aaca81dbf520e52dee9",
+  "type": "texture",
+  "tags": [
+    "generated",
+    "sand"
+  ],
+  "description": "",
+  "source": {
+    "generator": "texgen",
+    "kind": "sand",
+    "seed": 1,
+    "by": "mcp:director"
+  },
+  "import": {}
+}

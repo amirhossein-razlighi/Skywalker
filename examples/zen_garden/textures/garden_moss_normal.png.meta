@@ -1,0 +1,16 @@
+{
+  "guid": "7ce866d9ad99c42dd58ed7fa75fe70dc",
+  "type": "texture",
+  "tags": [
+    "generated",
+    "grass"
+  ],
+  "description": "",
+  "source": {
+    "generator": "texgen",
+    "kind": "grass",
+    "seed": 1,
+    "by": "mcp:director"
+  },
+  "import": {}
+}

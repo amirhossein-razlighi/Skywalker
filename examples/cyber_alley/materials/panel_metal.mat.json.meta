@@ -1,0 +1,13 @@
+{
+  "guid": "a9d631d2e709098850fb217df1ed82fd",
+  "type": "material",
+  "tags": [],
+  "description": "metal_brushed (procedural PBR)",
+  "source": {
+    "generator": "texgen",
+    "kind": "metal_brushed",
+    "seed": 1,
+    "by": "mcp:director"
+  },
+  "import": {}
+}

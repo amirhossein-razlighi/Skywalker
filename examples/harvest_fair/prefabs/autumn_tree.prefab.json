@@ -1,0 +1,287 @@
+{
+  "format": "skywalker.prefab",
+  "version": 1,
+  "name": "Autumn Tree",
+  "root": {
+    "name": "Autumn Tree",
+    "enabled": true,
+    "tags": [],
+    "vars": {},
+    "components": {
+      "transform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      }
+    },
+    "children": [
+      {
+        "name": "Autumn Tree Trunk",
+        "enabled": true,
+        "tags": [],
+        "vars": {},
+        "components": {
+          "transform": {
+            "position": [
+              0,
+              1.4,
+              0
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              0.35,
+              2.8,
+              0.35
+            ]
+          },
+          "mesh": {
+            "mesh": "cylinder",
+            "color": "#5a3d28",
+            "metallic": 0,
+            "roughness": 0.55,
+            "emissive": "#000000",
+            "texture": "",
+            "visible": true,
+            "billboard": false,
+            "material": "",
+            "unlit": false,
+            "shading": "pbr",
+            "normalMap": "",
+            "ormMap": "",
+            "emissiveMap": "",
+            "normalStrength": 1,
+            "tiling": 1,
+            "triplanar": false,
+            "clearcoat": 0,
+            "subsurface": 0,
+            "rim": 0,
+            "outline": 0,
+            "outlineColor": "#0a0a0f",
+            "doubleSided": false,
+            "castShadows": true
+          }
+        }
+      },
+      {
+        "name": "Autumn Tree Leaves 1",
+        "enabled": true,
+        "tags": [],
+        "vars": {},
+        "components": {
+          "transform": {
+            "position": [
+              0,
+              3.4,
+              0
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              2.6,
+              2.6,
+              2.6
+            ]
+          },
+          "mesh": {
+            "mesh": "sphere",
+            "color": "#d9611f",
+            "metallic": 0,
+            "roughness": 0.9,
+            "emissive": "#000000",
+            "texture": "",
+            "visible": true,
+            "billboard": false,
+            "material": "",
+            "unlit": false,
+            "shading": "pbr",
+            "normalMap": "",
+            "ormMap": "",
+            "emissiveMap": "",
+            "normalStrength": 1,
+            "tiling": 1,
+            "triplanar": false,
+            "clearcoat": 0,
+            "subsurface": 0,
+            "rim": 0,
+            "outline": 0,
+            "outlineColor": "#0a0a0f",
+            "doubleSided": false,
+            "castShadows": true
+          }
+        }
+      },
+      {
+        "name": "Autumn Tree Leaves 2",
+        "enabled": true,
+        "tags": [],
+        "vars": {},
+        "components": {
+          "transform": {
+            "position": [
+              0.9,
+              2.9,
+              0.3
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1.8,
+              1.8,
+              1.8
+            ]
+          },
+          "mesh": {
+            "mesh": "sphere",
+            "color": "#e89a2c",
+            "metallic": 0,
+            "roughness": 0.9,
+            "emissive": "#000000",
+            "texture": "",
+            "visible": true,
+            "billboard": false,
+            "material": "",
+            "unlit": false,
+            "shading": "pbr",
+            "normalMap": "",
+            "ormMap": "",
+            "emissiveMap": "",
+            "normalStrength": 1,
+            "tiling": 1,
+            "triplanar": false,
+            "clearcoat": 0,
+            "subsurface": 0,
+            "rim": 0,
+            "outline": 0,
+            "outlineColor": "#0a0a0f",
+            "doubleSided": false,
+            "castShadows": true
+          }
+        }
+      },
+      {
+        "name": "Autumn Tree Leaves 3",
+        "enabled": true,
+        "tags": [],
+        "vars": {},
+        "components": {
+          "transform": {
+            "position": [
+              -0.8,
+              3,
+              -0.4
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1.9,
+              1.9,
+              1.9
+            ]
+          },
+          "mesh": {
+            "mesh": "sphere",
+            "color": "#b8461c",
+            "metallic": 0,
+            "roughness": 0.9,
+            "emissive": "#000000",
+            "texture": "",
+            "visible": true,
+            "billboard": false,
+            "material": "",
+            "unlit": false,
+            "shading": "pbr",
+            "normalMap": "",
+            "ormMap": "",
+            "emissiveMap": "",
+            "normalStrength": 1,
+            "tiling": 1,
+            "triplanar": false,
+            "clearcoat": 0,
+            "subsurface": 0,
+            "rim": 0,
+            "outline": 0,
+            "outlineColor": "#0a0a0f",
+            "doubleSided": false,
+            "castShadows": true
+          }
+        }
+      },
+      {
+        "name": "Autumn Tree Leaves 4",
+        "enabled": true,
+        "tags": [],
+        "vars": {},
+        "components": {
+          "transform": {
+            "position": [
+              0.1,
+              4.3,
+              0.1
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1.6,
+              1.6,
+              1.6
+            ]
+          },
+          "mesh": {
+            "mesh": "sphere",
+            "color": "#f0b23a",
+            "metallic": 0,
+            "roughness": 0.9,
+            "emissive": "#000000",
+            "texture": "",
+            "visible": true,
+            "billboard": false,
+            "material": "",
+            "unlit": false,
+            "shading": "pbr",
+            "normalMap": "",
+            "ormMap": "",
+            "emissiveMap": "",
+            "normalStrength": 1,
+            "tiling": 1,
+            "triplanar": false,
+            "clearcoat": 0,
+            "subsurface": 0,
+            "rim": 0,
+            "outline": 0,
+            "outlineColor": "#0a0a0f",
+            "doubleSided": false,
+            "castShadows": true
+          }
+        }
+      }
+    ]
+  }
+}

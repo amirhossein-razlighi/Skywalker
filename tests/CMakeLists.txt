@@ -24,6 +24,7 @@ set(SKY_TEST_SOURCES
     test_mcp.cpp
     test_assets.cpp
     test_texturegen.cpp
+    test_import.cpp
 )
 
 add_executable(skywalker_tests ${SKY_TEST_SOURCES})

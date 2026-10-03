@@ -1,0 +1,14 @@
+{
+  "guid": "c910f73bcf78ae10dbb8ff7a2cc20c11",
+  "type": "prefab",
+  "tags": [
+    "platformer",
+    "nature"
+  ],
+  "description": "Cartoon round tree",
+  "source": {
+    "by": "mcp:director",
+    "fromEntity": "Round Tree"
+  },
+  "import": {}
+}

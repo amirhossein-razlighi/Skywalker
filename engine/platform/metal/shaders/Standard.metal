@@ -78,6 +78,7 @@ struct Vertex {
     packed_float3 position;
     packed_float3 normal;
     packed_float2 uv;
+    packed_float4 color;  // vertex color (white for primitives)
 };
 
 struct MeshOut {
@@ -85,6 +86,7 @@ struct MeshOut {
     float3 worldPos;
     float3 normal;
     float2 uv;
+    float4 color;
 };
 
 struct MainOut {
@@ -498,6 +500,7 @@ vertex MeshOut meshVertex(uint vid [[vertex_id]],
     o.worldPos = world.xyz;
     o.normal = (d.normalMatrix * float4(float3(v.normal), 0.0)).xyz;
     o.uv = float2(v.uv);
+    o.color = float4(v.color);
     return o;
 }
 
@@ -584,8 +587,8 @@ fragment MainOut meshFragment(MeshOut in [[stage_in]],
     Triplanar tp = triplanar(in.worldPos, Ngeo, d.material2.xy);
 
     SurfaceData s;
-    s.albedo = d.color.rgb;
-    s.alpha = d.color.a;
+    s.albedo = d.color.rgb * in.color.rgb;
+    s.alpha = d.color.a * in.color.a;
     if (d.maps.x > 0.5) {
         float4 t = tri ? sampleTri(albedoTex, tp) : albedoTex.sample(materialSampler, uv);
         s.albedo *= t.rgb;

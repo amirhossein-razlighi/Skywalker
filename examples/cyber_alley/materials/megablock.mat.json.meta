@@ -1,0 +1,13 @@
+{
+  "guid": "9d530041cc30fc53ed6c43d07a995882",
+  "type": "material",
+  "tags": [],
+  "description": "bricks (procedural PBR)",
+  "source": {
+    "generator": "texgen",
+    "kind": "bricks",
+    "seed": 1,
+    "by": "mcp:director"
+  },
+  "import": {}
+}

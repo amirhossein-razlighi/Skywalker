@@ -1,0 +1,14 @@
+{
+  "guid": "5b2f3ec2b035f1dfcc64e988b3c4f5fa",
+  "type": "prefab",
+  "tags": [
+    "horror",
+    "prop"
+  ],
+  "description": "Weathered gravestone",
+  "source": {
+    "by": "mcp:director",
+    "fromEntity": "Gravestone"
+  },
+  "import": {}
+}

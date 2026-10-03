@@ -1,0 +1,14 @@
+{
+  "guid": "c91ba5572f1b3a3f2ac533596514faea",
+  "type": "prefab",
+  "tags": [
+    "fx",
+    "celebration"
+  ],
+  "description": "Gold firework burst",
+  "source": {
+    "by": "mcp:director",
+    "fromEntity": "Firework Gold"
+  },
+  "import": {}
+}

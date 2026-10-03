@@ -46,7 +46,7 @@ AssetType assetTypeForPath(std::string_view path) {
     if (ends(".prefab.json")) return AssetType::Prefab;
     if (ends(".sky.json")) return AssetType::Scene;
     if (ends(".agent.json")) return AssetType::Agent;
-    if (ends(".obj") || ends(".glb") || ends(".gltf")) return AssetType::Mesh;
+    if (ends(".obj") || ends(".glb") || ends(".gltf") || ends(".ply") || ends(".stl")) return AssetType::Mesh;
     if (ends(".png") || ends(".jpg") || ends(".jpeg")) return AssetType::Texture;
     if (ends(".wav") || ends(".mp3") || ends(".ogg") || ends(".m4a") || ends(".flac")) return AssetType::Audio;
     if (ends(".mp4") || ends(".mov") || ends(".webm")) return AssetType::Video;
@@ -248,7 +248,7 @@ Result<const AssetRecord*> AssetDatabase::registerFile(std::string_view path) {
     if (!fs::exists(absolute(rel), ec)) return Error::make("not_found", "no such file: " + rel);
     if (assetTypeForPath(rel) == AssetType::Unknown) {
         return Error::make("unsupported", "unsupported asset type: " + rel,
-                           "supported: .obj .glb .gltf .png .jpg .mat.json .prefab.json .sky.json .wav .mp3 .ogg .wander");
+                           "supported: .obj .glb .gltf .ply .stl .png .jpg .mat.json .prefab.json .sky.json .wav .mp3 .ogg .wander");
     }
     refresh();
     AssetRecord* r = findMutable(rel);

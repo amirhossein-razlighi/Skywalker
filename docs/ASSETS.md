@@ -23,7 +23,7 @@ Types are recognized by file name:
 
 | Type | Extensions |
 |---|---|
-| Mesh | `.obj`, `.glb`, `.gltf` |
+| Mesh | `.glb`, `.gltf`, `.obj` (+ `.mtl`), `.ply`, `.stl` |
 | Texture | `.png`, `.jpg`, `.jpeg` |
 | Material | `.mat.json` |
 | Prefab | `.prefab.json` |
@@ -31,7 +31,42 @@ Types are recognized by file name:
 | Agent | `.agent.json` |
 | Audio / video | `.wav`, `.mp3`, `.ogg`, `.m4a` / `.mp4`, `.mov` |
 
-## Meshes: OBJ and glTF 2.0
+## Meshes
+
+| Format | What is imported |
+|---|---|
+| glTF 2.0 / GLB | Node hierarchy (flattened), normals, UVs, vertex colors, and the first material: base color, metal/roughness, emissive, plus base color, normal, ORM and emissive maps. |
+| OBJ + MTL | Polygons (triangulated), normals, UVs, `v x y z r g b` vertex colors, and the first `.mtl` material (`Kd`, `d`, `Ns`/`Pr` → roughness, `Pm`, `Ke`, `map_Kd`, `map_Bump`/`norm`). |
+| PLY | ASCII and binary (both endians): positions, normals, UVs, vertex colors, polygon faces. Point clouds without faces are rejected with a hint. |
+| STL | ASCII and binary, flat-shaded facets (CAD and 3D-printing models). |
+
+Import options for `asset_import` and `asset_download`:
+- `normalize` (default true) fits the model to 1 m. Use `false` to keep real-world units.
+- `z_up` rotates Z-up sources (CAD, scans, some exporters) to Y-up.
+
+Both options are stored in the asset's `.meta`, so the model loads the same way every time.
+
+### Downloading models from the web
+
+`asset_download {url, license, author?, source_page?, attribution?}`:
+- **Accepts:** a direct model, texture or audio file, or a `.zip` pack.
+  - `.zip` packs are extracted with traversal and zip-bomb guards.
+  - Multi-file glTF and OBJ+MTL dependencies are fetched automatically.
+- **Saves** into `downloads/<name>/`.
+- **Records** the license, author, URL and retrieval date in every file's `.meta`.
+- **Credits:** appends a line to the project's `CREDITS.md`.
+- **Imports** the model, and optionally places it in the scene.
+
+Rules for agents:
+- Only download assets whose license allows the project's use (CC0, CC-BY with attribution, MIT, public domain, or terms the human accepted).
+- Never bypass logins, paywalls or rate limits.
+- Unknown or "all rights reserved" licenses are refused. Non-commercial and no-derivatives licenses produce warnings.
+
+The tool is **open-world**:
+- MCP clients (Claude Code, Codex, …) show it as a network action that needs approval.
+- In the editor, the **Network** permission category asks before every download unless you explicitly allow it for an agent.
+
+### Notes on OBJ and glTF
 
 - **glTF and GLB** import supports:
   - embedded, data-URI and external buffers;

@@ -1,0 +1,14 @@
+{
+  "guid": "7b77e73948a0fe456edbf842a1c91de4",
+  "type": "prefab",
+  "tags": [
+    "garden",
+    "plant"
+  ],
+  "description": "Swaying bamboo cluster",
+  "source": {
+    "by": "mcp:director",
+    "fromEntity": "Bamboo"
+  },
+  "import": {}
+}

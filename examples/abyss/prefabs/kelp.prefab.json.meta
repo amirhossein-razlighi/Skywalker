@@ -1,0 +1,14 @@
+{
+  "guid": "2502db2f39fdfafd92d873dfde81d9a0",
+  "type": "prefab",
+  "tags": [
+    "underwater",
+    "plant"
+  ],
+  "description": "Swaying kelp stalk (has a Sway behavior)",
+  "source": {
+    "by": "mcp:director",
+    "fromEntity": "Kelp"
+  },
+  "import": {}
+}

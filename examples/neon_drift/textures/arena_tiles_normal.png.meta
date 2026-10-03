@@ -1,0 +1,16 @@
+{
+  "guid": "42578ff1412657223d8d2015d330c60f",
+  "type": "texture",
+  "tags": [
+    "generated",
+    "tiles"
+  ],
+  "description": "",
+  "source": {
+    "generator": "texgen",
+    "kind": "tiles",
+    "seed": 1,
+    "by": "mcp:director"
+  },
+  "import": {}
+}

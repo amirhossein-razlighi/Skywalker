@@ -1,0 +1,16 @@
+{
+  "guid": "9e1a796acd9704acb0e9170d0fa4cdfd",
+  "type": "texture",
+  "tags": [
+    "generated",
+    "rock"
+  ],
+  "description": "",
+  "source": {
+    "generator": "texgen",
+    "kind": "rock",
+    "seed": 1,
+    "by": "mcp:director"
+  },
+  "import": {}
+}

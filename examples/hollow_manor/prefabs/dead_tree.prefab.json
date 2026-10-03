@@ -1,0 +1,338 @@
+{
+  "format": "skywalker.prefab",
+  "version": 1,
+  "name": "Dead Tree",
+  "root": {
+    "name": "Dead Tree",
+    "enabled": true,
+    "tags": [],
+    "vars": {},
+    "components": {
+      "transform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      }
+    },
+    "children": [
+      {
+        "name": "Dead Tree Trunk",
+        "enabled": true,
+        "tags": [],
+        "vars": {},
+        "components": {
+          "transform": {
+            "position": [
+              0,
+              2.5,
+              0
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              0.32,
+              5,
+              0.32
+            ]
+          },
+          "mesh": {
+            "mesh": "cylinder",
+            "color": "#2b2622",
+            "metallic": 0,
+            "roughness": 1,
+            "emissive": "#000000",
+            "texture": "",
+            "visible": true,
+            "billboard": false,
+            "material": "",
+            "unlit": false,
+            "shading": "pbr",
+            "normalMap": "",
+            "ormMap": "",
+            "emissiveMap": "",
+            "normalStrength": 1,
+            "tiling": 1,
+            "triplanar": false,
+            "clearcoat": 0,
+            "subsurface": 0,
+            "rim": 0,
+            "outline": 0,
+            "outlineColor": "#0a0a0f",
+            "doubleSided": false,
+            "castShadows": true
+          }
+        }
+      },
+      {
+        "name": "Dead Tree Branch 1",
+        "enabled": true,
+        "tags": [],
+        "vars": {},
+        "components": {
+          "transform": {
+            "position": [
+              0.5737,
+              2.7432,
+              0.0435
+            ],
+            "rotation": [
+              51.062,
+              85.667,
+              0
+            ],
+            "scale": [
+              0.1,
+              1.6439,
+              0.1
+            ]
+          },
+          "mesh": {
+            "mesh": "cylinder",
+            "color": "#2b2622",
+            "metallic": 0,
+            "roughness": 1,
+            "emissive": "#000000",
+            "texture": "",
+            "visible": true,
+            "billboard": false,
+            "material": "",
+            "unlit": false,
+            "shading": "pbr",
+            "normalMap": "",
+            "ormMap": "",
+            "emissiveMap": "",
+            "normalStrength": 1,
+            "tiling": 1,
+            "triplanar": false,
+            "clearcoat": 0,
+            "subsurface": 0,
+            "rim": 0,
+            "outline": 0,
+            "outlineColor": "#0a0a0f",
+            "doubleSided": false,
+            "castShadows": true
+          }
+        }
+      },
+      {
+        "name": "Dead Tree Branch 2",
+        "enabled": true,
+        "tags": [],
+        "vars": {},
+        "components": {
+          "transform": {
+            "position": [
+              -0.2447,
+              3.0952,
+              -0.3199
+            ],
+            "rotation": [
+              53.017,
+              217.411,
+              0
+            ],
+            "scale": [
+              0.1,
+              1.1508,
+              0.1
+            ]
+          },
+          "mesh": {
+            "mesh": "cylinder",
+            "color": "#2b2622",
+            "metallic": 0,
+            "roughness": 1,
+            "emissive": "#000000",
+            "texture": "",
+            "visible": true,
+            "billboard": false,
+            "material": "",
+            "unlit": false,
+            "shading": "pbr",
+            "normalMap": "",
+            "ormMap": "",
+            "emissiveMap": "",
+            "normalStrength": 1,
+            "tiling": 1,
+            "triplanar": false,
+            "clearcoat": 0,
+            "subsurface": 0,
+            "rim": 0,
+            "outline": 0,
+            "outlineColor": "#0a0a0f",
+            "doubleSided": false,
+            "castShadows": true
+          }
+        }
+      },
+      {
+        "name": "Dead Tree Branch 3",
+        "enabled": true,
+        "tags": [],
+        "vars": {},
+        "components": {
+          "transform": {
+            "position": [
+              0.035,
+              3.6127,
+              0.4217
+            ],
+            "rotation": [
+              58.099,
+              4.74,
+              0
+            ],
+            "scale": [
+              0.1,
+              1.209,
+              0.1
+            ]
+          },
+          "mesh": {
+            "mesh": "cylinder",
+            "color": "#2b2622",
+            "metallic": 0,
+            "roughness": 1,
+            "emissive": "#000000",
+            "texture": "",
+            "visible": true,
+            "billboard": false,
+            "material": "",
+            "unlit": false,
+            "shading": "pbr",
+            "normalMap": "",
+            "ormMap": "",
+            "emissiveMap": "",
+            "normalStrength": 1,
+            "tiling": 1,
+            "triplanar": false,
+            "clearcoat": 0,
+            "subsurface": 0,
+            "rim": 0,
+            "outline": 0,
+            "outlineColor": "#0a0a0f",
+            "doubleSided": false,
+            "castShadows": true
+          }
+        }
+      },
+      {
+        "name": "Dead Tree Branch 4",
+        "enabled": true,
+        "tags": [],
+        "vars": {},
+        "components": {
+          "transform": {
+            "position": [
+              0.4302,
+              4.1205,
+              0.0425
+            ],
+            "rotation": [
+              61.895,
+              84.359,
+              0
+            ],
+            "scale": [
+              0.1,
+              1.235,
+              0.1
+            ]
+          },
+          "mesh": {
+            "mesh": "cylinder",
+            "color": "#2b2622",
+            "metallic": 0,
+            "roughness": 1,
+            "emissive": "#000000",
+            "texture": "",
+            "visible": true,
+            "billboard": false,
+            "material": "",
+            "unlit": false,
+            "shading": "pbr",
+            "normalMap": "",
+            "ormMap": "",
+            "emissiveMap": "",
+            "normalStrength": 1,
+            "tiling": 1,
+            "triplanar": false,
+            "clearcoat": 0,
+            "subsurface": 0,
+            "rim": 0,
+            "outline": 0,
+            "outlineColor": "#0a0a0f",
+            "doubleSided": false,
+            "castShadows": true
+          }
+        }
+      },
+      {
+        "name": "Dead Tree Branch 5",
+        "enabled": true,
+        "tags": [],
+        "vars": {},
+        "components": {
+          "transform": {
+            "position": [
+              -0.3536,
+              4.604,
+              0.2135
+            ],
+            "rotation": [
+              49.432,
+              301.126,
+              0
+            ],
+            "scale": [
+              0.1,
+              1.1801,
+              0.1
+            ]
+          },
+          "mesh": {
+            "mesh": "cylinder",
+            "color": "#2b2622",
+            "metallic": 0,
+            "roughness": 1,
+            "emissive": "#000000",
+            "texture": "",
+            "visible": true,
+            "billboard": false,
+            "material": "",
+            "unlit": false,
+            "shading": "pbr",
+            "normalMap": "",
+            "ormMap": "",
+            "emissiveMap": "",
+            "normalStrength": 1,
+            "tiling": 1,
+            "triplanar": false,
+            "clearcoat": 0,
+            "subsurface": 0,
+            "rim": 0,
+            "outline": 0,
+            "outlineColor": "#0a0a0f",
+            "doubleSided": false,
+            "castShadows": true
+          }
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "guid": "6f9af47f58bbc6201c1567417af6c3d1",
+  "type": "prefab",
+  "tags": [
+    "arctic",
+    "nature"
+  ],
+  "description": "Pine tree with snow-capped tiers",
+  "source": {
+    "by": "mcp:director",
+    "fromEntity": "Snowy Pine"
+  },
+  "import": {}
+}

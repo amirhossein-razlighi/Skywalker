@@ -1,0 +1,16 @@
+{
+  "guid": "4cdfdc746156cc220f24e0d6919df9f7",
+  "type": "texture",
+  "tags": [
+    "generated",
+    "cobblestone"
+  ],
+  "description": "",
+  "source": {
+    "generator": "texgen",
+    "kind": "cobblestone",
+    "seed": 1,
+    "by": "mcp:director"
+  },
+  "import": {}
+}

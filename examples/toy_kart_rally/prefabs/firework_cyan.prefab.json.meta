@@ -1,0 +1,14 @@
+{
+  "guid": "633b797c946b316eddc4221eb3d6f04f",
+  "type": "prefab",
+  "tags": [
+    "fx",
+    "celebration"
+  ],
+  "description": "Cyan firework burst",
+  "source": {
+    "by": "mcp:director",
+    "fromEntity": "Firework Cyan"
+  },
+  "import": {}
+}

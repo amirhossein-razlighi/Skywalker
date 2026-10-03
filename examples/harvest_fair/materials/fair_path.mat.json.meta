@@ -1,0 +1,13 @@
+{
+  "guid": "01eec5abf139959e6f57c49bdd968e93",
+  "type": "material",
+  "tags": [],
+  "description": "dirt (procedural PBR)",
+  "source": {
+    "generator": "texgen",
+    "kind": "dirt",
+    "seed": 1,
+    "by": "mcp:director"
+  },
+  "import": {}
+}

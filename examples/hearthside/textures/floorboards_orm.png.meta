@@ -1,0 +1,16 @@
+{
+  "guid": "b271bcca3c5f6e7f44fb047522787836",
+  "type": "texture",
+  "tags": [
+    "generated",
+    "planks"
+  ],
+  "description": "",
+  "source": {
+    "generator": "texgen",
+    "kind": "planks",
+    "seed": 1,
+    "by": "mcp:director"
+  },
+  "import": {}
+}

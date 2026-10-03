@@ -1,0 +1,185 @@
+{
+  "format": "skywalker.prefab",
+  "version": 1,
+  "name": "Rock",
+  "root": {
+    "name": "Rock",
+    "enabled": true,
+    "tags": [],
+    "vars": {},
+    "components": {
+      "transform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      }
+    },
+    "children": [
+      {
+        "name": "Rock Lump 1",
+        "enabled": true,
+        "tags": [],
+        "vars": {},
+        "components": {
+          "transform": {
+            "position": [
+              0,
+              0.325,
+              0
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1.82,
+              1.04,
+              1.3
+            ]
+          },
+          "mesh": {
+            "mesh": "sphere",
+            "color": "#ccccd1",
+            "metallic": 0,
+            "roughness": 0.55,
+            "emissive": "#000000",
+            "texture": "",
+            "visible": true,
+            "billboard": false,
+            "material": "materials/reef_rock.mat.json",
+            "unlit": false,
+            "shading": "pbr",
+            "normalMap": "",
+            "ormMap": "",
+            "emissiveMap": "",
+            "normalStrength": 1,
+            "tiling": 1,
+            "triplanar": false,
+            "clearcoat": 0,
+            "subsurface": 0,
+            "rim": 0,
+            "outline": 0,
+            "outlineColor": "#0a0a0f",
+            "doubleSided": false,
+            "castShadows": true
+          }
+        }
+      },
+      {
+        "name": "Rock Lump 2",
+        "enabled": true,
+        "tags": [],
+        "vars": {},
+        "components": {
+          "transform": {
+            "position": [
+              0.9,
+              0.2,
+              0.3
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1.12,
+              0.64,
+              0.8
+            ]
+          },
+          "mesh": {
+            "mesh": "sphere",
+            "color": "#ccccd1",
+            "metallic": 0,
+            "roughness": 0.55,
+            "emissive": "#000000",
+            "texture": "",
+            "visible": true,
+            "billboard": false,
+            "material": "materials/reef_rock.mat.json",
+            "unlit": false,
+            "shading": "pbr",
+            "normalMap": "",
+            "ormMap": "",
+            "emissiveMap": "",
+            "normalStrength": 1,
+            "tiling": 1,
+            "triplanar": false,
+            "clearcoat": 0,
+            "subsurface": 0,
+            "rim": 0,
+            "outline": 0,
+            "outlineColor": "#0a0a0f",
+            "doubleSided": false,
+            "castShadows": true
+          }
+        }
+      },
+      {
+        "name": "Rock Lump 3",
+        "enabled": true,
+        "tags": [],
+        "vars": {},
+        "components": {
+          "transform": {
+            "position": [
+              -0.7,
+              0.175,
+              -0.4
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              0.98,
+              0.56,
+              0.7
+            ]
+          },
+          "mesh": {
+            "mesh": "sphere",
+            "color": "#ccccd1",
+            "metallic": 0,
+            "roughness": 0.55,
+            "emissive": "#000000",
+            "texture": "",
+            "visible": true,
+            "billboard": false,
+            "material": "materials/reef_rock.mat.json",
+            "unlit": false,
+            "shading": "pbr",
+            "normalMap": "",
+            "ormMap": "",
+            "emissiveMap": "",
+            "normalStrength": 1,
+            "tiling": 1,
+            "triplanar": false,
+            "clearcoat": 0,
+            "subsurface": 0,
+            "rim": 0,
+            "outline": 0,
+            "outlineColor": "#0a0a0f",
+            "doubleSided": false,
+            "castShadows": true
+          }
+        }
+      }
+    ]
+  }
+}

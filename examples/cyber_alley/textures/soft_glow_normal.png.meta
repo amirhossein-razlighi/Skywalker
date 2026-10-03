@@ -1,0 +1,16 @@
+{
+  "guid": "29e86694330e65ddde9e1432c90b5af0",
+  "type": "texture",
+  "tags": [
+    "generated",
+    "glow"
+  ],
+  "description": "",
+  "source": {
+    "generator": "texgen",
+    "kind": "glow",
+    "seed": 1,
+    "by": "mcp:director"
+  },
+  "import": {}
+}

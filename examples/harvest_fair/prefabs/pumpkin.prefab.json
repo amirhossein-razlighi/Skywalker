@@ -1,0 +1,134 @@
+{
+  "format": "skywalker.prefab",
+  "version": 1,
+  "name": "Pumpkin",
+  "root": {
+    "name": "Pumpkin",
+    "enabled": true,
+    "tags": [],
+    "vars": {},
+    "components": {
+      "transform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      }
+    },
+    "children": [
+      {
+        "name": "Pumpkin Body",
+        "enabled": true,
+        "tags": [],
+        "vars": {},
+        "components": {
+          "transform": {
+            "position": [
+              0,
+              0.28,
+              0
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              0.7,
+              0.5,
+              0.7
+            ]
+          },
+          "mesh": {
+            "mesh": "sphere",
+            "color": "#e8771e",
+            "metallic": 0,
+            "roughness": 0.6,
+            "emissive": "#000000",
+            "texture": "",
+            "visible": true,
+            "billboard": false,
+            "material": "",
+            "unlit": false,
+            "shading": "pbr",
+            "normalMap": "",
+            "ormMap": "",
+            "emissiveMap": "",
+            "normalStrength": 1,
+            "tiling": 1,
+            "triplanar": false,
+            "clearcoat": 0,
+            "subsurface": 0,
+            "rim": 0,
+            "outline": 0,
+            "outlineColor": "#0a0a0f",
+            "doubleSided": false,
+            "castShadows": true
+          }
+        }
+      },
+      {
+        "name": "Pumpkin Stem",
+        "enabled": true,
+        "tags": [],
+        "vars": {},
+        "components": {
+          "transform": {
+            "position": [
+              0,
+              0.58,
+              0
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              0.06,
+              0.16,
+              0.06
+            ]
+          },
+          "mesh": {
+            "mesh": "cylinder",
+            "color": "#4e6a2a",
+            "metallic": 0,
+            "roughness": 0.55,
+            "emissive": "#000000",
+            "texture": "",
+            "visible": true,
+            "billboard": false,
+            "material": "",
+            "unlit": false,
+            "shading": "pbr",
+            "normalMap": "",
+            "ormMap": "",
+            "emissiveMap": "",
+            "normalStrength": 1,
+            "tiling": 1,
+            "triplanar": false,
+            "clearcoat": 0,
+            "subsurface": 0,
+            "rim": 0,
+            "outline": 0,
+            "outlineColor": "#0a0a0f",
+            "doubleSided": false,
+            "castShadows": true
+          }
+        }
+      }
+    ]
+  }
+}

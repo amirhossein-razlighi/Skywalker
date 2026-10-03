@@ -2,7 +2,7 @@
 import json, os, socket, subprocess
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-CLI = os.path.join(ROOT, "build", "bin", "skywalker")
+CLI = os.environ.get("SKY_CLI") or os.path.join(ROOT, "build", "bin", "skywalker")
 
 
 class Sky:

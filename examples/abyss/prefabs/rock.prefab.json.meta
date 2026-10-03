@@ -1,0 +1,14 @@
+{
+  "guid": "43e8ca29db5c27e8230b2ae584635581",
+  "type": "prefab",
+  "tags": [
+    "underwater",
+    "rock"
+  ],
+  "description": "Seabed rock cluster",
+  "source": {
+    "by": "mcp:director",
+    "fromEntity": "Rock"
+  },
+  "import": {}
+}

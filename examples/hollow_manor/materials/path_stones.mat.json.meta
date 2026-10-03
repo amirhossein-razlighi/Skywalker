@@ -1,0 +1,13 @@
+{
+  "guid": "39246fc037dbbbe0218ca43519dff379",
+  "type": "material",
+  "tags": [],
+  "description": "cobblestone (procedural PBR)",
+  "source": {
+    "generator": "texgen",
+    "kind": "cobblestone",
+    "seed": 1,
+    "by": "mcp:director"
+  },
+  "import": {}
+}
