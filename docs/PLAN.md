@@ -85,3 +85,15 @@ looks when a game asks for them.
 | Vegetation | GPU-instanced foliage and grass in the 100k+ range, wind animation, translucency, LOD and impostors |
 | Atmosphere | Volumetric clouds, aerial perspective, volumetric fog with local lights |
 | Cinematic post | Auto exposure, bokeh depth of field, motion blur, LUT grading, film grain, lens effects |
+
+## Efficiency (Apple silicon first, portable design)
+
+| Area | Practice |
+|---|---|
+| Tile-based GPU | Memoryless MSAA and G-buffer attachments (tile memory only), load/store actions that avoid bandwidth, half-resolution stochastic passes |
+| Upscaling | MetalFX temporal upscaling (render scale under 1), with the engine TAA as fallback |
+| GPU-driven work | Compute culling plus indirect draws for instanced foliage, grass and hair; GPU particle simulation; mesh shaders where they pay off |
+| CPU→GPU traffic | Triple-buffered ring buffers for per-frame uniforms and instance data, with no per-frame allocations; static geometry and instance buffers uploaded once and versioned |
+| Shaders and pipelines | Function-constant specialization instead of runtime branching; pipeline/binary-archive caching; runtime compilation kept for agent hot-reload |
+| CPU | A job system (P-core and E-core aware) for frame building, culling, particles, ocean, physics, and animation; data-oriented component storage |
+| Profiling | GPU timestamps per pass, CPU scopes, and memory stats, exposed through `perf_stats` so agents can measure and optimize their own scenes |
