@@ -81,3 +81,5 @@ examples/*/downloads/
 # Python bytecode
 __pycache__/
 *.pyc
+# Downloaded sample models for manual animation checks (see docs/ANIMATION.md)
+samples/

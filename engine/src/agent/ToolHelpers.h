@@ -50,5 +50,6 @@ void addStudioTools(Engine& engine, ToolRegistry& reg);
 /// physics_* and nav_* tools (PhysicsTools.cpp registers NavTools.cpp too).
 void addPhysicsTools(Engine& engine, ToolRegistry& reg);
 void addNavTools(Engine& engine, ToolRegistry& reg);
+void addAnimationTools(Engine& engine, ToolRegistry& reg);  // AnimationTools.cpp (+ SequenceTools.cpp)
 
 }  // namespace sky::tools

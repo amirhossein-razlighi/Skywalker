@@ -194,6 +194,8 @@ const std::unordered_map<std::string, FnSig>& functions() {
         {"play", {1, 1}},     {"play_sound", {1, 2}}, {"stop_sound", {1, 1}}, {"music", {1, 2}}, {"set_volume", {2, 2}},
         // input builtins
         {"action", {1, 1}},   {"pressed", {1, 1}},    {"released", {1, 1}},   {"axis", {1, 1}},
+        // animation builtins
+        {"set_param", {3, 3}}, {"trigger", {2, 2}}, {"play_animation", {2, 4}}, {"anim_state", {1, 1}}, {"play_sequence", {1, 2}},
         {"vec", {3, 3}},      {"color", {3, 4}},     {"length", {1, 1}},    {"normalize", {1, 1}},
         {"dot", {2, 2}},      {"cross", {2, 2}},     {"key", {1, 1}},       {"exists", {1, 1}},
         {"str", {1, 1}},      {"spawn", {1, 3}},     {"tagged", {2, 2}},    {"forward", {1, 1}},
@@ -364,7 +366,7 @@ private:
         h.loc = next().loc;  // 'on'
         const Token& t = next();
         static const std::vector<std::string> triggers{"start", "tick",    "event",         "key",         "click",
-                                                       "action", "collide", "trigger_enter", "trigger_exit"};
+                                                       "action", "collide", "trigger_enter", "trigger_exit", "anim"};
         if (t.text == "start") {
             h.trigger = Trigger::Start;
         } else if (t.text == "tick" || t.text == "update") {
@@ -379,6 +381,15 @@ private:
             }
         } else if (t.text == "click") {
             h.trigger = Trigger::Click;
+        } else if (t.text == "anim") {
+            // animation builtins: `on anim "footstep"` = an animation event on this entity
+            // (delivered as the event "anim:footstep" to the animator's entity).
+            h.trigger = Trigger::Event;
+            if (peek().kind != Tok::String) {
+                error(peek().loc, "expected_string", "'on anim' needs a quoted event name, e.g. on anim \"footstep\"");
+            } else {
+                h.argument = "anim:" + next().text;
+            }
         } else if (t.text == "collide" || t.text == "trigger_enter" || t.text == "trigger_exit") {
             // physics triggers, optionally filtered by the other entity's name or tag
             h.trigger = t.text == "collide"         ? Trigger::Collide
@@ -389,7 +400,7 @@ private:
             std::string guess = str::closest(t.text, triggers);
             error(t.loc, "unknown_trigger",
                   "unknown trigger '" + t.text +
-                      "' (use start, tick, event, key, click, action, collide, trigger_enter, trigger_exit)",
+                      "' (use start, tick, event, key, click, action, collide, trigger_enter, trigger_exit, anim)",
                   guess.empty() ? "" : "did you mean '" + guess + "'?");
         }
         scopes_.clear();
@@ -951,6 +962,7 @@ end
 
 Triggers:   on start | on tick | on event "name" | on key "space" | on click | on action "jump"
             on collide ("name or tag")? | on trigger_enter ("name or tag")? | on trigger_exit (...)?
+            on anim "footstep" (an animation event on this entity)
 Statements: let x = v | target = v | set target to v | if c then .. elif c then .. else .. end
             every <sec> .. end | after <sec> .. end | repeat <n> times .. end   (n <= 1000)
             move <e> by <vec> | move <e> toward <point|entity> at <speed> | rotate <e> by <deg vec>
@@ -972,6 +984,8 @@ Audio:      play(e) starts e's audio component; play_sound("audio/hit.wav", volu
             music("audio/theme.wav", fade?) crossfades the music (music("") fades out); set_volume("music", 0.5)
 Effects:    burst(n) / burst(e, n) emits n particles now (particles component; explosions, muzzle flashes)
             water_height(x, z) / water_height(pos): the animated water surface height (boats, buoyancy)
+Animation:  set_param(e, "speed", v) trigger(e, "jump") play_animation(e, "wave", fade?, loop?) anim_state(e)
+            play_sequence(e, from?)  (animator / sequencer components; see animation_list)
             e.particles.rate / .emitting / .colorStart ... and e.water.windSpeed ... like any component
 Physics:    push(e, force) (continuous, N) impulse(e, vec) (instant kick, N s) torque(e, vec) velocity(e)
             e.body.velocity = (0, 5, 0) sets it; e.body.mass / .gravityScale ... like any component

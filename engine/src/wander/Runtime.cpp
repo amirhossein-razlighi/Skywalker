@@ -768,6 +768,16 @@ private:
         }
         if (Value r; physicsCall(e, a, r)) return r;
         if (f == "str") return Value::string(toText(a[0]));
+        // animation builtins (the engine's AnimationSystem does the work)
+        if (f == "set_param" || f == "trigger" || f == "play_animation" || f == "anim_state" || f == "play_sequence") {
+            if (!rt_.animation) fail(e.loc, f + "() is not available in this context");
+            EntityId target = entity(a[0], e.args[0]->loc, f + "() argument 1");
+            std::vector<Json> rest;
+            for (size_t i = 1; i < a.size(); ++i) rest.push_back(toJson(a[i]));
+            auto r = rt_.animation(f, target, rest);
+            if (!r) fail(e.loc, f + "(): " + r.error().message + (r.error().hint.empty() ? "" : " (" + r.error().hint + ")"));
+            return fromJson(r.value());
+        }
         if (f == "spawn") {
             if (++rt_.spawnedThisTick_ > 256) fail(e.loc, "too many spawns in one tick (limit 256)");
             if (scene_.size() >= 20000) fail(e.loc, "entity limit reached (20000)");

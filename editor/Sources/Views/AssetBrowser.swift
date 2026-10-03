@@ -13,7 +13,7 @@ struct AssetItem: Identifiable, Hashable, Sendable {
 
     var name: String {
         let file = (path as NSString).lastPathComponent
-        for ext in [".mat.json", ".prefab.json", ".sky.json", ".agent.json"] where file.hasSuffix(ext) {
+        for ext in [".mat.json", ".prefab.json", ".sky.json", ".agent.json", ".animctl.json", ".sequence.json"] where file.hasSuffix(ext) {
             return String(file.dropLast(ext.count))
         }
         return (file as NSString).deletingPathExtension
@@ -30,6 +30,9 @@ struct AssetItem: Identifiable, Hashable, Sendable {
         case "video": "film"
         case "script": "chevron.left.forwardslash.chevron.right"
         case "agent": "cloud"
+        case "animation": "figure.walk"
+        case "controller": "point.3.connected.trianglepath.dotted"
+        case "sequence": "film.stack"
         default: "doc"
         }
     }
@@ -73,7 +76,7 @@ final class ThumbnailCache {
 
 enum AssetFilter: String, CaseIterable, Identifiable {
     case all = "All", mesh = "Meshes", material = "Materials", prefab = "Prefabs", texture = "Textures",
-         scene = "Scenes", audio = "Audio", agent = "Agents"
+         scene = "Scenes", audio = "Audio", animation = "Animation", agent = "Agents"
     var id: String { rawValue }
     var type: String? {
         switch self {
@@ -84,6 +87,7 @@ enum AssetFilter: String, CaseIterable, Identifiable {
         case .texture: "texture"
         case .scene: "scene"
         case .audio: "audio"
+        case .animation: "animation"
         case .agent: "agent"
         }
     }

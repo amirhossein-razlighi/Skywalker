@@ -78,6 +78,14 @@ set(SKY_ENGINE_SOURCES
     src/physics/DebugDraw.cpp
     src/agent/PhysicsTools.cpp
     src/agent/NavTools.cpp
+    # Animation (skinning, animator state machines, sequencer)
+    src/anim/Animation.cpp
+    src/anim/Controller.cpp
+    src/anim/Sequence.cpp
+    src/anim/AnimationSystem.cpp
+    src/ecs/AnimationComponents.cpp
+    src/agent/AnimationTools.cpp
+    src/agent/SequenceTools.cpp
 )
 
 # DCC bridge: the Python helper library and the Blender add-on are embedded so the engine can
@@ -152,7 +160,17 @@ if(SKY_HAS_METAL)
         DEPENDS ${_shader_src} ${PROJECT_SOURCE_DIR}/cmake/EmbedText.cmake
         COMMENT "Embedding Metal shader source")
 
-    target_sources(skywalker_engine PRIVATE platform/metal/MetalRenderer.mm ${_shader_inc})
+    # Animation: GPU skinning compute kernel (separate source, embedded the same way).
+    set(_skin_src ${CMAKE_CURRENT_SOURCE_DIR}/platform/metal/shaders/Skinning.metal)
+    set(_skin_inc ${CMAKE_CURRENT_BINARY_DIR}/generated/SkinningShaderSource.inc)
+    add_custom_command(
+        OUTPUT ${_skin_inc}
+        COMMAND ${CMAKE_COMMAND} -DINPUT=${_skin_src} -DOUTPUT=${_skin_inc}
+                -P ${PROJECT_SOURCE_DIR}/cmake/EmbedText.cmake
+        DEPENDS ${_skin_src} ${PROJECT_SOURCE_DIR}/cmake/EmbedText.cmake
+        COMMENT "Embedding Metal skinning shader source")
+
+    target_sources(skywalker_engine PRIVATE platform/metal/MetalRenderer.mm ${_shader_inc} ${_skin_inc})
     target_include_directories(skywalker_engine PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/generated)
     target_compile_definitions(skywalker_engine PUBLIC $<$<COMPILE_LANGUAGE:C,CXX,OBJCXX>:SKY_HAS_METAL=1>)
     target_link_libraries(skywalker_engine PUBLIC

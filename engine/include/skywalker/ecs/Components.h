@@ -276,3 +276,5 @@ struct Environment {
 // Components of other subsystems (each in its own header).
 #include "skywalker/ecs/AudioComponents.h"
 #include "skywalker/ecs/PhysicsComponents.h"  // body, collider, character, joint, physics_world, nav_agent, navmesh
+// Workstream components (each in its own header).
+#include "skywalker/ecs/AnimationComponents.h"

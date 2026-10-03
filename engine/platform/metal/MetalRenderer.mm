@@ -53,6 +53,23 @@ const char* kDefaultShaderSource =
 #include "ShaderSource.inc"
     ;
 
+// --- Animation: GPU skinning (compute pre-pass, Skinning.metal) --------------------------
+const char* kSkinningShaderSource =
+#include "SkinningShaderSource.inc"
+    ;
+struct SkinGpuVertex {  // must match Skinning.metal
+    float position[3];
+    float normal[3];
+    uint16_t joints[4];
+    float weights[4];
+};
+static_assert(sizeof(SkinGpuVertex) == 48);
+struct SkinParams {
+    uint32_t vertexCount, jointCount, pad0, pad1;
+};
+static_assert(sizeof(Mat4) == sizeof(simd_float4x4));
+// -----------------------------------------------------------------------------------------
+
 // Must match Standard.metal.
 struct FrameUniforms {
     simd_float4x4 viewProj;
@@ -299,6 +316,8 @@ struct GpuMesh {
         }
         return best;
     }
+    id<MTLBuffer> skin;  // animation: SkinGpuVertex stream of rigged meshes (nil if static)
+    uint32_t vertexCount = 0;
 };
 
 class MetalRenderer final : public Renderer {
@@ -344,6 +363,7 @@ public:
             return false;
         }
         source_ = kDefaultShaderSource;
+        buildSkinningPipeline();  // animation
 
         MTLDepthStencilDescriptor* ds = [MTLDepthStencilDescriptor new];
         ds.depthCompareFunction = MTLCompareFunctionLess;
@@ -491,6 +511,7 @@ public:
             lightsBuf_ = transient(allLights.data(), allLights.size() * sizeof(GPULight));
             clusterCellsBuf_ = transient(grid.cells.data(), grid.cells.size() * sizeof(uint32_t));
             clusterIndexBuf_ = transient(grid.indices.data(), grid.indices.size() * sizeof(uint32_t));
+            encodeSkinning(cmd, frame);  // animation: posed vertices for every pass below
             ensureCloudNoise(cmd);
             encodeEnvironment(cmd, frame, base);
             lodFrame_ = &frame;
@@ -914,6 +935,17 @@ private:
         }
         g.indices = [device_ newBufferWithBytes:all.data() length:all.size() * sizeof(uint32_t) options:MTLResourceStorageModeShared];
         g.indexCount = static_cast<uint32_t>(m.indices.size());
+        g.vertexCount = static_cast<uint32_t>(m.vertexCount());
+        if (m.skinned() && m.skin.joints.size() >= m.vertexCount() * 4 && m.skin.bind.size() >= m.vertexCount() * 6) {
+            std::vector<SkinGpuVertex> sv(m.vertexCount());  // animation: skinning input stream
+            for (size_t v = 0; v < sv.size(); ++v) {
+                std::memcpy(sv[v].position, &m.skin.bind[v * 6], sizeof(float) * 3);
+                std::memcpy(sv[v].normal, &m.skin.bind[v * 6 + 3], sizeof(float) * 3);
+                std::memcpy(sv[v].joints, &m.skin.joints[v * 4], sizeof(uint16_t) * 4);
+                std::memcpy(sv[v].weights, &m.skin.weights[v * 4], sizeof(float) * 4);
+            }
+            g.skin = [device_ newBufferWithBytes:sv.data() length:sv.size() * sizeof(SkinGpuVertex) options:MTLResourceStorageModeShared];
+        }
         Vec3 ext = m.bounds.max - m.bounds.min;
         g.radius = std::max(length(ext) * 0.5f, 1e-3f);
         return g;
@@ -951,6 +983,78 @@ private:
                  indexBufferOffset:m.lodOffset[lod] * sizeof(uint32_t)
                      instanceCount:instances];
     }
+
+    // --- Animation: GPU skinning -----------------------------------------------------------
+    void buildSkinningPipeline() {
+        NSError* error = nil;
+        id<MTLLibrary> lib = [device_ newLibraryWithSource:[NSString stringWithUTF8String:kSkinningShaderSource] options:nil error:&error];
+        id<MTLFunction> fn = lib ? [lib newFunctionWithName:@"skinVertices"] : nil;
+        skinPipeline_ = fn ? [device_ newComputePipelineStateWithFunction:fn error:&error] : nil;
+        if (!skinPipeline_) {
+            log::warn("render", std::string("GPU skinning unavailable, characters show their rest pose: ") +
+                                    (error ? error.localizedDescription.UTF8String : "no skinVertices kernel"));
+        }
+    }
+
+    /// Writes each skinned draw's posed vertices into a per-instance buffer registered as a
+    /// mesh under the SkinItem key, so every pass draws it like any other mesh.
+    void encodeSkinning(id<MTLCommandBuffer> cmd, const FrameData& frame) {
+        id<MTLComputeCommandEncoder> enc = nil;
+        std::unordered_map<const void*, id<MTLBuffer>> palettes;  // parts of one character share a pose
+        for (const SkinItem& s : frame.skins) {
+            skinnedKeys_[s.key] = frameIndex_;
+            const GpuMesh* base = mesh(s.mesh);
+            if (!base) continue;
+            GpuMesh& out = meshes_[s.key];
+            if (!skinPipeline_ || !base->skin || !s.palette || s.palette->empty()) {
+                out = *base;  // no GPU skinning: the rest pose
+                continue;
+            }
+            if (!out.vertices || out.vertices == base->vertices || out.vertexCount != base->vertexCount) {
+                out.vertices = [device_ newBufferWithLength:static_cast<NSUInteger>(base->vertexCount) * MeshData::kFloatsPerVertex * sizeof(float)
+                                                    options:MTLResourceStorageModePrivate];
+                out.vertexCount = base->vertexCount;
+            }
+            out.indices = base->indices;
+            out.indexCount = base->indexCount;
+            out.lodCount = base->lodCount;  // LOD index ranges are shared with the source mesh
+            std::copy(std::begin(base->lodOffset), std::end(base->lodOffset), std::begin(out.lodOffset));
+            std::copy(std::begin(base->lodCount_), std::end(base->lodCount_), std::begin(out.lodCount_));
+            std::copy(std::begin(base->lodError), std::end(base->lodError), std::begin(out.lodError));
+            out.radius = base->radius;
+            out.skin = nil;
+            id<MTLBuffer> pal = palettes[s.palette.get()];
+            if (!pal) {
+                pal = [device_ newBufferWithBytes:s.palette->data() length:s.palette->size() * sizeof(Mat4)
+                                          options:MTLResourceStorageModeShared];
+                palettes[s.palette.get()] = pal;
+            }
+            if (!enc) {
+                enc = [cmd computeCommandEncoder];
+                enc.label = @"Skinning";
+                [enc setComputePipelineState:skinPipeline_];
+            }
+            SkinParams sp{base->vertexCount, static_cast<uint32_t>(s.palette->size()), 0, 0};
+            [enc setBuffer:base->vertices offset:0 atIndex:0];
+            [enc setBuffer:base->skin offset:0 atIndex:1];
+            [enc setBuffer:pal offset:0 atIndex:2];
+            [enc setBytes:&sp length:sizeof(sp) atIndex:3];
+            [enc setBuffer:out.vertices offset:0 atIndex:4];
+            NSUInteger group = std::min<NSUInteger>(skinPipeline_.maxTotalThreadsPerThreadgroup, 64);
+            [enc dispatchThreads:MTLSizeMake(base->vertexCount, 1, 1) threadsPerThreadgroup:MTLSizeMake(group, 1, 1)];
+        }
+        if (enc) [enc endEncoding];
+        // Drop instances not drawn for a while (kept briefly: thumbnails render in between frames).
+        for (auto it = skinnedKeys_.begin(); it != skinnedKeys_.end();) {
+            if (frameIndex_ - it->second > 120) {
+                meshes_.erase(it->first);
+                it = skinnedKeys_.erase(it);
+            } else {
+                ++it;
+            }
+        }
+    }
+    // -----------------------------------------------------------------------------------------
 
     const GpuMesh* mesh(const std::string& name) {
         auto it = meshes_.find(name);
@@ -2551,6 +2655,8 @@ private:
     std::string hdriPath_;
     id<MTLTexture> hdri_;
     std::unordered_set<std::string> warnedMeshes_;
+    id<MTLComputePipelineState> skinPipeline_;      // animation: GPU skinning
+    std::unordered_map<std::string, uint64_t> skinnedKeys_;  // animation: per-instance skinned meshes -> last frame drawn
     std::string source_;
     size_t culled_ = 0;
     size_t terrainNodesDrawn_ = 0, instancesDrawn_ = 0;

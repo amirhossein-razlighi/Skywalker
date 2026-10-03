@@ -9,11 +9,19 @@
 // Models with several materials are split into *parts*, one per material: `part` selects
 // the triangles of one material (the asset system addresses it as "asset:model.gltf#<material>").
 // `fullBounds` always covers the whole model so parts can be normalized consistently.
+//
+// Rigged and animated models (skins and/or animations) also yield an animation library:
+// every scene node becomes a skeleton bone, glTF animations become clips (translation /
+// rotation / scale; LINEAR, STEP and CUBICSPLINE), and the mesh gets a SkinStream —
+// skinned primitives follow their joints (JOINTS_0/1, WEIGHTS_0/1, the 4 strongest kept),
+// other primitives follow their node rigidly. Static vertices hold the rest pose.
 
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <vector>
 
+#include "skywalker/anim/Animation.h"
 #include "skywalker/core/Result.h"
 #include "skywalker/math/Math.h"
 #include "skywalker/render/MeshData.h"
@@ -49,6 +57,9 @@ struct GltfImport {
     std::vector<int> parts;         // materials that have geometry, in first-use order (-1 = no material)
     size_t primitiveCount = 0;
     size_t materialCount = 0;
+    /// Skeleton + clips when the file has skins or animations (null for static models).
+    std::shared_ptr<anim::Library> animation;
+    bool skinned = false;  // has at least one skin (a rigged character)
 };
 
 constexpr int kGltfAllParts = -2;

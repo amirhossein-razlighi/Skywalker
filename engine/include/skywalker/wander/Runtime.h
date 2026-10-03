@@ -95,6 +95,9 @@ public:
         float speed = 0;  // approach speed along the normal (m/s)
     };
     void queueContact(const Contact& contact) { nextContacts_.push_back(contact); }
+    // animation builtins: set_param, trigger, play_animation, anim_state, play_sequence.
+    // Set by the engine (AnimationSystem); args exclude the entity. Returns the value.
+    std::function<Result<Json>(const std::string& fn, EntityId entity, const std::vector<Json>& args)> animation;
 
     /// Maximum AST nodes evaluated per handler invocation.
     static constexpr int kBudget = 200000;

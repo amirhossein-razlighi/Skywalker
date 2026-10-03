@@ -25,13 +25,17 @@ const char* toString(AssetType t) {
         case AssetType::Video: return "video";
         case AssetType::Script: return "script";
         case AssetType::Agent: return "agent";
+        case AssetType::Animation: return "animation";
+        case AssetType::Controller: return "controller";
+        case AssetType::Sequence: return "sequence";
     }
     return "unknown";
 }
 
 AssetType assetTypeFromString(std::string_view s) {
     for (auto t : {AssetType::Mesh, AssetType::Texture, AssetType::Material, AssetType::Prefab, AssetType::Scene,
-                   AssetType::Audio, AssetType::Video, AssetType::Script, AssetType::Agent}) {
+                   AssetType::Audio, AssetType::Video, AssetType::Script, AssetType::Agent, AssetType::Animation,
+                   AssetType::Controller, AssetType::Sequence}) {
         if (s == toString(t)) return t;
     }
     return AssetType::Unknown;
@@ -46,6 +50,9 @@ AssetType assetTypeForPath(std::string_view path) {
     if (ends(".prefab.json")) return AssetType::Prefab;
     if (ends(".sky.json")) return AssetType::Scene;
     if (ends(".agent.json")) return AssetType::Agent;
+    if (ends(".anim")) return AssetType::Animation;
+    if (ends(".animctl.json")) return AssetType::Controller;
+    if (ends(".sequence.json")) return AssetType::Sequence;
     if (ends(".obj") || ends(".glb") || ends(".gltf") || ends(".ply") || ends(".stl")) return AssetType::Mesh;
     if (ends(".png") || ends(".jpg") || ends(".jpeg") || ends(".hdr")) return AssetType::Texture;
     if (ends(".wav") || ends(".mp3") || ends(".ogg") || ends(".m4a") || ends(".flac")) return AssetType::Audio;

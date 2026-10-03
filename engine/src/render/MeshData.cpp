@@ -340,6 +340,7 @@ void normalizeToUnit(MeshData& m, const Aabb& reference) {
         m.vertices[i + 1] = (m.vertices[i + 1] - c.y) * s;
         m.vertices[i + 2] = (m.vertices[i + 2] - c.z) * s;
     }
+    if (m.skinned()) m.skin.transform = Mat4::scale(Vec3(s)) * Mat4::translate(-c) * m.skin.transform;
     m.computeBounds();
 }
 

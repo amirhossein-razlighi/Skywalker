@@ -33,10 +33,11 @@ struct EntityDetails: View {
     private var selectedID: UInt64? { engine.selection.count == 1 ? engine.selection.first : nil }
     private static let componentOrder = ["transform", "mesh", "light", "camera", "particles", "water", "terrain", "foliage",
                                          "audio", "listener", "body", "collider", "character", "joint", "nav_agent", "navmesh",
-                                         "physics_world"]
+                                         "physics_world", "animator", "attach", "ik", "sequencer"]
     /// Components offered by Add Component (transform is always present).
     private static let addable = ["mesh", "light", "camera", "particles", "water", "terrain", "foliage", "audio", "listener",
-                                  "body", "collider", "character", "joint", "nav_agent", "navmesh", "physics_world"]
+                                  "body", "collider", "character", "joint", "nav_agent", "navmesh", "physics_world",
+                                  "animator", "attach", "ik", "sequencer"]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -47,6 +48,9 @@ struct EntityDetails: View {
                                     onRemove: { update(id, ["components": .object([(comp, .null)])]) }) {
                         PropertyGrid(schema: schemas[comp], values: doc["components"][comp]) { field, value in
                             update(id, ["components": .object([(comp, .object([(field, value)]))])])
+                        }
+                        if comp == "animator" || comp == "sequencer" {
+                            AnimationScrubBar(entityID: id, component: comp, values: doc["components"][comp]) { reload() }
                         }
                     }
                 }
@@ -94,6 +98,10 @@ struct EntityDetails: View {
         case "physics_world": "globe"
         case "terrain": "mountain.2"
         case "foliage": "leaf"
+        case "animator": "figure.run"
+        case "attach": "paperclip"
+        case "ik": "hand.point.up.left"
+        case "sequencer": "film.stack"
         default: "puzzlepiece"
         }
     }
@@ -104,6 +112,8 @@ struct EntityDetails: View {
         case "nav_agent": "Nav Agent"
         case "navmesh": "NavMesh"
         case "physics_world": "Physics Settings"
+        case "attach": "Bone Attachment"
+        case "ik": "IK Target"
         default: comp.capitalized
         }
     }
