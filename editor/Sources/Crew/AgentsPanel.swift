@@ -3,7 +3,7 @@ import SwiftUI
 /// Crew roster + conversation with the focused agent.
 struct AgentsPanel: View {
     @Environment(CrewStore.self) private var crew
-    @Binding var focused: UUID?
+    @Binding var focused: String?
 
     var body: some View {
         HStack(spacing: 0) {
@@ -14,7 +14,8 @@ struct AgentsPanel: View {
                             CloudAvatar(color: c.color, face: c.face, size: 16, working: crew.isWorking(c))
                             VStack(alignment: .leading, spacing: 0) {
                                 Text(c.name).font(Theme.body)
-                                Text(c.role.title).font(.system(size: 10)).foregroundStyle(Theme.textFaint)
+                                Text(c.focus.isEmpty ? c.role.title : "\(c.role.title) · \(c.focus)")
+                                    .font(.system(size: 10)).foregroundStyle(Theme.textFaint).lineLimit(1)
                             }
                             Spacer()
                             if crew.isWorking(c) { ProgressView().controlSize(.mini) }
@@ -25,7 +26,8 @@ struct AgentsPanel: View {
                 .listStyle(.plain)
                 .scrollContentBackground(.hidden)
                 HStack {
-                    SettingsLink { Label("Manage crew", systemImage: "gearshape").font(Theme.label) }
+                    AddAgentMenu { id in focused = id }
+                    SettingsLink { Label("Manage", systemImage: "gearshape").font(Theme.label) }
                         .buttonStyle(.borderless)
                     Spacer()
                 }
@@ -55,14 +57,14 @@ struct ChatView: View {
             HStack(spacing: 8) {
                 CloudAvatar(color: cloudling.color, face: cloudling.face, size: 16, working: crew.isWorking(cloudling))
                 Text(cloudling.name).font(Theme.sectionTitle)
-                Text("\(cloudling.role.title) · \(crew.modelLabel(for: cloudling)) · \(cloudling.autonomy.label)")
+                Text("@\(cloudling.id) · \(cloudling.role.title) · \(crew.modelLabel(for: cloudling)) · \(cloudling.autonomy.label)")
                     .font(Theme.label).foregroundStyle(Theme.textFaint).lineLimit(1)
                 Spacer()
                 let u = crew.usage(for: cloudling)
                 if u.requests > 0 {
-                    Text("\(Self.compact(u.input + u.cacheRead)) in · \(Self.compact(u.output)) out")
+                    Text("\(Self.compact(u.input + u.cacheRead)) in · \(Self.compact(u.output)) out · $\(String(format: "%.2f", u.costUSD))")
                         .font(Theme.monoSmall).foregroundStyle(Theme.textFaint)
-                        .help("Tokens used by \(cloudling.name) (\(u.requests) requests, \(u.cacheRead.formatted()) cached)")
+                        .help("Tokens used by \(cloudling.name) (\(u.requests) requests, \(u.cacheRead.formatted()) cached, \(u.toolCalls) tool calls)")
                 }
                 if crew.isWorking(cloudling) {
                     Button("Stop", systemImage: "stop.circle") { crew.stop(cloudling) }.controlSize(.small)
@@ -208,146 +210,6 @@ struct ApprovalCard: View {
         .padding(8)
         .background(Theme.warning.opacity(0.08), in: RoundedRectangle(cornerRadius: 6))
         .overlay(RoundedRectangle(cornerRadius: 6).stroke(Theme.warning.opacity(0.4)))
-    }
-}
-
-/// Edit and run pipelines of agents. Each step receives the goal plus earlier reports.
-struct PipelinesPanel: View {
-    @Environment(CrewStore.self) private var crew
-    @State private var selected: UUID?
-    @State private var goal = ""
-
-    var body: some View {
-        @Bindable var crew = crew
-        HStack(spacing: 0) {
-            VStack(spacing: 0) {
-                List(selection: $selected) {
-                    ForEach(crew.plans) { Text($0.name).font(Theme.body).tag($0.id) }
-                }
-                .listStyle(.plain).scrollContentBackground(.hidden)
-                HStack {
-                    Button {
-                        let plan = FlightPlan(name: "Pipeline \(crew.plans.count + 1)", steps: [])
-                        crew.plans.append(plan)
-                        selected = plan.id
-                        crew.save()
-                    } label: { Label("New", systemImage: "plus").font(Theme.label) }
-                    .buttonStyle(.borderless)
-                    Spacer()
-                    if let selected {
-                        Button(role: .destructive) {
-                            crew.plans.removeAll { $0.id == selected }
-                            self.selected = nil
-                            crew.save()
-                        } label: { Image(systemName: "trash") }
-                        .buttonStyle(.borderless)
-                    }
-                }
-                .padding(6)
-            }
-            .frame(width: 190)
-            Rectangle().fill(Theme.border).frame(width: 1)
-            if let index = crew.plans.firstIndex(where: { $0.id == selected }) {
-                VStack(alignment: .leading, spacing: 8) {
-                    TextField("Name", text: $crew.plans[index].name).textFieldStyle(.plain).font(Theme.sectionTitle)
-                    ScrollView(.horizontal) {
-                        HStack(alignment: .center, spacing: 6) {
-                            ForEach(Array(CrewStore.stages(of: crew.plans[index]).enumerated()), id: \.offset) { _, stage in
-                                VStack(spacing: 4) {
-                                    ForEach(stage) { step in
-                                        if let k = crew.plans[index].steps.firstIndex(where: { $0.id == step.id }) {
-                                            StepCard(step: $crew.plans[index].steps[k], canParallel: k > 0) {
-                                                crew.plans[index].steps.removeAll { $0.id == step.id }
-                                            }
-                                        }
-                                    }
-                                }
-                                .padding(stage.count > 1 ? 4 : 0)
-                                .background(stage.count > 1 ? Theme.accent.opacity(0.06) : .clear, in: RoundedRectangle(cornerRadius: 8))
-                                .overlay {
-                                    if stage.count > 1 {
-                                        RoundedRectangle(cornerRadius: 8).stroke(Theme.accent.opacity(0.35), style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
-                                    }
-                                }
-                                Image(systemName: "arrow.right").font(.system(size: 10)).foregroundStyle(Theme.textFaint)
-                            }
-                            Menu {
-                                ForEach(crew.cloudlings) { c in
-                                    Button("\(c.name) — \(c.role.title)") {
-                                        crew.plans[index].steps.append(FlightStep(cloudlingID: c.id, instruction: ""))
-                                    }
-                                }
-                            } label: { Label("Add Step", systemImage: "plus").font(Theme.label) }
-                            .menuStyle(.borderlessButton).fixedSize()
-                        }
-                        .padding(2)
-                    }
-                    HStack {
-                        TextField("Goal for this run, e.g. “a moody lighthouse level with one secret”", text: $goal)
-                            .textFieldStyle(.plain).font(Theme.body)
-                            .padding(.horizontal, 6).frame(height: 24)
-                            .background(Theme.field, in: RoundedRectangle(cornerRadius: 4))
-                        Button(crew.runningPlan ? "Running…" : "Run", systemImage: "play.fill") {
-                            crew.save()
-                            let plan = crew.plans[index]
-                            Task { await crew.run(plan: plan, goal: goal) }
-                        }
-                        .buttonStyle(.borderedProminent).controlSize(.small)
-                        .disabled(crew.runningPlan || goal.isEmpty || crew.plans[index].steps.isEmpty)
-                    }
-                    ScrollView {
-                        Text(crew.planLog.joined(separator: "\n")).font(Theme.monoSmall).foregroundStyle(Theme.textDim)
-                            .textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                }
-                .padding(10)
-                .onChange(of: crew.plans) { _, _ in crew.save() }
-            } else {
-                VStack(spacing: 6) {
-                    Text("Pipelines").font(Theme.sectionTitle)
-                    Text("Chain agents into stages — steps can run in parallel — or let your director delegate dynamically with crew_delegate.")
-                        .font(Theme.label).foregroundStyle(Theme.textFaint).multilineTextAlignment(.center)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .padding()
-            }
-        }
-        .onAppear { selected = selected ?? crew.plans.first?.id }
-    }
-}
-
-private struct StepCard: View {
-    @Environment(CrewStore.self) private var crew
-    @Binding var step: FlightStep
-    var canParallel = false
-    let onDelete: () -> Void
-
-    var body: some View {
-        let c = crew.cloudlings.first { $0.id == step.cloudlingID }
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 6) {
-                if let c {
-                    CloudAvatar(color: c.color, face: c.face, size: 13, working: crew.isWorking(c))
-                    Text(c.name).font(Theme.sectionTitle)
-                }
-                Spacer()
-                if canParallel {
-                    Button { step.parallelWithPrevious.toggle() } label: {
-                        Image(systemName: "arrow.triangle.branch").font(.system(size: 10))
-                            .foregroundStyle(step.parallelWithPrevious ? Theme.accent : Theme.textFaint)
-                    }
-                    .buttonStyle(.borderless)
-                    .help(step.parallelWithPrevious ? "Runs in parallel with the previous step" : "Run in parallel with the previous step")
-                }
-                Button(action: onDelete) { Image(systemName: "xmark").font(.system(size: 9)) }.buttonStyle(.borderless)
-            }
-            TextField("What should this step do?", text: $step.instruction, axis: .vertical)
-                .textFieldStyle(.plain).font(Theme.label).lineLimit(2...4)
-        }
-        .padding(7)
-        .frame(width: 190)
-        .background(Theme.panelRaised, in: RoundedRectangle(cornerRadius: 6))
-        .overlay(RoundedRectangle(cornerRadius: 6).stroke(Theme.border))
     }
 }
 

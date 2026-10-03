@@ -63,18 +63,106 @@ static float3 triplanarNormal(texture2d<float> tex, Triplanar t, float3 N, float
     return normalize(nx.zyx * t.w.x + ny.xzy * t.w.y + nz.xyz * t.w.z);
 }
 
+// Direct (sun + punctual lights) and image-based lighting of a PBR / toon surface, before
+// emission and fog. Shared by meshes, instanced foliage and terrain.
+static float3 shadeSurface(SurfaceData s, float3 Ngeo, float3 worldPos, float2 fragXY, float3 V, bool toon, float rim,
+                           constant FrameUniforms& f, const device GPULight* lights, const device uint2* clusterCells,
+                           const device uint* clusterIndices, depth2d<float> shadowAtlas, texturecube<float> envTex,
+                           texture2d<float> brdfLut, texture3d<float> cloudShape) {
+    // Sun
+    float3 L = -f.sunDir.xyz;
+    float sunVisible = L.y > -0.08 ? shadowFactor(worldPos, Ngeo, fragXY, f, shadowAtlas) : 0.0;
+    if (sunVisible > 0.0) sunVisible *= cloudShadow(worldPos, L, f, cloudShape);  // drifting cloud shadows
+    float3 sunRad = f.sunColor.rgb * f.sunDir.w * sunVisible;
+    float3 color = toon ? toonLight(s, V, L, sunRad) : directLight(s, V, L, sunRad);
+
+    // Punctual lights: directional ones everywhere, point/spot lights from this pixel's cluster.
+    int dirCount = int(f.cluster2.y);
+    uint2 cell = clusterCells[clusterOf(f, fragXY, worldPos)];
+    int total = dirCount + int(cell.y);
+    for (int k = 0; k < total; ++k) {
+        int i = k < dirCount ? k : int(clusterIndices[cell.x + uint(k - dirCount)]);
+        GPULight l = lights[i];
+        float3 Ll;
+        float atten = 1.0;
+        if (l.kind.x < 0.5) {
+            Ll = -l.directionCone.xyz;
+        } else {
+            float3 toL = l.positionRange.xyz - worldPos;
+            float dist = length(toL);
+            Ll = toL / max(dist, 1e-4);
+            float r = l.positionRange.w;
+            float falloff = saturate(1.0 - pow(dist / r, 4.0));
+            atten = falloff * falloff / (dist * dist + 1.0);
+            if (l.kind.x > 1.5) {
+                float cd = dot(-Ll, l.directionCone.xyz);
+                atten *= smoothstep(l.directionCone.w, mix(l.directionCone.w, 1.0, 0.2), cd);
+            }
+        }
+        float3 rad = l.colorIntensity.rgb * l.colorIntensity.w * atten;
+        color += toon ? toonLight(s, V, Ll, rad) : directLight(s, V, Ll, rad);
+    }
+
+    // Image-based lighting (sky cubemap). `ambient` scales how much sky light reaches the
+    // scene (interiors, caves, night); `reflections` scales the specular part.
+    float ambientK = f.ground.w * 2.0;
+    float maxMip = f.extra.z;
+    float NdotV = max(dot(s.N, V), 1e-4);
+    float3 irradiance = envTex.sample(cubeSampler, s.N, level(maxMip)).rgb;
+    float3 indirect;
+    if (toon) {
+        float up = s.N.y * 0.5 + 0.5;
+        float3 hemi = mix(f.ground.rgb, mix(f.skyHorizon.rgb, f.skyTop.rgb, 0.6), up);
+        indirect = (hemi * 0.6 + irradiance * 0.4) * s.albedo * ambientK * 0.5;
+    } else {
+        float3 F0 = mix(float3(0.04), s.albedo, s.metallic);
+        float3 R = reflect(-V, s.N);
+        float3 prefiltered = envTex.sample(cubeSampler, R, level(s.roughness * maxMip)).rgb;
+        float2 ab = brdfLut.sample(linearClamp, float2(NdotV, 1.0 - s.roughness)).rg;
+        float3 Fr = F0 * ab.x + ab.y;
+        float3 kd = (1.0 - Fr) * (1.0 - s.metallic);
+        float3 diffuse = irradiance * s.albedo * kd;
+        float specOcclusion = saturate(pow(NdotV + s.ao, exp2(-16.0 * s.roughness - 1.0)) - 1.0 + s.ao);
+        float3 specular = prefiltered * Fr * f.sky.w * specOcclusion;
+        if (s.clearcoat > 0.0) {
+            float Fc = 0.04 + 0.96 * pow(1.0 - NdotV, 5.0);
+            float3 ccEnv = envTex.sample(cubeSampler, reflect(-V, Ngeo), level(0.06 * maxMip)).rgb;
+            specular = specular * (1.0 - Fc * s.clearcoat) + ccEnv * Fc * s.clearcoat * f.sky.w;
+            diffuse *= 1.0 - Fc * s.clearcoat;
+        }
+        indirect = (diffuse * s.ao + specular) * ambientK * 0.5;
+    }
+    // Rim light (stylized sheen along silhouettes, tinted by the sky)
+        if (rim > 0.0) {
+        float r = pow(1.0 - NdotV, 3.0) * rim;
+        if (toon) r = smoothstep(0.35, 0.4, r);
+        indirect += r * (mix(f.skyHorizon.rgb, f.sunColor.rgb, 0.5) + s.albedo * 0.3) * 0.6;
+    }
+    return color + indirect;
+}
+
+// Height fog with a warm in-scatter toward the sun.
+static float3 applyFog(float3 color, float3 worldPos, float3 V, constant FrameUniforms& f) {
+    float fogAmt = fogFactor(f, worldPos);
+    float3 fogC = f.fog.rgb + f.sunColor.rgb * f.sunDir.w * pow(saturate(dot(-V, -f.sunDir.xyz)), 8.0) * 0.25;
+    return mix(color, fogC, fogAmt);
+}
+
 fragment MainOut meshFragment(MeshOut in [[stage_in]],
                               bool frontFacing [[front_facing]],
                               constant DrawUniforms& d [[buffer(0)]],
                               constant FrameUniforms& f [[buffer(1)]],
-                              constant GPULight* lights [[buffer(2)]],
+                              const device GPULight* lights [[buffer(2)]],
+                              const device uint2* clusterCells [[buffer(3)]],
+                              const device uint* clusterIndices [[buffer(4)]],
                               texture2d<float> albedoTex [[texture(0)]],
                               depth2d<float> shadowAtlas [[texture(1)]],
                               texture2d<float> normalTex [[texture(2)]],
                               texture2d<float> ormTex [[texture(3)]],
                               texture2d<float> emissiveTex [[texture(4)]],
                               texturecube<float> envTex [[texture(5)]],
-                              texture2d<float> brdfLut [[texture(6)]]) {
+                              texture2d<float> brdfLut [[texture(6)]],
+                              texture3d<float> cloudShape [[texture(7)]]) {
     float3 Ngeo = normalize(in.normal) * (frontFacing ? 1.0 : -1.0);
     float3 V = normalize(f.cameraPos.xyz - in.worldPos);
     if (f.cameraForward.w > 0.5) V = -f.cameraForward.xyz;
@@ -161,78 +249,10 @@ fragment MainOut meshFragment(MeshOut in [[stage_in]],
     s.subsurface = d.material3.y;
     bool toon = shading == 1;
 
-    // Sun
-    float3 L = -f.sunDir.xyz;
-    float sunVisible = L.y > -0.08 ? shadowFactor(in.worldPos, Ngeo, in.position.xy, f, shadowAtlas) : 0.0;
-    float3 sunRad = f.sunColor.rgb * f.sunDir.w * sunVisible;
-    float3 color = toon ? toonLight(s, V, L, sunRad) : directLight(s, V, L, sunRad);
+    float3 color = shadeSurface(s, Ngeo, in.worldPos, in.position.xy, V, toon, d.material3.z, f, lights, clusterCells,
+                                clusterIndices, shadowAtlas, envTex, brdfLut, cloudShape) + emissive;
+    color = applyFog(color, in.worldPos, V, f);
 
-    // Punctual lights
-    int count = int(f.params.y);
-    for (int i = 0; i < count; ++i) {
-        GPULight l = lights[i];
-        float3 Ll;
-        float atten = 1.0;
-        if (l.kind.x < 0.5) {
-            Ll = -l.directionCone.xyz;
-        } else {
-            float3 toL = l.positionRange.xyz - in.worldPos;
-            float dist = length(toL);
-            Ll = toL / max(dist, 1e-4);
-            float r = l.positionRange.w;
-            float falloff = saturate(1.0 - pow(dist / r, 4.0));
-            atten = falloff * falloff / (dist * dist + 1.0);
-            if (l.kind.x > 1.5) {
-                float cd = dot(-Ll, l.directionCone.xyz);
-                atten *= smoothstep(l.directionCone.w, mix(l.directionCone.w, 1.0, 0.2), cd);
-            }
-        }
-        float3 rad = l.colorIntensity.rgb * l.colorIntensity.w * atten;
-        color += toon ? toonLight(s, V, Ll, rad) : directLight(s, V, Ll, rad);
-    }
-
-    // Image-based lighting (sky cubemap). `ambient` scales how much sky light reaches the
-    // scene (interiors, caves, night); `reflections` scales the specular part.
-    float ambientK = f.ground.w * 2.0;
-    float maxMip = f.extra.z;
-    float NdotV = max(dot(s.N, V), 1e-4);
-    float3 irradiance = envTex.sample(cubeSampler, s.N, level(maxMip)).rgb;
-    float3 indirect;
-    if (toon) {
-        float up = s.N.y * 0.5 + 0.5;
-        float3 hemi = mix(f.ground.rgb, mix(f.skyHorizon.rgb, f.skyTop.rgb, 0.6), up);
-        indirect = (hemi * 0.6 + irradiance * 0.4) * s.albedo * ambientK * 0.5;
-    } else {
-        float3 F0 = mix(float3(0.04), s.albedo, s.metallic);
-        float3 R = reflect(-V, s.N);
-        float3 prefiltered = envTex.sample(cubeSampler, R, level(s.roughness * maxMip)).rgb;
-        float2 ab = brdfLut.sample(linearClamp, float2(NdotV, 1.0 - s.roughness)).rg;
-        float3 Fr = F0 * ab.x + ab.y;
-        float3 kd = (1.0 - Fr) * (1.0 - s.metallic);
-        float3 diffuse = irradiance * s.albedo * kd;
-        float specOcclusion = saturate(pow(NdotV + s.ao, exp2(-16.0 * s.roughness - 1.0)) - 1.0 + s.ao);
-        float3 specular = prefiltered * Fr * f.sky.w * specOcclusion;
-        if (s.clearcoat > 0.0) {
-            float Fc = 0.04 + 0.96 * pow(1.0 - NdotV, 5.0);
-            float3 ccEnv = envTex.sample(cubeSampler, reflect(-V, Ngeo), level(0.06 * maxMip)).rgb;
-            specular = specular * (1.0 - Fc * s.clearcoat) + ccEnv * Fc * s.clearcoat * f.sky.w;
-            diffuse *= 1.0 - Fc * s.clearcoat;
-        }
-        indirect = (diffuse * s.ao + specular) * ambientK * 0.5;
-    }
-    // Rim light (stylized sheen along silhouettes, tinted by the sky)
-    float rim = d.material3.z;
-    if (rim > 0.0) {
-        float r = pow(1.0 - NdotV, 3.0) * rim;
-        if (toon) r = smoothstep(0.35, 0.4, r);
-        indirect += r * (mix(f.skyHorizon.rgb, f.sunColor.rgb, 0.5) + s.albedo * 0.3) * 0.6;
-    }
-    color += indirect + emissive;
-
-    // Fog (with a warm in-scatter toward the sun)
-    float fogAmt = fogFactor(f, in.worldPos);
-    float3 fogC = f.fog.rgb + f.sunColor.rgb * f.sunDir.w * pow(saturate(dot(-V, L)), 8.0) * 0.25;
-    color = mix(color, fogC, fogAmt);
 
     // Toon and legacy water keep their stylized ambient: no screen-space GI/reflections.
     bool screenSpace = !toon && shading != 3;

@@ -326,7 +326,8 @@ static float3 hairDomVisibility(constant HairParams& H, float3 worldPos, depth2d
     return exp(-O * ext);
 }
 
-static float3 hairShade(constant HairParams& H, constant FrameUniforms& f, constant GPULight* lights, HairShadeIn s,
+static float3 hairShade(constant HairParams& H, constant FrameUniforms& f, const device GPULight* lights,
+                        const device uint2* clusterCells, const device uint* clusterIndices, HairShadeIn s,
                         float2 pixel, depth2d<float> shadowAtlas, texturecube<float> envTex, depth2d<float> domDepth,
                         depth2d<float> domOpaque, texture2d<float> domDensity, thread float3& albedoOut,
                         thread float3& normalOut) {
@@ -345,8 +346,12 @@ static float3 hairShade(constant HairParams& H, constant FrameUniforms& f, const
     float3 vis = domT * opaqueVis * ext;
     float shadowAmt = dot(vis, float3(0.333));
     float3 color = hairBSDF(T, V, L, C, rough, radial, tilt, specular, scatter, shadowAmt) * f.sunColor.rgb * f.sunDir.w * vis;
-    int count = int(f.params.y);
-    for (int i = 0; i < count; ++i) {
+    // Punctual lights: directional ones everywhere, point / spot lights from this pixel's cluster.
+    int dirCount = int(f.cluster2.y);
+    uint2 cell = clusterCells[clusterOf(f, pixel, s.worldPos)];
+    int total = dirCount + int(cell.y);
+    for (int k = 0; k < total; ++k) {
+        int i = k < dirCount ? k : int(clusterIndices[cell.x + uint(k - dirCount)]);
         float3 Ll;
         float3 rad = pointLightAt(lights[i], s.worldPos, T, Ll);
         color += hairBSDF(T, V, Ll, C, rough, radial, tilt, specular, scatter, 1.0) * rad;
@@ -445,8 +450,10 @@ vertex HairVOut hairVertex(uint vid [[vertex_id]], uint iid [[instance_id]], con
     return o;
 }
 
-fragment HairOut hairFragment(HairVOut in [[stage_in]], constant HairParams& H [[buffer(3)]],
-                              constant FrameUniforms& f [[buffer(1)]], constant GPULight* lights [[buffer(2)]],
+fragment HairOut hairFragment(HairVOut in [[stage_in]], constant HairParams& H [[buffer(5)]],
+                              constant FrameUniforms& f [[buffer(1)]], const device GPULight* lights [[buffer(2)]],
+                              const device uint2* clusterCells [[buffer(3)]],
+                              const device uint* clusterIndices [[buffer(4)]],
                               depth2d<float> shadowAtlas [[texture(1)]], texturecube<float> envTex [[texture(5)]],
                               depth2d<float> domDepth [[texture(9)]], depth2d<float> domOpaque [[texture(10)]],
                               texture2d<float> domDensity [[texture(11)]]) {
@@ -454,7 +461,7 @@ fragment HairOut hairFragment(HairVOut in [[stage_in]], constant HairParams& H [
     if (mask == 0u) discard_fragment();
     HairShadeIn s{in.worldPos, in.tangent, in.t, in.rand};
     float3 albedo, N;
-    float3 c = hairShade(H, f, lights, s, in.position.xy, shadowAtlas, envTex, domDepth, domOpaque, domDensity, albedo, N);
+    float3 c = hairShade(H, f, lights, clusterCells, clusterIndices, s, in.position.xy, shadowAtlas, envTex, domDepth, domOpaque, domDensity, albedo, N);
     HairOut o;
     o.color = float4(c, 1.0);
     o.gbufA = float4(albedo, 1.0);
@@ -498,8 +505,10 @@ vertex HairCardOut hairCardVertex(uint vid [[vertex_id]], uint iid [[instance_id
     return o;
 }
 
-fragment HairOut hairCardFragment(HairCardOut in [[stage_in]], constant HairParams& H [[buffer(3)]],
-                                  constant FrameUniforms& f [[buffer(1)]], constant GPULight* lights [[buffer(2)]],
+fragment HairOut hairCardFragment(HairCardOut in [[stage_in]], constant HairParams& H [[buffer(5)]],
+                                  constant FrameUniforms& f [[buffer(1)]], const device GPULight* lights [[buffer(2)]],
+                                  const device uint2* clusterCells [[buffer(3)]],
+                                  const device uint* clusterIndices [[buffer(4)]],
                                   depth2d<float> shadowAtlas [[texture(1)]], texturecube<float> envTex [[texture(5)]],
                                   depth2d<float> domDepth [[texture(9)]], depth2d<float> domOpaque [[texture(10)]],
                                   texture2d<float> domDensity [[texture(11)]]) {
@@ -514,7 +523,7 @@ fragment HairOut hairCardFragment(HairCardOut in [[stage_in]], constant HairPara
     if (mask == 0u) discard_fragment();
     HairShadeIn s{in.worldPos, in.tangent, in.t, fract(floor(x) * 0.618)};
     float3 albedo, N;
-    float3 c = hairShade(H, f, lights, s, in.position.xy, shadowAtlas, envTex, domDepth, domOpaque, domDensity, albedo, N);
+    float3 c = hairShade(H, f, lights, clusterCells, clusterIndices, s, in.position.xy, shadowAtlas, envTex, domDepth, domOpaque, domDensity, albedo, N);
     HairOut o;
     o.color = float4(c, 1.0);
     o.gbufA = float4(albedo, 1.0);

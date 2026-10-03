@@ -73,6 +73,10 @@ struct Camera {
     bool orthographic = false;
     float orthoSize = 5.f;
     bool primary = true;
+    // Cinematic lens (used by the post stack)
+    float aperture = 0.f;       // f-stop for depth of field (1.4 shallow .. 16 deep), 0 = everything sharp
+    float focusDistance = 0.f;  // meters, 0 = autofocus on the center of the frame
+    float motionBlur = 0.f;     // shutter fraction 0..1 (0.5 = 180-degree shutter), 0 = off
 
     static const TypeInfo& type();
 };
@@ -251,6 +255,9 @@ struct Environment {
     Vec4 fogColor{0.74f, 0.80f, 0.88f, 1.f};
     float fogDensity = 0.004f;
     float exposure = 1.f;
+    bool autoExposure = false;         // adapt exposure to the scene brightness like an eye / camera
+    float exposureCompensation = 0.f;  // EV stops added on top (auto or manual)
+    float adaptationSpeed = 1.5f;      // auto exposure speed (higher = faster)
     bool showGrid = true;
     // Post-processing (HDR pipeline)
     float bloomIntensity = 0.55f;
@@ -258,12 +265,23 @@ struct Environment {
     float saturation = 1.05f;
     float contrast = 1.05f;
     float vignette = 0.22f;
+    float grain = 0.f;                 // film grain 0..1
+    float chromaticAberration = 0.f;   // lens color fringing toward the edges 0..1
+    std::string look = "none";         // color grading look: none | warm | cool | teal_orange | golden_hour | bleach | noir | vivid | moonlight | vintage
+    std::string lut;                   // optional .cube 3D LUT (project-relative), applied after the look
+    float lookStrength = 1.f;          // blend of the look / LUT
     // Sky, atmosphere, lighting quality
     std::string skyMode = "gradient";  // gradient | atmosphere | hdri
     std::string hdri;                  // equirectangular .hdr panorama (skyMode "hdri"), project-relative
     float hdriRotation = 0.f;          // degrees around the vertical axis
     float hdriIntensity = 1.f;         // panorama brightness (sky and image-based light)
-    float clouds = 0.f;                // procedural cloud cover 0..1
+    float clouds = 0.f;                // cloud cover 0..1
+    std::string cloudMode = "volumetric";  // volumetric (ray-marched, lit, casting shadows) | flat (cheap painted layer)
+    float cloudHeight = 1500.f;        // base of the cloud layer (m above the ground)
+    float cloudThickness = 1800.f;     // meters
+    float cloudDensity = 1.f;          // 0.3 wispy .. 2 heavy/stormy
+    float cloudScale = 1.f;            // feature size multiplier (0.5 small puffy .. 3 huge banks)
+    float cloudSpeed = 8.f;            // drift (m/s) along windDirection
     float stars = 0.f;                 // night-sky stars 0..1
     float sunSize = 1.f;               // sun/moon disc size multiplier
     float fogHeight = 0.f;             // height falloff: > 0 makes fog pool near the ground
@@ -291,5 +309,9 @@ struct Environment {
 
 }  // namespace sky
 
+#include "skywalker/ecs/WorldComponents.h"  // Terrain, Foliage
+// Components of other subsystems (each in its own header).
+#include "skywalker/ecs/AudioComponents.h"
+#include "skywalker/ecs/PhysicsComponents.h"  // body, collider, character, joint, physics_world, nav_agent, navmesh
 // Workstream components (kept in their own headers).
 #include "skywalker/ecs/GroomComponent.h"

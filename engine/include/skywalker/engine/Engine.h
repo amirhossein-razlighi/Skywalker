@@ -21,24 +21,33 @@
 #include "skywalker/assets/AssetDatabase.h"
 #include "skywalker/assets/Material.h"
 #include "skywalker/assets/Prefab.h"
+#include "skywalker/audio/AudioSystem.h"
 #include "skywalker/core/Json.h"
 #include "skywalker/engine/Gizmo.h"
 #include "skywalker/fx/Groom.h"
 #include "skywalker/fx/Ocean.h"
 #include "skywalker/fx/Particles.h"
+#include "skywalker/input/ActionMap.h"
+#include "skywalker/nav/NavSystem.h"
+#include "skywalker/physics/PhysicsSystem.h"
 #include "skywalker/render/MeshData.h"
 #include "skywalker/render/Renderer.h"
 #include "skywalker/scene/History.h"
 #include "skywalker/scene/Scene.h"
 #include "skywalker/wander/Runtime.h"
+#include "skywalker/world/WorldRuntime.h"
 
 namespace sky {
 
 class SocketServer;
+namespace studio {
+class Studio;
+}
 
 struct EngineConfig {
     RendererBackend renderer = RendererBackend::Auto;
     std::string projectDir = ".";
+    audio::AudioMode audio = audio::AudioMode::Auto;  // Null for tests/CI; SKYWALKER_AUDIO overrides Auto
 };
 
 enum class PlayState { Editing, Playing, Paused };
@@ -98,6 +107,18 @@ public:
     /// Runs a tool as `actor` and records an activity event. The main entry point for
     /// every client (MCP, in-editor agents, editor UI).
     ToolResult callTool(std::string_view name, const Json& args, const std::string& actor);
+
+    /// Non-blocking variant of callTool() for callers that must keep running while a slow tool
+    /// works (the editor's agents): beginTool() runs the quick part on the main thread. If the tool
+    /// deferred slow work (`call.result.deferred`), run `call.result.deferred->work()` on any thread
+    /// and then call finishTool() on the main thread; otherwise `call.result` is already final.
+    struct PendingCall {
+        std::string tool;
+        std::string actor;
+        ToolResult result;
+    };
+    PendingCall beginTool(std::string_view name, const Json& args, const std::string& actor);
+    ToolResult finishTool(PendingCall& call);
 
     /// Runs `fn` as one undoable, attributed transaction. Rolls back on failure. Nested
     /// calls join the outer transaction (used by `batch`).
@@ -200,6 +221,25 @@ public:
     /// Height of the water surface at world (x, z), waves included. False if no water covers it.
     bool waterHeight(float x, float z, float& height, Vec3* normal = nullptr);
 
+    // --- World building: terrain and foliage ----------------------------------------
+    world::WorldRuntime& world() { return *world_; }
+    // --- Audio & input (workstream S) -------------------------------------------------------
+    audio::AudioSystem& audio() { return *audio_; }
+    /// Project mixer settings (`audio.json`): bus volumes and mutes.
+    Status setAudioMix(const audio::MixSettings& mix);
+    /// The project's input actions (`input.json`, defaults when the file does not exist).
+    const input::ActionMap& actionMap() const { return actionMap_; }
+    Status setActionMap(input::ActionMap map);
+    /// Re-reads input.json / audio.json if they changed on disk (called periodically).
+    void reloadProjectSettings(bool force = false);
+    // --- Studio (multi-agent roster, board, feedback, loops; docs/STUDIO.md) -----------
+    /// Created on first use from the project's agents/ and studio/ folders. Main thread only.
+    studio::Studio& studio();
+    bool hasStudio() const { return studio_ != nullptr; }
+    // --- Physics & navigation (Jolt, Recast/Detour) -------------------------------------
+    physics::PhysicsSystem& physics() { return *physics_; }
+    nav::NavSystem& navigation() { return *nav_; }
+
     // --- Events (activity feed) -----------------------------------------------------
     void emitEvent(Json event);
     std::vector<Json> drainEvents();
@@ -217,6 +257,7 @@ public:
 
 private:
     void ensureMeshUploaded(const std::string& meshKey);
+    std::optional<audio::ListenerPose> listenerPose();
     void resolveTexturePaths(FrameData& f) const;
 
     EngineConfig config_;
@@ -245,12 +286,19 @@ private:
     Json playSnapshot_;
     double accumulator_ = 0;
     fx::ParticleSystem particles_;
+    std::unique_ptr<world::WorldRuntime> world_;
     fx::GroomSystem grooms_;
     std::unordered_map<EntityId, fx::Ocean> oceans_;
     double previewTime_ = 0;
     fx::Ocean& oceanFor(EntityId e, const Water& w);
     wander::InputState input_;
+    input::ActionMap actionMap_ = input::ActionMap::defaults();
+    std::unique_ptr<audio::AudioSystem> audio_;
+    int64_t inputFileTime_ = -1, audioFileTime_ = -1;
+    double settingsTimer_ = 0;
     std::deque<Json> messages_;
+    std::unique_ptr<physics::PhysicsSystem> physics_;  // after scene_/runtime_; nav_ refers to it
+    std::unique_ptr<nav::NavSystem> nav_;
 
     std::vector<EntityId> selection_;
     std::string scenePath_;
@@ -278,9 +326,14 @@ private:
     bool shuttingDown_ = false;   // guarded by jobsMutex_
     bool acceptingJobs_ = true;   // guarded by jobsMutex_
     void failQueuedJobsLocked(const std::string& why);
+    void recordToolEvent(std::string_view name, const ToolResult& result, const std::string& actor);
+    Json callToolFromConnection(const std::string& tool, const Json& args, const std::string& actor);
+    std::mutex workMutex_;
+    std::vector<std::shared_ptr<DeferredWork>> activeWork_;  // deferred tool work running on connection threads
     int editDepth_ = 0;
     std::deque<std::pair<std::function<Json()>, std::promise<Json>>> jobs_;
     std::unique_ptr<SocketServer> server_;
+    std::unique_ptr<studio::Studio> studio_;
 };
 
 void registerEngineTools(Engine& engine);

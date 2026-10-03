@@ -1,6 +1,8 @@
 #include "skywalker/wander/Runtime.h"
 
+#include <algorithm>
 #include <cmath>
+#include <optional>
 #include <sstream>
 
 #include "skywalker/core/Strings.h"
@@ -65,8 +67,10 @@ class Exec {
 public:
     // The script is addressed by index, never by reference: `spawn` can add Behavior
     // components mid-handler and reallocate their storage.
-    Exec(Runtime& rt, EntityId self, size_t scriptIndex, Runtime::Instance& inst, float dt, const InputState& input)
-        : rt_(rt), scene_(rt.scene_), self_(self), scriptIndex_(scriptIndex), inst_(inst), dt_(dt), input_(input) {
+    Exec(Runtime& rt, EntityId self, size_t scriptIndex, Runtime::Instance& inst, float dt, const InputState& input,
+         const Runtime::Contact* contact = nullptr)
+        : rt_(rt), scene_(rt.scene_), self_(self), scriptIndex_(scriptIndex), inst_(inst), dt_(dt), input_(input),
+          contact_(contact) {
         if (Script* s = script()) scriptName_ = s->name;
     }
 
@@ -298,6 +302,7 @@ private:
             case Stmt::Kind::Emit: {
                 EntityId target = s.extra ? entity(eval(*s.extra), s.loc, "emit receiver") : kNoEntity;
                 rt_.nextPending_.push_back({s.name, target});
+                if (rt_.onEmit) rt_.onEmit(s.name, target, self_);  // Studio hook (playtests)
                 break;
             }
             case Stmt::Kind::Destroy: {
@@ -515,6 +520,7 @@ private:
                 if (e.text == "time") return Value::number(rt_.time_);
                 if (e.text == "frame") return Value::number(static_cast<double>(rt_.frame_));
                 if (e.text == "pi") return Value::number(kPi);
+                if (Value v; physicsName(e.text, v)) return v;
                 fail(e.loc, "unknown name '" + e.text + "'");
             }
             case Expr::Kind::Member: return member(e);
@@ -702,6 +708,65 @@ private:
             }
             return Value::number(rt_.waterHeight ? rt_.waterHeight(x, z) : 0.0);
         }
+        // --- audio builtins -------------------------------------------------------------------
+        if (f == "play" || f == "stop_sound") {
+            EntityId target = entity(a[0], e.args[0]->loc, f + "() argument 1");
+            if (f == "stop_sound") {
+                if (rt_.stopAudio) rt_.stopAudio(target);
+                return {};
+            }
+            if (rt_.playAudio) {
+                std::string err = rt_.playAudio(target);
+                if (!err.empty()) fail(e.loc, "play(): " + err);
+            }
+            return {};
+        }
+        if (f == "play_sound") {
+            if (rt_.playSound) {
+                std::string err = rt_.playSound(s(0), a.size() > 1 ? static_cast<float>(n(1)) : 1.f, self_);
+                if (!err.empty()) fail(e.loc, "play_sound(): " + err);
+            }
+            return {};
+        }
+        if (f == "music") {
+            if (rt_.playMusic) {
+                std::string err = rt_.playMusic(s(0), a.size() > 1 ? static_cast<float>(n(1)) : -1.f);
+                if (!err.empty()) fail(e.loc, "music(): " + err);
+            }
+            return {};
+        }
+        if (f == "set_volume") {
+            const std::string bus = str::lower(s(0));
+            static const std::vector<std::string> buses{"master", "music", "sfx", "ambience", "voice", "ui"};
+            if (std::find(buses.begin(), buses.end(), bus) == buses.end()) {
+                std::string guess = str::closest(bus, buses, 3);
+                fail(e.loc, "set_volume(): unknown bus '" + bus + "' (buses: master, music, sfx, ambience, voice, ui)" +
+                                (guess.empty() ? "" : " - did you mean '" + guess + "'?"));
+            }
+            if (rt_.setBusVolume) rt_.setBusVolume(bus, static_cast<float>(n(1)));
+            return {};
+        }
+        // --- input builtins ----------------------------------------------------------------------
+        if (f == "action" || f == "pressed" || f == "released" || f == "axis") {
+            const std::string name = s(0);
+            auto it = input_.actions.find(name);
+            if (it == input_.actions.end()) {
+                std::vector<std::string> names;
+                for (const auto& entry : input_.actions) names.push_back(entry.first);
+                std::string guess = str::closest(name, names, 3);
+                std::string list;
+                for (const auto& k : names) list += (list.empty() ? "" : ", ") + k;
+                fail(e.loc, f + "(): unknown input action '" + name + "'" + (guess.empty() ? "" : " - did you mean '" + guess + "'?") +
+                                (list.empty() ? " (no actions are defined; see the input_map tool)" : " (actions: " + list + ")"));
+            }
+            const input::ActionState& st = it->second;
+            if (f == "action") return Value::boolean(st.held);
+            if (f == "pressed") return Value::boolean(st.pressed);
+            if (f == "released") return Value::boolean(st.released);
+            if (st.vec2) return Value::vec({st.x, st.y, 0.f});
+            return Value::number(st.x);
+        }
+        if (Value r; physicsCall(e, a, r)) return r;
         if (f == "str") return Value::string(toText(a[0]));
         if (f == "spawn") {
             if (++rt_.spawnedThisTick_ > 256) fail(e.loc, "too many spawns in one tick (limit 256)");
@@ -728,6 +793,132 @@ private:
         fail(e.loc, "unknown function '" + f + "'");
     }
 
+    // --- physics builtins ----------------------------------------------------------------
+    // Contact details inside collide/trigger handlers and the last raycast() hit.
+    bool physicsName(const std::string& name, Value& out) const {
+        if (name == "other") {
+            out = contact_ ? Value::entity(contact_->other) : Value{};
+        } else if (name == "contact_point") {
+            out = contact_ ? Value::vec(contact_->point) : Value{};
+        } else if (name == "contact_normal") {
+            out = contact_ ? Value::vec(contact_->normal) : Value{};
+        } else if (name == "impact") {
+            out = Value::number(contact_ ? contact_->speed : 0.0);
+        } else if (name == "hit_point") {
+            out = lastHit_ ? Value::vec(lastHit_->point) : Value{};
+        } else if (name == "hit_normal") {
+            out = lastHit_ ? Value::vec(lastHit_->normal) : Value{};
+        } else if (name == "hit_distance") {
+            out = lastHit_ ? Value::number(lastHit_->distance) : Value{};
+        } else {
+            return false;
+        }
+        return true;
+    }
+
+    PhysicsHooks& physicsHooks(SourceLoc loc, const std::string& f) {
+        if (!rt_.physics) fail(loc, f + "(): physics is not available in this context");
+        return *rt_.physics;
+    }
+
+    bool physicsCall(const Expr& e, const std::vector<Value>& a, Value& out) {
+        const std::string& f = e.text;
+        auto ent = [&](size_t i) { return entity(a[i], e.args[i]->loc, f + "() argument " + std::to_string(i + 1)); };
+        auto vecArg = [&](size_t i) { return vec(a[i], e.args[i]->loc, f + "() argument " + std::to_string(i + 1)); };
+        auto numArg = [&](size_t i) { return num(a[i], e.args[i]->loc, f + "() argument " + std::to_string(i + 1)); };
+        auto nameOf = [&](EntityId id) { return "'" + scene_.record(id)->name + "'"; };
+        if (f == "push" || f == "impulse" || f == "torque") {
+            EntityId id = ent(0);
+            Vec3 amount = vecArg(1);
+            PhysicsHooks& ph = physicsHooks(e.loc, f);
+            bool ok = f == "push" ? ph.addForce(id, amount) : f == "impulse" ? ph.addImpulse(id, amount) : ph.addTorque(id, amount);
+            if (!ok) fail(e.loc, f + "(): " + nameOf(id) + " has no dynamic body (add a body with motion \"dynamic\")");
+            out = {};
+            return true;
+        }
+        if (f == "velocity") {
+            EntityId id = ent(0);
+            auto v = physicsHooks(e.loc, f).velocity(id);
+            if (!v) fail(e.loc, "velocity(): " + nameOf(id) + " has no body or character");
+            out = Value::vec(*v);
+            return true;
+        }
+        if (f == "raycast") {
+            Vec3 origin = vecArg(0), dir = vecArg(1);
+            double maxDist = a.size() > 2 ? numArg(2) : 1000.0;
+            if (length(dir) < 1e-6f) fail(e.args[1]->loc, "raycast(): direction must not be zero");
+            lastHit_ = physicsHooks(e.loc, f).raycast(origin, normalize(dir), static_cast<float>(std::max(0.0, maxDist)), self_);
+            out = lastHit_ ? Value::entity(lastHit_->entity) : Value{};
+            return true;
+        }
+        if (f == "overlap_sphere") {
+            Vec3 center = vecArg(0);
+            double radius = numArg(1);
+            std::string tag;
+            if (a.size() > 2) {
+                if (a[2].type != Value::Type::String) fail(e.args[2]->loc, "overlap_sphere() tag must be a string");
+                tag = a[2].s;
+            }
+            out = {};
+            for (EntityId id : physicsHooks(e.loc, f).overlapSphere(center, static_cast<float>(std::max(0.0, radius)), self_)) {
+                const EntityRecord* r = scene_.record(id);
+                if (!r) continue;
+                if (!tag.empty() && std::find(r->tags.begin(), r->tags.end(), tag) == r->tags.end()) continue;
+                out = Value::entity(id);
+                break;
+            }
+            return true;
+        }
+        if (f == "walk") {
+            EntityId id = ent(0);
+            if (!physicsHooks(e.loc, f).walk(id, vecArg(1))) fail(e.loc, "walk(): " + nameOf(id) + " has no character component");
+            out = {};
+            return true;
+        }
+        if (f == "jump") {
+            EntityId id = ent(0);
+            float speed = a.size() > 1 ? static_cast<float>(numArg(1)) : 0.f;
+            if (!scene_.get<CharacterController>(id)) fail(e.loc, "jump(): " + nameOf(id) + " has no character component");
+            out = Value::boolean(physicsHooks(e.loc, f).jump(id, speed));
+            return true;
+        }
+        if (f == "grounded") {
+            EntityId id = ent(0);
+            auto g = physicsHooks(e.loc, f).grounded(id);
+            if (!g) fail(e.loc, "grounded(): " + nameOf(id) + " has no character component");
+            out = Value::boolean(*g);
+            return true;
+        }
+        if (f == "navigate") {
+            EntityId id = ent(0);
+            EntityId follow = a[1].type == Value::Type::Entity ? ent(1) : kNoEntity;
+            if (!physicsHooks(e.loc, f).navigate(id, vecArg(1), follow)) {
+                fail(e.loc, "navigate(): " + nameOf(id) + " has no nav_agent component");
+            }
+            out = {};
+            return true;
+        }
+        if (f == "stop_navigation") {
+            EntityId id = ent(0);
+            if (!physicsHooks(e.loc, f).stopNavigation(id)) fail(e.loc, "stop_navigation(): " + nameOf(id) + " has no nav_agent");
+            out = {};
+            return true;
+        }
+        if (f == "arrived") {
+            EntityId id = ent(0);
+            auto r = physicsHooks(e.loc, f).arrived(id);
+            if (!r) fail(e.loc, "arrived(): " + nameOf(id) + " has no nav_agent component");
+            out = Value::boolean(*r);
+            return true;
+        }
+        if (f == "path_length") {
+            auto len = physicsHooks(e.loc, f).pathLength(vecArg(0), vecArg(1));
+            out = len ? Value::number(*len) : Value{};
+            return true;
+        }
+        return false;
+    }
+
     Script* script() {
         Behavior* b = scene_.get<Behavior>(self_);
         return b && scriptIndex_ < b->scripts.size() ? &b->scripts[scriptIndex_] : nullptr;
@@ -743,6 +934,8 @@ private:
     const InputState& input_;
     int budget_ = Runtime::kBudget;
     std::vector<std::unordered_map<std::string, Value>> locals_;
+    const Runtime::Contact* contact_ = nullptr;  // physics builtins: the contact being handled
+    std::optional<RayHitInfo> lastHit_;          // physics builtins: the last raycast() in this handler
 };
 
 Runtime::Runtime(Scene& scene) : scene_(scene), rng_(scene.seed) {}
@@ -753,6 +946,8 @@ void Runtime::reset(bool keepQueuedEvents) {
     frame_ = 0;
     pending_.clear();
     if (!keepQueuedEvents) nextPending_.clear();
+    contacts_.clear();
+    nextContacts_.clear();
     instances_.clear();
     toDestroy_.clear();
     scene_.registry().each<Behavior>([](ecs::Entity, Behavior& b) {
@@ -779,12 +974,28 @@ void Runtime::compileScripts() {
     }
 }
 
-void Runtime::emit(std::string name, EntityId target) { nextPending_.push_back({std::move(name), target}); }
+bool Runtime::matchesContactFilter(EntityId other, const std::string& filter) const {
+    if (filter.empty()) return true;
+    const EntityRecord* r = scene_.record(other);
+    if (!r) return false;
+    if (str::lower(r->name) == str::lower(filter)) return true;
+    return std::find(r->tags.begin(), r->tags.end(), filter) != r->tags.end();
+}
+
+void Runtime::emit(std::string name, EntityId target) {
+    if (onEmit) onEmit(name, target, kNoEntity);  // Studio hook (playtests)
+    nextPending_.push_back({std::move(name), target});
+}
 
 void Runtime::tick(float dt, const InputState& input) {
     compileScripts();
     pending_ = std::move(nextPending_);
     nextPending_.clear();
+    // physics builtins: contacts reported by the last physics step, grouped by receiver
+    // (stable, so each receiver sees them in the producer's deterministic order).
+    contacts_ = std::move(nextContacts_);
+    nextContacts_.clear();
+    std::stable_sort(contacts_.begin(), contacts_.end(), [](const Contact& x, const Contact& y) { return x.self < y.self; });
     spawnedThisTick_ = 0;
 
     // Snapshot the order: entities spawned this tick start running next tick.
@@ -823,7 +1034,25 @@ void Runtime::tick(float dt, const InputState& input) {
             for (const auto& ev : pending_) {
                 if (ev.target == kNoEntity || ev.target == id) runAll(Trigger::Event, ev.name);
             }
+            // physics builtins: collide / trigger_enter / trigger_exit, filtered by the other's name or tag
+            Contact probe;
+            probe.self = id;
+            auto range = std::equal_range(contacts_.begin(), contacts_.end(), probe,
+                                          [](const Contact& x, const Contact& y) { return x.self < y.self; });
+            for (auto c = range.first; c != range.second; ++c) {
+                for (const auto& beh : program->behaviors) {
+                    for (const auto& h : beh.handlers) {
+                        if (h.trigger != c->trigger || !matchesContactFilter(c->other, h.argument)) continue;
+                        Behavior* cur = scene_.get<Behavior>(id);
+                        if (!cur || si >= cur->scripts.size() || !cur->scripts[si].enabled) break;
+                        Exec(*this, id, si, inst, dt, input, &*c).run(h.body);
+                    }
+                }
+            }
             for (const auto& key : input.pressed) runAll(Trigger::Key, key);
+            for (const auto& [name, st] : input.actions) {
+                if (st.pressed) runAll(Trigger::Action, name);  // input actions (jump, fire, ...)
+            }
             for (EntityId clicked : input.clicked) {
                 if (clicked == id) runAll(Trigger::Click, "");
             }

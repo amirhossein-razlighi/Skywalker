@@ -10,6 +10,7 @@
 // One surface means humans and agents always see and do exactly the same things.
 
 #include <functional>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -25,10 +26,31 @@ struct ContentBlock {
     std::string mimeType;  // Image: e.g. "image/png"
 };
 
+struct ToolResult;
+
+/// The slow half of a tool call (a design app running for seconds, a download...). `work` runs
+/// off the main thread and must not touch engine state; `finish` then runs on the main thread
+/// and builds the real result (importing files, editing the scene). Agent connections run the
+/// work on their own thread, so the editor stays responsive while it runs.
+struct DeferredWork {
+    std::function<void()> work;
+    std::function<ToolResult()> finish;
+    /// Optional, thread-safe: asks `work` to stop early (the agent server is shutting down).
+    std::function<void()> cancel;
+};
+
 struct ToolResult {
     std::vector<ContentBlock> content;
     Json structured;  // machine-readable payload (also mirrored as text for older clients)
     bool isError = false;
+    /// Set by tools that finish asynchronously (see DeferredWork). Everything else ignores it:
+    /// ToolRegistry::call() completes it inline, only the agent server splits the steps.
+    std::shared_ptr<DeferredWork> deferred;
+
+    /// Runs the deferred work (if any) inline and returns the final result.
+    ToolResult complete();
+    static ToolResult defer(std::function<void()> work, std::function<ToolResult()> finish,
+                            std::function<void()> cancel = nullptr);
 
     static ToolResult text(std::string t);
     static ToolResult json(Json payload, std::string summary = {});
@@ -62,8 +84,11 @@ public:
     const ToolDef* find(std::string_view name) const;
     const std::vector<ToolDef>& all() const { return tools_; }
 
-    /// Validates arguments against the schema, then invokes the handler. Never throws.
+    /// Validates arguments against the schema, then invokes the handler. Never throws. A tool
+    /// that defers its slow half is completed inline (use invoke() to split the steps).
     ToolResult call(std::string_view name, const Json& args, ToolContext& ctx) const;
+    /// Like call(), but returns a deferred result as is (see DeferredWork).
+    ToolResult invoke(std::string_view name, const Json& args, ToolContext& ctx) const;
 
     /// MCP `tools/list` payload.
     Json listJson() const;

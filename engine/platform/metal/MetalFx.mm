@@ -54,6 +54,7 @@ void MetalFx::simulate(const FrameData& frame, id<MTLTexture> prevDepth, id<MTLT
 }
 
 void MetalFx::encodeShadowCaster(id<MTLRenderCommandEncoder> enc, const FrameData& frame, simd_float4x4 lightViewProj) {
+    [enc setVertexBytes:&lightViewProj length:sizeof(lightViewProj) atIndex:2];
     hair_->encodeShadowCaster(enc, frame, lightViewProj);
     particles_->encodeShadowCaster(enc);
 }

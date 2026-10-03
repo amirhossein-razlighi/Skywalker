@@ -405,7 +405,7 @@ void MetalHair::encodeOpaque(id<MTLRenderCommandEncoder> enc) {
         GroomGpu& g = grooms_[id];
         if (!g.interpolated) continue;
         [enc setVertexBytes:&g.params length:sizeof(g.params) atIndex:3];
-        [enc setFragmentBytes:&g.params length:sizeof(g.params) atIndex:3];
+        [enc setFragmentBytes:&g.params length:sizeof(g.params) atIndex:5];  // 2-4: lights + clusters (renderer)
         [enc setFragmentTexture:g.domDepth atIndex:9];
         [enc setFragmentTexture:g.domOpaque atIndex:10];
         [enc setFragmentTexture:g.domDensity atIndex:11];

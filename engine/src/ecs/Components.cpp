@@ -12,6 +12,8 @@ static_assert(std::is_standard_layout_v<Environment>);
 static_assert(std::is_standard_layout_v<ParticleEmitter>);
 static_assert(std::is_standard_layout_v<Water>);
 static_assert(std::is_standard_layout_v<FluidVolume>);
+static_assert(std::is_standard_layout_v<Terrain>);
+static_assert(std::is_standard_layout_v<Foliage>);
 
 const TypeInfo& Transform::type() {
     static const TypeInfo info{
@@ -26,7 +28,8 @@ const TypeInfo& Transform::type() {
 }
 
 const std::vector<std::string>& MeshRenderer::primitives() {
-    static const std::vector<std::string> names{"cube", "sphere", "plane", "cylinder", "cone", "quad", "capsule", "torus"};
+    static const std::vector<std::string> names{"cube",  "sphere", "plane",  "cylinder", "cone",   "quad",   "capsule", "torus",
+                                                "grass", "grass_tall", "fern", "flowers", "pebbles", "shell", "rock"};
     return names;
 }
 
@@ -95,6 +98,9 @@ const TypeInfo& Camera::type() {
             SKY_FIELD(Camera, orthographic, Bool, "Orthographic projection (2D games)"),
             SKY_FIELD_RANGE(Camera, orthoSize, Float, "Half the visible height in orthographic mode", 0.01f, 10000.f),
             SKY_FIELD(Camera, primary, Bool, "Use this camera for gameplay"),
+            SKY_FIELD_RANGE(Camera, aperture, Float, "Depth of field f-stop: 1.4 very shallow .. 16 deep (0 = off)", 0.f, 64.f),
+            SKY_FIELD_RANGE(Camera, focusDistance, Float, "Focus distance in meters (0 = autofocus on the frame center)", 0.f, 100000.f),
+            SKY_FIELD_RANGE(Camera, motionBlur, Float, "Motion blur shutter (0.5 = film-like 180 degrees, 0 = off)", 0.f, 1.f),
         }};
     return info;
 }
@@ -272,6 +278,50 @@ const TypeInfo& Water::type() {
     return info;
 }
 
+const TypeInfo& Terrain::type() {
+    static const TypeInfo info{
+        "terrain",
+        "Large heightfield terrain (islands, beaches, mountains, canyons, dunes) with erosion, up to 8 blended "
+        "material layers and wet shorelines. Rendered with continuous LOD. Use terrain_create, terrain_sculpt, "
+        "terrain_paint and terrain_layers; heights are relative to the entity.",
+        {
+            SKY_FIELD(Terrain, data, String, "Project-relative .terrain file with heights and layer weights"),
+            SKY_FIELD_RANGE(Terrain, size, Float, "Square extent in meters", 8.f, 32768.f),
+            SKY_FIELD_RANGE(Terrain, resolution, Int, "Height samples per side (2^n+1: 257, 513, 1025, 2049)", 17, 4097),
+            SKY_FIELD_JSON(Terrain, generator, "Generation parameters (shape, seed, minHeight, maxHeight, featureSize, ridges, "
+                                               "warp, erosion, thermal, terraces, beachWidth, seaLevel)",
+                           R"({"type":"object"})"),
+            SKY_FIELD_JSON(Terrain, layers,
+                           "Material layers, base first. Each: {name, texture, normalMap, ormMap, color, roughness, tiling (m), "
+                           "heightMin, heightMax, slopeMin, slopeMax, noise, sharpness}. Rules auto-paint the weights.",
+                           R"({"type":"array","items":{"type":"object"}})"),
+            SKY_FIELD(Terrain, waterLevel, Float, "World height of the water line (wet sand/soil just above it)"),
+            SKY_FIELD_RANGE(Terrain, wetBand, Float, "Meters above the water line that stay damp", 0.f, 20.f),
+            SKY_FIELD_RANGE(Terrain, detail, Float, "Level-of-detail quality multiplier", 0.25f, 4.f),
+            SKY_FIELD(Terrain, castShadows, Bool, "Cast sun shadows"),
+        }};
+    return info;
+}
+
+const TypeInfo& Foliage::type() {
+    static const TypeInfo info{
+        "foliage",
+        "GPU-instanced scattering of grass, flowers, ferns, pebbles, shells, rocks and trees over a terrain (this entity or "
+        "its parent) or over scene meshes inside `area`. Wind-animated, deterministic. Use foliage_add with presets.",
+        {
+            SKY_FIELD_JSON(Foliage, layers,
+                           "Layers: [{preset, mesh, color, density (/m²), scaleMin, scaleMax, slopeMin, slopeMax, heightMin, "
+                           "heightMax, terrainLayer, wind, cullDistance, castShadows, clumping, alignToNormal}]",
+                           R"({"type":"array","items":{"type":"object"}})"),
+            SKY_FIELD(Foliage, seed, Int, "Random seed of the placement"),
+            SKY_FIELD_RANGE(Foliage, density, Float, "Density multiplier for every layer", 0.f, 4.f),
+            SKY_FIELD_ENUM(Foliage, surface, "What to grow on", "terrain", "scene"),
+            SKY_FIELD(Foliage, area, Vec3, "Scene mode: extent in meters around the entity"),
+            SKY_FIELD(Foliage, visible, Bool, "Draw the foliage"),
+        }};
+    return info;
+}
+
 Vec3 Environment::sunDirection() const {
     float az = radians(sunAzimuth);
     float el = radians(sunElevation);
@@ -295,12 +345,21 @@ const TypeInfo& Environment::type() {
             SKY_FIELD(Environment, fogColor, Color, "Distance fog color"),
             SKY_FIELD_RANGE(Environment, fogDensity, Float, "Exponential fog density (0 = off)", 0.f, 1.f),
             SKY_FIELD_RANGE(Environment, exposure, Float, "Camera exposure multiplier", 0.01f, 20.f),
+            SKY_FIELD(Environment, autoExposure, Bool, "Adapt exposure to scene brightness (eye adaptation)"),
+            SKY_FIELD_RANGE(Environment, exposureCompensation, Float, "Exposure compensation in EV stops", -6.f, 6.f),
+            SKY_FIELD_RANGE(Environment, adaptationSpeed, Float, "Auto exposure adaptation speed", 0.05f, 20.f),
             SKY_FIELD(Environment, showGrid, Bool, "Draw the editor ground grid"),
             SKY_FIELD_RANGE(Environment, bloomIntensity, Float, "Glow around bright/emissive things (0 = off)", 0.f, 5.f),
             SKY_FIELD_RANGE(Environment, bloomThreshold, Float, "Brightness where glow starts (lower = more glow)", 0.f, 10.f),
             SKY_FIELD_RANGE(Environment, saturation, Float, "Color saturation (1 = neutral)", 0.f, 2.f),
             SKY_FIELD_RANGE(Environment, contrast, Float, "Contrast (1 = neutral)", 0.5f, 2.f),
             SKY_FIELD_RANGE(Environment, vignette, Float, "Darken the image corners", 0.f, 1.f),
+            SKY_FIELD_RANGE(Environment, grain, Float, "Film grain", 0.f, 1.f),
+            SKY_FIELD_RANGE(Environment, chromaticAberration, Float, "Lens color fringing toward the frame edges", 0.f, 1.f),
+            SKY_FIELD_ENUM(Environment, look, "Color grading look", "none", "warm", "cool", "teal_orange", "golden_hour", "bleach",
+                           "noir", "vivid", "moonlight", "vintage"),
+            SKY_FIELD(Environment, lut, String, "Optional .cube 3D LUT file (project-relative) applied after the look"),
+            SKY_FIELD_RANGE(Environment, lookStrength, Float, "Strength of the look / LUT", 0.f, 1.f),
             SKY_FIELD_ENUM(Environment, skyMode,
                            "gradient = two artist colors; atmosphere = physically inspired sky from the sun; hdri = a "
                            "photographed .hdr panorama lights and backs the scene (set `hdri`)",
@@ -309,6 +368,12 @@ const TypeInfo& Environment::type() {
             SKY_FIELD(Environment, hdriRotation, Float, "Panorama rotation in degrees (line its sun up with sunAzimuth)"),
             SKY_FIELD_RANGE(Environment, hdriIntensity, Float, "Panorama brightness", 0.f, 20.f),
             SKY_FIELD_RANGE(Environment, clouds, Float, "Procedural cloud cover", 0.f, 1.f),
+            SKY_FIELD_ENUM(Environment, cloudMode, "Clouds: volumetric (ray-marched, lit, shadows) or flat (cheap)", "volumetric", "flat"),
+            SKY_FIELD_RANGE(Environment, cloudHeight, Float, "Cloud layer base height in meters", 100.f, 12000.f),
+            SKY_FIELD_RANGE(Environment, cloudThickness, Float, "Cloud layer thickness in meters", 100.f, 10000.f),
+            SKY_FIELD_RANGE(Environment, cloudDensity, Float, "Cloud density: 0.3 wispy .. 2 stormy", 0.f, 4.f),
+            SKY_FIELD_RANGE(Environment, cloudScale, Float, "Cloud feature size (0.5 small puffs .. 3 huge banks)", 0.1f, 8.f),
+            SKY_FIELD_RANGE(Environment, cloudSpeed, Float, "Cloud drift speed in m/s (along windDirection)", 0.f, 100.f),
             SKY_FIELD_RANGE(Environment, stars, Float, "Stars in the night sky", 0.f, 1.f),
             SKY_FIELD_RANGE(Environment, sunSize, Float, "Sun / moon disc size", 0.1f, 8.f),
             SKY_FIELD_RANGE(Environment, fogHeight, Float, "Fog pools near the ground as this grows (0 = uniform)", 0.f, 2.f),

@@ -7,6 +7,12 @@ using namespace sky;
 
 TEST_CASE("mesh: primitives are well formed with outward CCW winding") {
     for (const auto& name : MeshRenderer::primitives()) {
+        // Vegetation / ground-detail meshes stand on y = 0 at natural sizes and are partly
+        // open (blades, fronds): they are checked in test_world.
+        if (name == "grass" || name == "grass_tall" || name == "fern" || name == "flowers" || name == "pebbles" ||
+            name == "shell" || name == "rock") {
+            continue;
+        }
         auto m = mesh::primitive(name);
         REQUIRE(m.ok());
         CHECK(m->indices.size() % 3 == 0);
