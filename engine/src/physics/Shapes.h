@@ -7,6 +7,7 @@
 
 #include <Jolt/Physics/Collision/Shape/Shape.h>
 
+#include <cstring>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -63,7 +64,14 @@ struct Hasher {
     uint64_t h = 1469598103934665603ull;
     void bytes(const void* data, size_t n) {
         const auto* p = static_cast<const unsigned char*>(data);
-        for (size_t i = 0; i < n; ++i) {
+        size_t i = 0;
+        for (; i + 8 <= n; i += 8) {  // 8 bytes per round (hot: runs for every body every tick)
+            uint64_t w;
+            std::memcpy(&w, p + i, 8);
+            h = (h ^ w) * 0x9E3779B97F4A7C15ull;
+            h ^= h >> 29;
+        }
+        for (; i < n; ++i) {
             h ^= p[i];
             h *= 1099511628211ull;
         }

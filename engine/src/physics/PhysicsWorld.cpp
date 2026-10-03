@@ -78,6 +78,36 @@ int depthOf(const Scene& s, EntityId id) {
     return d;
 }
 
+/// Per-sync view of the scene hierarchy: children lists and memoized world matrices, so a sync
+/// is O(entities) instead of re-walking parents and scanning for children per entity.
+class SceneIndex {
+public:
+    explicit SceneIndex(const Scene& s) : s_(s) {
+        world_.reserve(s.size());
+        for (EntityId e : s.entities()) {
+            if (const EntityRecord* r = s.record(e); r && r->parent) kids_[r->parent].push_back(e);
+        }
+    }
+    const std::vector<EntityId>& children(EntityId e) const {
+        static const std::vector<EntityId> none;
+        auto it = kids_.find(e);
+        return it == kids_.end() ? none : it->second;
+    }
+    const Mat4& world(EntityId e) {
+        if (auto it = world_.find(e); it != world_.end()) return it->second;
+        const EntityRecord* r = s_.record(e);
+        const Transform* t = s_.get<Transform>(e);
+        Mat4 local = t ? t->local() : Mat4{};
+        Mat4 m = r && r->parent && s_.exists(r->parent) ? world(r->parent) * local : local;
+        return world_.emplace(e, m).first->second;
+    }
+
+private:
+    const Scene& s_;
+    std::unordered_map<EntityId, std::vector<EntityId>> kids_;
+    std::unordered_map<EntityId, Mat4> world_;
+};
+
 struct ContactKey {
     uint32_t b1 = 0, s1 = 0, b2 = 0, s2 = 0;
     auto operator<=>(const ContactKey&) const = default;
@@ -200,6 +230,7 @@ struct PhysicsWorld::Impl final : public JPH::ContactListener {
     std::vector<ContactEvent> events;
     std::vector<EntityId> brokenJoints;
     float lastDt = 1.f / 60.f;
+    uint64_t syncCount = 0;
 
     Impl(MeshProvider m, PathResolver p, WorldOptions o)
         : meshes(std::move(m)), paths(std::move(p)), options(std::move(o)) {
@@ -356,9 +387,10 @@ struct PhysicsWorld::Impl final : public JPH::ContactListener {
     }
 
     /// Solid colliders below `owner` (stopping at entities that own their own body).
-    void collectChildParts(const Scene& s, EntityId owner, EntityId at, const Mat4& rel, Vec3 ownerScale,
-                           std::vector<ShapePart>& parts, Aabb& meshBounds, bool& anyMesh, const RigidBody* body) {
-        for (EntityId c : s.children(at)) {
+    void collectChildParts(const Scene& s, const SceneIndex& index, EntityId owner, EntityId at, const Mat4& rel,
+                           Vec3 ownerScale, std::vector<ShapePart>& parts, Aabb& meshBounds, bool& anyMesh,
+                           const RigidBody* body) {
+        for (EntityId c : index.children(at)) {
             if (!s.get<Transform>(c) || !s.record(c)->enabled) continue;
             if (s.get<RigidBody>(c) || s.get<CharacterController>(c)) continue;
             Mat4 m = rel * s.get<Transform>(c)->local();
@@ -379,7 +411,7 @@ struct PhysicsWorld::Impl final : public JPH::ContactListener {
                 p.restitution = col->restitution >= 0 ? col->restitution : (body ? body->restitution : 0.f);
                 parts.push_back(p);
             }
-            collectChildParts(s, owner, c, m, ownerScale, parts, meshBounds, anyMesh, body);
+            collectChildParts(s, index, owner, c, m, ownerScale, parts, meshBounds, anyMesh, body);
         }
     }
 
@@ -399,7 +431,8 @@ struct PhysicsWorld::Impl final : public JPH::ContactListener {
             if (p.collider) h.reflected(p.collider, Collider::type());
             if (p.mesh) {
                 h.str(p.mesh->mesh);
-                const MeshData* md = meshes ? meshes(p.mesh->mesh) : nullptr;
+                // Imported meshes can be hot-reloaded: include the loaded data's identity.
+                const MeshData* md = meshes && p.mesh->mesh.rfind("asset:", 0) == 0 ? meshes(p.mesh->mesh) : nullptr;
                 h.pod(md);
                 h.pod(md ? md->vertexCount() : 0);
             }
@@ -410,16 +443,34 @@ struct PhysicsWorld::Impl final : public JPH::ContactListener {
         return h.h;
     }
 
-    std::vector<Desired> desiredBodies(const Scene& s) {
+    /// What the scene wants simulated. Static geometry that already has a body only gets a full
+    /// (signature) check every 8th sync, staggered by entity; teleports are still seen every tick.
+    std::vector<Desired> desiredBodies(const Scene& s, SceneIndex& index, bool fullCheck) {
         std::vector<Desired> out;
+        out.reserve(bodies.size() + 8);
         for (EntityId e : s.entities()) {
             if (!active(s, e)) continue;
             if (s.get<CharacterController>(e)) continue;  // characters are not rigid bodies
             const RigidBody* rb = s.get<RigidBody>(e);
             const Collider* col = s.get<Collider>(e);
             bool forced = options.forceDynamic.count(e) != 0;
+            const Mat4& world = index.world(e);
+            if (!fullCheck && !forced && (rb || col) && (!rb || rb->motion == "static") && !(col && col->isTrigger) &&
+                (syncCount + e) % 8 != 0) {
+                auto it = bodies.find({e, kRoleSolid});
+                if (it != bodies.end() && it->second.motion == JPH::EMotionType::Static && !hasBodyAncestor(s, e)) {
+                    Desired d;  // unchanged as far as this tick is concerned
+                    d.entity = e;
+                    d.role = kRoleSolid;
+                    d.motion = JPH::EMotionType::Static;
+                    d.body = rb;
+                    d.world = world;
+                    d.signature = it->second.signature;
+                    out.push_back(std::move(d));
+                    continue;
+                }
+            }
             Vec3 scale = chainScale(s, e);
-            Mat4 world = s.worldMatrix(e);
 
             // Trigger: its own kinematic sensor body (always awake so it sees sleeping bodies).
             if (col && col->isTrigger) {
@@ -474,7 +525,7 @@ struct PhysicsWorld::Impl final : public JPH::ContactListener {
             }
             Aabb meshBounds{Vec3(1e30f), Vec3(-1e30f)};
             bool anyMesh = false;
-            collectChildParts(s, e, e, Mat4{}, scale, d.parts, meshBounds, anyMesh, rb);
+            collectChildParts(s, index, e, e, Mat4{}, scale, d.parts, meshBounds, anyMesh, rb);
             if (d.parts.empty()) {
                 if (col && col->isTrigger) continue;  // only a trigger: no solid body
                 ShapePart p;  // implicit "auto" collider
@@ -1125,7 +1176,8 @@ struct PhysicsWorld::Impl final : public JPH::ContactListener {
             }
         }
         if (!order.empty()) {
-            for (auto& [k, b] : bodies) b.lastWorld = s.worldMatrix(b.entity);
+            SceneIndex index(s);
+            for (auto& [k, b] : bodies) b.lastWorld = index.world(b.entity);
             s.markDirty();
         }
     }
@@ -1143,14 +1195,18 @@ PhysicsWorld::~PhysicsWorld() = default;
 void PhysicsWorld::sync(const Scene& scene, float dt) {
     Impl& m = *impl_;
     m.applySettings(scene);
-    std::vector<Impl::Desired> desired = m.desiredBodies(scene);
-    std::map<std::pair<EntityId, int>, const Impl::Desired*> byKey;
-    for (const auto& d : desired) byKey[{d.entity, d.role}] = &d;
+    SceneIndex index(scene);
+    // Query/edit worlds (dt == 0) sync only when the scene changed: always check everything.
+    std::vector<Impl::Desired> desired = m.desiredBodies(scene, index, dt <= 0.f);
+    ++m.syncCount;
+    std::unordered_map<uint64_t, const Impl::Desired*> byKey;  // entity * 2 + role
+    byKey.reserve(desired.size() * 2);
+    for (const auto& d : desired) byKey[d.entity * 2 + static_cast<uint64_t>(d.role)] = &d;
 
     // Joints must go before the bodies they reference.
     std::set<uint32_t> doomed;
     for (auto& [key, b] : m.bodies) {
-        auto it = byKey.find(key);
+        auto it = byKey.find(key.first * 2 + static_cast<uint64_t>(key.second));
         if (it == byKey.end() || it->second->signature != b.signature) doomed.insert(b.id.GetIndexAndSequenceNumber());
     }
     for (auto it = m.joints.begin(); it != m.joints.end();) {
