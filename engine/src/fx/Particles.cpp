@@ -451,7 +451,7 @@ const Preset kParticlePresets[] = {
         "lifetimeJitter":0.2,"shape":"box","shapeSize":[16,0,16],"direction":[0,-1,0],"speed":0.3,
         "spread":30,"gravity":1.6,"drag":2.2,"turbulence":1.4,"turbulenceScale":1.8,"wind":0.8,
         "sizeStart":0.14,"sizeEnd":0.14,"sizeJitter":0.35,"colorStart":"#c75b19","colorEnd":"#c75b19",
-        "hueVariation":0.09,"spin":160,"roughness":0.55,"collide":true,"floorHeight":0,
+        "hueVariation":0.05,"spin":160,"roughness":0.55,"collide":true,"floorHeight":0,
         "depthCollision":true,"stick":true,"maxParticles":8000})"},
     {"snow_heavy", R"({"simulation":"gpu","look":"snow","rate":12000,"lifetime":14,"lifetimeJitter":0.2,"shape":"box",
         "shapeSize":[44,0,44],"direction":[0,-1,0],"speed":0.9,"spread":20,"gravity":1.4,"drag":1.4,

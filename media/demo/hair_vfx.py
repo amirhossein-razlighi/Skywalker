@@ -170,10 +170,10 @@ def bust(s, groom=None, overrides=None, hair_color=None):
         print("  groom:", {k: info.get(k) for k in ("strands", "guides", "generateMs", "gpuMemoryMB", "error")}, flush=True)
 
 
-def lights(s, rim="#9fc4ff", warm="#ffb070"):
+def lights(s, rim="#e8eeff", warm="#ffb070"):
     s.call("batch", label="lights", operations=[
         {"tool": "entity_create", "args": {"name": "Rim Light", "position": [-0.45, 1.95, -0.7],
-                                           "components": {"light": {"kind": "point", "color": rim, "intensity": 6, "range": 4}}}},
+                                           "components": {"light": {"kind": "point", "color": rim, "intensity": 4, "range": 4}}}},
         {"tool": "entity_create", "args": {"name": "Kicker", "position": [0.8, 1.5, -0.6],
                                            "components": {"light": {"kind": "point", "color": warm, "intensity": 1.2, "range": 4}}}},
     ])
@@ -184,7 +184,7 @@ if wanted("hair"):
     looks = [
         ("hair_wavy", {"melanin": 0.7, "redness": 0.15}, "hair_wavy_brunette"),
         ("hair_straight", {"melanin": 0.18, "redness": 0.2, "length": 0.4}, "hair_straight_blond"),
-        ("hair_curly", {"melanin": 0.95, "redness": 0.1}, "hair_curly_black"),
+        ("hair_curly", {"melanin": 0.88, "redness": 0.15}, "hair_curly_black"),
         ("hair_wavy", {"melanin": 0.5, "redness": 0.92, "wave": 0.02, "length": 0.32}, "hair_wavy_ginger"),
         ("hair_ponytail", {"melanin": 0.4, "redness": 0.3}, "hair_ponytail"),
     ]
@@ -288,7 +288,7 @@ if wanted("vfx"):
         ("vfx_fireworks", "fireworks", [0, 0, -12], {}, True, [0, 3, 20], [0, 10, -12], 6),
         ("vfx_magic_vortex", "magic_vortex", [0, 0, 0], {}, True, [3.2, 1.9, 4.2], [0, 1.4, 0], 3),
         ("vfx_ember_storm", "ember_storm", [0, 1, 0], {}, True, [5, 2, 7], [0, 2, 0], 4),
-        ("vfx_falling_leaves", "falling_leaves", [0, 6, 0], {}, False, [3.4, 1.6, 4.6], [0, 1.4, 0], 12),
+        ("vfx_falling_leaves", "falling_leaves", [0, 4.5, 1.5], {}, False, [2.2, 1.3, 3.6], [0, 1.7, 0], 12),
         ("vfx_snow_heavy", "snow_heavy", [0, 12, 0], {}, False, [6, 2.2, 8], [0, 1.2, 0], 6),
         ("vfx_rain_heavy", "rain_heavy", [0, 0, 0], {}, "rain", [4.5, 1.6, 6], [0, 0.6, 0], 3),
         ("vfx_smoke_column", "smoke_column_gpu", [0, 0, -1], {}, False, [9, 3.5, 13], [0, 5, 0], 10),
