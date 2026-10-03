@@ -16,6 +16,9 @@ const char* toString(FieldType t) {
         case FieldType::Vec3: return "vec3";
         case FieldType::Color: return "color";
         case FieldType::Enum: return "enum";
+        case FieldType::Vec2: return "vec2";
+        case FieldType::Vec4: return "vec4";
+        case FieldType::Json: return "json";
     }
     return "?";
 }
@@ -136,6 +139,51 @@ Json colorToJson(Vec4 c) {
     return Json::array({round4(c.x), round4(c.y), round4(c.z), round4(c.w)});
 }
 
+bool jsonToVec2(const Json& j, Vec2& out) {
+    if (j.isArray() && (j.size() == 2 || j.size() == 3) && j[0].isNumber() && j[1].isNumber()) {
+        out = {j[0].asFloat(), j[1].asFloat()};
+        return true;
+    }
+    if (j.isObject()) {
+        const Json* x = j.find("x");
+        const Json* y = j.find("y");
+        if (x && y && x->isNumber() && y->isNumber()) {
+            out = {x->asFloat(), y->asFloat()};
+            return true;
+        }
+    }
+    if (j.isNumber()) {
+        out = {j.asFloat(), j.asFloat()};
+        return true;
+    }
+    return false;
+}
+
+Json vec2ToJson(Vec2 v) { return Json::array({round4(v.x), round4(v.y)}); }
+
+bool jsonToVec4(const Json& j, Vec4& out) {
+    if (j.isNumber()) {
+        float v = j.asFloat();
+        out = {v, v, v, v};
+        return true;
+    }
+    if (!j.isArray() || j.size() < 1 || j.size() > 4) return false;
+    float v[4];
+    for (size_t i = 0; i < j.size(); ++i) {
+        if (!j[i].isNumber()) return false;
+        v[i] = j[i].asFloat();
+    }
+    switch (j.size()) {  // CSS shorthand: [all], [vertical, horizontal], [top, horizontal, bottom]
+        case 1: out = {v[0], v[0], v[0], v[0]}; break;
+        case 2: out = {v[0], v[1], v[0], v[1]}; break;
+        case 3: out = {v[0], v[1], v[2], v[1]}; break;
+        default: out = {v[0], v[1], v[2], v[3]}; break;
+    }
+    return true;
+}
+
+Json vec4ToJson(Vec4 v) { return Json::array({round4(v.x), round4(v.y), round4(v.z), round4(v.w)}); }
+
 Json fieldToJson(const void* object, const FieldInfo& f) {
     switch (f.type) {
         case FieldType::Float: return round4(at<float>(object, f));
@@ -145,6 +193,9 @@ Json fieldToJson(const void* object, const FieldInfo& f) {
         case FieldType::Enum: return at<std::string>(object, f);
         case FieldType::Vec3: return vec3ToJson(at<Vec3>(object, f));
         case FieldType::Color: return colorToJson(at<Vec4>(object, f));
+        case FieldType::Vec2: return vec2ToJson(at<Vec2>(object, f));
+        case FieldType::Vec4: return vec4ToJson(at<Vec4>(object, f));
+        case FieldType::Json: return at<Json>(object, f);
     }
     return {};
 }
@@ -197,6 +248,23 @@ Status fieldFromJson(void* object, const FieldInfo& f, const Json& v, std::strin
             Vec4 out;
             if (!jsonToColor(v, out)) return typeError(context, f, v, "a color like \"#ff8800\" or [r, g, b(, a)]");
             at<Vec4>(object, f) = out;
+            return {};
+        }
+        case FieldType::Vec2: {
+            Vec2 out;
+            if (!jsonToVec2(v, out)) return typeError(context, f, v, "[x, y]");
+            at<Vec2>(object, f) = out;
+            return {};
+        }
+        case FieldType::Vec4: {
+            Vec4 out;
+            if (!jsonToVec4(v, out)) return typeError(context, f, v, "[a, b, c, d] (or a number / CSS-style shorthand)");
+            at<Vec4>(object, f) = out;
+            return {};
+        }
+        case FieldType::Json: {
+            // Structured data: the owning system validates the content; null resets it.
+            at<Json>(object, f) = v;
             return {};
         }
     }
@@ -266,6 +334,22 @@ Json schema(const TypeInfo& type) {
                 break;
             case FieldType::Color:
                 p["description"] = "hex string \"#rrggbb[aa]\" or [r,g,b(,a)] in 0..1";
+                break;
+            case FieldType::Vec2:
+                p["type"] = "array";
+                p["items"] = Json::object({{"type", "number"}});
+                p["minItems"] = 2;
+                p["maxItems"] = 2;
+                break;
+            case FieldType::Vec4:
+                p["type"] = "array";
+                p["items"] = Json::object({{"type", "number"}});
+                p["minItems"] = 4;
+                p["maxItems"] = 4;
+                break;
+            case FieldType::Json:
+                p["type"] = Json::array({"object", "array", "string", "null"});
+                p["x-skywalker-json"] = true;
                 break;
         }
         if (!f.doc.empty()) {

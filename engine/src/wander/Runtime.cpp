@@ -138,6 +138,8 @@ private:
             case Json::Type::Array: {
                 Vec3 v;
                 if (reflect::jsonToVec3(j, v)) return Value::vec(v);
+                Vec2 v2;  // Vec2 component fields read as (x, y, 0)
+                if (j.size() == 2 && reflect::jsonToVec2(j, v2)) return Value::vec({v2.x, v2.y, 0.f});
                 Vec4 c;
                 if (reflect::jsonToColor(j, c)) return Value::color(c);
                 return {};

@@ -58,6 +58,17 @@ void Scene::registerKinds() {
     kinds_.push_back(makeReflectedKind<ParticleEmitter>());
     kinds_.push_back(makeReflectedKind<Water>());
     kinds_.push_back(makeReflectedKind<FluidVolume>());
+    // 2D, text, UI and dialogue
+    kinds_.push_back(makeReflectedKind<Sprite>());
+    kinds_.push_back(makeReflectedKind<SpriteAnimator>());
+    kinds_.push_back(makeReflectedKind<Tilemap>());
+    kinds_.push_back(makeReflectedKind<Light2D>());
+    kinds_.push_back(makeReflectedKind<Parallax>());
+    kinds_.push_back(makeReflectedKind<Camera2D>());
+    kinds_.push_back(makeReflectedKind<Text>());
+    kinds_.push_back(makeReflectedKind<UICanvas>());
+    kinds_.push_back(makeReflectedKind<UIElement>());
+    kinds_.push_back(makeReflectedKind<DialogueRunner>());
 }
 
 const ComponentKind* Scene::componentKind(std::string_view n) const {

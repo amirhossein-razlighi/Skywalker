@@ -248,3 +248,5 @@ struct Environment {
 };
 
 }  // namespace sky
+
+#include "skywalker/ecs/Components2D.h"  // sprites, tilemaps, 2D lights, text, UI, dialogue

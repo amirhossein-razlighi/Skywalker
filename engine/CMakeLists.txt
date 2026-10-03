@@ -35,10 +35,39 @@ set(SKY_ENGINE_SOURCES
     src/agent/SocketServer.cpp
     src/engine/Engine.cpp
     src/engine/Gizmo.cpp
+    # 2D, text, UI and dialogue
+    src/third_party/StbImpl.cpp
+    src/ecs/Components2D.cpp
+    src/text/Font.cpp
+    src/text/TextLayout.cpp
+    src/render2d/ImageIO.cpp
+    src/render2d/Atlas.cpp
+    src/render2d/Tilemap.cpp
+    src/render2d/Sprites.cpp
+    src/render2d/Raster2D.cpp
+    src/ui/UiStyle.cpp
+    src/ui/UiLayout.cpp
+    src/ui/UiSystem.cpp
+    src/ui/Dialogue.cpp
+    src/ui/World2D.cpp
+    src/agent/Tools2D.cpp
+    src/agent/UiTools.cpp
+    src/agent/DialogueTools.cpp
 )
 
 add_library(skywalker_engine STATIC ${SKY_ENGINE_SOURCES})
 add_library(sky::engine ALIAS skywalker_engine)
+
+# stb (public domain): stb_truetype (SDF fonts), stb_image (PNG/JPEG decoding), stb_rect_pack (atlases).
+include(FetchContent)
+FetchContent_Declare(stb
+    URL https://github.com/nothings/stb/archive/2c980bb59875b0d32144a71867fbdebb2f77cd20.tar.gz
+    URL_HASH SHA256=9a955b1b49a4410088a2e0ee2a9c057c3c907d0c1d75454144cb980aca0ba515)
+FetchContent_MakeAvailable(stb)
+target_include_directories(skywalker_engine SYSTEM PRIVATE ${stb_SOURCE_DIR})
+# Built-in assets (fonts) are found here when running from a build tree; SKYWALKER_ASSETS overrides.
+target_compile_definitions(skywalker_engine PRIVATE SKY_BUILTIN_ASSETS_DIR="${PROJECT_SOURCE_DIR}/assets"
+    SKY_DEFAULT_FONT_FILE="${PROJECT_SOURCE_DIR}/assets/fonts/Inter.ttf")  # embedded fallback (#embed)
 
 find_package(ZLIB REQUIRED)
 find_package(CURL REQUIRED)
@@ -63,7 +92,21 @@ if(SKY_HAS_METAL)
         DEPENDS ${_shader_src} ${PROJECT_SOURCE_DIR}/cmake/EmbedText.cmake
         COMMENT "Embedding Metal shader source")
 
-    target_sources(skywalker_engine PRIVATE platform/metal/MetalRenderer.mm ${_shader_inc})
+    # Additional shader libraries: Name.metal -> generated/NameSource.inc
+    set(_extra_shader_incs)
+    foreach(_name Sprite2D UI)
+        set(_src ${CMAKE_CURRENT_SOURCE_DIR}/platform/metal/shaders/${_name}.metal)
+        set(_inc ${CMAKE_CURRENT_BINARY_DIR}/generated/${_name}Source.inc)
+        add_custom_command(
+            OUTPUT ${_inc}
+            COMMAND ${CMAKE_COMMAND} -DINPUT=${_src} -DOUTPUT=${_inc} -P ${PROJECT_SOURCE_DIR}/cmake/EmbedText.cmake
+            DEPENDS ${_src} ${PROJECT_SOURCE_DIR}/cmake/EmbedText.cmake
+            COMMENT "Embedding ${_name}.metal")
+        list(APPEND _extra_shader_incs ${_inc})
+    endforeach()
+
+    target_sources(skywalker_engine PRIVATE platform/metal/MetalRenderer.mm platform/metal/MetalRenderer2D.mm
+                   ${_shader_inc} ${_extra_shader_incs})
     target_include_directories(skywalker_engine PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/generated)
     target_compile_definitions(skywalker_engine PUBLIC $<$<COMPILE_LANGUAGE:C,CXX,OBJCXX>:SKY_HAS_METAL=1>)
     target_link_libraries(skywalker_engine PUBLIC

@@ -16,7 +16,9 @@
 
 namespace sky {
 
-enum class FieldType { Float, Int, Bool, String, Vec3, Color, Enum };
+enum class FieldType { Float, Int, Bool, String, Vec3, Color, Enum, Vec2, Vec4, Json };
+// Vec2/Vec4 store sky::Vec2/Vec4; Json stores a free-form sky::Json (structured data such as
+// animation clips or tilemap layers) that is validated by the owning system.
 
 const char* toString(FieldType t);
 
@@ -63,6 +65,12 @@ Json vec3ToJson(Vec3 v);
 /// Accepts [r,g,b], [r,g,b,a] or a hex string.
 bool jsonToColor(const Json& j, Vec4& out);
 Json colorToJson(Vec4 c);
+/// Accepts [x, y] (or [x, y, z], z ignored) or a number (uniform).
+bool jsonToVec2(const Json& j, Vec2& out);
+Json vec2ToJson(Vec2 v);
+/// Accepts [a, b, c, d], a number (uniform), or CSS shorthand [v, h] / [top, h, bottom].
+bool jsonToVec4(const Json& j, Vec4& out);
+Json vec4ToJson(Vec4 v);
 
 }  // namespace reflect
 

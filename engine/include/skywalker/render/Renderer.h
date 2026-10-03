@@ -18,6 +18,7 @@
 #include "skywalker/ecs/Components.h"
 #include "skywalker/math/Math.h"
 #include "skywalker/render/Image.h"
+#include "skywalker/render/Render2D.h"
 #include "skywalker/scene/Scene.h"
 
 namespace sky {
@@ -175,6 +176,7 @@ struct FrameData {
     std::vector<VolumeItem> volumes;
     bool drawGrid = true;
     float time = 0;
+    Frame2D render2d;  // sprites, tilemaps, world text, 2D lights and UI (see Render2D.h)
 
     static constexpr size_t kMaxLights = 16;
     Mat4 viewProjection() const { return projection * view; }
