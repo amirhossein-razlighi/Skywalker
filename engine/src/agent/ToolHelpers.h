@@ -1,12 +1,17 @@
 #pragma once
 // Internal helpers shared by the tool catalogue files (EngineTools / AssetTools / WorldTools).
 
+#include <memory>
 #include <optional>
 #include <string>
 #include <vector>
 
 #include "skywalker/agent/ToolRegistry.h"
 #include "skywalker/engine/Engine.h"
+
+namespace sky::dcc {
+class Manager;
+}
 
 namespace sky::tools {
 
@@ -33,5 +38,8 @@ void addAssetTools(Engine& engine, ToolRegistry& reg);
 void addWorldTools(Engine& engine, ToolRegistry& reg);
 void addNetworkTools(Engine& engine, ToolRegistry& reg);
 void addFxTools(Engine& engine, ToolRegistry& reg);
+/// DCC bridge tools (Blender, Maya, Houdini, 3ds Max). Pass a manager to use a specific state
+/// folder / host (tests); the default talks to the real machine. Returns the manager in use.
+std::shared_ptr<dcc::Manager> addDccTools(Engine& engine, ToolRegistry& reg, std::shared_ptr<dcc::Manager> manager = nullptr);
 
 }  // namespace sky::tools

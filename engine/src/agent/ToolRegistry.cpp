@@ -59,7 +59,30 @@ const ToolDef* ToolRegistry::find(std::string_view name) const {
     return nullptr;
 }
 
+ToolResult ToolResult::defer(std::function<void()> work, std::function<ToolResult()> finish) {
+    ToolResult r;
+    r.deferred = std::make_shared<DeferredWork>(DeferredWork{std::move(work), std::move(finish)});
+    return r;
+}
+
+ToolResult ToolResult::complete() {
+    if (!deferred) return std::move(*this);
+    std::shared_ptr<DeferredWork> d = std::move(deferred);
+    try {
+        if (d->work) d->work();
+        return d->finish ? d->finish() : ToolResult::text("");
+    } catch (const std::exception& e) {
+        return ToolResult::error(Error::make("internal_error", std::string("tool crashed: ") + e.what()));
+    } catch (...) {
+        return ToolResult::error(Error::make("internal_error", "tool crashed"));
+    }
+}
+
 ToolResult ToolRegistry::call(std::string_view name, const Json& args, ToolContext& ctx) const {
+    return invoke(name, args, ctx).complete();
+}
+
+ToolResult ToolRegistry::invoke(std::string_view name, const Json& args, ToolContext& ctx) const {
     const ToolDef* tool = find(name);
     if (!tool) {
         std::vector<std::string> names;

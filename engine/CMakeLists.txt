@@ -31,11 +31,31 @@ set(SKY_ENGINE_SOURCES
     src/agent/WorldTools.cpp
     src/agent/NetworkTools.cpp
     src/agent/FxTools.cpp
+    src/agent/DccTools.cpp
+    src/dcc/Process.cpp
+    src/dcc/Apps.cpp
+    src/dcc/Manager.cpp
+    src/dcc/Embedded.cpp
     src/agent/McpServer.cpp
     src/agent/SocketServer.cpp
     src/engine/Engine.cpp
     src/engine/Gizmo.cpp
 )
+
+# DCC bridge: the Python helper library and the Blender add-on are embedded so the engine can
+# run and install them without the source tree.
+file(GLOB_RECURSE _dcc_py CONFIGURE_DEPENDS ${PROJECT_SOURCE_DIR}/integrations/*.py)
+set(_dcc_inc ${CMAKE_CURRENT_BINARY_DIR}/generated/DccEmbedded.inc)
+add_custom_command(
+    OUTPUT ${_dcc_inc}
+    COMMAND ${CMAKE_COMMAND}
+            "-DSPECS=lib=${PROJECT_SOURCE_DIR}/integrations/dcc|addon=${PROJECT_SOURCE_DIR}/integrations/blender"
+            -DOUTPUT=${_dcc_inc} -P ${PROJECT_SOURCE_DIR}/cmake/EmbedFiles.cmake
+    DEPENDS ${_dcc_py} ${PROJECT_SOURCE_DIR}/cmake/EmbedFiles.cmake
+    COMMENT "Embedding the DCC helper library and Blender add-on"
+    VERBATIM)
+set_source_files_properties(src/dcc/Embedded.cpp PROPERTIES
+    OBJECT_DEPENDS ${_dcc_inc} COMPILE_OPTIONS -Wno-overlength-strings)
 
 add_library(skywalker_engine STATIC ${SKY_ENGINE_SOURCES})
 add_library(sky::engine ALIAS skywalker_engine)
@@ -46,6 +66,7 @@ find_package(Threads REQUIRED)
 
 target_include_directories(skywalker_engine PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
+target_include_directories(skywalker_engine PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/generated)
 target_link_libraries(skywalker_engine PUBLIC sky::options PRIVATE ZLIB::ZLIB CURL::libcurl Threads::Threads)
 # Definitions are C-family only (Swift consumers of the C API must not see them).
 target_compile_definitions(skywalker_engine PUBLIC

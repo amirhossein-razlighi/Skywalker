@@ -271,6 +271,8 @@ private:
     bool shuttingDown_ = false;   // guarded by jobsMutex_
     bool acceptingJobs_ = true;   // guarded by jobsMutex_
     void failQueuedJobsLocked(const std::string& why);
+    void recordToolEvent(std::string_view name, const ToolResult& result, const std::string& actor);
+    Json callToolFromConnection(const std::string& tool, const Json& args, const std::string& actor);
     int editDepth_ = 0;
     std::deque<std::pair<std::function<Json()>, std::promise<Json>>> jobs_;
     std::unique_ptr<SocketServer> server_;
