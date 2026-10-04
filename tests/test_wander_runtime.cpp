@@ -176,3 +176,38 @@ end)");
     CHECK(s.record(e)->vars["clicked"].asBool());
     CHECK(s.get<Transform>(e)->position.z == doctest::Approx(-1));
 }
+
+TEST_CASE("runtime: locals in a loop body survive temporaries of the loop header and nested conditions") {
+    // Regression: `for i in 0..counts[k]` left the range bound's scratch registers allocated, so the body's
+    // `let u` was placed above the locals area and the next condition's temporaries overwrote it.
+    Scene s;
+    EntityId x = s.create("X");
+    EntityId y = s.create("Y");
+    withScript(s, "Ctl", R"(
+behavior Ctl
+  var counts = [1, 1]
+  fn show(s: number)
+    for k in 0..2
+      for i in 0..counts[k]
+        let u = find(["X", "Y"][k])
+        if k == s then
+          if not u.enabled then
+            u.enabled = true
+            u.position = (u.position.x, 3, u.position.z)
+          end
+        else
+          u.enabled = false
+        end
+      end
+    end
+  end
+  on start
+    show(0)
+  end
+end)");
+    Runtime rt(s);
+    run(rt, 2);
+    CHECK(rt.drainMessages().empty());
+    CHECK(s.record(x)->enabled);
+    CHECK_FALSE(s.record(y)->enabled);
+}
