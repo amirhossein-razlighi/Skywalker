@@ -1,7 +1,7 @@
 {
   "name": "skywalker",
   "version": "0.1.0",
-  "description": "Skills, subagents and commands for building games with the Skywalker engine over MCP: world building, look development, assets, DCC, audio and a multi-agent studio.",
+  "description": "Skills, subagents and commands for building games with the Skywalker engine over MCP: world building, look development, assets, DCC, audio, Wander gameplay, physics and navigation, 2D and UI, animation and cinematics, VFX and hair, shipping macOS apps and a multi-agent studio.",
   "contextFileName": "GEMINI.md",
   "mcpServers": {
     "skywalker": {

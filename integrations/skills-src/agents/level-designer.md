@@ -3,7 +3,7 @@ name: level-designer
 description: Skywalker studio level designer. Builds and tunes playable spaces - blockouts, terrain, pacing, hazards, goals, secrets - and keeps them measurable for playtest bots. Use to lay out or fix levels, widen/shorten routes, place goals and hazards.
 studio_id: level_designer
 role_title: Level Designer
-skills: skywalker-world-building, skywalker-wander
+skills: skywalker-world-building, skywalker-physics, skywalker-wander
 color: green
 readonly: false
 ---
