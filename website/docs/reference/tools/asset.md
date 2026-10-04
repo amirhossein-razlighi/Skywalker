@@ -336,6 +336,7 @@ Register a file placed in the project (e.g. by a generator) as an asset. Meshes 
 | `tags` | string[] |  | Tags |  |
 | `normalize` | boolean |  | Scale meshes to fit 1 m (default true; rigged characters default to their real size); false keeps real-world units |  |
 | `z_up` | boolean |  | The mesh is Z-up (CAD, scans, some exporters) — rotate to Y-up |  |
+| `lods` | boolean |  | Build the automatic level-of-detail chain for meshes of 3,000+ triangles (default true). false for meshes whose edges must stay exact: voxel or terrain chunks, modular pieces that meet seamlessly |  |
 
 === "Tool call"
 

@@ -2397,6 +2397,10 @@
      "z_up": {
       "type": "boolean",
       "description": "The mesh is Z-up (CAD, scans, some exporters) — rotate to Y-up"
+     },
+     "lods": {
+      "type": "boolean",
+      "description": "Build the automatic level-of-detail chain for meshes of 3,000+ triangles (default true). false for meshes whose edges must stay exact: voxel or terrain chunks, modular pieces that meet seamlessly"
      }
     },
     "additionalProperties": false,
