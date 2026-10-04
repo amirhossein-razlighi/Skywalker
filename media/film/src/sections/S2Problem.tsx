@@ -123,7 +123,7 @@ export const S2Problem: React.FC = () => {
   // after the beats: everything recedes, cursor becomes a point of light
   const recede = prog(frame, 234, 300, EASE.inOut);
   const lightP = prog(frame, 250, 320, EASE.out);
-  const dot = { x: lerp(1000, W / 2, lightP), y: lerp(400, H / 2 - 40, lightP) };
+  const dot = { x: lerp(1000, W / 2, lightP), y: lerp(400, H / 2 - 150, lightP) };
   const exit = prog(frame, 480, 504, EASE.in);
 
   return (
@@ -210,7 +210,7 @@ const ToolStream: React.FC<{ from: number }> = ({ from }) => {
   const t = frame - from;
   const a = prog(frame, from, from + 30);
   return (
-    <AbsoluteFill style={{ opacity: 0.32 * a, maskImage: "linear-gradient(transparent, black 25%, black 75%, transparent)" }}>
+    <AbsoluteFill style={{ opacity: 0.42 * a, maskImage: "linear-gradient(transparent, black 25%, black 75%, transparent)" }}>
       {Array.from({ length: 3 }).map((_, col) => (
         <div key={col} style={{ position: "absolute", left: 120 + col * 600, top: 1080 - ((t * (1.6 + col * 0.35)) % 1500), fontFamily: FONT.mono, fontSize: 20, lineHeight: 2.4, color: col === 1 ? C.violet : C.sky }}>
           {CALLS.concat(CALLS).map((l, i) => (

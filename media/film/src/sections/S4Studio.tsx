@@ -37,15 +37,15 @@ const Crew: React.FC = () => {
         {CREW.map((m, i) => {
           const n = CREW.length;
           const a = (i - (n - 1) / 2) / ((n - 1) / 2); // -1..1
-          const x = 960 + a * 720;
-          const y = 690 + a * a * -70 + 60;
+          const x = 960 + a * 740;
+          const y = 700 + a * a * -60;
           const s = sp(frame, fps, 26 + i * 4, SPRING.pop);
           const bob = Math.sin((frame + i * 13) / 14) * 5;
           return (
-            <div key={m.name} style={{ position: "absolute", left: x - 90, top: y - 90 + bob, width: 180, textAlign: "center", opacity: Math.min(1, s * 1.5), transform: `scale(${0.5 + 0.5 * s})` }}>
-              <Cloudling size={150} color={m.color} face={m.face} blink />
-              <div style={{ fontFamily: FONT.display, fontWeight: 600, fontSize: 28, color: C.text, marginTop: 8, letterSpacing: -0.4 }}>{m.name}</div>
-              <div style={{ fontFamily: FONT.body, fontSize: 17, color: C.dim, marginTop: 2 }}>{m.role}</div>
+            <div key={m.name} style={{ position: "absolute", left: x - 110, top: y - 110 + bob, width: 220, textAlign: "center", opacity: Math.min(1, s * 1.5), transform: `scale(${0.5 + 0.5 * s})` }}>
+              <Cloudling size={200} color={m.color} face={m.face} blink />
+              <div style={{ fontFamily: FONT.display, fontWeight: 600, fontSize: 32, color: C.text, marginTop: 10, letterSpacing: -0.5 }}>{m.name}</div>
+              <div style={{ fontFamily: FONT.body, fontSize: 19, color: C.dim, marginTop: 2 }}>{m.role}</div>
             </div>
           );
         })}
@@ -102,9 +102,9 @@ const Board: React.FC = () => {
           return (
             <div key={m.name} style={{ position: "absolute", left: 120, top: 300 + i * 104, display: "flex", alignItems: "center", gap: 14, opacity: s }}>
               <div style={{ transform: `scale(${talking ? 1.08 : 1})` }}>
-                <Cloudling size={74} color={m.color} face={m.face} blink />
+                <Cloudling size={84} color={m.color} face={m.face} blink />
               </div>
-              <div style={{ fontFamily: FONT.body, fontWeight: 600, fontSize: 18, color: talking ? C.text : C.dim }}>{m.name}</div>
+              <div style={{ fontFamily: FONT.body, fontWeight: 600, fontSize: 20, color: talking ? C.text : C.dim }}>{m.name}</div>
             </div>
           );
         })}
@@ -138,11 +138,11 @@ const Board: React.FC = () => {
                 transition: "none",
               }}
             >
-              <div style={{ display: "flex", justifyContent: "space-between", fontFamily: FONT.mono, fontSize: 14, color: C.faint }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontFamily: FONT.mono, fontSize: 16, color: C.faint }}>
                 <span>{card.id}</span>
                 <span style={{ color: m.color }}>{m.name}</span>
               </div>
-              <div style={{ fontFamily: FONT.body, fontWeight: 500, fontSize: 18, color: C.text, marginTop: 6, lineHeight: 1.3 }}>{card.title}</div>
+              <div style={{ fontFamily: FONT.body, fontWeight: 500, fontSize: 21, color: C.text, marginTop: 6, lineHeight: 1.3 }}>{card.title}</div>
               {Math.round(col) === 4 && <div style={{ marginTop: 6, fontFamily: FONT.mono, fontSize: 13, color: C.green }}>✓ done</div>}
             </div>
           );
@@ -164,7 +164,7 @@ const Board: React.FC = () => {
                 background: "rgba(255,255,255,0.95)",
                 color: "#151826",
                 fontFamily: FONT.body,
-                fontSize: 19,
+                fontSize: 22,
                 fontWeight: 500,
                 boxShadow: "0 16px 40px rgba(0,0,0,0.45)",
                 opacity: p * (1 - out),
@@ -201,8 +201,8 @@ const Triage: React.FC = () => {
           <Words text="Playtesters report. The director decides." at={6} size={60} weight={700} align="left" stagger={2} />
         </div>
         {/* director */}
-        <div style={{ position: "absolute", left: 180, top: 420, textAlign: "center", width: 240, opacity: prog(frame, 6, 20) }}>
-          <Cloudling size={220} color={CREW[0].color} face="determined" blink />
+        <div style={{ position: "absolute", left: 150, top: 430, textAlign: "center", width: 300, opacity: prog(frame, 6, 20) }}>
+          <Cloudling size={280} color={CREW[0].color} face="determined" blink />
           <div style={{ fontFamily: FONT.display, fontWeight: 600, fontSize: 32, color: C.text, marginTop: 8 }}>Nimbus</div>
           <div style={{ fontFamily: FONT.body, fontSize: 18, color: C.dim }}>Creative director</div>
         </div>
@@ -213,7 +213,7 @@ const Triage: React.FC = () => {
           const v = sp(frame, fps, vAt, { damping: 9, mass: 0.6, stiffness: 180 });
           const dropped = f.verdict === "DROP";
           const fade = dropped ? prog(frame, vAt + 30, vAt + 50) : 0;
-          const y = 330 + i * 200;
+          const y = 320 + i * 220;
           return (
             <div key={f.id} style={{ position: "absolute", left: 640, top: y, width: 900, opacity: s * (1 - 0.55 * fade), transform: `translateX(${(1 - s) * 120}px)` }}>
               <div

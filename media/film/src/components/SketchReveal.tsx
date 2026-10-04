@@ -34,7 +34,7 @@ export const DrawnLines: React.FC<{ data: Linework; progress: number; color: str
   width = 1.7,
   glow,
 }) => (
-  <svg viewBox={`0 0 ${data.w} ${data.h}`} style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}>
+  <svg viewBox={`0 0 ${data.w} ${data.h}`} preserveAspectRatio="xMidYMid slice" style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}>
     {glow && (
       <defs>
         <filter id="lineglow" x="-5%" y="-5%" width="110%" height="110%">
@@ -118,7 +118,7 @@ export const SketchReveal: React.FC<{
         {hasSlot(`${slot}_sketch`) && sketchP > 0 && (
           <AbsoluteFill
             style={{
-              opacity: sketchP * (luminous ? 0.55 : 1),
+              opacity: sketchP * (luminous ? 0.36 : 1),
               filter: luminous ? "invert(1) sepia(0.3) hue-rotate(190deg) saturate(1.6) brightness(0.9)" : undefined,
               mixBlendMode: luminous ? "screen" : "multiply",
             }}
@@ -139,7 +139,7 @@ export const SketchReveal: React.FC<{
         {clayP > 0 && clayP < 1 && (
           <AbsoluteFill
             style={{
-              background: `linear-gradient(${wipeAngle}deg, transparent ${wipePos - 6}%, rgba(200,210,255,0.55) ${wipePos - 1}%, transparent ${wipePos + 3}%)`,
+              background: `linear-gradient(${wipeAngle}deg, transparent ${wipePos - 14}%, rgba(200,210,255,${0.32 * Math.sin(Math.PI * clayP)}) ${wipePos - 3}%, transparent ${wipePos + 2}%)`,
               mixBlendMode: "screen",
             }}
           />

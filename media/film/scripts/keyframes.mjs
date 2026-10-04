@@ -5,7 +5,7 @@ import path from "node:path";
 import fs from "node:fs";
 import url from "node:url";
 import { bundle } from "@remotion/bundler";
-import { renderStill, selectComposition } from "@remotion/renderer";
+import { openBrowser, renderStill, selectComposition } from "@remotion/renderer";
 
 const here = path.dirname(url.fileURLToPath(import.meta.url));
 const root = path.join(here, "..");
@@ -23,9 +23,11 @@ if (args.includes("--every")) {
   for (let f = opt("--from", 0); f <= Math.min(opt("--to", composition.durationInFrames - 1), composition.durationInFrames - 1); f += every) frames.push(f);
 }
 const scale = opt("--scale", 1);
+const puppeteerInstance = await openBrowser("chrome");
 for (const f of frames) {
   const file = path.join(out, `f${String(f).padStart(5, "0")}.jpg`);
-  await renderStill({ composition, serveUrl, output: file, frame: f, imageFormat: "jpeg", jpegQuality: 88, scale });
+  await renderStill({ composition, serveUrl, output: file, frame: f, imageFormat: "jpeg", jpegQuality: 88, scale, puppeteerInstance });
   process.stdout.write(`${f} `);
 }
 process.stdout.write("\n");
+await puppeteerInstance.close({ silent: true });

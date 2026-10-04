@@ -49,9 +49,13 @@ const ToolWall: React.FC = () => {
   const cellW = 300;
   const cellH = 58;
   const gridW = cols * cellW;
-  const hx = heroCol * cellW + cellW / 2 - gridW / 2;
-  const hy = heroRow * cellH + cellH / 2 - (Math.ceil(tools.length / cols) * cellH) / 2;
-  const drift = interpolate(frame, [0, 180], [140, -60]);
+  const gridH = Math.ceil(tools.length / cols) * cellH;
+  // hero cell centre, relative to the grid's own centre (which sits at the frame centre)
+  const hcx = heroCol * cellW + (cellW - 14) / 2;
+  const hcy = heroRow * cellH + (cellH - 12) / 2;
+  const hx = hcx - gridW / 2;
+  const hy = hcy - gridH / 2;
+  const drift = interpolate(frame, [0, 180], [60, -40]);
   const scale = lerp(1, 7, dive);
   return (
     <AbsoluteFill style={{ background: C.void, overflow: "hidden" }}>
@@ -60,7 +64,9 @@ const ToolWall: React.FC = () => {
           style={{
             position: "relative",
             width: gridW,
-            transform: `translate(${-hx * dive}px, ${drift * (1 - dive) - hy * dive}px) rotateX(${22 * (1 - dive)}deg) scale(${scale})`,
+            height: gridH,
+            transformOrigin: `${hcx}px ${hcy}px`,
+            transform: `translate(${-hx * dive}px, ${drift * (1 - dive) - hy * dive}px) rotateX(${14 * (1 - dive)}deg) scale(${scale})`,
             transformStyle: "preserve-3d",
           }}
         >
@@ -260,7 +266,7 @@ const Act: React.FC = () => {
           );
         })}
       </div>
-      <div style={{ position: "absolute", left: 96, bottom: 34, fontFamily: FONT.display, fontSize: 30, color: C.dim, opacity: prog(frame, 120, 140), letterSpacing: -0.4 }}>
+      <div style={{ position: "absolute", left: 1420, top: 870, width: 420, fontFamily: FONT.display, fontSize: 26, lineHeight: 1.35, color: C.dim, opacity: prog(frame, 140, 156), letterSpacing: -0.3 }}>
         Every change is undoable, and signed by whoever made it.
       </div>
     </Backdrop>
@@ -307,8 +313,8 @@ const Surface: React.FC = () => {
           const p = prog(frame, 16 + i * 6, 36 + i * 6);
           return (
             <div key={i} style={{ position: "absolute", left: 230, top: y - 42, width: 410, opacity: p, transform: `translateX(${(1 - p) * -20}px)` }}>
-              <div style={{ fontFamily: FONT.display, fontWeight: 600, fontSize: 36, color: C.text, letterSpacing: -0.6 }}>{s.label}</div>
-              <div style={{ fontFamily: FONT.body, fontSize: 19, color: C.dim, marginTop: 4 }}>{s.sub}</div>
+              <div style={{ fontFamily: FONT.display, fontWeight: 600, fontSize: 42, color: C.text, letterSpacing: -0.8 }}>{s.label}</div>
+              <div style={{ fontFamily: FONT.body, fontSize: 21, color: C.dim, marginTop: 4 }}>{s.sub}</div>
             </div>
           );
         })}
@@ -337,7 +343,7 @@ const Surface: React.FC = () => {
         <div style={{ position: "absolute", left: cx + 220, top: cy - 120, width: 420, opacity: prog(frame, 80, 100) }}>
           {["Typed JSON schemas", "Did-you-mean errors", "Undoable, attributed edits", "Deterministic 60 Hz simulation"].map((t, i) => (
             <div key={t} style={{ opacity: prog(frame, 84 + i * 6, 100 + i * 6), marginBottom: 16 }}>
-              <Chip color={i % 2 ? C.violet : C.sky} style={{ fontSize: 22 }}>{t}</Chip>
+              <Chip color={i % 2 ? C.violet : C.sky} style={{ fontSize: 26, padding: "10px 18px" }}>{t}</Chip>
             </div>
           ))}
         </div>

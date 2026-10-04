@@ -53,7 +53,7 @@ export const S1Open: React.FC = () => {
             move={{ from: [0.6, 0.4, 1.02], to: [-0.8, -0.2, 1.13], duration: LOGO_AT }}
           />
           <LightLeak t={interpolate(frame, [440, 560], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" })} x0={80} x1={10} strength={0.5} />
-          {/* gentle cinematic letterbox while the world forms */}
+          <AbsoluteFill style={{ background: "linear-gradient(0deg, rgba(0,0,0,0.45) 0%, rgba(0,0,0,0) 28%)" }} />
           <Caption text="Every world starts as a sketch." at={56} out={226} />
           <Caption text="Then it takes shape." at={300} out={392} />
           <Caption text="Then it comes to life." at={430} out={540} />
