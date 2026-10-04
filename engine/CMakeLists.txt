@@ -197,6 +197,15 @@ set(SKY_ENGINE_SOURCES
     src/anim/BodyColliders.cpp
     src/engine/CharacterBuiltins.cpp
     src/agent/CharacterTools.cpp
+    # 2D physics (Box2D): body2d, collider2d, joint2d, character2d, tilemap collision
+    src/physics2d/Physics2DComponents.cpp
+    src/physics2d/TileColliders.cpp
+    src/physics2d/Physics2DWorld.cpp
+    src/physics2d/Character2DController.cpp
+    src/physics2d/Physics2DQueries.cpp
+    src/physics2d/Physics2DSystem.cpp
+    src/physics2d/Physics2DBuiltins.cpp
+    src/agent/Physics2DTools.cpp
 )
 
 # DCC bridge: the Python helper library and the Blender add-on are embedded so the engine can
@@ -314,6 +323,9 @@ set_source_files_properties(src/audio/Miniaudio.cpp PROPERTIES COMPILE_OPTIONS "
 # Physics (Jolt) and navigation (Recast/Detour), see cmake/PhysicsDeps.cmake.
 include(${PROJECT_SOURCE_DIR}/cmake/PhysicsDeps.cmake)
 target_link_libraries(skywalker_engine PRIVATE Jolt Recast Detour DetourCrowd)
+# 2D physics (Box2D v3), see cmake/Physics2DDeps.cmake.
+include(${PROJECT_SOURCE_DIR}/cmake/Physics2DDeps.cmake)
+target_link_libraries(skywalker_engine PRIVATE box2d)
 
 # meshoptimizer: automatic LODs, see cmake/MeshDeps.cmake.
 include(${PROJECT_SOURCE_DIR}/cmake/MeshDeps.cmake)

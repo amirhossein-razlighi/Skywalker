@@ -50,6 +50,9 @@ class SocketServer;
 class CustomTools;
 class World2D;
 class NativeModules;
+namespace physics2d {
+class Physics2DSystem;
+}
 namespace studio {
 class Studio;
 }
@@ -338,6 +341,7 @@ public:
     // --- Physics & navigation (Jolt, Recast/Detour) -------------------------------------
     physics::PhysicsSystem& physics() { return *physics_; }
     nav::NavSystem& navigation() { return *nav_; }
+    physics2d::Physics2DSystem& physics2d() { return *physics2d_; }  // 2D physics (Box2D, docs/PHYSICS.md)
 
     // --- Movie renderer (docs/MOVIE_RENDER.md) ------------------------------------------
     /// Renders a movie to completion on this thread; `progress` (and "movie_progress" events) report each frame.
@@ -512,6 +516,7 @@ private:
     std::shared_ptr<EventLog> eventLog_ = std::make_shared<EventLog>(4096);
     std::shared_ptr<ToolHost> toolHost_ = std::make_shared<ToolHost>(tools_);
     std::unique_ptr<CustomTools> customTools_;  // custom & external tools (agent/CustomTools.h)
+    std::unique_ptr<physics2d::Physics2DSystem> physics2d_;  // 2D physics (physics2d/Physics2DSystem.h)
 };
 
 void registerEngineTools(Engine& engine);

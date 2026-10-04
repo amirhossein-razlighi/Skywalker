@@ -364,3 +364,9 @@ struct Environment {
 #include "skywalker/ecs/VehicleComponents.h"  // vehicle, chase_camera
 #include "skywalker/ecs/Particles2D.h"  // particles2d: pixel-art 2D particles (weather, leaves, fireflies)
 #include "skywalker/ecs/CharacterComponents.h"  // characterIk: foot planting, hand targets, turn in place
+// 2D physics (Box2D, physics2d/): body2d, collider2d, joint2d, character2d, physics2d_world.
+#include "skywalker/ecs/Body2D.h"
+#include "skywalker/ecs/Collider2D.h"
+#include "skywalker/ecs/Joint2D.h"
+#include "skywalker/ecs/Character2D.h"
+#include "skywalker/ecs/Physics2DSettings.h"

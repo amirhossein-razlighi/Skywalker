@@ -106,6 +106,9 @@ public:
     void charge(int64_t units) const;
     /// Aborts the calling handler with a runtime error at the call site.
     [[noreturn]] void fail(std::string message) const;
+    /// Sets what `hit_point`, `hit_normal` and `hit_distance` read in the calling handler (raycast builtins).
+    void setLastHit(EntityRef entity, Vec3 point, Vec3 normal, float distance) const;
+    void clearLastHit() const;
 
 private:
     friend ExecState& CallContextAccess(CallContext& c);

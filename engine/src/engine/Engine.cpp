@@ -1,6 +1,7 @@
 #include "skywalker/engine/Engine.h"
 #include "CharacterHooks.h"  // character tech
 #include "skywalker/game/GameSettings.h"
+#include "skywalker/physics2d/Physics2DSystem.h"  // 2D physics
 
 #include <algorithm>
 #include <atomic>
@@ -205,6 +206,7 @@ Engine::Engine(EngineConfig config)
     nav_ = std::make_unique<nav::NavSystem>(*scene_, *physics_, [this](const std::string& path) { return resolvePath(path); });
     physics_->setNavigation(nav_.get());
     runtime_->physics = physics_.get();
+    physics2d_ = std::make_unique<physics2d::Physics2DSystem>(*scene_, physics2d::tileCollisionFrom(world2d_->assets()));
     registerEngineTools(*this);
     mainThread_ = std::this_thread::get_id();
     customTools_ = std::make_unique<CustomTools>(*this);  // after the built-in tools: custom ones never shadow them
@@ -340,6 +342,7 @@ void Engine::play() {
         animation_->reset();
         animation_->setPlaying(true);
         physics_->beginPlay();  // the world is built from the scene on the first tick
+        physics2d_->beginPlay();
         nav_->beginPlay();
         resetFrameFlow();  // render interpolation history, pacing stats
     }
@@ -366,6 +369,7 @@ void Engine::stop() {
     animation_->reset();
     animation_->setPlaying(false);
     physics_->endPlay();
+    physics2d_->endPlay();
     nav_->endPlay();
     resetFrameFlow();
     input_ = {};
@@ -657,6 +661,7 @@ FrameData Engine::buildFrameData(const CaptureOptions& opts) {
     {
         SKY_PROFILE_SCOPE("2d.gather");
         world2d_->gather(*scene_, f, bo.editorOverlays ? selection_ : std::vector<EntityId>{}, bo.time, texelSnap);  // 2D + UI
+        physics2d_->gatherDebug(f.render2d);  // physics2d_world.debugDraw
     }
     // Effects: simulated particles (+ the light fires cast) and FFT water.
     {

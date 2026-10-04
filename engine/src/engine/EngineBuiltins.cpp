@@ -16,6 +16,7 @@ void registerRenderLayerBuiltins(wander::BuiltinRegistry& reg);  // RenderBuilti
 void registerProbeBuiltins(wander::BuiltinRegistry& reg);  // ProbeBuiltins.cpp: probe_bake
 void registerVehicleBuiltins(wander::BuiltinRegistry& reg);      // VehicleBuiltins.cpp: vehicle_*
 void registerCharacterBuiltins(wander::BuiltinRegistry& reg);  // CharacterBuiltins.cpp: hand_ik, foot_ik, turn_in_place, look_at
+void registerPhysics2DBuiltins(wander::BuiltinRegistry& reg);  // physics2d/Physics2DBuiltins.cpp: push2d, raycast2d, move2d...
 
 namespace {
 
@@ -170,6 +171,7 @@ void registerEngineBuiltins() {
         registerProbeBuiltins(reg);  // reflection probes (ProbeBuiltins.cpp)
         registerVehicleBuiltins(reg);      // vehicles (VehicleBuiltins.cpp)
         registerCharacterBuiltins(reg);  // character IK and turning (CharacterBuiltins.cpp)
+        registerPhysics2DBuiltins(reg);  // 2D physics (physics2d/Physics2DBuiltins.cpp)
     });
 }
 

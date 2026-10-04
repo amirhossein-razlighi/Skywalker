@@ -128,6 +128,12 @@ struct ScreenBox {
     bool ui = false;
 };
 
+/// A world-space debug line drawn over the 2D pass (2D physics shapes, contacts, joints).
+struct DebugLine2D {
+    Vec3 a, b;
+    Vec4 color{1.f, 1.f, 1.f, 1.f};
+};
+
 struct Frame2D {
     std::vector<SpriteInstance> sprites;  // painter's order
     std::vector<SpriteBatch> spriteBatches;
@@ -139,6 +145,7 @@ struct Frame2D {
     std::vector<UIBatch> uiBatches;
     std::vector<UICanvasItem> uiCanvases;
     std::vector<ScreenBox> boxes;
+    std::vector<DebugLine2D> debugLines;  // physics2d_world.debugDraw (drawn on top of the world, under UI)
 
     static constexpr size_t kMaxLights = 32;
     bool empty() const { return sprites.empty() && ui.empty(); }

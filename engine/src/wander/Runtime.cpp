@@ -273,6 +273,12 @@ void CallContext::charge(int64_t units) const {
     }
 }
 void CallContext::fail(std::string message) const { throw RuntimeError{loc_, std::move(message), {}}; }
+
+void CallContext::setLastHit(EntityRef entity, Vec3 point, Vec3 normal, float distance) const {
+    state_.lastHit = RayHitInfo{entity, point, normal, distance};
+}
+
+void CallContext::clearLastHit() const { state_.lastHit.reset(); }
 void* CallContext::serviceById(std::type_index t) const { return state_.rt.serviceById(t); }
 ExecState& CallContextAccess(CallContext& c) { return c.state_; }
 

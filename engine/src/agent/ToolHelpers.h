@@ -76,6 +76,7 @@ void addAuditTools(Engine& engine, ToolRegistry& reg);   // AuditTools.cpp: scen
 void addVehicleTools(Engine& engine, ToolRegistry& reg);  // VehicleTools.cpp: vehicle_create/tune/info/test_drive
 void addParticles2DTools(Engine& engine, ToolRegistry& reg);  // Particles2DTools.cpp: particles2d_create, particles2d_info
 void addCharacterTools(Engine& engine, ToolRegistry& reg);  // CharacterTools.cpp: character_inspect, character_ik, animation_retarget
+void addPhysics2DTools(Engine& engine, ToolRegistry& reg);  // Physics2DTools.cpp: physics2d_info, physics2d_add, physics2d_settle, physics2d_query
 /// perf_stats "characters": skinning, groom simulation and groom rendering cost (CharacterTools.cpp).
 /// `groomRenderMs` < 0 = not measured (perf_stats measures it by benchmarking with grooms hidden).
 Json characterPerfStats(Engine& engine, double groomRenderMs = -1.0);

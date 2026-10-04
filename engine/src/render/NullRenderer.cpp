@@ -10,6 +10,7 @@
 #include "skywalker/render/ReflectionProbes.h"
 #include "skywalker/render/Renderer.h"
 #include "skywalker/render/ShadowAtlas.h"
+#include "skywalker/physics/DebugDraw.h"
 #include "skywalker/render2d/Raster2D.h"
 
 namespace sky {
@@ -87,6 +88,12 @@ public:
         }
         // 2D: sprites, tiles, world text and lights, then UI (so headless captures show HUDs and menus).
         raster2d::drawWorld(image_, frame, textures_);
+        if (!frame.render2d.debugLines.empty()) {  // 2D physics debug draw, over the world and under the UI
+            debugdraw::Canvas canvas(image_, frame.camera);
+            for (const DebugLine2D& l : frame.render2d.debugLines) {
+                canvas.line(l.a, l.b, {toByte(l.color.x), toByte(l.color.y), toByte(l.color.z), static_cast<uint8_t>(std::clamp(l.color.w, 0.f, 1.f) * 255.f)});
+            }
+        }
         raster2d::drawUI(image_, frame, textures_);
         return {};
     }
