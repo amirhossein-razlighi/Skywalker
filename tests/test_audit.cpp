@@ -94,6 +94,29 @@ TEST_CASE("audit: primitives on screen get coverage; strict fails above 0.1%") {
     CHECK(s.get("primitiveLimit").asFloat() == doctest::Approx(0.1f));
 }
 
+TEST_CASE("audit: skinned draws are rasterized in their pose, looked up by the mesh key") {
+    AuditFixture fx;
+    EntityId hero = fx.add("Hero", "cube", {0, 1, 0});
+    FrameData f = buildFrame(fx.scene, fx.cam, 1920, 1080, BuildOptions{});
+    REQUIRE(f.draws.size() == 1);
+    // What the frame builder emits for an animated mesh: a per-instance key and a skin entry.
+    f.draws[0].skin = 0;
+    f.draws[0].mesh = "cube@skin" + std::to_string(hero);
+    f.skins.push_back({"cube", f.draws[0].mesh, nullptr});
+    std::vector<std::string> asked;
+    fx.src.posed = [&](EntityId, const std::string& key) -> std::shared_ptr<const MeshData> {
+        asked.push_back(key);
+        auto posed = std::make_shared<MeshData>(mesh::cube());
+        for (size_t v = 0; v < posed->vertexCount(); ++v) posed->vertices[v * MeshData::kFloatsPerVertex] += 50.f;  // posed out of view
+        posed->computeBounds();
+        return posed;
+    };
+    Json r = audit::auditFrame(fx.scene, f, fx.src, audit::Options{}, "test");
+    REQUIRE_FALSE(asked.empty());
+    CHECK(asked.front() == "cube");  // the mesh key, not the per-instance draw key
+    CHECK(coverageOf(r, "Hero") == doctest::Approx(0.f));  // the pose was used, not the rest pose
+}
+
 TEST_CASE("audit: occlusion - hidden primitives do not count") {
     AuditFixture fx;
     fx.add("Wall", "cube", {0, 1, 2}, {6, 4, 0.2f});
