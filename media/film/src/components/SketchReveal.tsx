@@ -137,7 +137,8 @@ export const SketchReveal: React.FC<{
         )}
         {clayP > 0 && (
           <AbsoluteFill style={{ WebkitMaskImage: clayMask, maskImage: clayMask }}>
-            <Footage slot={`${slot}_clay`} kb={still} playAt={playAt} placeholderLabel={false} />
+            {/* graded toward neutral clay (the engine's clay keeps the sky and water), so color arrives with the final */}
+            <Footage slot={`${slot}_clay`} kb={still} playAt={playAt} placeholderLabel={false} style={{ filter: "grayscale(0.82) sepia(0.18) contrast(0.94) brightness(1.04)" }} />
           </AbsoluteFill>
         )}
         {clayP > 0 && clayP < 1 && (

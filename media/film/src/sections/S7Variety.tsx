@@ -35,6 +35,8 @@ const TILES: { slot: string; label: string; fallback?: string[] }[] = [
 const FOCUS = "var_strategy";
 /** The map tile holds on the whole continent, then starts its zoom while the grid is still on screen. */
 const FOCUS_PLAY = 100;
+/** The map fills the frame on beat 11; from here the full-frame Strategy shot carries the same clip on. */
+const MAP_CUT = 198;
 const COLS = 4;
 const GAP = 14;
 const TW = (1920 - 2 * 96 - (COLS - 1) * GAP) / COLS; // 421
@@ -51,7 +53,7 @@ const Mosaic: React.FC = () => {
   const pull = prog(frame, 0, 110, EASE.out);
   const s0 = lerp(1.45, 0.86, pull);
   const focusIdx = tiles.findIndex((t) => t.slot === FOCUS);
-  const fly = prog(frame, 168, 202, EASE.inOut);
+  const fly = prog(frame, 162, 196, EASE.inOut);
   // where the focus tile sits on screen (grid space -> screen space), so it can grow from there
   const fcol = focusIdx % COLS;
   const frow = Math.floor(focusIdx / COLS);
@@ -111,8 +113,8 @@ const Mosaic: React.FC = () => {
           })}
         </div>
       </AbsoluteFill>
-      <AbsoluteFill style={{ background: "radial-gradient(55% 45% at 50% 50%, rgba(4,5,13,0.82), rgba(4,5,13,0.2) 80%, transparent)", opacity: prog(frame, 70, 90) * (1 - prog(frame, 150, 168)) }} />
-      <AbsoluteFill style={{ alignItems: "center", justifyContent: "center", opacity: 1 - prog(frame, 150, 166) }}>
+      <AbsoluteFill style={{ background: "radial-gradient(55% 45% at 50% 50%, rgba(4,5,13,0.82), rgba(4,5,13,0.2) 80%, transparent)", opacity: prog(frame, 70, 90) * (1 - prog(frame, 146, 162)) }} />
+      <AbsoluteFill style={{ alignItems: "center", justifyContent: "center", opacity: 1 - prog(frame, 146, 160) }}>
         <Words text={"One engine.\nEvery kind of game."} at={74} size={120} weight={700} />
       </AbsoluteFill>
       {/* the map tile grows out of the grid to full frame (the same clip keeps playing) */}
@@ -144,7 +146,7 @@ const Caption: React.FC<{ kicker: string; title: string; color: string; at: numb
 /** Meridian Accord full frame: the zoom continues from the tile down to the river crossing (labels, tooltip, HUD). */
 const Strategy: React.FC = () => (
   <AbsoluteFill>
-    <Footage slot={FOCUS} offset={204 - FOCUS_PLAY} placeholderLabel={false} />
+    <Footage slot={FOCUS} offset={MAP_CUT - FOCUS_PLAY} placeholderLabel={false} />
     <Caption kicker="Meridian Accord · grand strategy" title={"From the continent\nto the front line."} color={C.sunset} at={8} out={112} />
   </AbsoluteFill>
 );
@@ -155,7 +157,7 @@ const Decree: React.FC = () => {
   const p = prog(frame, 0, 16, EASE.out);
   return (
     <AbsoluteFill style={{ background: C.void }}>
-      <AbsoluteFill style={{ opacity: p, transform: `scale(${lerp(1.05, 1, p)})` }}>
+      <AbsoluteFill style={{ transform: `scale(${lerp(1.06, 1, p)})` }}>
         <Footage slot="var_decree" offset={4} placeholderLabel={false} />
       </AbsoluteFill>
       <Caption kicker="The Chancellor's Desk · political drama" title={"Documents, choices,\nconsequences."} color={C.gold} at={10} out={130} top={430} />
@@ -193,10 +195,10 @@ const Gloam: React.FC = () => {
 
 export const S7Variety: React.FC = () => (
   <AbsoluteFill style={{ background: C.void }}>
-    <Sequence durationInFrames={204}>
+    <Sequence durationInFrames={MAP_CUT}>
       <Mosaic />
     </Sequence>
-    <Sequence from={204} durationInFrames={120}>
+    <Sequence from={MAP_CUT} durationInFrames={324 - MAP_CUT}>
       <Strategy />
     </Sequence>
     <Sequence from={324} durationInFrames={144}>

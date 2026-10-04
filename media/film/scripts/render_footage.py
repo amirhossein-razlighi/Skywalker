@@ -7,7 +7,7 @@ public/footage/<id>.mp4 (HEVC, 1920x1080, 30 fps) through the engine's Movie Ren
     python3 scripts/render_footage.py --list             # what would render, and what exists
     python3 scripts/render_footage.py --force --only x   # re-render even if the clip exists
     python3 scripts/render_footage.py --only x --frames 2 --out /tmp/look   # quick framing test (not resumable)
-    python3 scripts/render_footage.py --linework         # trace public/linework/<id>.json from each sketch clip's first frame
+    python3 scripts/render_footage.py --linework         # trace public/linework/<id>.json from each sketch clip's first frame (re-rendered lossless)
 
 Resumable: a clip that exists is skipped, and a clip is written to <id>.part.mp4 and renamed only when it is
 complete, so an interrupted run never leaves a truncated clip behind. Clips render strictly one at a time
@@ -27,8 +27,10 @@ Needs ffmpeg (for --linework).
 """
 import json
 import os
+import shutil
 import subprocess
 import sys
+import tempfile
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -74,15 +76,19 @@ def wanted(slot, only):
     return any(slot["id"] == o or (o.endswith("*") and slot["id"].startswith(o[:-1])) for o in only)
 
 
-def render(sky, project, slot, samples, out_dir=OUT, frames=None):
+def render(sky, project, slot, samples, out_dir=OUT, frames=None, still=False):
+    """One clip (or, with `still`, its first frame as a lossless PNG <id>.png, for tracing linework)."""
     c = slot["clip"]
-    out = os.path.join(out_dir, slot["id"] + ".mp4")
+    out = os.path.join(out_dir, slot["id"] + (".png" if still else ".mp4"))
     part = os.path.join(out_dir, slot["id"] + ".part.mp4")
     if os.path.exists(part):
         os.remove(part)
     w, h = slot["resolution"]
     args = dict(output=part, codec="hevc", width=w, height=h, fps=FPS, samples=min(samples, c.get("samples", samples), MAX_SAMPLES),
                 shutter=c.get("shutter", 0.5), simulate=c.get("simulate", True), duration=(frames or slot["frames"]) / FPS)
+    if still:
+        part = os.path.join(out_dir, slot["id"] + "_part")
+        args.update(output=part + "/f_####.png", codec="png", shutter=0, duration=1 / FPS)
     if c.get("sequence"):
         args["sequence"] = c["sequence"]
         args["start"] = c.get("start", 0)
@@ -96,24 +102,19 @@ def render(sky, project, slot, samples, out_dir=OUT, frames=None):
         args["debug_view"] = "sketch"
     t0 = time.time()
     res = sky.call("movie_render", **args)
+    if still:
+        pngs = sorted(os.listdir(part)) if os.path.isdir(part) else []
+        if not pngs:
+            raise RuntimeError(f"no output ({res})")
+        os.replace(os.path.join(part, pngs[0]), out)
+        shutil.rmtree(part, ignore_errors=True)
+        print(f"  {slot['id']}: first frame", flush=True)
+        return
     if not os.path.exists(part):
         raise RuntimeError(f"no output ({res})")
     os.replace(part, out)
     frames = res.get("frames") if isinstance(res, dict) else "?"
     print(f"  {slot['id']}: {frames} frames, {os.path.getsize(out) / 1e6:.1f} MB in {time.time() - t0:.0f}s", flush=True)
-
-
-def linework():
-    """public/linework/<id>.json for every sketch clip, traced from its first frame (the reveal holds on it while the
-    strokes draw, then the clip starts to move)."""
-    import shutil
-    import tempfile
-    tmp = tempfile.mkdtemp(prefix="film-linework-")
-    for f in sorted(os.listdir(OUT)):
-        if f.endswith("_sketch.mp4"):
-            subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", os.path.join(OUT, f), "-frames:v", "1", os.path.join(tmp, f[:-4] + ".png")], check=True)
-    subprocess.run([sys.executable, os.path.join(FILM, "scripts", "trace_lines.py"), tmp, os.path.join(FILM, "public", "linework")], check=True)
-    shutil.rmtree(tmp, ignore_errors=True)
 
 
 def main():
@@ -122,15 +123,15 @@ def main():
         if a == "--project" and "=" in argv[i + 1]:
             k, v = argv[i + 1].split("=", 1)
             PROJECTS[k] = v
-    if "--linework" in argv:
-        linework()
-        return
+    lines = "--linework" in argv
     test_frames = int(argv[argv.index("--frames") + 1]) if "--frames" in argv else None
     out_dir = os.path.abspath(argv[argv.index("--out") + 1]) if "--out" in argv else OUT
+    if lines:  # the sketch clips' first frames, lossless, into a scratch folder for the tracer
+        out_dir = tempfile.mkdtemp(prefix="film-linework-")
     only = argv[argv.index("--only") + 1].split(",") if "--only" in argv else None
     force = "--force" in argv
     samples = int(os.environ.get("SKY_SAMPLES", MAX_SAMPLES))
-    slots = [s for s in manifest() if s.get("clip") and not s.get("pending") and wanted(s, only)]
+    slots = [s for s in manifest() if s.get("clip") and not s.get("pending") and wanted(s, only) and (not lines or s["mode"] == "sketch")]
     todo = [s for s in slots if force or out_dir != OUT or not os.path.exists(os.path.join(OUT, s["id"] + ".mp4"))]
     todo.sort(key=lambda s: session_key(s)[0])  # stable: one engine load per project
     if "--list" in argv:
@@ -159,7 +160,7 @@ def main():
                         sky.call("environment_update", **mood_args(project, k[2]))
                     for op in json.loads(k[3]):
                         sky.call(op["tool"], **op["args"])
-                render(sky, project, s, samples, out_dir, test_frames)
+                render(sky, project, s, samples, out_dir, test_frames, still=lines)
             except Exception as e:  # keep going: one broken scene should not stop the batch
                 failed.append(s["id"])
                 print(f"  {s['id']}: FAILED {e}", flush=True)
@@ -169,6 +170,12 @@ def main():
     finally:
         if sky:
             sky.close()
+    if lines:
+        # public/linework/<id>.json: the reveal holds each clip on its first frame while these strokes draw, then the
+        # three matched clips start to move together.
+        subprocess.run([sys.executable, os.path.join(FILM, "scripts", "trace_lines.py"), out_dir, os.path.join(FILM, "public", "linework")],
+                       check=True)
+        shutil.rmtree(out_dir, ignore_errors=True)
     if failed:
         print("failed:", ",".join(failed))
         sys.exit(1)

@@ -94,7 +94,7 @@ const Setup: React.FC = () => {
 const Blender: React.FC = () => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const exit = prog(frame, 176, 190, EASE.in);
+  const exit = prog(frame, 168, 182, EASE.in);
   const card = sp(frame, fps, 8, SPRING.gentle);
   const wipe = prog(frame, 92, 132, EASE.inOut);
   const wpos = lerp(-12, 112, wipe);
@@ -110,7 +110,7 @@ const Blender: React.FC = () => {
         <div style={{ position: "absolute", left: 96, top: 300, width: 600 }}>
           <ToolCall
             tool="dcc_run_script"
-            args={'{"script": "monastery.py", "out_dir": "dcc/monastery"}'}
+            args={'{"script": "monastery.py"}'}
             at={14}
             actor="agent:Pixel"
             result="Monastery kit → glTF, imported"
@@ -142,7 +142,7 @@ const Blender: React.FC = () => {
             transform: `translateY(${(1 - card) * 40}px) scale(${0.96 + 0.04 * card})`,
           }}
         >
-          <Footage slot="tools_blender_clay" placeholderLabel={false} />
+          <Footage slot="tools_blender_clay" placeholderLabel={false} style={{ filter: "grayscale(0.82) sepia(0.18) contrast(0.94) brightness(1.04)" }} />
           <AbsoluteFill style={{ WebkitMaskImage: mask, maskImage: mask }}>
             <Footage slot="tools_blender" placeholderLabel={false} />
           </AbsoluteFill>
@@ -245,12 +245,12 @@ export const S8Tools: React.FC = () => (
     <Sequence durationInFrames={204}>
       <Setup />
     </Sequence>
-    <Sequence from={198} durationInFrames={190}>
+    <Sequence from={198} durationInFrames={184}>
       <PushIn>
         <Blender />
       </PushIn>
     </Sequence>
-    <Sequence from={384} durationInFrames={192}>
+    <Sequence from={378} durationInFrames={198}>
       <PushIn>
         <Ship />
       </PushIn>

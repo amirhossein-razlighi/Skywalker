@@ -195,8 +195,8 @@ export const FOOTAGE: Slot[] = [
     { sequence: "sequences/pilgrim_stairs.sequence.json", start: 1.0 }),
   ...triple("fin_c", "finale", FARM, [112, 142, 150], "Berrybrook: rising past the windmill's turning sails",
     { sequence: "cinematics/windmill.sequence.json", start: 1.0 }),
-  c("fin_hero", "finale", PEAKS, 180, "Ashen Peaks: the storm-lit valley at sunset from the monastery terrace",
-    { sequence: "sequences/storm_vista.sequence.json", start: 0.3 }),
+  c("fin_hero", "finale", ISLE, 180, "Tidebreak Isle: aerial over the turquoise shallows, the jetty and the cove at golden hour",
+    { sequence: "sequences/shallows.sequence.json", start: 0.4 }),
 ];
 
 export const SLOT = Object.fromEntries(FOOTAGE.map((x) => [x.id, x])) as Record<string, Slot>;
