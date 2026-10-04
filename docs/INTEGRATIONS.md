@@ -5,7 +5,7 @@ loop, conventions and pitfalls from the first message, and a team of agents shou
 source and installed with one command.
 
 ```
-integrations/skills-src/   the single source: 12 skills, 8 studio-role subagents, 5 workflows, project guidance
+integrations/skills-src/   the single source: 13 skills, 8 studio-role subagents, 5 workflows, project guidance
         │  python3 integrations/generate.py
         ▼
 integrations/claude-code/  Claude Code plugin  (+ .claude-plugin/marketplace.json at the repo root)
