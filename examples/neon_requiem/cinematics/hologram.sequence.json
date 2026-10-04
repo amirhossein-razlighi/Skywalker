@@ -1,0 +1,51 @@
+{
+  "format": "skywalker.sequence",
+  "version": 1,
+  "name": "hologram",
+  "duration": 7,
+  "tracks": [
+    {
+      "type": "shot",
+      "camera": "Cam hologram",
+      "keys": [
+        {
+          "t": 0,
+          "shot": "path",
+          "duration": 7,
+          "target": [
+            0,
+            31,
+            -77
+          ],
+          "points": [
+            [
+              4,
+              23,
+              -27
+            ],
+            [
+              3,
+              24,
+              -31
+            ],
+            [
+              2,
+              25,
+              -35
+            ]
+          ],
+          "fov": 45
+        }
+      ]
+    },
+    {
+      "type": "camera",
+      "keys": [
+        {
+          "t": 0,
+          "camera": "Cam hologram"
+        }
+      ]
+    }
+  ]
+}

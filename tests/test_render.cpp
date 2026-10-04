@@ -1,5 +1,7 @@
 #include <doctest/doctest.h>
 
+#include <filesystem>
+
 #include "skywalker/render/MeshData.h"
 #include "skywalker/render/Renderer.h"
 
@@ -78,6 +80,17 @@ TEST_CASE("png: encoder emits a valid signature and IHDR") {
     CHECK(png[15] == 'R');
     CHECK(png[19] == 4);  // width (big endian, low byte)
     CHECK(png[23] == 3);  // height
+}
+
+TEST_CASE("png: writing into a folder that does not exist yet creates it") {
+    namespace fs = std::filesystem;
+    fs::path dir = fs::temp_directory_path() / "sky_png_test" / "nested" / "lookdev";
+    fs::remove_all(fs::temp_directory_path() / "sky_png_test");
+    Image img(2, 2);
+    REQUIRE(writePng(img, (dir / "shot.png").string()).ok());
+    CHECK(fs::exists(dir / "shot.png"));
+    CHECK(fs::file_size(dir / "shot.png") > 33);
+    fs::remove_all(fs::temp_directory_path() / "sky_png_test");
 }
 
 TEST_CASE("frame: visible entities, picking and scene camera") {

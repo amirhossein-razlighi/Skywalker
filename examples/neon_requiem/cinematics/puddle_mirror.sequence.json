@@ -1,0 +1,51 @@
+{
+  "format": "skywalker.sequence",
+  "version": 1,
+  "name": "puddle_mirror",
+  "duration": 6,
+  "tracks": [
+    {
+      "type": "shot",
+      "camera": "Cam puddle_mirror",
+      "keys": [
+        {
+          "t": 0,
+          "shot": "path",
+          "duration": 6,
+          "target": [
+            -1.2,
+            3.5,
+            -45
+          ],
+          "points": [
+            [
+              1,
+              0.34,
+              4.5
+            ],
+            [
+              0.5,
+              0.3,
+              1.8
+            ],
+            [
+              0,
+              0.28,
+              -0.9
+            ]
+          ],
+          "fov": 42
+        }
+      ]
+    },
+    {
+      "type": "camera",
+      "keys": [
+        {
+          "t": 0,
+          "camera": "Cam puddle_mirror"
+        }
+      ]
+    }
+  ]
+}
