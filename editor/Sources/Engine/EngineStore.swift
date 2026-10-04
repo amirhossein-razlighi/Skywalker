@@ -18,6 +18,8 @@ struct EntitySummary: Identifiable, Hashable, Sendable {
     var parent: UInt64
     var enabled: Bool
     var components: [String]
+    var prefabSource = ""      // a linked prefab instance root: its prefab file
+    var prefabMember = false   // part of a linked prefab instance (not the root)
 }
 
 enum GizmoMode: Int, CaseIterable, Identifiable, Sendable {
@@ -304,7 +306,9 @@ final class EngineStore {
             EntitySummary(id: UInt64($0["id"].number ?? 0), name: $0["name"].string ?? "",
                           parent: UInt64($0["parent"].number ?? 0),
                           enabled: $0["enabled"].bool ?? true,
-                          components: $0["components"].array.compactMap(\.string))
+                          components: $0["components"].array.compactMap(\.string),
+                          prefabSource: $0["prefab"].string ?? "",
+                          prefabMember: $0["prefab"].number != nil)
         }
         syncSelectionFromEngine()
     }
@@ -428,6 +432,8 @@ final class EngineStore {
     // MARK: Assets
 
     static let assetDragPrefix = "skywalker-asset:"
+    /// Outliner rows drag "skywalker-entity:<id>" onto entity-link fields in the Details panel.
+    static let entityDragPrefix = "skywalker-entity:"
 
     /// Places a mesh or prefab asset where a viewport pixel points (on the surface under it),
     /// or in front of the camera's target when `pixel` is nil. Applies materials/textures to
