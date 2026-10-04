@@ -7,7 +7,7 @@ title: "Render tools"
 
 Environment, effects, hair, shaders, render layers, impostors, benchmarks and the movie renderer.
 
-22 tools in the `render` category. Badges: **read-only** tools never change the project; **mutating** tools are undoable and attributed; **open-world** tools reach outside the engine and MCP clients ask before running them.
+27 tools in the `render` category. Badges: **read-only** tools never change the project; **mutating** tools are undoable and attributed; **open-world** tools reach outside the engine and MCP clients ask before running them.
 
 | Tool | Summary |
 |---|---|
@@ -33,6 +33,11 @@ Environment, effects, hair, shaders, render layers, impostors, benchmarks and th
 | [`probe_info`](#probe_info) | Reflection probes and their atlas: the budget (Environment.probeBudget probes, probeUpdates faces per frame), atlas resolution / slots / memory, and per probe: slot and debug color (the reflection_probes debug view draws it), whether it is captured, lighting this view, waiting for the face budget, over budget or out of view, captures so far, last capture GPU time, `stale` (something in range changed since a once probe was captured: run probe_bake), size, update mode. |
 | [`particles2d_create`](#particles2d_create) | Create pixel-art particles for a 2D game from a preset, ready to tweak: rain (streaks over the whole view), drizzle, snow (drifting flakes), leaves and petals (falling, swaying), fireflies (glowing, twinkling, wandering), smoke (chimney puffs), ripples (puddle rings while it rains), dust (motes in sunlight), sparkle (water glints). |
 | [`particles2d_info`](#particles2d_info) | Live state of particles2d emitters: particles alive, cap, rate, box, wrap, and the bounds the live particles cover (world units). |
+| [`locale_list`](#locale_list) | Lists the game's locales: the current one and its fallback chain (pt-BR -&gt; pt -&gt; source), the source language, every locale with strings (count, coverage, files under locale/), game.json `localization` settings, strings requested at run time that no table has, and table file problems. |
+| [`locale_set`](#locale_set) | Switches the language the game shows: texts written as "@key" (ui.text, ui.placeholder, text.text), tr() calls and #line dialogue lines follow at once. |
+| [`locale_check`](#locale_check) | Audits localization and returns findings an agent can fix one by one: per locale the keys with no translation (and coverage); keys the project uses ("@key" fields, tr("key") in scripts, #line dialogue ids) that no table defines; unused keys; placeholder mismatches between a translation and the source ({name} missing or extra); invalid messages; plurals missing forms the language needs (ru: one/few/many, ar: zero..many); strings longer than their budget (the table's `max` column, or source length x `budget`, default game.json maxLengthRatio); characters no font covers (CJK, Arabic...: add a font); keys requested at run time but missing. |
+| [`locale_extract`](#locale_extract) | Scans the open scene, scenes, prefabs, dialogue scripts and Wander code for hard-coded player-facing texts (ui.text, ui.placeholder, text.text, dialogue lines and choices without a #line id, `.text = "..."` in scripts) and proposes a key for each ("main_menu.play", "dlg.intro.start.003"); a text whose source string already exists reuses its key. |
+| [`locale_pseudo`](#locale_pseudo) | Writes a pseudo-locale for layout testing: every string accented and about 30% longer inside brackets ("Play" -&gt; "[Ƥļáý~~]"), placeholders, plurals and rich-text tags intact, so truncation, overflow and hard-coded texts (they stay plain) jump out. |
 
 ### `environment_get` { #environment_get }
 
@@ -1092,6 +1097,199 @@ Live state of particles2d emitters: particles alive, cap, rate, box, wrap, and t
       "params": {
         "name": "particles2d_info",
         "arguments": {}
+      }
+    }
+    ```
+
+### `locale_list` { #locale_list }
+
+**List locales** <span class="sky-badge sky-badge--ro" title="Never changes the scene">read-only</span>
+
+Lists the game's locales: the current one and its fallback chain (pt-BR -> pt -> source), the source language, every locale with strings (count, coverage, files under locale/), game.json `localization` settings, strings requested at run time that no table has, and table file problems. Start here before translating or checking.
+
+Takes no arguments.
+
+=== "Tool call"
+
+    ```tool
+    locale_list {}
+    ```
+
+=== "CLI"
+
+    ```bash
+    skywalker call locale_list '{}' --project my_game
+    ```
+
+=== "MCP request"
+
+    ```json
+    {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "method": "tools/call",
+      "params": {
+        "name": "locale_list",
+        "arguments": {}
+      }
+    }
+    ```
+
+### `locale_set` { #locale_set }
+
+**Set the locale** <span class="sky-badge sky-badge--ro" title="Never changes the scene">read-only</span>
+
+Switches the language the game shows: texts written as "@key" (ui.text, ui.placeholder, text.text), tr() calls and #line dialogue lines follow at once. While playing it acts like Wander's set_locale (undone when play stops); while editing it previews a language in the editor until changed. "" returns to the default (game.json localization.locale, else the source language). Then viewport_capture / ui_inspect to look for overflow. Example: {"locale": "fr"}.
+
+| Argument | Type | Required | Description | Values |
+|---|---|---|---|---|
+| `locale` | string | yes | Locale code ("fr", "pt-BR", "en-XA" for the pseudo-locale); "" = default |  |
+
+=== "Tool call"
+
+    ```tool
+    locale_set {"locale": "fr"}
+    ```
+
+=== "CLI"
+
+    ```bash
+    skywalker call locale_set '{"locale": "fr"}' --project my_game
+    ```
+
+=== "MCP request"
+
+    ```json
+    {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "method": "tools/call",
+      "params": {
+        "name": "locale_set",
+        "arguments": {
+          "locale": "fr"
+        }
+      }
+    }
+    ```
+
+### `locale_check` { #locale_check }
+
+**Check the string tables** <span class="sky-badge sky-badge--ro" title="Never changes the scene">read-only</span>
+
+Audits localization and returns findings an agent can fix one by one: per locale the keys with no translation (and coverage); keys the project uses ("@key" fields, tr("key") in scripts, #line dialogue ids) that no table defines; unused keys; placeholder mismatches between a translation and the source ({name} missing or extra); invalid messages; plurals missing forms the language needs (ru: one/few/many, ar: zero..many); strings longer than their budget (the table's `max` column, or source length x `budget`, default game.json maxLengthRatio); characters no font covers (CJK, Arabic...: add a font); keys requested at run time but missing. Example: {"locale": "de", "budget": 1.3}.
+
+| Argument | Type | Required | Description | Values |
+|---|---|---|---|---|
+| `locale` | string |  | Only this locale (default: all) |  |
+| `budget` | number |  | Max length ratio translation / source, e.g. 1.3 (default game.json localization.maxLengthRatio) |  |
+| `max_findings` | integer |  | Most findings listed per category (default 200) |  |
+
+=== "Tool call"
+
+    ```tool
+    locale_check {"locale": "de", "budget": 1.3}
+    ```
+
+=== "CLI"
+
+    ```bash
+    skywalker call locale_check '{"locale": "de", "budget": 1.3}' --project my_game
+    ```
+
+=== "MCP request"
+
+    ```json
+    {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "method": "tools/call",
+      "params": {
+        "name": "locale_check",
+        "arguments": {
+          "locale": "de",
+          "budget": 1.3
+        }
+      }
+    }
+    ```
+
+### `locale_extract` { #locale_extract }
+
+**Extract hard-coded texts** <span class="sky-badge sky-badge--mut" title="Changes the project; undoable and attributed">mutating</span>
+
+Scans the open scene, scenes, prefabs, dialogue scripts and Wander code for hard-coded player-facing texts (ui.text, ui.placeholder, text.text, dialogue lines and choices without a #line id, `.text = "..."` in scripts) and proposes a key for each ("main_menu.play", "dlg.intro.start.003"); a text whose source string already exists reuses its key. With apply: true it writes the source strings to a CSV table (default locale/strings.csv), replaces the open scene's fields with "@key" (one undoable edit) and tags dialogue lines with #line:<key>; script strings are only reported (use tr("key")). Example: {"apply": true}.
+
+| Argument | Type | Required | Description | Values |
+|---|---|---|---|---|
+| `apply` | boolean |  | Write the table, update the open scene and tag dialogue lines (default false: proposals only) |  |
+| `file` | string |  | CSV table to write (default locale/strings.csv) |  |
+| `max` | integer |  | Most proposals returned (default 300) |  |
+
+=== "Tool call"
+
+    ```tool
+    locale_extract {"apply": true}
+    ```
+
+=== "CLI"
+
+    ```bash
+    skywalker call locale_extract '{"apply": true}' --project my_game
+    ```
+
+=== "MCP request"
+
+    ```json
+    {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "method": "tools/call",
+      "params": {
+        "name": "locale_extract",
+        "arguments": {
+          "apply": true
+        }
+      }
+    }
+    ```
+
+### `locale_pseudo` { #locale_pseudo }
+
+**Generate a pseudo-locale** <span class="sky-badge sky-badge--mut" title="Changes the project; undoable and attributed">mutating</span>
+
+Writes a pseudo-locale for layout testing: every string accented and about 30% longer inside brackets ("Play" -> "[Ƥļáý~~]"), placeholders, plurals and rich-text tags intact, so truncation, overflow and hard-coded texts (they stay plain) jump out. Writes locale/pseudo.csv with the locale en-XA and, by default, switches to it (like locale_set). Then viewport_capture and ui_inspect each menu; locale_set {"locale": ""} goes back. Example: {"expand": 0.4}.
+
+| Argument | Type | Required | Description | Values |
+|---|---|---|---|---|
+| `expand` | number |  | Extra length, 0..2 (default 0.3 = 30% longer) |  |
+| `locale` | string |  | Pseudo-locale code (default en-XA) |  |
+| `activate` | boolean |  | Switch to it afterwards (default true) |  |
+
+=== "Tool call"
+
+    ```tool
+    locale_pseudo {"expand": 0.4}
+    ```
+
+=== "CLI"
+
+    ```bash
+    skywalker call locale_pseudo '{"expand": 0.4}' --project my_game
+    ```
+
+=== "MCP request"
+
+    ```json
+    {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "method": "tools/call",
+      "params": {
+        "name": "locale_pseudo",
+        "arguments": {
+          "expand": 0.4
+        }
       }
     }
     ```

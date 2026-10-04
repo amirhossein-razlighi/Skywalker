@@ -7,7 +7,7 @@ title: "Simulation tools"
 
 Play, pause, step and stop; inject input; trace and inspect what runs.
 
-9 tools in the `sim` category. Badges: **read-only** tools never change the project; **mutating** tools are undoable and attributed; **open-world** tools reach outside the engine and MCP clients ask before running them.
+14 tools in the `sim` category. Badges: **read-only** tools never change the project; **mutating** tools are undoable and attributed; **open-world** tools reach outside the engine and MCP clients ask before running them.
 
 | Tool | Summary |
 |---|---|
@@ -20,6 +20,11 @@ Play, pause, step and stop; inject input; trace and inspect what runs.
 | [`input_map`](#input_map) | Read or edit the project's input action map (input.json): named, device-independent actions bound to keyboard, mouse and gamepad. |
 | [`process_info`](#process_info) | What runs while the game is paused or slowed, and how smooth real-time frames are. |
 | [`sim_teleport`](#sim_teleport) | Move an entity instantly — a respawn, a portal, a checkpoint — without render interpolation smearing it across the screen for a frame (Wander: teleport(entity, position)). |
+| [`save_game`](#save_game) | Saves the running game into a slot, exactly as Wander's save_game() would at a tick boundary: every entity with a `persist` component (whole state or chosen fields, Wander vars, spawned subtrees), tombstones for persisted scene entities that were destroyed, game_var values, the scene, the play time and the exact behavior state. |
+| [`load_game`](#load_game) | Restores a slot into the running game: persisted entities return to their saved state (spawned ones are recreated with their ids, ones destroyed before the save are removed again), game vars, the scene (a save from another scene is an immediate scene flow change: `carry` entities come along) and the exact behavior state (state machines, timers, waiting handlers, random generator), then `on loaded` runs. |
+| [`save_list`](#save_list) | Lists the save slots of this project: slot, metadata (title, chapter...), file size, format and game version, play time, scene, tick and when it was saved. |
+| [`save_inspect`](#save_inspect) | Diffs a save slot against the running game to debug "what didn't restore": per persisted entity, the fields whose current value differs from the saved one (path, saved, current), entities missing from the scene, entities the save destroyed or never had, game var differences, the scene and the tick. |
+| [`save_delete`](#save_delete) | Deletes a save slot's file. |
 
 ### `sim_control` { #sim_control }
 
@@ -428,6 +433,199 @@ Move an entity instantly — a respawn, a portal, a checkpoint — without rende
             1,
             0
           ]
+        }
+      }
+    }
+    ```
+
+### `save_game` { #save_game }
+
+**Save the game** <span class="sky-badge sky-badge--mut" title="Changes the project; undoable and attributed">mutating</span>
+
+Saves the running game into a slot, exactly as Wander's save_game() would at a tick boundary: every entity with a `persist` component (whole state or chosen fields, Wander vars, spawned subtrees), tombstones for persisted scene entities that were destroyed, game_var values, the scene, the play time and the exact behavior state. Use it to make checkpoints while playtesting, then load_game to jump back. Needs play mode (sim_control play). Slots: 1-64 of [a-z0-9_-]; "autosave" and "quicksave" do not count toward game.json saves.maxSlots. Example: {"slot": "checkpoint-1", "meta": {"title": "Before the boss", "chapter": 3}}.
+
+| Argument | Type | Required | Description | Values |
+|---|---|---|---|---|
+| `slot` | string | yes | Slot name, e.g. "slot1", "autosave", "checkpoint-2" |  |
+| `meta` | object |  | Shown in save menus: title, chapter, thumbnail (project-relative image path), anything else the game wants |  |
+
+=== "Tool call"
+
+    ```tool
+    save_game {"slot": "checkpoint-1", "meta": {"title": "Before the boss", "chapter": 3}}
+    ```
+
+=== "CLI"
+
+    ```bash
+    skywalker call save_game '{"slot": "checkpoint-1", "meta": {"title": "Before the boss", "chapter": 3}}' --project my_game
+    ```
+
+=== "MCP request"
+
+    ```json
+    {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "method": "tools/call",
+      "params": {
+        "name": "save_game",
+        "arguments": {
+          "slot": "checkpoint-1",
+          "meta": {
+            "title": "Before the boss",
+            "chapter": 3
+          }
+        }
+      }
+    }
+    ```
+
+### `load_game` { #load_game }
+
+**Load a save** <span class="sky-badge sky-badge--mut" title="Changes the project; undoable and attributed">mutating</span>
+
+Restores a slot into the running game: persisted entities return to their saved state (spawned ones are recreated with their ids, ones destroyed before the save are removed again), game vars, the scene (a save from another scene is an immediate scene flow change: `carry` entities come along) and the exact behavior state (state machines, timers, waiting handlers, random generator), then `on loaded` runs. Older saves are migrated (game.json saves.version / saves.migrate). Stopping play still returns to the edited scene. After loading, save_inspect on the same slot lists anything that did not restore. Example: {"slot": "checkpoint-1"}.
+
+| Argument | Type | Required | Description | Values |
+|---|---|---|---|---|
+| `slot` | string | yes | Slot to load (save_list shows them) |  |
+
+=== "Tool call"
+
+    ```tool
+    load_game {"slot": "checkpoint-1"}
+    ```
+
+=== "CLI"
+
+    ```bash
+    skywalker call load_game '{"slot": "checkpoint-1"}' --project my_game
+    ```
+
+=== "MCP request"
+
+    ```json
+    {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "method": "tools/call",
+      "params": {
+        "name": "load_game",
+        "arguments": {
+          "slot": "checkpoint-1"
+        }
+      }
+    }
+    ```
+
+### `save_list` { #save_list }
+
+**List save slots** <span class="sky-badge sky-badge--ro" title="Never changes the scene">read-only</span>
+
+Lists the save slots of this project: slot, metadata (title, chapter...), file size, format and game version, play time, scene, tick and when it was saved. Damaged files are listed with an `error`. Also returns the save folder and game.json `saves` settings. Works while editing too.
+
+Takes no arguments.
+
+=== "Tool call"
+
+    ```tool
+    save_list {}
+    ```
+
+=== "CLI"
+
+    ```bash
+    skywalker call save_list '{}' --project my_game
+    ```
+
+=== "MCP request"
+
+    ```json
+    {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "method": "tools/call",
+      "params": {
+        "name": "save_list",
+        "arguments": {}
+      }
+    }
+    ```
+
+### `save_inspect` { #save_inspect }
+
+**Compare a save with the game** <span class="sky-badge sky-badge--ro" title="Never changes the scene">read-only</span>
+
+Diffs a save slot against the running game to debug "what didn't restore": per persisted entity, the fields whose current value differs from the saved one (path, saved, current), entities missing from the scene, entities the save destroyed or never had, game var differences, the scene and the tick. Right after load_game everything should read `same`; anything else is what the load could not bring back. Example: {"slot": "autosave", "max_diffs": 50}.
+
+| Argument | Type | Required | Description | Values |
+|---|---|---|---|---|
+| `slot` | string | yes | Slot to compare |  |
+| `max_diffs` | integer |  | Most field differences to list (default 200) |  |
+
+=== "Tool call"
+
+    ```tool
+    save_inspect {"slot": "autosave", "max_diffs": 50}
+    ```
+
+=== "CLI"
+
+    ```bash
+    skywalker call save_inspect '{"slot": "autosave", "max_diffs": 50}' --project my_game
+    ```
+
+=== "MCP request"
+
+    ```json
+    {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "method": "tools/call",
+      "params": {
+        "name": "save_inspect",
+        "arguments": {
+          "slot": "autosave",
+          "max_diffs": 50
+        }
+      }
+    }
+    ```
+
+### `save_delete` { #save_delete }
+
+**Delete a save slot** <span class="sky-badge sky-badge--mut" title="Changes the project; undoable and attributed">mutating</span> <span class="sky-badge" title="May remove or overwrite data">destructive</span>
+
+Deletes a save slot's file. Cannot be undone. Example: {"slot": "slot3"}.
+
+| Argument | Type | Required | Description | Values |
+|---|---|---|---|---|
+| `slot` | string | yes | Slot to delete |  |
+
+=== "Tool call"
+
+    ```tool
+    save_delete {"slot": "slot3"}
+    ```
+
+=== "CLI"
+
+    ```bash
+    skywalker call save_delete '{"slot": "slot3"}' --project my_game
+    ```
+
+=== "MCP request"
+
+    ```json
+    {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "method": "tools/call",
+      "params": {
+        "name": "save_delete",
+        "arguments": {
+          "slot": "slot3"
         }
       }
     }

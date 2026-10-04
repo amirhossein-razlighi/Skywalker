@@ -86,6 +86,9 @@ Strand hair and fur, particles and fluids, skeletal animation and cinematics.
 | [Audio](audio.md) | Sound sources, the mixer and its buses, listeners and generated audio |
 | [Input](input.md) | Input actions and axes, keyboard, mouse and gamepad, simulated input for tests |
 | [2D and UI](2d-ui.md) | Sprites, tilemaps, 2D lights and cameras, world text, UI canvases and dialogue |
+| [Scene flow](scene-flow.md) | Changing scenes while the game runs, carried entities, sub-scenes, loading scenes, fades and crossfades |
+| [Save games](save-games.md) | Checkpoints, autosaves and slots, the `persist` component, exact replay after a load, migrations |
+| [Localization](localization.md) | String tables, `@key` texts, plurals and numbers per language, the locale, the translation workflow |
 
 ### Wander scripting
 

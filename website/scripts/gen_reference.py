@@ -69,6 +69,8 @@ COMPONENT_GROUPS = OrderedDict([
                  ["body", "collider", "character", "joint", "vehicle", "chase_camera", "physics_world", "navmesh", "nav_agent"])),
     ("animation", ("Animation", "Animators, character IK (foot planting, hand targets, turn in place), bone attachments, IK "
                    "effectors and sequence players.", ["animator", "characterIk", "attach", "ik", "sequencer"])),
+    ("game", ("Game flow", "What a save game restores (persist) and what is carried across runtime scene changes (carry).",
+              ["persist", "carry"])),
 ])
 
 # Example values for synthesized tool examples (only used when a tool's description has no "Example: {...}").

@@ -9121,7 +9121,7 @@
   {
    "name": "game_settings",
    "title": "Game settings (game.json)",
-   "description": "Read or change the project's shipping settings in game.json: startScene, window {width,height,fullscreen,resizable,vsync}, quality (low|medium|high|ultra), renderScale, quitOnEscape, pauseOnFocusLoss, icon (a PNG, 1024x1024 recommended), bundleId (reverse-DNS), version, copyright, plus include/exclude globs for packaging, and the description fields (id, title, genre, mood, pitch), and mounts: shared folders outside the project addressed by a top-level name, e.g. {\"mounts\": {\"kit\": \"../_kit\"}} makes kit/characters/guard.prefab.json resolve into ../_kit (assets, prefabs, materials and animations load from it; game_build copies what the game uses). `get` returns the effective settings, the resolved start scene and validation problems. `set` merges the given fields (null removes one) and validates them. Example: {\"operation\":\"set\",\"settings\":{\"title\":\"Sky Dash\",\"startScene\":\"scenes/main.sky.json\",\"window\":{\"width\":1280,\"height\":720}}}",
+   "description": "Read or change the project's shipping settings in game.json: startScene, window {width,height,fullscreen,resizable,vsync}, quality (low|medium|high|ultra), renderScale, quitOnEscape, pauseOnFocusLoss, icon (a PNG, 1024x1024 recommended), bundleId (reverse-DNS), version, copyright, plus include/exclude globs for packaging, and the description fields (id, title, genre, mood, pitch), and mounts: shared folders outside the project addressed by a top-level name, e.g. {\"mounts\": {\"kit\": \"../_kit\"}} makes kit/characters/guard.prefab.json resolve into ../_kit (assets, prefabs, materials and animations load from it; game_build copies what the game uses), and saves {version, maxSlots, compress, migrate} for save games (docs/SAVE_GAMES.md). `get` returns the effective settings, the resolved start scene and validation problems. `set` merges the given fields (null removes one) and validates them. Example: {\"operation\":\"set\",\"settings\":{\"title\":\"Sky Dash\",\"startScene\":\"scenes/main.sky.json\",\"window\":{\"width\":1280,\"height\":720}}}",
    "inputSchema": {
     "type": "object",
     "properties": {
@@ -11635,6 +11635,434 @@
    },
    "_meta": {
     "skywalker/category": "animation"
+   }
+  },
+  {
+   "name": "save_game",
+   "title": "Save the game",
+   "description": "Saves the running game into a slot, exactly as Wander's save_game() would at a tick boundary: every entity with a `persist` component (whole state or chosen fields, Wander vars, spawned subtrees), tombstones for persisted scene entities that were destroyed, game_var values, the scene, the play time and the exact behavior state. Use it to make checkpoints while playtesting, then load_game to jump back. Needs play mode (sim_control play). Slots: 1-64 of [a-z0-9_-]; \"autosave\" and \"quicksave\" do not count toward game.json saves.maxSlots. Example: {\"slot\": \"checkpoint-1\", \"meta\": {\"title\": \"Before the boss\", \"chapter\": 3}}.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "slot": {
+      "type": "string",
+      "description": "Slot name, e.g. \"slot1\", \"autosave\", \"checkpoint-2\""
+     },
+     "meta": {
+      "type": "object",
+      "description": "Shown in save menus: title, chapter, thumbnail (project-relative image path), anything else the game wants"
+     }
+    },
+    "additionalProperties": false,
+    "required": [
+     "slot"
+    ]
+   },
+   "annotations": {
+    "title": "Save the game",
+    "readOnlyHint": false,
+    "destructiveHint": false,
+    "openWorldHint": false
+   },
+   "_meta": {
+    "skywalker/category": "sim"
+   }
+  },
+  {
+   "name": "load_game",
+   "title": "Load a save",
+   "description": "Restores a slot into the running game: persisted entities return to their saved state (spawned ones are recreated with their ids, ones destroyed before the save are removed again), game vars, the scene (a save from another scene is an immediate scene flow change: `carry` entities come along) and the exact behavior state (state machines, timers, waiting handlers, random generator), then `on loaded` runs. Older saves are migrated (game.json saves.version / saves.migrate). Stopping play still returns to the edited scene. After loading, save_inspect on the same slot lists anything that did not restore. Example: {\"slot\": \"checkpoint-1\"}.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "slot": {
+      "type": "string",
+      "description": "Slot to load (save_list shows them)"
+     }
+    },
+    "additionalProperties": false,
+    "required": [
+     "slot"
+    ]
+   },
+   "annotations": {
+    "title": "Load a save",
+    "readOnlyHint": false,
+    "destructiveHint": false,
+    "openWorldHint": false
+   },
+   "_meta": {
+    "skywalker/category": "sim"
+   }
+  },
+  {
+   "name": "save_list",
+   "title": "List save slots",
+   "description": "Lists the save slots of this project: slot, metadata (title, chapter...), file size, format and game version, play time, scene, tick and when it was saved. Damaged files are listed with an `error`. Also returns the save folder and game.json `saves` settings. Works while editing too.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+   },
+   "annotations": {
+    "title": "List save slots",
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "openWorldHint": false
+   },
+   "_meta": {
+    "skywalker/category": "sim"
+   }
+  },
+  {
+   "name": "save_inspect",
+   "title": "Compare a save with the game",
+   "description": "Diffs a save slot against the running game to debug \"what didn't restore\": per persisted entity, the fields whose current value differs from the saved one (path, saved, current), entities missing from the scene, entities the save destroyed or never had, game var differences, the scene and the tick. Right after load_game everything should read `same`; anything else is what the load could not bring back. Example: {\"slot\": \"autosave\", \"max_diffs\": 50}.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "slot": {
+      "type": "string",
+      "description": "Slot to compare"
+     },
+     "max_diffs": {
+      "type": "integer",
+      "description": "Most field differences to list (default 200)"
+     }
+    },
+    "additionalProperties": false,
+    "required": [
+     "slot"
+    ]
+   },
+   "annotations": {
+    "title": "Compare a save with the game",
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "openWorldHint": false
+   },
+   "_meta": {
+    "skywalker/category": "sim"
+   }
+  },
+  {
+   "name": "save_delete",
+   "title": "Delete a save slot",
+   "description": "Deletes a save slot's file. Cannot be undone. Example: {\"slot\": \"slot3\"}.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "slot": {
+      "type": "string",
+      "description": "Slot to delete"
+     }
+    },
+    "additionalProperties": false,
+    "required": [
+     "slot"
+    ]
+   },
+   "annotations": {
+    "title": "Delete a save slot",
+    "readOnlyHint": false,
+    "destructiveHint": true,
+    "openWorldHint": false
+   },
+   "_meta": {
+    "skywalker/category": "sim"
+   }
+  },
+  {
+   "name": "locale_list",
+   "title": "List locales",
+   "description": "Lists the game's locales: the current one and its fallback chain (pt-BR -> pt -> source), the source language, every locale with strings (count, coverage, files under locale/), game.json `localization` settings, strings requested at run time that no table has, and table file problems. Start here before translating or checking.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+   },
+   "annotations": {
+    "title": "List locales",
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "openWorldHint": false
+   },
+   "_meta": {
+    "skywalker/category": "render"
+   }
+  },
+  {
+   "name": "locale_set",
+   "title": "Set the locale",
+   "description": "Switches the language the game shows: texts written as \"@key\" (ui.text, ui.placeholder, text.text), tr() calls and #line dialogue lines follow at once. While playing it acts like Wander's set_locale (undone when play stops); while editing it previews a language in the editor until changed. \"\" returns to the default (game.json localization.locale, else the source language). Then viewport_capture / ui_inspect to look for overflow. Example: {\"locale\": \"fr\"}.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "locale": {
+      "type": "string",
+      "description": "Locale code (\"fr\", \"pt-BR\", \"en-XA\" for the pseudo-locale); \"\" = default"
+     }
+    },
+    "additionalProperties": false,
+    "required": [
+     "locale"
+    ]
+   },
+   "annotations": {
+    "title": "Set the locale",
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "openWorldHint": false
+   },
+   "_meta": {
+    "skywalker/category": "render"
+   }
+  },
+  {
+   "name": "locale_check",
+   "title": "Check the string tables",
+   "description": "Audits localization and returns findings an agent can fix one by one: per locale the keys with no translation (and coverage); keys the project uses (\"@key\" fields, tr(\"key\") in scripts, #line dialogue ids) that no table defines; unused keys; placeholder mismatches between a translation and the source ({name} missing or extra); invalid messages; plurals missing forms the language needs (ru: one/few/many, ar: zero..many); strings longer than their budget (the table's `max` column, or source length x `budget`, default game.json maxLengthRatio); characters no font covers (CJK, Arabic...: add a font); keys requested at run time but missing. Example: {\"locale\": \"de\", \"budget\": 1.3}.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "locale": {
+      "type": "string",
+      "description": "Only this locale (default: all)"
+     },
+     "budget": {
+      "type": "number",
+      "description": "Max length ratio translation / source, e.g. 1.3 (default game.json localization.maxLengthRatio)"
+     },
+     "max_findings": {
+      "type": "integer",
+      "description": "Most findings listed per category (default 200)"
+     }
+    },
+    "additionalProperties": false
+   },
+   "annotations": {
+    "title": "Check the string tables",
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "openWorldHint": false
+   },
+   "_meta": {
+    "skywalker/category": "render"
+   }
+  },
+  {
+   "name": "locale_extract",
+   "title": "Extract hard-coded texts",
+   "description": "Scans the open scene, scenes, prefabs, dialogue scripts and Wander code for hard-coded player-facing texts (ui.text, ui.placeholder, text.text, dialogue lines and choices without a #line id, `.text = \"...\"` in scripts) and proposes a key for each (\"main_menu.play\", \"dlg.intro.start.003\"); a text whose source string already exists reuses its key. With apply: true it writes the source strings to a CSV table (default locale/strings.csv), replaces the open scene's fields with \"@key\" (one undoable edit) and tags dialogue lines with #line:<key>; script strings are only reported (use tr(\"key\")). Example: {\"apply\": true}.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "apply": {
+      "type": "boolean",
+      "description": "Write the table, update the open scene and tag dialogue lines (default false: proposals only)"
+     },
+     "file": {
+      "type": "string",
+      "description": "CSV table to write (default locale/strings.csv)"
+     },
+     "max": {
+      "type": "integer",
+      "description": "Most proposals returned (default 300)"
+     }
+    },
+    "additionalProperties": false
+   },
+   "annotations": {
+    "title": "Extract hard-coded texts",
+    "readOnlyHint": false,
+    "destructiveHint": false,
+    "openWorldHint": false
+   },
+   "_meta": {
+    "skywalker/category": "render"
+   }
+  },
+  {
+   "name": "locale_pseudo",
+   "title": "Generate a pseudo-locale",
+   "description": "Writes a pseudo-locale for layout testing: every string accented and about 30% longer inside brackets (\"Play\" -> \"[Ƥļáý~~]\"), placeholders, plurals and rich-text tags intact, so truncation, overflow and hard-coded texts (they stay plain) jump out. Writes locale/pseudo.csv with the locale en-XA and, by default, switches to it (like locale_set). Then viewport_capture and ui_inspect each menu; locale_set {\"locale\": \"\"} goes back. Example: {\"expand\": 0.4}.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "expand": {
+      "type": "number",
+      "description": "Extra length, 0..2 (default 0.3 = 30% longer)"
+     },
+     "locale": {
+      "type": "string",
+      "description": "Pseudo-locale code (default en-XA)"
+     },
+     "activate": {
+      "type": "boolean",
+      "description": "Switch to it afterwards (default true)"
+     }
+    },
+    "additionalProperties": false
+   },
+   "annotations": {
+    "title": "Generate a pseudo-locale",
+    "readOnlyHint": false,
+    "destructiveHint": false,
+    "openWorldHint": false
+   },
+   "_meta": {
+    "skywalker/category": "render"
+   }
+  },
+  {
+   "name": "scene_flow_info",
+   "title": "Scene flow state",
+   "description": "The running game's scene flow: the current scene (alias or path), the pending change (target, preloaded assets, loading scene), loading progress, the transition (kind, phase out|loading|in|idle, alpha), loaded sub-scenes with their entity counts, the carried entities (`carried`: `carry` components, game.json sceneFlow.carry), game.json scene aliases and every scene file. Use it before and after scene_change / scene_additive_load, and to explain why something did not carry over.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+   },
+   "annotations": {
+    "title": "Scene flow state",
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "openWorldHint": false
+   },
+   "_meta": {
+    "skywalker/category": "scene"
+   }
+  },
+  {
+   "name": "scene_change",
+   "title": "Change scene (play)",
+   "description": "Moves the running game to another scene, as Wander's change_scene does: the scene is a game.json \"scenes\" alias or a .sky.json path (unknown names get a did-you-mean). Entities with a `carry` component, game.json sceneFlow.carry names and `keep` carry over with their behaviors running; the rest is replaced. The change runs over the next ticks (transition out, preloading, swap, transition in); step the simulation to see it, or pass immediate: true to swap now. Stopping play returns the editor to the scene play started in. Example: {\"scene\": \"level2\", \"transition\": \"fade\", \"duration\": 0.4, \"spawn_at\": \"Door_West\"}.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "scene": {
+      "type": "string",
+      "description": "Alias or .sky.json path"
+     },
+     "transition": {
+      "description": "\"none\" | \"fade\" | \"crossfade\", or {kind, duration, color}"
+     },
+     "duration": {
+      "type": "number",
+      "description": "Transition seconds (0..10)"
+     },
+     "color": {
+      "type": "string",
+      "description": "Fade color, e.g. \"#000000\""
+     },
+     "keep": {
+      "type": "array",
+      "items": {
+       "type": "string",
+       "description": "Entity name"
+      },
+      "description": "More entities to carry over this time"
+     },
+     "spawn_at": {
+      "type": "string",
+      "description": "Entity of the new scene the player moves to (carry.spawn, else tag \"player\")"
+     },
+     "loading": {
+      "type": "string",
+      "description": "Loading scene shown while the target preloads (\"\" = none; default game.json sceneFlow.loadingScene)"
+     },
+     "immediate": {
+      "type": "boolean",
+      "description": "Swap now, without transition or preloading (default false)"
+     }
+    },
+    "additionalProperties": false,
+    "required": [
+     "scene"
+    ]
+   },
+   "annotations": {
+    "title": "Change scene (play)",
+    "readOnlyHint": false,
+    "destructiveHint": false,
+    "openWorldHint": false
+   },
+   "_meta": {
+    "skywalker/category": "scene"
+   }
+  },
+  {
+   "name": "scene_additive_load",
+   "title": "Load a sub-scene (play)",
+   "description": "Adds a scene's entities to the running game (a room, a streaming chunk, a UI overlay) with fresh entity ids and returns its handle. The sub-scene owns exactly the entities it created, so scene_additive_unload removes those and nothing else. Options: id (handle; default the alias or file name), parent (entity to load under), offset (added to its root positions). Loads now (between ticks); `on scene_loaded` runs next tick. Example: {\"scene\": \"rooms/cellar\", \"offset\": [40, 0, 0]}.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "scene": {
+      "type": "string",
+      "description": "Alias or .sky.json path"
+     },
+     "id": {
+      "type": "string",
+      "description": "Handle for unloading (default: alias or file name, made unique)"
+     },
+     "parent": {
+      "type": [
+       "integer",
+       "string"
+      ],
+      "description": "Entity to load under (default: the root)"
+     },
+     "offset": {
+      "type": "array",
+      "items": {
+       "type": "number"
+      },
+      "minItems": 3,
+      "maxItems": 3,
+      "description": "Added to the sub-scene's root positions"
+     }
+    },
+    "additionalProperties": false,
+    "required": [
+     "scene"
+    ]
+   },
+   "annotations": {
+    "title": "Load a sub-scene (play)",
+    "readOnlyHint": false,
+    "destructiveHint": false,
+    "openWorldHint": false
+   },
+   "_meta": {
+    "skywalker/category": "scene"
+   }
+  },
+  {
+   "name": "scene_additive_unload",
+   "title": "Unload a sub-scene (play)",
+   "description": "Removes a sub-scene loaded with scene_additive_load or Wander's load_additive: exactly the entities it created. Entities the game added under them at run time are kept and moved to the root (listed as orphans). Removes now (between ticks). Example: {\"handle\": \"cellar\"}.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "handle": {
+      "type": "string",
+      "description": "Sub-scene handle (scene_flow_info lists them)"
+     }
+    },
+    "additionalProperties": false,
+    "required": [
+     "handle"
+    ]
+   },
+   "annotations": {
+    "title": "Unload a sub-scene (play)",
+    "readOnlyHint": false,
+    "destructiveHint": false,
+    "openWorldHint": false
+   },
+   "_meta": {
+    "skywalker/category": "scene"
    }
   }
  ]

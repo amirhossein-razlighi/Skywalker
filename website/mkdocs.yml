@@ -171,6 +171,9 @@ nav:
           - Audio: manual/audio.md
           - Input: manual/input.md
           - 2D and UI: manual/2d-ui.md
+          - Scene flow: manual/scene-flow.md
+          - Save games: manual/save-games.md
+          - Localization: manual/localization.md
       - Wander scripting:
           - manual/wander/index.md
           - Language: manual/wander/language.md
@@ -223,6 +226,7 @@ nav:
           - Audio: reference/components/audio.md
           - Physics and navigation: reference/components/physics.md
           - Animation: reference/components/animation.md
+          - Game flow: reference/components/game.md
       - Wander builtins: reference/wander.md
       - Command line: reference/cli.md
       - C API: reference/capi.md

@@ -47,6 +47,7 @@ ALLOW = set(skills.ALLOW) | {
     "frame_handlers", "align_sun_to_hdri", "create_material", "update_references", "skip_existing", "all_assets",
     "build_native", "dry_run", "bundle_id", "render_layers", "wander_bench", "scene_overview", "entity_get",
     "tool_warn", "tool_fail", "tool_actor",  # builtins that exist only inside custom tool code (docs/CUSTOM_TOOLS.md)
+    "save_copy",  # a DCC bridge method (manual/dcc.md), not a save game tool
 }
 
 # Names of other engines are stored ROT13-encoded so they never appear in the site's sources themselves.

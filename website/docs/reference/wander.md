@@ -5,7 +5,7 @@ title: "Wander builtins"
 
 # Wander builtins
 
-Every function a Wander script can call lives in one registry: name, typed parameters, return type, category, documentation and an example. The compiler checks calls against it (arity, types, did-you-mean), and this page is generated from it. **146 builtins** in 20 categories.
+Every function a Wander script can call lives in one registry: name, typed parameters, return type, category, documentation and an example. The compiler checks calls against it (arity, types, did-you-mean), and this page is generated from it. **161 builtins** in 22 categories.
 
 Agents get the same information from `wander_reference` (the guide) and `wander_reference {topic}` (structured entries for a category or a function). For the language itself, read the [Wander manual](../manual/wander/index.md).
 
@@ -20,13 +20,15 @@ Agents get the same information from `wander_reference` (the guide) and `wander_
 | [effects](#effects) | [`burst`](#effects-burst), [`water_height`](#effects-water_height) |
 | [input](#input) | [`action`](#input-action), [`axis`](#input-axis), [`cursor_lock`](#input-cursor_lock), [`key`](#input-key), [`key_pressed`](#input-key_pressed), [`pressed`](#input-pressed), [`quit_game`](#input-quit_game), [`released`](#input-released) |
 | [list](#list) | [`clear`](#list-clear), [`contains`](#list-contains), [`first`](#list-first), [`index_of`](#list-index_of), [`insert`](#list-insert), [`is_empty`](#list-is_empty), [`join`](#list-join), [`last`](#list-last), [`pop`](#list-pop), [`push`](#list-push), [`remove`](#list-remove), [`remove_at`](#list-remove_at), [`reverse`](#list-reverse), [`slice`](#list-slice), [`sort`](#list-sort), [`sorted`](#list-sorted), [`sum`](#list-sum) |
+| [locale](#locale) | [`locale`](#locale-locale), [`locales`](#locale-locales), [`set_locale`](#locale-set_locale), [`tr`](#locale-tr) |
 | [map](#map) | [`get`](#map-get), [`has`](#map-has), [`keys`](#map-keys), [`set`](#map-set), [`values`](#map-values) |
 | [math](#math) | [`abs`](#math-abs), [`acos`](#math-acos), [`approach`](#math-approach), [`asin`](#math-asin), [`atan`](#math-atan), [`atan2`](#math-atan2), [`ceil`](#math-ceil), [`clamp`](#math-clamp), [`cos`](#math-cos), [`deg`](#math-deg), [`exp`](#math-exp), [`floor`](#math-floor), [`inverse_lerp`](#math-inverse_lerp), [`lerp`](#math-lerp), [`ln`](#math-ln), [`max`](#math-max), [`min`](#math-min), [`noise`](#math-noise), [`pow`](#math-pow), [`rad`](#math-rad), [`round`](#math-round), [`sign`](#math-sign), [`sin`](#math-sin), [`smoothstep`](#math-smoothstep), [`sqrt`](#math-sqrt), [`tan`](#math-tan) |
 | [navigation](#navigation) | [`arrived`](#navigation-arrived), [`navigate`](#navigation-navigate), [`path_length`](#navigation-path_length), [`stop_navigation`](#navigation-stop_navigation) |
 | [physics](#physics) | [`impulse`](#physics-impulse), [`overlap_sphere`](#physics-overlap_sphere), [`push`](#physics-push), [`raycast`](#physics-raycast), [`torque`](#physics-torque), [`velocity`](#physics-velocity) |
 | [random](#random) | [`chance`](#random-chance), [`pick`](#random-pick), [`random`](#random-random), [`random_int`](#random-random_int), [`shuffle`](#random-shuffle) |
 | [render](#render) | [`layer_mask`](#render-layer_mask), [`probe_bake`](#render-probe_bake) |
-| [scene](#scene) | [`add_tag`](#scene-add_tag), [`children`](#scene-children), [`count`](#scene-count), [`exists`](#scene-exists), [`find`](#scene-find), [`find_all`](#scene-find_all), [`has`](#scene-has), [`nearest`](#scene-nearest), [`remove_tag`](#scene-remove_tag), [`set_parent`](#scene-set_parent), [`spawn`](#scene-spawn), [`tagged`](#scene-tagged) |
+| [save](#save) | [`delete_save`](#save-delete_save), [`game_var`](#save-game_var), [`has_save`](#save-has_save), [`list_saves`](#save-list_saves), [`load_game`](#save-load_game), [`save_game`](#save-save_game) |
+| [scene](#scene) | [`add_tag`](#scene-add_tag), [`change_scene`](#scene-change_scene), [`children`](#scene-children), [`count`](#scene-count), [`current_scene`](#scene-current_scene), [`exists`](#scene-exists), [`find`](#scene-find), [`find_all`](#scene-find_all), [`has`](#scene-has), [`load_additive`](#scene-load_additive), [`loading_progress`](#scene-loading_progress), [`nearest`](#scene-nearest), [`remove_tag`](#scene-remove_tag), [`set_parent`](#scene-set_parent), [`spawn`](#scene-spawn), [`tagged`](#scene-tagged), [`unload_scene`](#scene-unload_scene) |
 | [text](#text) | [`num`](#text-num), [`str`](#text-str), [`type_of`](#text-type_of), [`ends_with`](#text-ends_with), [`lower`](#text-lower), [`replace`](#text-replace), [`split`](#text-split), [`starts_with`](#text-starts_with), [`trim`](#text-trim), [`upper`](#text-upper) |
 | [time](#time) | [`is_paused`](#time-is_paused), [`pause_game`](#time-pause_game), [`resume_game`](#time-resume_game), [`teleport`](#time-teleport), [`time_scale`](#time-time_scale), [`unscaled_dt`](#time-unscaled_dt), [`unscaled_time`](#time-unscaled_time) |
 | [vector](#vector) | [`cross`](#vector-cross), [`direction`](#vector-direction), [`distance`](#vector-distance), [`dot`](#vector-dot), [`forward`](#vector-forward), [`length`](#vector-length), [`normalize`](#vector-normalize), [`right`](#vector-right), [`up`](#vector-up), [`vec`](#vector-vec), [`world_position`](#vector-world_position) |
@@ -41,8 +43,12 @@ Besides the core triggers (`on start`, `on tick`, `on event`, `on key`, `on clic
 | `on action` | An input action was pressed: on action "jump" (actions come from input.json). |
 | `on collide` | Two bodies touched: on collide ("name or tag")? — other, contact_point, contact_normal, impact. |
 | `on dialogue` | `on dialogue "start" \| "line" \| "choice" \| "end" \| "&lt;command&gt;"`: conversation events and &lt;&lt;command&gt;&gt;s of .dialogue scripts (event "dialogue:..."). |
+| `on loaded` | A save was loaded (load_game or the load_game tool): on loaded — data.slot, data.version, data.meta. Refresh what is derived from saved state (HUD, music). data: {slot: string, version: number, meta: map} |
 | `on pause` | The game was paused (pause_game): delivered to every behavior, also those the pause stops. |
 | `on resume` | The game resumed (resume_game). |
+| `on saved` | A save_game() finished: on saved — data.slot, data.meta. data: {slot: string, meta: map} |
+| `on scene_loaded` | A scene finished loading: on scene_loaded — data.id (alias or path, or a sub-scene's handle), data.path, data.additive. data: {id: string, path: string, additive: bool} |
+| `on scene_unloading` | A scene is about to go: on scene_unloading — data.id, data.to (the next scene), data.additive. Delivered the tick before the change, to the leaving scene too. data: {id: string, to: string, additive: bool} |
 | `on trigger_enter` | Something entered this trigger collider: on trigger_enter ("name or tag")? — other. |
 | `on trigger_exit` | Something left this trigger collider: on trigger_exit ("name or tag")? — other. |
 | `on ui` | `on ui "Name"`: the button/toggle/slider/input named Name was used (event "ui:Name"). |
@@ -1013,6 +1019,75 @@ Returns: `number`
 let total = scores.sum()
 ```
 
+## locale { #locale }
+
+### `locale` { #locale-locale }
+
+```text
+locale() -> string
+```
+
+The current locale code ("en", "fr", "pt-BR").
+
+Returns: `string`
+
+```text
+if locale() == "ja" then self.text.font = "fonts/NotoSansJP.otf" end
+```
+
+### `locales` { #locale-locales }
+
+```text
+locales() -> list
+```
+
+Locale codes the game has strings for (with the source language), sorted: for a language menu.
+
+Returns: `list`
+
+```text
+for code in locales() log code end
+```
+
+### `set_locale` { #locale-set_locale }
+
+```text
+set_locale(code: string)
+```
+
+Switches the game's language from the next frame (a language menu): "fr", "pt-BR". Texts written as "@key" and #line dialogue lines follow at once. Undone when play stops; save it with game_var to keep it.
+
+| Parameter | Type | |
+|---|---|---|
+| `code` | string |  |
+
+Returns: `none`
+
+```text
+on ui "French"
+  set_locale("fr")
+end
+```
+
+### `tr` { #locale-tr }
+
+```text
+tr(key: string, args: map?) -> string
+```
+
+The localized string for a key in the current locale (locale/*.csv or *.po), falling back pt-BR -> pt -> the source language. `args` fill {placeholders}, plurals ({n, plural, one {# coin} other {# coins}}) and selects; numbers are formatted for the locale. A missing key returns the key and is reported by locale_check.
+
+| Parameter | Type | |
+|---|---|---|
+| `key` | string |  |
+| `args` | map | optional |
+
+Returns: `string`
+
+```text
+self.ui.text = tr("hud.coins", {n: coins})
+```
+
 ## map { #map }
 
 ### `get` { #map-get }
@@ -1910,6 +1985,114 @@ Returns: `none`
 probe_bake(find("Hall Probe"))
 ```
 
+## save { #save }
+
+### `delete_save` { #save-delete_save }
+
+```text
+delete_save(slot: string) -> bool
+```
+
+Deletes a slot. Returns whether there was a save to delete.
+
+| Parameter | Type | |
+|---|---|---|
+| `slot` | string |  |
+
+Returns: `bool`
+
+```text
+delete_save("slot3")
+```
+
+### `game_var` { #save-game_var }
+
+```text
+game_var(name: string, value?) -> any
+```
+
+Reads (or with a value, sets) a global game variable: state that belongs to the game, not to one entity (chapter, flags, unlocked levels, settings). Saved with every save; reset when play stops. Setting none removes it.
+
+| Parameter | Type | |
+|---|---|---|
+| `name` | string |  |
+| `value` | any | optional |
+
+Returns: `any`
+
+```text
+game_var("chapter", game_var("chapter") + 1)
+```
+
+### `has_save` { #save-has_save }
+
+```text
+has_save(slot: string) -> bool
+```
+
+Whether a slot holds a save (a "Continue" button shows only then).
+
+| Parameter | Type | |
+|---|---|---|
+| `slot` | string |  |
+
+Returns: `bool`
+
+```text
+find("Continue").ui.visible = has_save("autosave")
+```
+
+### `list_saves` { #save-list_saves }
+
+```text
+list_saves() -> list
+```
+
+Every save, sorted by slot: maps {slot, meta, play_time, saved_at, version, scene}; damaged files have an `error` instead. For load / save menus.
+
+Returns: `list`
+
+```text
+for s in list_saves() log s.slot + ": " + s.meta.get("title", s.slot) end
+```
+
+### `load_game` { #save-load_game }
+
+```text
+load_game(slot: string) -> bool
+```
+
+Loads a slot at the end of this tick: persisted entities, game vars, the exact behavior state and the scene return to the moment of the save. Returns false (and does nothing) when the slot is empty. `on loaded` follows next tick.
+
+| Parameter | Type | |
+|---|---|---|
+| `slot` | string |  |
+
+Returns: `bool`
+
+```text
+if not load_game("autosave") then log "no save yet" end
+```
+
+### `save_game` { #save-save_game }
+
+```text
+save_game(slot: string, meta: map?)
+```
+
+Saves the game into a slot at the end of this tick: every entity with a `persist` component, game_var values, the scene and the play time. `meta` is shown in save menus (title, chapter, thumbnail). `on saved` follows next tick (`on event "save_failed"` on error). Slots: "slot1", "autosave", "quicksave"...
+
+| Parameter | Type | |
+|---|---|---|
+| `slot` | string |  |
+| `meta` | map | optional |
+
+Returns: `none`
+
+```text
+save_game("autosave", {title: "Forest gate", chapter: 2})
+```
+
 ## scene { #scene }
 
 ### `add_tag` { #scene-add_tag }
@@ -1929,6 +2112,25 @@ Returns: `none`
 
 ```text
 add_tag(self, "carried")
+```
+
+### `change_scene` { #scene-change_scene }
+
+```text
+change_scene(scene: string, options: map?)
+```
+
+Moves the game to another scene (a game.json "scenes" alias or a .sky.json path) after this tick: the current scene hears `on scene_unloading`, entities with a `carry` component (and options.keep) carry over with their running behaviors, the rest is replaced. Options: transition ("fade" | "crossfade" | "none" or {kind, duration, color}), duration, keep: [names], spawn_at: "EntityName" (the player moves there), loading: a loading scene shown while assets preload. `on scene_loaded` follows. Stopping play returns the editor to the scene play started in.
+
+| Parameter | Type | |
+|---|---|---|
+| `scene` | string |  |
+| `options` | map | optional |
+
+Returns: `none`
+
+```text
+change_scene("level2", {transition: "fade", duration: 0.5, spawn_at: "Door_West"})
 ```
 
 ### `children` { #scene-children }
@@ -1965,6 +2167,20 @@ Returns: `number`
 
 ```text
 if count("coin") == 0 then ... end
+```
+
+### `current_scene` { #scene-current_scene }
+
+```text
+current_scene() -> string
+```
+
+The scene the game is in: its game.json alias, else its path.
+
+Returns: `string`
+
+```text
+if current_scene() == "menu" then music("audio/menu.ogg") end
 ```
 
 ### `exists` { #scene-exists }
@@ -2038,6 +2254,39 @@ Returns: `bool`
 
 ```text
 if has(self, "light") then self.light.intensity = 2 end
+```
+
+### `load_additive` { #scene-load_additive }
+
+```text
+load_additive(scene: string, options: map?) -> string
+```
+
+Adds a scene's entities to the running one at the end of this tick (a room, a streaming chunk, a UI overlay) and returns its handle for unload_scene. Options: id (handle), parent (entity to load under), offset (vector added to its root positions). It owns exactly the entities it created.
+
+| Parameter | Type | |
+|---|---|---|
+| `scene` | string |  |
+| `options` | map | optional |
+
+Returns: `string`
+
+```text
+let room = load_additive("rooms/cellar", {offset: (40, 0, 0)})
+```
+
+### `loading_progress` { #scene-loading_progress }
+
+```text
+loading_progress() -> number
+```
+
+How far the next scene has preloaded, 0..1 (1 when nothing is loading): for a loading bar in a loading scene.
+
+Returns: `number`
+
+```text
+find("Bar").ui.value = loading_progress()
 ```
 
 ### `nearest` { #scene-nearest }
@@ -2135,6 +2384,24 @@ Returns: `bool`
 
 ```text
 if tagged(other, "player") then ... end
+```
+
+### `unload_scene` { #scene-unload_scene }
+
+```text
+unload_scene(handle: string)
+```
+
+Removes a sub-scene loaded with load_additive: its entities hear `on scene_unloading` next tick and are removed the tick after. Entities the game added under it are kept (moved to the root).
+
+| Parameter | Type | |
+|---|---|---|
+| `handle` | string |  |
+
+Returns: `none`
+
+```text
+unload_scene(room)
 ```
 
 ## text { #text }
@@ -2891,6 +3158,11 @@ let w = vehicle_wheel(self, "rear_left")
         list.sort() — Sorts numbers or strings in place (ascending).
         list.sorted() -> list — A sorted copy (numbers or strings).
         list.sum() -> number — Sum of a list of numbers.
+      [locale]
+        locale() -> string — The current locale code ("en", "fr", "pt-BR").
+        locales() -> list — Locale codes the game has strings for (with the source language), sorted: for a language menu.
+        set_locale(code: string) — Switches the game's language from the next frame (a language menu): "fr", "pt-BR". Texts written as "@key" and #line dialogue lines follow at once. Undone when play stops; save it with game_var to keep it.
+        tr(key: string, args: map?) -> string — The localized string for a key in the current locale (locale/*.csv or *.po), falling back pt-BR -> pt -> the source language. `args` fill {placeholders}, plurals ({n, plural, one {# coin} other {# coins}}) and selects; numbers are formatted for the locale. A missing key returns the key and is reported by locale_check.
       [map]
         map.get(key: string, default?) -> any — Value for a key, or the default (none) if missing.
         map.has(key: string) -> bool — Whether the map has a key.
@@ -2945,19 +3217,31 @@ let w = vehicle_wheel(self, "rear_left")
       [render]
         layer_mask(layers: number|string|list, ...) -> number — Render layer bitmask from layer names (game.json render.layers), layer numbers as strings ("3"), "all" / "none", or a list of names / layer numbers; several arguments are combined. Set it on mesh.layers, camera.cullMask or light.cullMask, e.g. hide the player's own body from the first-person camera.
         probe_bake(probe: entity?) — Re-captures a reflection probe (or every probe without an argument) over the next rendered frames: after opening a door, switching the room's lights or rearranging furniture, so `once` probes reflect the new state. Rendering only; the simulation is unaffected.
+      [save]
+        delete_save(slot: string) -> bool — Deletes a slot. Returns whether there was a save to delete.
+        game_var(name: string, value?) -> any — Reads (or with a value, sets) a global game variable: state that belongs to the game, not to one entity (chapter, flags, unlocked levels, settings). Saved with every save; reset when play stops. Setting none removes it.
+        has_save(slot: string) -> bool — Whether a slot holds a save (a "Continue" button shows only then).
+        list_saves() -> list — Every save, sorted by slot: maps {slot, meta, play_time, saved_at, version, scene}; damaged files have an `error` instead. For load / save menus.
+        load_game(slot: string) -> bool — Loads a slot at the end of this tick: persisted entities, game vars, the exact behavior state and the scene return to the moment of the save. Returns false (and does nothing) when the slot is empty. `on loaded` follows next tick.
+        save_game(slot: string, meta: map?) — Saves the game into a slot at the end of this tick: every entity with a `persist` component, game_var values, the scene and the play time. `meta` is shown in save menus (title, chapter, thumbnail). `on saved` follows next tick (`on event "save_failed"` on error). Slots: "slot1", "autosave", "quicksave"...
       [scene]
         add_tag(e: entity, tag: string) — Adds a tag to an entity.
+        change_scene(scene: string, options: map?) — Moves the game to another scene (a game.json "scenes" alias or a .sky.json path) after this tick: the current scene hears `on scene_unloading`, entities with a `carry` component (and options.keep) carry over with their running behaviors, the rest is replaced. Options: transition ("fade" | "crossfade" | "none" or {kind, duration, color}), duration, keep: [names], spawn_at: "EntityName" (the player moves there), loading: a loading scene shown while assets preload. `on scene_loaded` follows. Stopping play returns the editor to the scene play started in.
         children(e: entity) -> list — Direct children of an entity, in order.
         count(tag: string) -> number — How many entities have a tag.
+        current_scene() -> string — The scene the game is in: its game.json alias, else its path.
         exists(e) -> bool — Whether a value is an entity that still exists.
         find(name: string) -> none|entity — Entity by name (or "#id"); none if missing. "%Name" finds the entity marked unique (entity_update unique=true) inside this prefab instance, else in the scene, so each copy of a prefab finds its own part.
         find_all(tag: string) -> list — Active entities with a tag, in scene order.
         has(e: entity, component: string) -> bool — Whether the entity has a component ("light", "particles", ...).
+        load_additive(scene: string, options: map?) -> string — Adds a scene's entities to the running one at the end of this tick (a room, a streaming chunk, a UI overlay) and returns its handle for unload_scene. Options: id (handle), parent (entity to load under), offset (vector added to its root positions). It owns exactly the entities it created.
+        loading_progress() -> number — How far the next scene has preloaded, 0..1 (1 when nothing is loading): for a loading bar in a loading scene.
         nearest(tag: string, max_distance: number?) -> none|entity — Closest other active entity with a tag (within max_distance); none if there is none.
         remove_tag(e: entity, tag: string) — Removes a tag from an entity.
         set_parent(e: entity, parent: none|entity, keep_world: bool?) — Moves an entity under a new parent, or to the scene root with none. By default it keeps its world position, rotation and scale (keep_world = false keeps its local transform instead, so it jumps to the same offset from the new parent). Parenting under itself or a descendant fails. Like every play-time change, it is undone when play stops.
         spawn(mesh: string, position: vector|entity?, name?) -> entity — Creates an entity: a primitive mesh ("cube", "sphere"...), "asset:models/x.glb", or a whole prefab "prefab:prefabs/coin.prefab.json" (with its children and behaviors). Its behaviors start next tick. Limits: 256 spawns per tick, 20000 entities.
         tagged(e, tag: string) -> bool — Whether an entity has a tag (false for none).
+        unload_scene(handle: string) — Removes a sub-scene loaded with load_additive: its entities hear `on scene_unloading` next tick and are removed the tick after. Entities the game added under it are kept (moved to the root).
       [text]
         num(text) -> none|number — Number parsed from text (none if it is not a number).
         str(value) -> string — Text form of any value (entities give their name).
@@ -2999,8 +3283,12 @@ let w = vehicle_wheel(self, "rear_left")
         on action — An input action was pressed: on action "jump" (actions come from input.json).
         on collide — Two bodies touched: on collide ("name or tag")? — other, contact_point, contact_normal, impact.
         on dialogue — `on dialogue "start" | "line" | "choice" | "end" | "<command>"`: conversation events and <<command>>s of .dialogue scripts (event "dialogue:...").
+        on loaded — A save was loaded (load_game or the load_game tool): on loaded — data.slot, data.version, data.meta. Refresh what is derived from saved state (HUD, music). data: {slot: string, version: number, meta: map}
         on pause — The game was paused (pause_game): delivered to every behavior, also those the pause stops.
         on resume — The game resumed (resume_game).
+        on saved — A save_game() finished: on saved — data.slot, data.meta. data: {slot: string, meta: map}
+        on scene_loaded — A scene finished loading: on scene_loaded — data.id (alias or path, or a sub-scene's handle), data.path, data.additive. data: {id: string, path: string, additive: bool}
+        on scene_unloading — A scene is about to go: on scene_unloading — data.id, data.to (the next scene), data.additive. Delivered the tick before the change, to the leaving scene too. data: {id: string, to: string, additive: bool}
         on trigger_enter — Something entered this trigger collider: on trigger_enter ("name or tag")? — other.
         on trigger_exit — Something left this trigger collider: on trigger_exit ("name or tag")? — other.
         on ui — `on ui "Name"`: the button/toggle/slider/input named Name was used (event "ui:Name").

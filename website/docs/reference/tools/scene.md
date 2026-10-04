@@ -7,7 +7,7 @@ title: "Scene tools"
 
 Orient yourself, query and save scenes, and batch many edits into one undo step.
 
-7 tools in the `scene` category. Badges: **read-only** tools never change the project; **mutating** tools are undoable and attributed; **open-world** tools reach outside the engine and MCP clients ask before running them.
+11 tools in the `scene` category. Badges: **read-only** tools never change the project; **mutating** tools are undoable and attributed; **open-world** tools reach outside the engine and MCP clients ask before running them.
 
 | Tool | Summary |
 |---|---|
@@ -18,6 +18,10 @@ Orient yourself, query and save scenes, and batch many edits into one undo step.
 | [`scene_save`](#scene_save) | Save the scene as JSON (.sky.json). |
 | [`scene_load`](#scene_load) | Load a scene file (replaces the current scene and clears history). |
 | [`scene_new`](#scene_new) | Start a new scene. |
+| [`scene_flow_info`](#scene_flow_info) | The running game's scene flow: the current scene (alias or path), the pending change (target, preloaded assets, loading scene), loading progress, the transition (kind, phase out\|loading\|in\|idle, alpha), loaded sub-scenes with their entity counts, the carried entities (`carried`: `carry` components, game.json sceneFlow.carry), game.json scene aliases and every scene file. |
+| [`scene_change`](#scene_change) | Moves the running game to another scene, as Wander's change_scene does: the scene is a game.json "scenes" alias or a .sky.json path (unknown names get a did-you-mean). |
+| [`scene_additive_load`](#scene_additive_load) | Adds a scene's entities to the running game (a room, a streaming chunk, a UI overlay) with fresh entity ids and returns its handle. |
+| [`scene_additive_unload`](#scene_additive_unload) | Removes a sub-scene loaded with scene_additive_load or Wander's load_additive: exactly the entities it created. |
 
 ### `engine_info` { #engine_info }
 
@@ -333,6 +337,172 @@ Start a new scene. By default it contains a ground plane, a cube and a camera; e
         "name": "scene_new",
         "arguments": {
           "empty": true
+        }
+      }
+    }
+    ```
+
+### `scene_flow_info` { #scene_flow_info }
+
+**Scene flow state** <span class="sky-badge sky-badge--ro" title="Never changes the scene">read-only</span>
+
+The running game's scene flow: the current scene (alias or path), the pending change (target, preloaded assets, loading scene), loading progress, the transition (kind, phase out|loading|in|idle, alpha), loaded sub-scenes with their entity counts, the carried entities (`carried`: `carry` components, game.json sceneFlow.carry), game.json scene aliases and every scene file. Use it before and after scene_change / scene_additive_load, and to explain why something did not carry over.
+
+Takes no arguments.
+
+=== "Tool call"
+
+    ```tool
+    scene_flow_info {}
+    ```
+
+=== "CLI"
+
+    ```bash
+    skywalker call scene_flow_info '{}' --project my_game
+    ```
+
+=== "MCP request"
+
+    ```json
+    {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "method": "tools/call",
+      "params": {
+        "name": "scene_flow_info",
+        "arguments": {}
+      }
+    }
+    ```
+
+### `scene_change` { #scene_change }
+
+**Change scene (play)** <span class="sky-badge sky-badge--mut" title="Changes the project; undoable and attributed">mutating</span>
+
+Moves the running game to another scene, as Wander's change_scene does: the scene is a game.json "scenes" alias or a .sky.json path (unknown names get a did-you-mean). Entities with a `carry` component, game.json sceneFlow.carry names and `keep` carry over with their behaviors running; the rest is replaced. The change runs over the next ticks (transition out, preloading, swap, transition in); step the simulation to see it, or pass immediate: true to swap now. Stopping play returns the editor to the scene play started in. Example: {"scene": "level2", "transition": "fade", "duration": 0.4, "spawn_at": "Door_West"}.
+
+| Argument | Type | Required | Description | Values |
+|---|---|---|---|---|
+| `scene` | string | yes | Alias or .sky.json path |  |
+| `transition` | any |  | "none" \| "fade" \| "crossfade", or {kind, duration, color} |  |
+| `duration` | number |  | Transition seconds (0..10) |  |
+| `color` | string |  | Fade color, e.g. "#000000" |  |
+| `keep` | string[] |  | More entities to carry over this time |  |
+| `spawn_at` | string |  | Entity of the new scene the player moves to (carry.spawn, else tag "player") |  |
+| `loading` | string |  | Loading scene shown while the target preloads ("" = none; default game.json sceneFlow.loadingScene) |  |
+| `immediate` | boolean |  | Swap now, without transition or preloading (default false) |  |
+
+=== "Tool call"
+
+    ```tool
+    scene_change {"scene": "level2", "transition": "fade", "duration": 0.4, "spawn_at": "Door_West"}
+    ```
+
+=== "CLI"
+
+    ```bash
+    skywalker call scene_change '{"scene": "level2", "transition": "fade", "duration": 0.4, "spawn_at": "Door_West"}' --project my_game
+    ```
+
+=== "MCP request"
+
+    ```json
+    {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "method": "tools/call",
+      "params": {
+        "name": "scene_change",
+        "arguments": {
+          "scene": "level2",
+          "transition": "fade",
+          "duration": 0.4,
+          "spawn_at": "Door_West"
+        }
+      }
+    }
+    ```
+
+### `scene_additive_load` { #scene_additive_load }
+
+**Load a sub-scene (play)** <span class="sky-badge sky-badge--mut" title="Changes the project; undoable and attributed">mutating</span>
+
+Adds a scene's entities to the running game (a room, a streaming chunk, a UI overlay) with fresh entity ids and returns its handle. The sub-scene owns exactly the entities it created, so scene_additive_unload removes those and nothing else. Options: id (handle; default the alias or file name), parent (entity to load under), offset (added to its root positions). Loads now (between ticks); `on scene_loaded` runs next tick. Example: {"scene": "rooms/cellar", "offset": [40, 0, 0]}.
+
+| Argument | Type | Required | Description | Values |
+|---|---|---|---|---|
+| `scene` | string | yes | Alias or .sky.json path |  |
+| `id` | string |  | Handle for unloading (default: alias or file name, made unique) |  |
+| `parent` | integer \| string |  | Entity to load under (default: the root) |  |
+| `offset` | number[3] |  | Added to the sub-scene's root positions |  |
+
+=== "Tool call"
+
+    ```tool
+    scene_additive_load {"scene": "rooms/cellar", "offset": [40, 0, 0]}
+    ```
+
+=== "CLI"
+
+    ```bash
+    skywalker call scene_additive_load '{"scene": "rooms/cellar", "offset": [40, 0, 0]}' --project my_game
+    ```
+
+=== "MCP request"
+
+    ```json
+    {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "method": "tools/call",
+      "params": {
+        "name": "scene_additive_load",
+        "arguments": {
+          "scene": "rooms/cellar",
+          "offset": [
+            40,
+            0,
+            0
+          ]
+        }
+      }
+    }
+    ```
+
+### `scene_additive_unload` { #scene_additive_unload }
+
+**Unload a sub-scene (play)** <span class="sky-badge sky-badge--mut" title="Changes the project; undoable and attributed">mutating</span>
+
+Removes a sub-scene loaded with scene_additive_load or Wander's load_additive: exactly the entities it created. Entities the game added under them at run time are kept and moved to the root (listed as orphans). Removes now (between ticks). Example: {"handle": "cellar"}.
+
+| Argument | Type | Required | Description | Values |
+|---|---|---|---|---|
+| `handle` | string | yes | Sub-scene handle (scene_flow_info lists them) |  |
+
+=== "Tool call"
+
+    ```tool
+    scene_additive_unload {"handle": "cellar"}
+    ```
+
+=== "CLI"
+
+    ```bash
+    skywalker call scene_additive_unload '{"handle": "cellar"}' --project my_game
+    ```
+
+=== "MCP request"
+
+    ```json
+    {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "method": "tools/call",
+      "params": {
+        "name": "scene_additive_unload",
+        "arguments": {
+          "handle": "cellar"
         }
       }
     }

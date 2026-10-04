@@ -5,7 +5,7 @@ title: "Components"
 
 # Components
 
-Every component is a plain struct with a reflected field table. The same table drives JSON scene files, the JSON Schema agents read (`component_schema`), the editor's property grid and Wander access (`self.light.intensity`). There are **39 components** plus the scene-wide environment.
+Every component is a plain struct with a reflected field table. The same table drives JSON scene files, the JSON Schema agents read (`component_schema`), the editor's property grid and Wander access (`self.light.intensity`). There are **41 components** plus the scene-wide environment.
 
 Set them with `entity_create` / `entity_update` (component objects are merged field by field), from the editor's Details panel, or from Wander. Unknown fields fail with a *did you mean …?* hint.
 
@@ -51,3 +51,5 @@ Set them with `entity_create` / `entity_update` (component objects are merged fi
 | [`attach`](animation.md#attach) | Animation | Keeps this entity on a bone of an animated character (weapon in a hand, hat on a head, lantern on a belt). |
 | [`ik`](animation.md#ik) | Animation | Two-bone IK effector: the character's hand or foot (and elbow or knee) reaches this entity's position. |
 | [`sequencer`](animation.md#sequencer) | Animation | Plays a cinematic sequence (*.sequence.json): camera shots and cuts, keyed properties, events and animations. Build sequences with the sequence_* tools. |
+| [`persist`](game.md#persist) | Game flow | Saves this entity in save games (save_game in Wander, the save_game tool): its whole state or chosen fields, plus its Wander vars. Put it on the player, doors, collectibles, quest givers; leave scenery without it. Spawned entities (spawn() at run time) need spawned: true to be recreated on load. |
+| [`carry`](game.md#carry) | Game flow | Carries this entity and its children across runtime scene changes (change_scene in Wander, scene_change): a game manager, the player, background music. Its behaviors keep running with their state. If the next scene has an entity with the same carry key, that copy is dropped, so a manager can sit in every level. Not the same as `persist`, which marks what a save game restores (a player usually has both). |

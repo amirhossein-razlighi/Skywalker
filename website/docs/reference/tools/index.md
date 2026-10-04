@@ -5,22 +5,22 @@ title: "Tools"
 
 # Tools
 
-Skywalker exposes **208 tools** (engine 0.1.0). The editor, its in-app agents, the CLI and every MCP client call the same tools with the same JSON arguments, so anything you read here works everywhere. 124 tools change the project; every such change is undoable and attributed to whoever made it.
+Skywalker exposes **222 tools** (engine 0.1.0). The editor, its in-app agents, the CLI and every MCP client call the same tools with the same JSON arguments, so anything you read here works everywhere. 132 tools change the project; every such change is undoable and attributed to whoever made it.
 
 Arguments are validated before a tool runs: unknown keys, wrong types and bad enum values fail with a *did you mean …?* hint. Each tool page shows the arguments, the annotations MCP clients use for approvals, and the same call as a tool call, a CLI command and a raw MCP request.
 
 | Category | Tools | What for |
 |---|---|---|
-| [Scene](scene.md) | 7 | Orient yourself, query and save scenes, and batch many edits into one undo step. |
+| [Scene](scene.md) | 11 | Orient yourself, query and save scenes, and batch many edits into one undo step. |
 | [Entity](entity.md) | 10 | Create, read, change, move, duplicate and delete entities; read component schemas. |
 | [History](history.md) | 1 | Undo, redo and the attributed edit history. |
 | [View](view.md) | 9 | See the scene: captures with entity boxes, debug views, multi-view sheets, selection and the editor camera. |
-| [Render](render.md) | 22 | Environment, effects, hair, shaders, render layers, impostors, benchmarks and the movie renderer. |
+| [Render](render.md) | 27 | Environment, effects, hair, shaders, render layers, impostors, benchmarks and the movie renderer. |
 | [World](world.md) | 15 | Terrain, foliage, water queries and spatial placement on real geometry. |
 | [Asset](asset.md) | 27 | The asset database, import and download, materials, textures, prefabs, audio generation and previews. |
 | [Wander](wander.md) | 9 | Write, check, test, graph and inspect Wander behaviors. |
 | [Code](code.md) | 4 | Native code: ahead-of-time compiled behaviors and C++ modules (trusted local code; clients ask first). |
-| [Simulation](sim.md) | 9 | Play, pause, step and stop; inject input; trace and inspect what runs. |
+| [Simulation](sim.md) | 14 | Play, pause, step and stop; inject input; trace and inspect what runs. |
 | [Physics](physics.md) | 12 | Rigid bodies, characters, queries, settling and navigation meshes. |
 | [Animation](animation.md) | 15 | Skeletal animation, controllers, IK, bone attachments and cinematic sequences. |
 | [UI](ui.md) | 4 | Build, style, inspect and drive user interfaces. |
@@ -38,6 +38,10 @@ Arguments are validated before a tool runs: unknown keys, wrong types and bad en
 |---|---|---|
 | [`batch`](scene.md#batch) | Scene | Run many tool calls atomically as ONE undo step. |
 | [`engine_info`](scene.md#engine_info) | Scene | Version, renderer, play state, component types and tool categories. |
+| [`scene_additive_load`](scene.md#scene_additive_load) | Scene | Adds a scene's entities to the running game (a room, a streaming chunk, a UI overlay) with fresh entity ids and returns its handle. |
+| [`scene_additive_unload`](scene.md#scene_additive_unload) | Scene | Removes a sub-scene loaded with scene_additive_load or Wander's load_additive: exactly the entities it created. |
+| [`scene_change`](scene.md#scene_change) | Scene | Moves the running game to another scene, as Wander's change_scene does: the scene is a game.json "scenes" alias or a .sky.json path (unknown names get a did-you-mean). |
+| [`scene_flow_info`](scene.md#scene_flow_info) | Scene | The running game's scene flow: the current scene (alias or path), the pending change (target, preloaded assets, loading scene), loading progress, the transition (kind, phase out\|loading\|in\|idle, alpha), loaded sub-scenes with their entity counts, the carried entities (`carried`: `carry` components, game.json sceneFlow.carry), game.json scene aliases and every scene file. |
 | [`scene_load`](scene.md#scene_load) | Scene | Load a scene file (replaces the current scene and clears history). |
 | [`scene_new`](scene.md#scene_new) | Scene | Start a new scene. |
 | [`scene_overview`](scene.md#scene_overview) | Scene | Compact outline of the whole scene: every entity as one line (id, name, mesh/color, position, tags) in hierarchy order, plus environment, selection and the scene file (`path`; empty until saved). |
@@ -74,6 +78,11 @@ Arguments are validated before a tool runs: unknown keys, wrong types and bad en
 | [`groom_update`](render.md#groom_update) | Render | Change a groom's fields (or switch to another preset and then apply `fields`). |
 | [`impostor_bake`](render.md#impostor_bake) | Render | Bake the octahedral impostors of foliage layers now: each heavy model (an imported tree, bush, rock or grass clump; one mesh or every part of a prefab) is captured from up to 32x32 directions into an atlas of albedo, normal and depth, and instances beyond the layer's transition distance render as impostors (lit, shadowed and depth-correct like real geometry). |
 | [`light_shadows`](render.md#light_shadows) | Render | Turn shadows of point/spot lights on or off and tune them, for one light, a list, or every light ("all", optionally only one kind). |
+| [`locale_check`](render.md#locale_check) | Render | Audits localization and returns findings an agent can fix one by one: per locale the keys with no translation (and coverage); keys the project uses ("@key" fields, tr("key") in scripts, #line dialogue ids) that no table defines; unused keys; placeholder mismatches between a translation and the source ({name} missing or extra); invalid messages; plurals missing forms the language needs (ru: one/few/many, ar: zero..many); strings longer than their budget (the table's `max` column, or source length x `budget`, default game.json maxLengthRatio); characters no font covers (CJK, Arabic...: add a font); keys requested at run time but missing. |
+| [`locale_extract`](render.md#locale_extract) | Render | Scans the open scene, scenes, prefabs, dialogue scripts and Wander code for hard-coded player-facing texts (ui.text, ui.placeholder, text.text, dialogue lines and choices without a #line id, `.text = "..."` in scripts) and proposes a key for each ("main_menu.play", "dlg.intro.start.003"); a text whose source string already exists reuses its key. |
+| [`locale_list`](render.md#locale_list) | Render | Lists the game's locales: the current one and its fallback chain (pt-BR -&gt; pt -&gt; source), the source language, every locale with strings (count, coverage, files under locale/), game.json `localization` settings, strings requested at run time that no table has, and table file problems. |
+| [`locale_pseudo`](render.md#locale_pseudo) | Render | Writes a pseudo-locale for layout testing: every string accented and about 30% longer inside brackets ("Play" -&gt; "[Ƥļáý~~]"), placeholders, plurals and rich-text tags intact, so truncation, overflow and hard-coded texts (they stay plain) jump out. |
+| [`locale_set`](render.md#locale_set) | Render | Switches the language the game shows: texts written as "@key" (ui.text, ui.placeholder, text.text), tr() calls and #line dialogue lines follow at once. |
 | [`movie_render`](render.md#movie_render) | Render | Render a cinematic to video or a PNG sequence, offline and deterministically (the movie renderer). |
 | [`particles2d_create`](render.md#particles2d_create) | Render | Create pixel-art particles for a 2D game from a preset, ready to tweak: rain (streaks over the whole view), drizzle, snow (drifting flakes), leaves and petals (falling, swaying), fireflies (glowing, twinkling, wandering), smoke (chimney puffs), ripples (puddle rings while it rains), dust (motes in sunlight), sparkle (water glints). |
 | [`particles2d_info`](render.md#particles2d_info) | Render | Live state of particles2d emitters: particles alive, cap, rate, box, wrap, and the bounds the live particles cover (world units). |
@@ -143,8 +152,13 @@ Arguments are validated before a tool runs: unknown keys, wrong types and bad en
 | [`audio_mix`](sim.md#audio_mix) | Simulation | Read or set the project's mixer (audio.json): per-bus volume and mute for master, music, sfx, ambience, voice and ui, and the default music crossfade. |
 | [`audio_play`](sim.md#audio_play) | Simulation | Listen to a clip or an entity's audio component. |
 | [`input_map`](sim.md#input_map) | Simulation | Read or edit the project's input action map (input.json): named, device-independent actions bound to keyboard, mouse and gamepad. |
+| [`load_game`](sim.md#load_game) | Simulation | Restores a slot into the running game: persisted entities return to their saved state (spawned ones are recreated with their ids, ones destroyed before the save are removed again), game vars, the scene (a save from another scene is an immediate scene flow change: `carry` entities come along) and the exact behavior state (state machines, timers, waiting handlers, random generator), then `on loaded` runs. |
 | [`logs`](sim.md#logs) | Simulation | Recent Wander log output and runtime/compile errors. |
 | [`process_info`](sim.md#process_info) | Simulation | What runs while the game is paused or slowed, and how smooth real-time frames are. |
+| [`save_delete`](sim.md#save_delete) | Simulation | Deletes a save slot's file. |
+| [`save_game`](sim.md#save_game) | Simulation | Saves the running game into a slot, exactly as Wander's save_game() would at a tick boundary: every entity with a `persist` component (whole state or chosen fields, Wander vars, spawned subtrees), tombstones for persisted scene entities that were destroyed, game_var values, the scene, the play time and the exact behavior state. |
+| [`save_inspect`](sim.md#save_inspect) | Simulation | Diffs a save slot against the running game to debug "what didn't restore": per persisted entity, the fields whose current value differs from the saved one (path, saved, current), entities missing from the scene, entities the save destroyed or never had, game var differences, the scene and the tick. |
+| [`save_list`](sim.md#save_list) | Simulation | Lists the save slots of this project: slot, metadata (title, chapter...), file size, format and game version, play time, scene, tick and when it was saved. |
 | [`sim_control`](sim.md#sim_control) | Simulation | play / pause / stop the game, or `step` N fixed ticks (1/60 s each) deterministically and get the resulting logs and errors. |
 | [`sim_input`](sim.md#sim_input) | Simulation | Inject player input for the next ticks, like a player (or a playtest bot) would: press keys (fires `on key`), hold/release keys (for key()), press or hold input ACTIONS (jump, fire, ... |
 | [`sim_teleport`](sim.md#sim_teleport) | Simulation | Move an entity instantly — a respawn, a portal, a checkpoint — without render interpolation smearing it across the screen for a frame (Wander: teleport(entity, position)). |

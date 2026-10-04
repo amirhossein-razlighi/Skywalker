@@ -4372,6 +4372,61 @@
   },
   "additionalProperties": false
  },
+ "persist": {
+  "type": "object",
+  "description": "Saves this entity in save games (save_game in Wander, the save_game tool): its whole state or chosen fields, plus its Wander vars. Put it on the player, doors, collectibles, quest givers; leave scenery without it. Spawned entities (spawn() at run time) need spawned: true to be recreated on load.",
+  "properties": {
+   "id": {
+    "type": "string",
+    "description": "Stable save key (\"player\", \"door_3\"). Empty: the entity id, stable for entities placed in a scene. Set it for entities whose id can change (re-created by a script, moved between scenes)"
+   },
+   "mode": {
+    "type": "string",
+    "enum": [
+     "all",
+     "fields",
+     "vars"
+    ],
+    "description": "all (name, tags, enabled, parent and every component) | fields (only `fields`) | vars (Wander vars only)"
+   },
+   "fields": {
+    "type": "array",
+    "items": {
+     "type": "string"
+    },
+    "x-sky-json": true,
+    "description": "mode fields: what to save, as component names or component.field, e.g. [\"transform\", \"light.intensity\", \"body.velocity\"]"
+   },
+   "vars": {
+    "type": "boolean",
+    "description": "Also save the entity's Wander vars (hp, inventory, quest state)"
+   },
+   "spawned": {
+    "type": "boolean",
+    "description": "Created at run time (spawn): a load recreates it, with its children and saved ids, when it is missing; copies spawned after the save are removed"
+   },
+   "prefab": {
+    "type": "string",
+    "description": "Prefab it was spawned from (informational, shown in save_inspect; filled in from the prefab link when empty)"
+   }
+  },
+  "additionalProperties": false
+ },
+ "carry": {
+  "type": "object",
+  "description": "Carries this entity and its children across runtime scene changes (change_scene in Wander, scene_change): a game manager, the player, background music. Its behaviors keep running with their state. If the next scene has an entity with the same carry key, that copy is dropped, so a manager can sit in every level. Not the same as `persist`, which marks what a save game restores (a player usually has both).",
+  "properties": {
+   "id": {
+    "type": "string",
+    "description": "Key that identifies the same entity in other scenes (\"game_manager\"). Empty: the entity's name"
+   },
+   "spawn": {
+    "type": "boolean",
+    "description": "Move to the spawn_at entity of a scene change (the player). Without any, entities tagged \"player\" move"
+   }
+  },
+  "additionalProperties": false
+ },
  "environment": {
   "type": "object",
   "description": "Scene-wide sky, sun, ambient light, fog and exposure.",
