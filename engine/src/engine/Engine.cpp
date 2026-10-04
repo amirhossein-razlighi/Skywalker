@@ -6,6 +6,9 @@
 #include <cstdlib>
 #include <filesystem>
 #include <cstring>
+#include <fcntl.h>
+#include <sys/file.h>
+#include <unistd.h>
 #include <dispatch/dispatch.h>
 #include <mutex>
 #include <fstream>
@@ -49,8 +52,20 @@ Json AssetRequest::toJson() const {
     return j;
 }
 
+namespace {
+/// The project root is absolute everywhere: relative roots break asset lookups that mix
+/// resolved (absolute) and project-relative paths, e.g. `--project examples/x` from the CLI.
+EngineConfig withAbsoluteProject(EngineConfig config) {
+    std::error_code ec;
+    fs::path abs = fs::absolute(config.projectDir.empty() ? fs::path(".") : fs::path(config.projectDir), ec);
+    if (!ec) config.projectDir = abs.lexically_normal().string();
+    while (config.projectDir.size() > 1 && config.projectDir.back() == '/') config.projectDir.pop_back();
+    return config;
+}
+}  // namespace
+
 Engine::Engine(EngineConfig config)
-    : config_(std::move(config)),
+    : config_(withAbsoluteProject(std::move(config))),
       scene_(std::make_unique<Scene>()),
       history_(std::make_unique<History>(*scene_)),
       builtins_(std::make_unique<wander::BuiltinRegistry>(&wander::BuiltinRegistry::global())),
@@ -655,7 +670,35 @@ FrameData Engine::frame(const CaptureOptions& opts) {
     return f;
 }
 
+namespace {
+/// Offline renders (captures, benchmarks) from every Skywalker process on this machine take
+/// turns on the GPU: many agents rendering heavy stills at once starve the window server
+/// and can trip the GPU watchdog. Released when the capture ends (or the process exits).
+class GpuJobLock {
+public:
+    GpuJobLock() {
+        const char* home = std::getenv("HOME");
+        std::string dir = std::string(home && *home ? home : "/tmp") + "/.skywalker";
+        std::error_code ec;
+        fs::create_directories(dir, ec);
+        fd_ = ::open((dir + "/gpu.lock").c_str(), O_CREAT | O_RDWR | O_CLOEXEC, 0644);
+        if (fd_ >= 0) ::flock(fd_, LOCK_EX);
+    }
+    ~GpuJobLock() {
+        if (fd_ < 0) return;
+        ::flock(fd_, LOCK_UN);
+        ::close(fd_);
+    }
+    GpuJobLock(const GpuJobLock&) = delete;
+    GpuJobLock& operator=(const GpuJobLock&) = delete;
+
+private:
+    int fd_ = -1;
+};
+}  // namespace
+
 Result<Capture> Engine::capture(const CaptureOptions& opts) {
+    GpuJobLock gpuLock;
     Capture c;
     c.frame = frame(opts);
     if (Status s = renderer_->render(c.frame); !s) return s.error();
