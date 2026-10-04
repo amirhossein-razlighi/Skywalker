@@ -173,6 +173,10 @@ void addSceneTools(Engine& engine, ToolRegistry& reg) {
                                         {"conventions", "meters, +Y up, entities face -Z, rotations in Euler degrees "
                                                         "[pitch, yaw, roll], colors as \"#rrggbb\""}});
                  j["shaders"] = ri.shaders;  // [shader cache] library origin, compile/startup ms, pipeline archive
+                 if (ri.shaders.contains("shaderCompileMs")) {
+                     j["shaderCompileMs"] = ri.shaders.get("shaderCompileMs");
+                     j["rendererStartupMs"] = ri.shaders.get("startupMs");
+                 }
                  for (const auto& n : engine.scene().componentNames()) j["components"].push(n);
                  for (const auto& p : MeshRenderer::primitives()) j["primitives"].push(p);
                  return ToolResult::json(j);

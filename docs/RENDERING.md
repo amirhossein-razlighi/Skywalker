@@ -221,7 +221,8 @@ camera; `{"debug_view": "uv_checker"}` shows stretched or flipped UVs.
   `compileShaderLibraryAsync` build on a background queue and return a handle to poll
   (`ready()`), so a renderer draws a fallback until a custom pipeline is ready. Surface
   shaders build on this.
-- **Measure.** `engine_info` → `shaders`: `library` (`metallib` or `source`), `libraryMs`,
+- **Measure.** `engine_info` → `shaderCompileMs` and `rendererStartupMs`, and in detail
+  `shaders`: `library` (`metallib` or `source`), `libraryMs`,
   `pipelinesMs`, `shaderCompileMs`, renderer `startupMs`, and `pipelineCache` (`hits`,
   `misses`, `loadMs`, `saveMs`, `bytes`, `path`). `SKY_SHADER_NONCE=<text>` appends a
   comment to the library source, which forces a cold compile for benchmarking.
