@@ -144,7 +144,6 @@ fragment EffectOut waterFragment(WaterOut in [[stage_in]],
     float2 sl = sl0.xy + sl1.xy + sl2.xy;
     float persistentFoam = saturate(sl0.z + sl1.z * 0.8 + sl2.z * 0.5);
     float3 N = normalize(float3(-sl.x, 1.0, -sl.y) * float3(mix(0.3, 1.0, in.calm), 1.0, mix(0.3, 1.0, in.calm)));
-    float J = j0.sample(oceanSampler, u0).w + j1.sample(oceanSampler, u1).w + j2.sample(oceanSampler, u2).w - 2.0;
 
     float3 V = normalize(f.cameraPos.xyz - in.worldPos);
     if (dot(N, V) < 0.02) N = normalize(N + V * (0.02 - dot(N, V)));

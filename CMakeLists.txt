@@ -5,6 +5,10 @@ if(POLICY CMP0157)
     cmake_policy(SET CMP0157 NEW)
 endif()
 
+# Third-party dependencies (recastnavigation, meshoptimizer, doctest) still declare cmake_minimum_required
+# below 3.10, which CMake 4 rejects or warns about. Raise their policy floor instead of patching them.
+set(CMAKE_POLICY_VERSION_MINIMUM 3.10)
+
 # Must be set before project() to take effect.
 set(CMAKE_OSX_DEPLOYMENT_TARGET "15.0" CACHE STRING "Minimum macOS version")
 

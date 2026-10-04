@@ -16,7 +16,7 @@ cmake --preset asan && cmake --build --preset asan && ./build/asan/tests/skywalk
 cmake --preset debug && cmake --build --preset debug            # only if you touched editor/ (macOS, Xcode 16+)
 ```
 
-The `headless` and `release` presets build with warnings as errors. Run the **whole** suite, not only your filter, before you stop.
+The `headless`, `release`, `debug` and `asan` presets build with warnings as errors (the tree is warning-free in every preset; keep it so). Run the **whole** suite, not only your filter, before you stop.
 
 Useful: `./build/headless/bin/skywalker tools --markdown` (tool catalogue), `skywalker call TOOL '{json}' --project DIR` (one tool call),
 `skywalker render SCENE -o out.png`, `skywalker mcp --project DIR` (MCP over stdio), `skywalker check FILE.wander`.
