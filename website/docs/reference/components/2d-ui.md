@@ -5,7 +5,7 @@ title: "2D, text and UI"
 
 # 2D, text and UI
 
-Sprites, tilemaps, 2D lights and cameras, world text, UI canvases and dialogue.
+Sprites, tilemaps, 2D lights and cameras, world text, UI canvases, dialogue and 2D physics.
 
 ## `sprite` { #sprite }
 
@@ -386,4 +386,169 @@ Runs a .dialogue script (Yarn-style: nodes, `Speaker: line #tags`, `-> choices`,
 
     ```text
     self.dialogue.script          -- read or write any field
+    ```
+
+## `body2d` { #body2d }
+
+Simulated 2D rigid body (Box2D) on the XY plane: dynamic = moved by gravity, forces and collisions; kinematic = moved by its transform or velocity (moving platforms, doors) and pushes dynamic bodies; static = never moves. Shape it with a collider2d on the entity or its children. It writes position x/y and the Z rotation.
+
+| Field | Type | Description | Values |
+|---|---|---|---|
+| `motion` | string | How the body moves | `dynamic` `kinematic` `static` |
+| `mass` | number | Mass in kg (0 = from the colliders' density x area) | 0 .. 10000000 |
+| `gravityScale` | number | Gravity multiplier (0 = floats, -1 = falls up) | -100 .. 100 |
+| `linearDamping` | number | Drag on movement | 0 .. 100 |
+| `angularDamping` | number | Drag on spinning | 0 .. 100 |
+| `fixedRotation` | boolean | Never rotates (upright crates, force-driven characters) |  |
+| `bullet` | boolean | Continuous collision against other moving bodies: fast projectiles never tunnel |  |
+| `allowSleep` | boolean | May sleep when at rest (saves time; woken by contacts) |  |
+| `startAwake` | boolean | Simulate from the start (false = sleep until touched) |  |
+| `velocity` | number[2] | Linear velocity in units/s (initial; live while playing, writable) |  |
+| `angularVelocity` | number | Angular velocity in degrees/s around Z (initial; live while playing) |  |
+| `sleeping` | boolean | Whether the body sleeps (live while playing, read-only) |  |
+
+=== "Tool call"
+
+    ```tool
+    entity_update {"entity": "Crate", "components": {"body2d": {}}}
+    ```
+
+=== "Wander"
+
+    ```text
+    self.body2d.motion          -- read or write any field
+    ```
+
+## `collider2d` { #collider2d }
+
+2D collision shape on the XY plane. Alone it is static geometry (ground, walls); with a body2d it shapes the body; on a child without its own body2d it adds a shape to the ancestor's body. sensor makes a zone that fires `on trigger_enter` / `on trigger_exit`. oneWay makes a platform you can jump through from below. shape tilemap builds merged collision from the entity's tilemap (solid layers, per-tile slopes and one-way tiles).
+
+| Field | Type | Description | Values |
+|---|---|---|---|
+| `shape` | string | Shape type | `box` `circle` `capsule` `polygon` `chain` `segment` `tilemap` |
+| `size` | number[2] | Box: full width and height (local units, scaled by the transform) |  |
+| `radius` | number | Circle/capsule radius (local units) | 0 .. 100000 |
+| `height` | number | Capsule total height along local Y (&gt;= 2 x radius) | 0.001 .. 100000 |
+| `offset` | number[2] | Shape center relative to the entity origin (local) |  |
+| `rotation` | number | Shape rotation around Z relative to the entity (degrees) |  |
+| `points` | number[2][] | Polygon (convex, 3..8 points), chain (&gt;= 4 points) or segment (2 points), local: [[x, y], ...] |  |
+| `loop` | boolean | Chain: closed loop (counter-clockwise collides on the outside) |  |
+| `friction` | number | Surface friction (ice 0.02, wood 0.6, rubber 1) | 0 .. 10 |
+| `restitution` | number | Bounciness: 0 = none, 1 = perfectly elastic | 0 .. 1 |
+| `density` | number | kg per square unit (gives dynamic bodies their mass) | 0 .. 1000000 |
+| `sensor` | boolean | Sensor: detects overlaps (trigger_enter/exit) but never blocks |  |
+| `layer` | string | Collision layer | `default` `static` `player` `enemy` `projectile` `trigger` `debris` |
+| `mask` | string | Layers it collides with: "all" or names ("default, player") |  |
+| `oneWay` | boolean | One-way platform: blocks only from above (local +Y), passable from below |  |
+| `tileMerge` | string | Tilemap: chains = merged outlines (smooth), boxes = merged rectangles | `chains` `boxes` |
+| `tileShapes` | object | Tilemap: per-tile shapes over the tileset's collision table, by tile id: full \| none \| slope_up \| slope_down \| half_bottom \| half_top \| top (one-way), or {"points": [[px, py], ...], "oneWay": true} in tile pixels (origin top-left, y down) |  |
+
+=== "Tool call"
+
+    ```tool
+    entity_update {"entity": "Crate", "components": {"collider2d": {}}}
+    ```
+
+=== "Wander"
+
+    ```text
+    self.collider2d.shape          -- read or write any field
+    ```
+
+## `character2d` { #character2d }
+
+Kinematic platformer controller on the XY plane: a capsule that slides along walls, walks up and down slopes up to maxSlope, lands on one-way platforms, with its own gravity, coyote time and jump buffering. Drive it every tick from Wander: move2d(self, axis("move").x), if pressed("jump") then jump2d(self) end, grounded2d(self). Dynamic bodies are pushed by it; sensors detect it.
+
+| Field | Type | Description | Values |
+|---|---|---|---|
+| `height` | number | Capsule height (units) | 0.05 .. 100 |
+| `radius` | number | Capsule radius (units) | 0.02 .. 50 |
+| `offset` | number[2] | Capsule center relative to the entity origin (y = height/2: origin at the feet) |  |
+| `moveSpeed` | number | Run speed in units/s at move2d(self, 1) | 0 .. 1000 |
+| `acceleration` | number | Ground acceleration in units/s^2 | 0 .. 10000 |
+| `airControl` | number | Share of the acceleration in the air (0..1) | 0 .. 1 |
+| `jumpSpeed` | number | Jump take-off speed in units/s | 0 .. 1000 |
+| `gravity` | number | Downward acceleration in units/s^2 | 0 .. 10000 |
+| `fallMultiplier` | number | Gravity multiplier while falling (snappier jumps) | 1 .. 10 |
+| `maxFallSpeed` | number | Terminal fall speed in units/s | 0 .. 1000 |
+| `maxSlope` | number | Steepest walkable slope in degrees | 0 .. 89 |
+| `coyoteTime` | number | Seconds after leaving a ledge in which a jump still works | 0 .. 2 |
+| `jumpBuffer` | number | Seconds a jump pressed in the air is remembered until landing | 0 .. 2 |
+| `snapDistance` | number | Stays glued to the ground across slopes and small steps (units) | 0 .. 10 |
+| `layer` | string | Collision layer | `default` `static` `player` `enemy` `projectile` `trigger` `debris` |
+| `mask` | string | Layers it collides with: "all" or names |  |
+| `velocity` | number[2] | Velocity in units/s (live while playing; writable: knockback, launch pads) |  |
+| `grounded` | boolean | Standing on walkable ground (live while playing, read-only) |  |
+
+=== "Tool call"
+
+    ```tool
+    entity_update {"entity": "Crate", "components": {"character2d": {}}}
+    ```
+
+=== "Wander"
+
+    ```text
+    self.character2d.height          -- read or write any field
+    ```
+
+## `joint2d` { #joint2d }
+
+Connects this entity's 2D body to another body (other) or to the world. revolute = hinge/pivot (wheels, doors, ragdoll limbs), prismatic = slider, distance = rod or spring, weld = glue (breakable with breakForce), wheel = car wheel with suspension along axis, target = pulls the body to a world point or the other entity (drag, grapple).
+
+| Field | Type | Description | Values |
+|---|---|---|---|
+| `kind` | string | Joint type | `revolute` `prismatic` `distance` `weld` `wheel` `target` |
+| `other` | object \| string \| integer \| null | The other body (empty = the world; target: the entity to follow) — entity link: name ("Door"), "#id", {"id": 12} or null; read back as {"id", "name"} (follows renames; entity_refs lists links) |  |
+| `anchor` | number[2] | Pivot in this entity's local space |  |
+| `otherAnchor` | number[2] | The other end in the other body's local space (world point without other) |  |
+| `axis` | number[2] | Prismatic/wheel axis in this entity's local space |  |
+| `length` | number | Distance: rest length (0 = the distance at play start) | 0 .. 100000 |
+| `limitMin` | number | Lower limit: degrees (revolute) or units; active when min &lt; max |  |
+| `limitMax` | number | Upper limit |  |
+| `motorSpeed` | number | Motor speed: degrees/s (revolute, wheel) or units/s (prismatic) |  |
+| `motorForce` | number | Max motor torque (N m) or force (N); 0 = motor off | 0 .. 1000000000 |
+| `stiffness` | number | Spring frequency in Hz (0 = rigid) | 0 .. 1000 |
+| `damping` | number | Spring damping ratio (0.7 = settles without bouncing) | 0 .. 100 |
+| `target` | number[2] | Target joint: world point to pull to (when other is empty) |  |
+| `maxForce` | number | Target joint: strongest pull in N | 0 .. 1000000000 |
+| `breakForce` | number | Breaks above this force in N (0 = unbreakable) | 0 .. 1000000000 |
+| `collideConnected` | boolean | The two bodies collide with each other |  |
+| `enabled` | boolean | false after breaking (on event "joint_broken") |  |
+
+=== "Tool call"
+
+    ```tool
+    entity_update {"entity": "Crate", "components": {"joint2d": {}}}
+    ```
+
+=== "Wander"
+
+    ```text
+    self.joint2d.kind          -- read or write any field
+    ```
+
+## `physics2d_world` { #physics2d_world }
+
+Scene-wide 2D physics settings (put it on one entity; defaults apply without one): gravity, solver sub-steps, sleeping, the impact event threshold and debug drawing of shapes, contacts and joints.
+
+| Field | Type | Description | Values |
+|---|---|---|---|
+| `gravity` | number[2] | Gravity in units/s^2 (default 0, -20) |  |
+| `substeps` | integer | Solver sub-steps per tick (1..16; more = stiffer stacks) |  |
+| `allowSleep` | boolean | Bodies at rest may sleep |  |
+| `impactSpeed` | number | Approach speed (units/s) above which `on impact` fires | 0 .. 10000 |
+| `debugDraw` | boolean | Draw shapes, contacts and joints in the frame |  |
+| `enabled` | boolean | Simulate 2D physics |  |
+
+=== "Tool call"
+
+    ```tool
+    entity_update {"entity": "Crate", "components": {"physics2d_world": {}}}
+    ```
+
+=== "Wander"
+
+    ```text
+    self.physics2d_world.gravity          -- read or write any field
     ```

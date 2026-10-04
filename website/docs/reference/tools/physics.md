@@ -7,7 +7,7 @@ title: "Physics tools"
 
 Rigid bodies, characters, queries, settling and navigation meshes.
 
-12 tools in the `physics` category. Badges: **read-only** tools never change the project; **mutating** tools are undoable and attributed; **open-world** tools reach outside the engine and MCP clients ask before running them.
+16 tools in the `physics` category. Badges: **read-only** tools never change the project; **mutating** tools are undoable and attributed; **open-world** tools reach outside the engine and MCP clients ask before running them.
 
 | Tool | Summary |
 |---|---|
@@ -23,6 +23,10 @@ Rigid bodies, characters, queries, settling and navigation meshes.
 | [`vehicle_tune`](#vehicle_tune) | Change a vehicle's handling parameters with validation (one undoable edit; works while playing: the vehicle is rebuilt keeping its speed). |
 | [`vehicle_info`](#vehicle_info) | Live state of vehicles: speed (km/h), rpm, gear, inputs as asked and as applied after assists (steering smoothing, auto reverse, traction control, ABS, drift assist), drift angle, lateral/longitudinal g, and per wheel: suspension length/compression, contact point and surface, load (N), drive and cornering forces, slip ratio and slip angle, skid 0..1. |
 | [`vehicle_test_drive`](#vehicle_test_drive) | An autopilot drives a copy of the vehicle through standard maneuvers in a private physics world (the scene is not changed; works while editing) and returns handling metrics to tune by numbers: accel (0-60, 0-100 km/h, quarter mile, wheelspin, upshifts), braking (distance and g from `speed`, default 100 km/h; ABS activity, stability), slalom (8 cones every cone_spacing m at `speed`, default 60: completed, cones hit, average speed, line error), skidpad (circle of `radius` m, speed ramps until the car leaves the line: max lateral g, and whether it understeers, oversteers or runs out of power), top_speed (`duration` s), custom (`inputs` keyframes [{t, throttle, brake, steer, handbrake}]), all (accel, braking, slalom, skidpad). |
+| [`physics2d_info`](#physics2d_info) | The 2D physics world (Box2D) at a glance: settings (gravity, sub-steps, debug draw), counts (bodies by motion, awake/sleeping, shapes, sensors, chains, characters, joints, contacts), each body and character2d with its velocity, sleeping/grounded state, tilemap collision pieces (merged loops/boxes/polygons), and warnings (bad polygons, unknown layers, missing joint bodies). |
+| [`physics2d_add`](#physics2d_add) | Make 2D entities physical with a preset (one undoable edit); colliders are fitted to the sprite. |
+| [`physics2d_settle`](#physics2d_settle) | Drop 2D objects with a real simulation and keep where they come to rest: only the listed entities move (as dynamic bodies, even without body2d), everything else is frozen; the result is ONE undoable edit. |
+| [`physics2d_query`](#physics2d_query) | Ask the 2D collision world (collider2d shapes, character2d capsules) on the XY plane — works while editing and playing. |
 
 ### `physics_add` { #physics_add }
 
@@ -587,6 +591,187 @@ An autopilot drives a copy of the vehicle through standard maneuvers in a privat
         "arguments": {
           "entity": "Coupe",
           "maneuver": "all"
+        }
+      }
+    }
+    ```
+
+### `physics2d_info` { #physics2d_info }
+
+**2D physics info** <span class="sky-badge sky-badge--ro" title="Never changes the scene">read-only</span>
+
+The 2D physics world (Box2D) at a glance: settings (gravity, sub-steps, debug draw), counts (bodies by motion, awake/sleeping, shapes, sensors, chains, characters, joints, contacts), each body and character2d with its velocity, sleeping/grounded state, tilemap collision pieces (merged loops/boxes/polygons), and warnings (bad polygons, unknown layers, missing joint bodies). Works while editing (an edit-time mirror) and playing. Pass entity for one entity only. Example: {"entity": "Player"}.
+
+| Argument | Type | Required | Description | Values |
+|---|---|---|---|---|
+| `entity` | integer \| string |  | Only this entity |  |
+| `limit` | integer |  | Max bodies listed (default 50) |  |
+
+=== "Tool call"
+
+    ```tool
+    physics2d_info {"entity": "Player"}
+    ```
+
+=== "CLI"
+
+    ```bash
+    skywalker call physics2d_info '{"entity": "Player"}' --project my_game
+    ```
+
+=== "MCP request"
+
+    ```json
+    {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "method": "tools/call",
+      "params": {
+        "name": "physics2d_info",
+        "arguments": {
+          "entity": "Player"
+        }
+      }
+    }
+    ```
+
+### `physics2d_add` { #physics2d_add }
+
+**Make 2D physical** <span class="sky-badge sky-badge--mut" title="Changes the project; undoable and attributed">mutating</span>
+
+Make 2D entities physical with a preset (one undoable edit); colliders are fitted to the sprite. platformer_player = character2d controller (drive with move2d/jump2d in Wander); crate = dynamic box; ball = bouncy dynamic circle; one_way_platform = static box you can jump through from below; tilemap_collision = merged collision from the entity's tilemap (solid layers, per-tile slopes and one-way tiles); static_ground = static box; sensor_zone = trigger area (on trigger_enter / on trigger_exit); moving_platform = kinematic box (move it with its transform or body2d.velocity); remove = strip the 2D physics components. `overrides` patches the components: {"collider2d": {"restitution": 0.9}, "character2d": {"jumpSpeed": 14}}. Example: {"entity": "Player", "preset": "platformer_player"}.
+
+| Argument | Type | Required | Description | Values |
+|---|---|---|---|---|
+| `entity` | integer \| string |  | Entity (or use entities) |  |
+| `entities` | integer \| string[] |  | Entities to change |  |
+| `preset` | string | yes | What the entities become | `platformer_player` `crate` `ball` `one_way_platform` `tilemap_collision` `static_ground` `sensor_zone` `moving_platform` `remove` |
+| `overrides` | object |  | Component patches: {"body2d": {...}, "collider2d": {...}, "character2d": {...}} |  |
+
+=== "Tool call"
+
+    ```tool
+    physics2d_add {"entity": "Player", "preset": "platformer_player"}
+    ```
+
+=== "CLI"
+
+    ```bash
+    skywalker call physics2d_add '{"entity": "Player", "preset": "platformer_player"}' --project my_game
+    ```
+
+=== "MCP request"
+
+    ```json
+    {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "method": "tools/call",
+      "params": {
+        "name": "physics2d_add",
+        "arguments": {
+          "entity": "Player",
+          "preset": "platformer_player"
+        }
+      }
+    }
+    ```
+
+### `physics2d_settle` { #physics2d_settle }
+
+**Settle with 2D physics** <span class="sky-badge sky-badge--mut" title="Changes the project; undoable and attributed">mutating</span>
+
+Drop 2D objects with a real simulation and keep where they come to rest: only the listed entities move (as dynamic bodies, even without body2d), everything else is frozen; the result is ONE undoable edit. Use after placing crates, rocks or props on a level so they rest on the ground and on each other. Example: {"entities": ["Crate 1", "Crate 2"], "seconds": 3}.
+
+| Argument | Type | Required | Description | Values |
+|---|---|---|---|---|
+| `entity` | integer \| string |  | Entity to settle (or use entities) |  |
+| `entities` | integer \| string[] |  | Entities to settle |  |
+| `seconds` | number |  | Max simulated seconds (default 4, max 30); stops early when everything sleeps |  |
+| `freeze_others` | boolean |  | Keep other dynamic bodies still (default true) |  |
+
+=== "Tool call"
+
+    ```tool
+    physics2d_settle {"entities": ["Crate 1", "Crate 2"], "seconds": 3}
+    ```
+
+=== "CLI"
+
+    ```bash
+    skywalker call physics2d_settle '{"entities": ["Crate 1", "Crate 2"], "seconds": 3}' --project my_game
+    ```
+
+=== "MCP request"
+
+    ```json
+    {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "method": "tools/call",
+      "params": {
+        "name": "physics2d_settle",
+        "arguments": {
+          "entities": [
+            "Crate 1",
+            "Crate 2"
+          ],
+          "seconds": 3
+        }
+      }
+    }
+    ```
+
+### `physics2d_query` { #physics2d_query }
+
+**2D physics query** <span class="sky-badge sky-badge--ro" title="Never changes the scene">read-only</span>
+
+Ask the 2D collision world (collider2d shapes, character2d capsules) on the XY plane — works while editing and playing. raycast = first hit along a ray; raycast_all = every entity along it; overlap_circle / overlap_box = entities touching the shape at origin (is this spot free?); point = entities containing the point. Sensors are ignored unless include_sensors. Example: {"type": "raycast", "origin": [2, 5], "direction": [0, -1]}.
+
+| Argument | Type | Required | Description | Values |
+|---|---|---|---|---|
+| `type` | string | yes | Query kind | `raycast` `raycast_all` `overlap_circle` `overlap_box` `point` |
+| `origin` | number[] | yes | Ray start, shape center or point [x, y] |  |
+| `direction` | number[] |  | Ray direction [x, y] (default [0, -1]) |  |
+| `max_distance` | number |  | Max ray distance (default 100) |  |
+| `radius` | number |  | overlap_circle radius (default 0.5) |  |
+| `half_extents` | number[] |  | overlap_box half size [x, y] (default [0.5, 0.5]) |  |
+| `angle` | number |  | overlap_box rotation in degrees |  |
+| `exclude` | integer \| string[] |  | Entities to ignore |  |
+| `include_sensors` | boolean |  | Also report sensors |  |
+| `layers` | string[] |  | Only these collision layers |  |
+
+=== "Tool call"
+
+    ```tool
+    physics2d_query {"type": "raycast", "origin": [2, 5], "direction": [0, -1]}
+    ```
+
+=== "CLI"
+
+    ```bash
+    skywalker call physics2d_query '{"type": "raycast", "origin": [2, 5], "direction": [0, -1]}' --project my_game
+    ```
+
+=== "MCP request"
+
+    ```json
+    {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "method": "tools/call",
+      "params": {
+        "name": "physics2d_query",
+        "arguments": {
+          "type": "raycast",
+          "origin": [
+            2,
+            5
+          ],
+          "direction": [
+            0,
+            -1
+          ]
         }
       }
     }

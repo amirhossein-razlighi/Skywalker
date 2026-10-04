@@ -5,7 +5,7 @@ title: "Wander builtins"
 
 # Wander builtins
 
-Every function a Wander script can call lives in one registry: name, typed parameters, return type, category, documentation and an example. The compiler checks calls against it (arity, types, did-you-mean), and this page is generated from it. **161 builtins** in 22 categories.
+Every function a Wander script can call lives in one registry: name, typed parameters, return type, category, documentation and an example. The compiler checks calls against it (arity, types, did-you-mean), and this page is generated from it. **173 builtins** in 24 categories.
 
 Agents get the same information from `wander_reference` (the guide) and `wander_reference {topic}` (structured entries for a category or a function). For the language itself, read the [Wander manual](../manual/wander/index.md).
 
@@ -15,6 +15,7 @@ Agents get the same information from `wander_reference` (the guide) and `wander_
 | [animation](#animation) | [`anim_state`](#animation-anim_state), [`foot_ik`](#animation-foot_ik), [`hand_ik`](#animation-hand_ik), [`look_at`](#animation-look_at), [`play_animation`](#animation-play_animation), [`play_sequence`](#animation-play_sequence), [`set_param`](#animation-set_param), [`trigger`](#animation-trigger), [`turn_in_place`](#animation-turn_in_place) |
 | [audio](#audio) | [`music`](#audio-music), [`play`](#audio-play), [`play_sound`](#audio-play_sound), [`set_volume`](#audio-set_volume), [`stop_sound`](#audio-stop_sound) |
 | [character](#character) | [`grounded`](#character-grounded), [`jump`](#character-jump), [`walk`](#character-walk) |
+| [character2d](#character2d) | [`drop_through2d`](#character2d-drop_through2d), [`grounded2d`](#character2d-grounded2d), [`jump2d`](#character2d-jump2d), [`move2d`](#character2d-move2d) |
 | [color](#color) | [`color`](#color-color), [`hsv`](#color-hsv) |
 | [dialogue](#dialogue) | [`dialogue_advance`](#dialogue-dialogue_advance), [`dialogue_choose`](#dialogue-dialogue_choose), [`dialogue_var`](#dialogue-dialogue_var), [`start_dialogue`](#dialogue-start_dialogue) |
 | [effects](#effects) | [`burst`](#effects-burst), [`water_height`](#effects-water_height) |
@@ -25,6 +26,7 @@ Agents get the same information from `wander_reference` (the guide) and `wander_
 | [math](#math) | [`abs`](#math-abs), [`acos`](#math-acos), [`approach`](#math-approach), [`asin`](#math-asin), [`atan`](#math-atan), [`atan2`](#math-atan2), [`ceil`](#math-ceil), [`clamp`](#math-clamp), [`cos`](#math-cos), [`deg`](#math-deg), [`exp`](#math-exp), [`floor`](#math-floor), [`inverse_lerp`](#math-inverse_lerp), [`lerp`](#math-lerp), [`ln`](#math-ln), [`max`](#math-max), [`min`](#math-min), [`noise`](#math-noise), [`pow`](#math-pow), [`rad`](#math-rad), [`round`](#math-round), [`sign`](#math-sign), [`sin`](#math-sin), [`smoothstep`](#math-smoothstep), [`sqrt`](#math-sqrt), [`tan`](#math-tan) |
 | [navigation](#navigation) | [`arrived`](#navigation-arrived), [`navigate`](#navigation-navigate), [`path_length`](#navigation-path_length), [`stop_navigation`](#navigation-stop_navigation) |
 | [physics](#physics) | [`impulse`](#physics-impulse), [`overlap_sphere`](#physics-overlap_sphere), [`push`](#physics-push), [`raycast`](#physics-raycast), [`torque`](#physics-torque), [`velocity`](#physics-velocity) |
+| [physics2d](#physics2d) | [`impulse2d`](#physics2d-impulse2d), [`overlap2d`](#physics2d-overlap2d), [`point2d`](#physics2d-point2d), [`push2d`](#physics2d-push2d), [`raycast2d`](#physics2d-raycast2d), [`set_velocity2d`](#physics2d-set_velocity2d), [`torque2d`](#physics2d-torque2d), [`velocity2d`](#physics2d-velocity2d) |
 | [random](#random) | [`chance`](#random-chance), [`pick`](#random-pick), [`random`](#random-random), [`random_int`](#random-random_int), [`shuffle`](#random-shuffle) |
 | [render](#render) | [`layer_mask`](#render-layer_mask), [`probe_bake`](#render-probe_bake) |
 | [save](#save) | [`delete_save`](#save-delete_save), [`game_var`](#save-game_var), [`has_save`](#save-has_save), [`list_saves`](#save-list_saves), [`load_game`](#save-load_game), [`save_game`](#save-save_game) |
@@ -42,7 +44,9 @@ Besides the core triggers (`on start`, `on tick`, `on event`, `on key`, `on clic
 |---|---|
 | `on action` | An input action was pressed: on action "jump" (actions come from input.json). |
 | `on collide` | Two bodies touched: on collide ("name or tag")? — other, contact_point, contact_normal, impact. |
+| `on collide_end` | Two 2D bodies stopped touching: on collide_end — other. data: {} |
 | `on dialogue` | `on dialogue "start" \| "line" \| "choice" \| "end" \| "&lt;command&gt;"`: conversation events and &lt;&lt;command&gt;&gt;s of .dialogue scripts (event "dialogue:..."). |
+| `on impact` | A 2D body hit this one faster than physics2d_world.impactSpeed: on impact — other, data. data: {point: vec, normal: vec, speed: number, impulse: number} |
 | `on loaded` | A save was loaded (load_game or the load_game tool): on loaded — data.slot, data.version, data.meta. Refresh what is derived from saved state (HUD, music). data: {slot: string, version: number, meta: map} |
 | `on pause` | The game was paused (pause_game): delivered to every behavior, also those the pause stops. |
 | `on resume` | The game resumed (resume_game). |
@@ -446,6 +450,82 @@ Returns: `none`
 
 ```text
 walk(self, (axis("move").x, 0, -axis("move").y))
+```
+
+## character2d { #character2d }
+
+### `drop_through2d` { #character2d-drop_through2d }
+
+```text
+drop_through2d(e: entity) -> bool
+```
+
+Drops a character2d through the one-way platform it stands on; false when it stands on solid ground.
+
+| Parameter | Type | |
+|---|---|---|
+| `e` | entity |  |
+
+Returns: `bool`
+
+```text
+if pressed("down") and pressed("jump") then drop_through2d(self) end
+```
+
+### `grounded2d` { #character2d-grounded2d }
+
+```text
+grounded2d(e: entity) -> bool
+```
+
+Whether a character2d stands on walkable ground (a slope up to maxSlope or a platform).
+
+| Parameter | Type | |
+|---|---|---|
+| `e` | entity |  |
+
+Returns: `bool`
+
+```text
+if grounded2d(self) then play_anim(self, "run") end
+```
+
+### `jump2d` { #character2d-jump2d }
+
+```text
+jump2d(e: entity, speed: number?) -> bool
+```
+
+Makes a character2d jump (default: its jumpSpeed). True when it jumps now (grounded or within coyote time); otherwise the press is buffered and the jump happens on landing within jumpBuffer seconds.
+
+| Parameter | Type | |
+|---|---|---|
+| `e` | entity |  |
+| `speed` | number | optional |
+
+Returns: `bool`
+
+```text
+if pressed("jump") then jump2d(self) end
+```
+
+### `move2d` { #character2d-move2d }
+
+```text
+move2d(e: entity, x: number)
+```
+
+Runs a character2d this tick: -1 = full speed left, 1 = right (scaled by moveSpeed, with acceleration). Call every tick.
+
+| Parameter | Type | |
+|---|---|---|
+| `e` | entity |  |
+| `x` | number |  |
+
+Returns: `none`
+
+```text
+move2d(self, axis("move").x)
 ```
 
 ## color { #color }
@@ -1853,6 +1933,161 @@ Returns: `vector`
 if length(velocity(self)) > 10 then ... end
 ```
 
+## physics2d { #physics2d }
+
+### `impulse2d` { #physics2d-impulse2d }
+
+```text
+impulse2d(e: entity, impulse: vector)
+```
+
+An instant kick (N s, x/y) to a dynamic body2d.
+
+| Parameter | Type | |
+|---|---|---|
+| `e` | entity |  |
+| `impulse` | vector |  |
+
+Returns: `none`
+
+```text
+impulse2d(self, (0, 8, 0))
+```
+
+### `overlap2d` { #physics2d-overlap2d }
+
+```text
+overlap2d(center: vector|entity, radius: number, tag: string?) -> none|entity
+```
+
+Nearest entity (not self) whose 2D collider overlaps the circle, optionally with a tag; sensors are ignored; none if empty.
+
+| Parameter | Type | |
+|---|---|---|
+| `center` | vector\|entity |  |
+| `radius` | number |  |
+| `tag` | string | optional |
+
+Returns: `none|entity`
+
+```text
+let enemy = overlap2d(self, 3, "enemy")
+```
+
+### `point2d` { #physics2d-point2d }
+
+```text
+point2d(point: vector|entity, tag: string?) -> none|entity
+```
+
+Entity whose 2D collider contains the point (sensors included, self excluded), optionally with a tag; none if empty.
+
+| Parameter | Type | |
+|---|---|---|
+| `point` | vector\|entity |  |
+| `tag` | string | optional |
+
+Returns: `none|entity`
+
+```text
+let under = point2d((2, 1, 0), "crate")
+```
+
+### `push2d` { #physics2d-push2d }
+
+```text
+push2d(e: entity, force: vector)
+```
+
+Applies a continuous force (N, x/y) to a dynamic body2d this tick.
+
+| Parameter | Type | |
+|---|---|---|
+| `e` | entity |  |
+| `force` | vector |  |
+
+Returns: `none`
+
+```text
+push2d(self, (axis("move").x * 20, 0, 0))
+```
+
+### `raycast2d` { #physics2d-raycast2d }
+
+```text
+raycast2d(origin: vector|entity, direction: vector, max_distance: number?) -> none|entity
+```
+
+First 2D collider hit along a ray on the XY plane (self is ignored, sensors too); sets hit_point, hit_normal and hit_distance.
+
+| Parameter | Type | |
+|---|---|---|
+| `origin` | vector\|entity |  |
+| `direction` | vector |  |
+| `max_distance` | number | optional |
+
+Returns: `none|entity`
+
+```text
+let ground = raycast2d(self, (0, -1, 0), 1.2)
+```
+
+### `set_velocity2d` { #physics2d-set_velocity2d }
+
+```text
+set_velocity2d(e: entity, velocity: vector)
+```
+
+Sets the velocity of a body2d (dynamic or kinematic) or character2d (knockback, launch pads).
+
+| Parameter | Type | |
+|---|---|---|
+| `e` | entity |  |
+| `velocity` | vector |  |
+
+Returns: `none`
+
+```text
+set_velocity2d(self, (velocity2d(self).x, 14, 0))
+```
+
+### `torque2d` { #physics2d-torque2d }
+
+```text
+torque2d(e: entity, torque: number)
+```
+
+Applies a torque (N m, counter-clockwise) to a dynamic body2d.
+
+| Parameter | Type | |
+|---|---|---|
+| `e` | entity |  |
+| `torque` | number |  |
+
+Returns: `none`
+
+```text
+torque2d(self, 5)
+```
+
+### `velocity2d` { #physics2d-velocity2d }
+
+```text
+velocity2d(e: entity) -> vector
+```
+
+Current velocity of a body2d or character2d (units/s, z = 0).
+
+| Parameter | Type | |
+|---|---|---|
+| `e` | entity |  |
+
+Returns: `vector`
+
+```text
+if abs(velocity2d(self).x) > 8 then ... end
+```
+
 ## random { #random }
 
 ### `chance` { #random-chance }
@@ -3120,6 +3355,11 @@ let w = vehicle_wheel(self, "rear_left")
         grounded(e: entity) -> bool — Whether a character stands on the ground.
         jump(e: entity, speed: number?) -> bool — Makes a grounded character jump (default: its jumpSpeed); false when airborne.
         walk(e: entity, direction: vector) — Moves a character this tick (|direction| 1 = its moveSpeed). Call every tick while walking.
+      [character2d]
+        drop_through2d(e: entity) -> bool — Drops a character2d through the one-way platform it stands on; false when it stands on solid ground.
+        grounded2d(e: entity) -> bool — Whether a character2d stands on walkable ground (a slope up to maxSlope or a platform).
+        jump2d(e: entity, speed: number?) -> bool — Makes a character2d jump (default: its jumpSpeed). True when it jumps now (grounded or within coyote time); otherwise the press is buffered and the jump happens on landing within jumpBuffer seconds.
+        move2d(e: entity, x: number) — Runs a character2d this tick: -1 = full speed left, 1 = right (scaled by moveSpeed, with acceleration). Call every tick.
       [color]
         color(r: number, g: number, b: number, a: number?) -> color — Makes a color from 0..1 channels.
         hsv(h: number, s: number, v: number) -> color — Color from hue (0..1, wraps), saturation and value.
@@ -3208,6 +3448,15 @@ let w = vehicle_wheel(self, "rear_left")
         raycast(origin: vector|entity, direction: vector, max_distance: number?) -> none|entity — First collider hit along a ray (self is ignored); sets hit_point, hit_normal and hit_distance.
         torque(e: entity, torque: vector) — Applies a torque (N m) to a dynamic body.
         velocity(e: entity) -> vector — Current linear velocity of a body or character (m/s).
+      [physics2d]
+        impulse2d(e: entity, impulse: vector) — An instant kick (N s, x/y) to a dynamic body2d.
+        overlap2d(center: vector|entity, radius: number, tag: string?) -> none|entity — Nearest entity (not self) whose 2D collider overlaps the circle, optionally with a tag; sensors are ignored; none if empty.
+        point2d(point: vector|entity, tag: string?) -> none|entity — Entity whose 2D collider contains the point (sensors included, self excluded), optionally with a tag; none if empty.
+        push2d(e: entity, force: vector) — Applies a continuous force (N, x/y) to a dynamic body2d this tick.
+        raycast2d(origin: vector|entity, direction: vector, max_distance: number?) -> none|entity — First 2D collider hit along a ray on the XY plane (self is ignored, sensors too); sets hit_point, hit_normal and hit_distance.
+        set_velocity2d(e: entity, velocity: vector) — Sets the velocity of a body2d (dynamic or kinematic) or character2d (knockback, launch pads).
+        torque2d(e: entity, torque: number) — Applies a torque (N m, counter-clockwise) to a dynamic body2d.
+        velocity2d(e: entity) -> vector — Current velocity of a body2d or character2d (units/s, z = 0).
       [random]
         chance(p: number) -> bool — true with probability p (0..1).
         pick(items: list) -> any — A random element of a list (none if empty).
@@ -3282,7 +3531,9 @@ let w = vehicle_wheel(self, "rear_left")
     SUBSYSTEM TRIGGERS
         on action — An input action was pressed: on action "jump" (actions come from input.json).
         on collide — Two bodies touched: on collide ("name or tag")? — other, contact_point, contact_normal, impact.
+        on collide_end — Two 2D bodies stopped touching: on collide_end — other. data: {}
         on dialogue — `on dialogue "start" | "line" | "choice" | "end" | "<command>"`: conversation events and <<command>>s of .dialogue scripts (event "dialogue:...").
+        on impact — A 2D body hit this one faster than physics2d_world.impactSpeed: on impact — other, data. data: {point: vec, normal: vec, speed: number, impulse: number}
         on loaded — A save was loaded (load_game or the load_game tool): on loaded — data.slot, data.version, data.meta. Refresh what is derived from saved state (HUD, music). data: {slot: string, version: number, meta: map}
         on pause — The game was paused (pause_game): delivered to every behavior, also those the pause stops.
         on resume — The game resumed (resume_game).

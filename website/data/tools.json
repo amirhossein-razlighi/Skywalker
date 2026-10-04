@@ -12361,6 +12361,239 @@
    "_meta": {
     "skywalker/category": "wander"
    }
+  },
+  {
+   "name": "physics2d_info",
+   "title": "2D physics info",
+   "description": "The 2D physics world (Box2D) at a glance: settings (gravity, sub-steps, debug draw), counts (bodies by motion, awake/sleeping, shapes, sensors, chains, characters, joints, contacts), each body and character2d with its velocity, sleeping/grounded state, tilemap collision pieces (merged loops/boxes/polygons), and warnings (bad polygons, unknown layers, missing joint bodies). Works while editing (an edit-time mirror) and playing. Pass entity for one entity only. Example: {\"entity\": \"Player\"}.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "entity": {
+      "type": [
+       "integer",
+       "string"
+      ],
+      "description": "Only this entity"
+     },
+     "limit": {
+      "type": "integer",
+      "description": "Max bodies listed (default 50)"
+     }
+    },
+    "additionalProperties": false
+   },
+   "annotations": {
+    "title": "2D physics info",
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "openWorldHint": false
+   },
+   "_meta": {
+    "skywalker/category": "physics"
+   }
+  },
+  {
+   "name": "physics2d_add",
+   "title": "Make 2D physical",
+   "description": "Make 2D entities physical with a preset (one undoable edit); colliders are fitted to the sprite. platformer_player = character2d controller (drive with move2d/jump2d in Wander); crate = dynamic box; ball = bouncy dynamic circle; one_way_platform = static box you can jump through from below; tilemap_collision = merged collision from the entity's tilemap (solid layers, per-tile slopes and one-way tiles); static_ground = static box; sensor_zone = trigger area (on trigger_enter / on trigger_exit); moving_platform = kinematic box (move it with its transform or body2d.velocity); remove = strip the 2D physics components. `overrides` patches the components: {\"collider2d\": {\"restitution\": 0.9}, \"character2d\": {\"jumpSpeed\": 14}}. Example: {\"entity\": \"Player\", \"preset\": \"platformer_player\"}.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "entity": {
+      "type": [
+       "integer",
+       "string"
+      ],
+      "description": "Entity (or use entities)"
+     },
+     "entities": {
+      "type": "array",
+      "items": {
+       "type": [
+        "integer",
+        "string"
+       ],
+       "description": "Entity id (number) or exact name"
+      },
+      "description": "Entities to change"
+     },
+     "preset": {
+      "type": "string",
+      "enum": [
+       "platformer_player",
+       "crate",
+       "ball",
+       "one_way_platform",
+       "tilemap_collision",
+       "static_ground",
+       "sensor_zone",
+       "moving_platform",
+       "remove"
+      ],
+      "description": "What the entities become"
+     },
+     "overrides": {
+      "type": "object",
+      "description": "Component patches: {\"body2d\": {...}, \"collider2d\": {...}, \"character2d\": {...}}"
+     }
+    },
+    "additionalProperties": false,
+    "required": [
+     "preset"
+    ]
+   },
+   "annotations": {
+    "title": "Make 2D physical",
+    "readOnlyHint": false,
+    "destructiveHint": false,
+    "openWorldHint": false
+   },
+   "_meta": {
+    "skywalker/category": "physics"
+   }
+  },
+  {
+   "name": "physics2d_settle",
+   "title": "Settle with 2D physics",
+   "description": "Drop 2D objects with a real simulation and keep where they come to rest: only the listed entities move (as dynamic bodies, even without body2d), everything else is frozen; the result is ONE undoable edit. Use after placing crates, rocks or props on a level so they rest on the ground and on each other. Example: {\"entities\": [\"Crate 1\", \"Crate 2\"], \"seconds\": 3}.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "entity": {
+      "type": [
+       "integer",
+       "string"
+      ],
+      "description": "Entity to settle (or use entities)"
+     },
+     "entities": {
+      "type": "array",
+      "items": {
+       "type": [
+        "integer",
+        "string"
+       ],
+       "description": "Entity id (number) or exact name"
+      },
+      "description": "Entities to settle"
+     },
+     "seconds": {
+      "type": "number",
+      "description": "Max simulated seconds (default 4, max 30); stops early when everything sleeps"
+     },
+     "freeze_others": {
+      "type": "boolean",
+      "description": "Keep other dynamic bodies still (default true)"
+     }
+    },
+    "additionalProperties": false
+   },
+   "annotations": {
+    "title": "Settle with 2D physics",
+    "readOnlyHint": false,
+    "destructiveHint": false,
+    "openWorldHint": false
+   },
+   "_meta": {
+    "skywalker/category": "physics"
+   }
+  },
+  {
+   "name": "physics2d_query",
+   "title": "2D physics query",
+   "description": "Ask the 2D collision world (collider2d shapes, character2d capsules) on the XY plane — works while editing and playing. raycast = first hit along a ray; raycast_all = every entity along it; overlap_circle / overlap_box = entities touching the shape at origin (is this spot free?); point = entities containing the point. Sensors are ignored unless include_sensors. Example: {\"type\": \"raycast\", \"origin\": [2, 5], \"direction\": [0, -1]}.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "type": {
+      "type": "string",
+      "enum": [
+       "raycast",
+       "raycast_all",
+       "overlap_circle",
+       "overlap_box",
+       "point"
+      ],
+      "description": "Query kind"
+     },
+     "origin": {
+      "type": "array",
+      "items": {
+       "type": "number"
+      },
+      "minItems": 2,
+      "maxItems": 3,
+      "description": "Ray start, shape center or point [x, y]"
+     },
+     "direction": {
+      "type": "array",
+      "items": {
+       "type": "number"
+      },
+      "minItems": 2,
+      "maxItems": 3,
+      "description": "Ray direction [x, y] (default [0, -1])"
+     },
+     "max_distance": {
+      "type": "number",
+      "description": "Max ray distance (default 100)"
+     },
+     "radius": {
+      "type": "number",
+      "description": "overlap_circle radius (default 0.5)"
+     },
+     "half_extents": {
+      "type": "array",
+      "items": {
+       "type": "number"
+      },
+      "minItems": 2,
+      "maxItems": 3,
+      "description": "overlap_box half size [x, y] (default [0.5, 0.5])"
+     },
+     "angle": {
+      "type": "number",
+      "description": "overlap_box rotation in degrees"
+     },
+     "exclude": {
+      "type": "array",
+      "items": {
+       "type": [
+        "integer",
+        "string"
+       ],
+       "description": "Entity id (number) or exact name"
+      },
+      "description": "Entities to ignore"
+     },
+     "include_sensors": {
+      "type": "boolean",
+      "description": "Also report sensors"
+     },
+     "layers": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "Only these collision layers"
+     }
+    },
+    "additionalProperties": false,
+    "required": [
+     "type",
+     "origin"
+    ]
+   },
+   "annotations": {
+    "title": "2D physics query",
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "openWorldHint": false
+   },
+   "_meta": {
+    "skywalker/category": "physics"
+   }
   }
  ]
 }

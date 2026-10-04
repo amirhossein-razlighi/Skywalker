@@ -5,7 +5,7 @@ title: "Tools"
 
 # Tools
 
-Skywalker exposes **232 tools** (engine 0.1.0). The editor, its in-app agents, the CLI and every MCP client call the same tools with the same JSON arguments, so anything you read here works everywhere. 133 tools change the project; every such change is undoable and attributed to whoever made it.
+Skywalker exposes **236 tools** (engine 0.1.0). The editor, its in-app agents, the CLI and every MCP client call the same tools with the same JSON arguments, so anything you read here works everywhere. 135 tools change the project; every such change is undoable and attributed to whoever made it.
 
 Arguments are validated before a tool runs: unknown keys, wrong types and bad enum values fail with a *did you mean …?* hint. Each tool page shows the arguments, the annotations MCP clients use for approvals, and the same call as a tool call, a CLI command and a raw MCP request.
 
@@ -21,7 +21,7 @@ Arguments are validated before a tool runs: unknown keys, wrong types and bad en
 | [Wander](wander.md) | 19 | Write, check, test, graph and inspect Wander behaviors. |
 | [Code](code.md) | 4 | Native code: ahead-of-time compiled behaviors and C++ modules (trusted local code; clients ask first). |
 | [Simulation](sim.md) | 14 | Play, pause, step and stop; inject input; trace and inspect what runs. |
-| [Physics](physics.md) | 12 | Rigid bodies, characters, queries, settling and navigation meshes. |
+| [Physics](physics.md) | 16 | Rigid bodies, characters, queries, settling and navigation meshes. |
 | [Animation](animation.md) | 15 | Skeletal animation, controllers, IK, bone attachments and cinematic sequences. |
 | [UI](ui.md) | 4 | Build, style, inspect and drive user interfaces. |
 | [Dialogue](dialogue.md) | 3 | Lint, preview and control branching dialogue. |
@@ -176,6 +176,10 @@ Arguments are validated before a tool runs: unknown keys, wrong types and bad en
 | [`nav_build`](physics.md#nav_build) | Physics | Bake (or rebuild) the navigation mesh from static colliders and static meshes, save it to the project and record the settings in the scene's `navmesh` component (one undoable edit; creates an entity named "Navigation" if needed). |
 | [`nav_debug`](physics.md#nav_debug) | Physics | Top-down map of the level with the navmesh drawn over it (teal = walkable), nav agents (yellow dots) with their current paths, and optionally a test path between two points (orange). |
 | [`nav_path`](physics.md#nav_path) | Physics | Walking path on the navmesh between two points or entities (bakes the navmesh first if needed). |
+| [`physics2d_add`](physics.md#physics2d_add) | Physics | Make 2D entities physical with a preset (one undoable edit); colliders are fitted to the sprite. |
+| [`physics2d_info`](physics.md#physics2d_info) | Physics | The 2D physics world (Box2D) at a glance: settings (gravity, sub-steps, debug draw), counts (bodies by motion, awake/sleeping, shapes, sensors, chains, characters, joints, contacts), each body and character2d with its velocity, sleeping/grounded state, tilemap collision pieces (merged loops/boxes/polygons), and warnings (bad polygons, unknown layers, missing joint bodies). |
+| [`physics2d_query`](physics.md#physics2d_query) | Physics | Ask the 2D collision world (collider2d shapes, character2d capsules) on the XY plane — works while editing and playing. |
+| [`physics2d_settle`](physics.md#physics2d_settle) | Physics | Drop 2D objects with a real simulation and keep where they come to rest: only the listed entities move (as dynamic bodies, even without body2d), everything else is frozen; the result is ONE undoable edit. |
 | [`physics_add`](physics.md#physics_add) | Physics | Make entities physical with a preset (one undoable edit). |
 | [`physics_debug`](physics.md#physics_debug) | Physics | Capture the viewport with every collider drawn as a wireframe (color = state) plus physics stats (bodies, awake/asleep, contacts, triggers, characters, joints) and warnings (bad layers, unsupported shapes, missing joint targets). |
 | [`physics_query`](physics.md#physics_query) | Physics | Ask the collision world (colliders, not render meshes) — works while editing and playing. |

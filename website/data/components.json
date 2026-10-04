@@ -4427,6 +4427,489 @@
   },
   "additionalProperties": false
  },
+ "body2d": {
+  "type": "object",
+  "description": "Simulated 2D rigid body (Box2D) on the XY plane: dynamic = moved by gravity, forces and collisions; kinematic = moved by its transform or velocity (moving platforms, doors) and pushes dynamic bodies; static = never moves. Shape it with a collider2d on the entity or its children. It writes position x/y and the Z rotation.",
+  "properties": {
+   "motion": {
+    "type": "string",
+    "enum": [
+     "dynamic",
+     "kinematic",
+     "static"
+    ],
+    "description": "How the body moves"
+   },
+   "mass": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 10000000,
+    "description": "Mass in kg (0 = from the colliders' density x area)"
+   },
+   "gravityScale": {
+    "type": "number",
+    "minimum": -100,
+    "maximum": 100,
+    "description": "Gravity multiplier (0 = floats, -1 = falls up)"
+   },
+   "linearDamping": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 100,
+    "description": "Drag on movement"
+   },
+   "angularDamping": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 100,
+    "description": "Drag on spinning"
+   },
+   "fixedRotation": {
+    "type": "boolean",
+    "description": "Never rotates (upright crates, force-driven characters)"
+   },
+   "bullet": {
+    "type": "boolean",
+    "description": "Continuous collision against other moving bodies: fast projectiles never tunnel"
+   },
+   "allowSleep": {
+    "type": "boolean",
+    "description": "May sleep when at rest (saves time; woken by contacts)"
+   },
+   "startAwake": {
+    "type": "boolean",
+    "description": "Simulate from the start (false = sleep until touched)"
+   },
+   "velocity": {
+    "type": "array",
+    "items": {
+     "type": "number"
+    },
+    "minItems": 2,
+    "maxItems": 2,
+    "description": "Linear velocity in units/s (initial; live while playing, writable)"
+   },
+   "angularVelocity": {
+    "type": "number",
+    "description": "Angular velocity in degrees/s around Z (initial; live while playing)"
+   },
+   "sleeping": {
+    "type": "boolean",
+    "description": "Whether the body sleeps (live while playing, read-only)"
+   }
+  },
+  "additionalProperties": false
+ },
+ "collider2d": {
+  "type": "object",
+  "description": "2D collision shape on the XY plane. Alone it is static geometry (ground, walls); with a body2d it shapes the body; on a child without its own body2d it adds a shape to the ancestor's body. sensor makes a zone that fires `on trigger_enter` / `on trigger_exit`. oneWay makes a platform you can jump through from below. shape tilemap builds merged collision from the entity's tilemap (solid layers, per-tile slopes and one-way tiles).",
+  "properties": {
+   "shape": {
+    "type": "string",
+    "enum": [
+     "box",
+     "circle",
+     "capsule",
+     "polygon",
+     "chain",
+     "segment",
+     "tilemap"
+    ],
+    "description": "Shape type"
+   },
+   "size": {
+    "type": "array",
+    "items": {
+     "type": "number"
+    },
+    "minItems": 2,
+    "maxItems": 2,
+    "description": "Box: full width and height (local units, scaled by the transform)"
+   },
+   "radius": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 100000,
+    "description": "Circle/capsule radius (local units)"
+   },
+   "height": {
+    "type": "number",
+    "minimum": 0.001,
+    "maximum": 100000,
+    "description": "Capsule total height along local Y (>= 2 x radius)"
+   },
+   "offset": {
+    "type": "array",
+    "items": {
+     "type": "number"
+    },
+    "minItems": 2,
+    "maxItems": 2,
+    "description": "Shape center relative to the entity origin (local)"
+   },
+   "rotation": {
+    "type": "number",
+    "description": "Shape rotation around Z relative to the entity (degrees)"
+   },
+   "points": {
+    "type": "array",
+    "items": {
+     "type": "array",
+     "items": {
+      "type": "number"
+     },
+     "minItems": 2,
+     "maxItems": 2
+    },
+    "x-sky-json": true,
+    "description": "Polygon (convex, 3..8 points), chain (>= 4 points) or segment (2 points), local: [[x, y], ...]"
+   },
+   "loop": {
+    "type": "boolean",
+    "description": "Chain: closed loop (counter-clockwise collides on the outside)"
+   },
+   "friction": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 10,
+    "description": "Surface friction (ice 0.02, wood 0.6, rubber 1)"
+   },
+   "restitution": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1,
+    "description": "Bounciness: 0 = none, 1 = perfectly elastic"
+   },
+   "density": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1000000,
+    "description": "kg per square unit (gives dynamic bodies their mass)"
+   },
+   "sensor": {
+    "type": "boolean",
+    "description": "Sensor: detects overlaps (trigger_enter/exit) but never blocks"
+   },
+   "layer": {
+    "type": "string",
+    "enum": [
+     "default",
+     "static",
+     "player",
+     "enemy",
+     "projectile",
+     "trigger",
+     "debris"
+    ],
+    "description": "Collision layer"
+   },
+   "mask": {
+    "type": "string",
+    "description": "Layers it collides with: \"all\" or names (\"default, player\")"
+   },
+   "oneWay": {
+    "type": "boolean",
+    "description": "One-way platform: blocks only from above (local +Y), passable from below"
+   },
+   "tileMerge": {
+    "type": "string",
+    "enum": [
+     "chains",
+     "boxes"
+    ],
+    "description": "Tilemap: chains = merged outlines (smooth), boxes = merged rectangles"
+   },
+   "tileShapes": {
+    "type": "object",
+    "x-sky-json": true,
+    "description": "Tilemap: per-tile shapes over the tileset's collision table, by tile id: full | none | slope_up | slope_down | half_bottom | half_top | top (one-way), or {\"points\": [[px, py], ...], \"oneWay\": true} in tile pixels (origin top-left, y down)"
+   }
+  },
+  "additionalProperties": false
+ },
+ "joint2d": {
+  "type": "object",
+  "description": "Connects this entity's 2D body to another body (other) or to the world. revolute = hinge/pivot (wheels, doors, ragdoll limbs), prismatic = slider, distance = rod or spring, weld = glue (breakable with breakForce), wheel = car wheel with suspension along axis, target = pulls the body to a world point or the other entity (drag, grapple).",
+  "properties": {
+   "kind": {
+    "type": "string",
+    "enum": [
+     "revolute",
+     "prismatic",
+     "distance",
+     "weld",
+     "wheel",
+     "target"
+    ],
+    "description": "Joint type"
+   },
+   "other": {
+    "type": [
+     "object",
+     "string",
+     "integer",
+     "null"
+    ],
+    "description": "The other body (empty = the world; target: the entity to follow) — entity link: name (\"Door\"), \"#id\", {\"id\": 12} or null; read back as {\"id\", \"name\"} (follows renames; entity_refs lists links)",
+    "x-sky-entity": true
+   },
+   "anchor": {
+    "type": "array",
+    "items": {
+     "type": "number"
+    },
+    "minItems": 2,
+    "maxItems": 2,
+    "description": "Pivot in this entity's local space"
+   },
+   "otherAnchor": {
+    "type": "array",
+    "items": {
+     "type": "number"
+    },
+    "minItems": 2,
+    "maxItems": 2,
+    "description": "The other end in the other body's local space (world point without other)"
+   },
+   "axis": {
+    "type": "array",
+    "items": {
+     "type": "number"
+    },
+    "minItems": 2,
+    "maxItems": 2,
+    "description": "Prismatic/wheel axis in this entity's local space"
+   },
+   "length": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 100000,
+    "description": "Distance: rest length (0 = the distance at play start)"
+   },
+   "limitMin": {
+    "type": "number",
+    "description": "Lower limit: degrees (revolute) or units; active when min < max"
+   },
+   "limitMax": {
+    "type": "number",
+    "description": "Upper limit"
+   },
+   "motorSpeed": {
+    "type": "number",
+    "description": "Motor speed: degrees/s (revolute, wheel) or units/s (prismatic)"
+   },
+   "motorForce": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1000000000,
+    "description": "Max motor torque (N m) or force (N); 0 = motor off"
+   },
+   "stiffness": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1000,
+    "description": "Spring frequency in Hz (0 = rigid)"
+   },
+   "damping": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 100,
+    "description": "Spring damping ratio (0.7 = settles without bouncing)"
+   },
+   "target": {
+    "type": "array",
+    "items": {
+     "type": "number"
+    },
+    "minItems": 2,
+    "maxItems": 2,
+    "description": "Target joint: world point to pull to (when other is empty)"
+   },
+   "maxForce": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1000000000,
+    "description": "Target joint: strongest pull in N"
+   },
+   "breakForce": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1000000000,
+    "description": "Breaks above this force in N (0 = unbreakable)"
+   },
+   "collideConnected": {
+    "type": "boolean",
+    "description": "The two bodies collide with each other"
+   },
+   "enabled": {
+    "type": "boolean",
+    "description": "false after breaking (on event \"joint_broken\")"
+   }
+  },
+  "additionalProperties": false
+ },
+ "character2d": {
+  "type": "object",
+  "description": "Kinematic platformer controller on the XY plane: a capsule that slides along walls, walks up and down slopes up to maxSlope, lands on one-way platforms, with its own gravity, coyote time and jump buffering. Drive it every tick from Wander: move2d(self, axis(\"move\").x), if pressed(\"jump\") then jump2d(self) end, grounded2d(self). Dynamic bodies are pushed by it; sensors detect it.",
+  "properties": {
+   "height": {
+    "type": "number",
+    "minimum": 0.05,
+    "maximum": 100,
+    "description": "Capsule height (units)"
+   },
+   "radius": {
+    "type": "number",
+    "minimum": 0.02,
+    "maximum": 50,
+    "description": "Capsule radius (units)"
+   },
+   "offset": {
+    "type": "array",
+    "items": {
+     "type": "number"
+    },
+    "minItems": 2,
+    "maxItems": 2,
+    "description": "Capsule center relative to the entity origin (y = height/2: origin at the feet)"
+   },
+   "moveSpeed": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1000,
+    "description": "Run speed in units/s at move2d(self, 1)"
+   },
+   "acceleration": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 10000,
+    "description": "Ground acceleration in units/s^2"
+   },
+   "airControl": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1,
+    "description": "Share of the acceleration in the air (0..1)"
+   },
+   "jumpSpeed": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1000,
+    "description": "Jump take-off speed in units/s"
+   },
+   "gravity": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 10000,
+    "description": "Downward acceleration in units/s^2"
+   },
+   "fallMultiplier": {
+    "type": "number",
+    "minimum": 1,
+    "maximum": 10,
+    "description": "Gravity multiplier while falling (snappier jumps)"
+   },
+   "maxFallSpeed": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1000,
+    "description": "Terminal fall speed in units/s"
+   },
+   "maxSlope": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 89,
+    "description": "Steepest walkable slope in degrees"
+   },
+   "coyoteTime": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 2,
+    "description": "Seconds after leaving a ledge in which a jump still works"
+   },
+   "jumpBuffer": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 2,
+    "description": "Seconds a jump pressed in the air is remembered until landing"
+   },
+   "snapDistance": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 10,
+    "description": "Stays glued to the ground across slopes and small steps (units)"
+   },
+   "layer": {
+    "type": "string",
+    "enum": [
+     "default",
+     "static",
+     "player",
+     "enemy",
+     "projectile",
+     "trigger",
+     "debris"
+    ],
+    "description": "Collision layer"
+   },
+   "mask": {
+    "type": "string",
+    "description": "Layers it collides with: \"all\" or names"
+   },
+   "velocity": {
+    "type": "array",
+    "items": {
+     "type": "number"
+    },
+    "minItems": 2,
+    "maxItems": 2,
+    "description": "Velocity in units/s (live while playing; writable: knockback, launch pads)"
+   },
+   "grounded": {
+    "type": "boolean",
+    "description": "Standing on walkable ground (live while playing, read-only)"
+   }
+  },
+  "additionalProperties": false
+ },
+ "physics2d_world": {
+  "type": "object",
+  "description": "Scene-wide 2D physics settings (put it on one entity; defaults apply without one): gravity, solver sub-steps, sleeping, the impact event threshold and debug drawing of shapes, contacts and joints.",
+  "properties": {
+   "gravity": {
+    "type": "array",
+    "items": {
+     "type": "number"
+    },
+    "minItems": 2,
+    "maxItems": 2,
+    "description": "Gravity in units/s^2 (default 0, -20)"
+   },
+   "substeps": {
+    "type": "integer",
+    "description": "Solver sub-steps per tick (1..16; more = stiffer stacks)"
+   },
+   "allowSleep": {
+    "type": "boolean",
+    "description": "Bodies at rest may sleep"
+   },
+   "impactSpeed": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 10000,
+    "description": "Approach speed (units/s) above which `on impact` fires"
+   },
+   "debugDraw": {
+    "type": "boolean",
+    "description": "Draw shapes, contacts and joints in the frame"
+   },
+   "enabled": {
+    "type": "boolean",
+    "description": "Simulate 2D physics"
+   }
+  },
+  "additionalProperties": false
+ },
  "environment": {
   "type": "object",
   "description": "Scene-wide sky, sun, ambient light, fog and exposure.",
