@@ -12,6 +12,7 @@ scene, reads the keyboard, mouse and gamepads, plays sound and needs no editor, 
 - [Agent tools](#agent-tools)
 - [Testing without a display](#testing-without-a-display)
 - [Signing and distribution](#signing-and-distribution)
+- [License notices and privacy](#license-notices-and-privacy)
 - [Limitations](#limitations)
 
 ## Quick start
@@ -241,6 +242,17 @@ cannot be verified"). To distribute:
 
 Mac App Store builds additionally need the App Sandbox entitlement and a provisioning profile; the player has not been
 validated against the sandbox (project files are read from inside the bundle, nothing is written outside it).
+
+## License notices and privacy
+
+Every app `skywalker build` packages carries the license notices in `Contents/Resources/Licenses/`: Skywalker's
+`LICENSE` (the runtime is inside the app), the font licenses and `THIRD-PARTY-NOTICES.md`. Keep them in the bundle
+([LICENSING](LICENSING.md)).
+
+A shipped game shows no Skywalker terms or consent screens: the game is the developer's product. The player collects and
+sends nothing (no telemetry, analytics or network connections of its own; crash logs stay on the player's disk). If your
+game adds networking, accounts, analytics, ads or AI features, you are the controller for that data: follow the checklist
+in the [Privacy Notice](legal/PRIVACY.md#for-developers-who-ship-games). Agents can read the documents with `legal_info`.
 
 ## Limitations
 

@@ -27,6 +27,13 @@ regardless of size. Production use above the thresholds needs a commercial licen
 
 Contact the licensor for terms.
 
+## Terms of Use and privacy
+
+Using the software and its AI features is also covered by the [Terms of Use](legal/TERMS.md) and the
+[Privacy Notice](legal/PRIVACY.md); the editor asks you to accept them on first launch, and
+`skywalker legal` prints them. Skywalker sends no telemetry and nothing to the licensor. Both are
+templates awaiting legal review.
+
 ## Your games are yours
 
 Games, applications, assets, scripts, scenes and other content you create with Skywalker belong

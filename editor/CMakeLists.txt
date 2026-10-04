@@ -36,6 +36,13 @@ if(EXISTS ${SKY_ICON})
     set_source_files_properties(${SKY_ICON} PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
 endif()
 
+# Terms of Use, Privacy Notice and licenses for the first-launch sheet and Help ▸ Terms of Use / Privacy Notice /
+# Licenses (Contents/Resources/Legal). Their "Version:" lines decide when the sheet asks again.
+set(SKY_LEGAL_DOCS ${PROJECT_SOURCE_DIR}/docs/legal/TERMS.md ${PROJECT_SOURCE_DIR}/docs/legal/PRIVACY.md
+    ${PROJECT_SOURCE_DIR}/docs/LICENSING.md ${PROJECT_SOURCE_DIR}/LICENSE)
+target_sources(SkywalkerEditor PRIVATE ${SKY_LEGAL_DOCS})
+set_source_files_properties(${SKY_LEGAL_DOCS} PROPERTIES MACOSX_PACKAGE_LOCATION Resources/Legal)
+
 # swiftc compiles and links in one step and needs the bundle directory to exist up front.
 add_custom_command(TARGET SkywalkerEditor PRE_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory ${PROJECT_BINARY_DIR}/bin/Skywalker.app/Contents/MacOS)

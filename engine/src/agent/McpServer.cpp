@@ -199,7 +199,7 @@ Json McpSession::dispatch(const Json& req) {
     if (method == "resources/list") return rpcResult(id, listResources());
     if (method == "resources/templates/list") {
         return rpcResult(id, Json::object({{"resourceTemplates", Json::array({
-            Json::object({{"uriTemplate", "skywalker://docs/{name}"}, {"name", "docs"}, {"description", "Engine documentation page, e.g. STUDIO, RENDERING, AGENTS"}, {"mimeType", "text/markdown"}}),
+            Json::object({{"uriTemplate", "skywalker://docs/{name}"}, {"name", "docs"}, {"description", "Engine documentation page, e.g. STUDIO, RENDERING, AGENTS, legal/TERMS, legal/PRIVACY"}, {"mimeType", "text/markdown"}}),
             Json::object({{"uriTemplate", "skywalker://skills/{name}"}, {"name", "skills"}, {"description", "A skywalker-* agent skill (SKILL.md)"}, {"mimeType", "text/markdown"}})})}}));
     }
     if (method == "resources/read") {
@@ -221,7 +221,9 @@ Json McpSession::listResources() const {
                             "Every engine tool by category with its description (generated from the live registry)", "text/markdown"));
     for (const auto& r : kLive) list.push(resourceEntry(r.uri, r.name, "", r.description, r.mime));
     for (const auto* a : embeddedAssetsUnder(kDocsPrefix)) {
-        std::string name = stem(a->path);
+        // Path below docs/ without ".md": "STUDIO", "legal/TERMS".
+        std::string rel = std::string(a->path).substr(std::string_view(kDocsPrefix).size());
+        std::string name = rel.substr(0, rel.size() - std::min<size_t>(rel.size(), 3));
         list.push(resourceEntry("skywalker://docs/" + name, name, firstHeading(a->content), "", "text/markdown"));
     }
     for (const auto* a : embeddedAssetsUnder(kSkillsPrefix)) {
@@ -256,7 +258,7 @@ Json McpSession::readResource(const Json& id, const std::string& uri) {
     constexpr std::string_view skills = "skywalker://skills/";
     if (startsWith(uri, docs)) {
         std::string name = uri.substr(docs.size());
-        if (name.find('/') != std::string::npos) return notFound();
+        if (name.empty() || name.find("..") != std::string::npos) return notFound();
         if (const auto* a = findEmbeddedAsset(std::string(kDocsPrefix) + name + ".md")) return contents(a->content, "text/markdown");
         return notFound();
     }

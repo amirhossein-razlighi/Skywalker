@@ -7,6 +7,7 @@ struct SettingsView: View {
             Tab("Providers", systemImage: "brain") { ProviderSettings() }
             Tab("External Agents", systemImage: "antenna.radiowaves.left.and.right") { ExternalAgentSettings() }
             Tab("Design Apps", systemImage: "wand.and.stars") { DesignAppSettings() }
+            Tab("Legal", systemImage: "checkmark.seal") { LegalSettings() }
         }
         .frame(width: 820, height: 620)
     }

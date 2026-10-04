@@ -1,6 +1,6 @@
 ---
 name: skywalker-ship
-description: Ship a Skywalker game as a standalone macOS app - game.json settings (title, window, quality, icon, bundle id), game_settings, dry-run packaging checks, game_build, trying the real player with game_run and frame captures, the skywalker build CLI, headless --check validation, signing and notarization notes. Use when the human wants to package, release, test as a player, or hand a game to someone else.
+description: Ship a Skywalker game as a standalone macOS app - game.json settings (title, window, quality, icon, bundle id), game_settings, dry-run packaging checks, game_build, trying the real player with game_run and frame captures, the skywalker build CLI, headless --check validation, signing and notarization notes, license notices and players' privacy (legal_info). Use when the human wants to package, release, test as a player, or hand a game to someone else.
 ---
 
 # Shipping a game
@@ -84,6 +84,17 @@ A build is **ad-hoc signed**: it runs on the Mac that built it, but Gatekeeper b
 - `game_run {capture:...}` shows the title screen/first frame correctly (look at the PNG); `game_run start` plays a full loop with the keyboard (and a gamepad if supported) and the pause/quit path works.
 - `--check` passes on the built `.app`; `CREDITS.md` lists every downloaded asset with its license (skywalker-assets).
 - The game works at several window sizes and at `quality:"low"`.
+
+## Legal and privacy
+
+- Every app gets the license notices in `Contents/Resources/Licenses/` (Skywalker's `LICENSE`, fonts, third-party notices); keep them. Shipped games show no Skywalker terms: the game is the developer's product.
+- The player collects and sends nothing. If the game adds networking, accounts, analytics, ads or AI features, the **developer** is the controller: point the human to the checklist in `skywalker://docs/legal/PRIVACY` ("For developers who ship games").
+- `legal_info` reports the Terms / Privacy Notice versions, whether a person accepted them on this computer, and the verified data practices; `legal_info {document:"licensing"}` adds the license summary. Never accept the terms yourself: the human uses the editor or `skywalker legal --accept`.
+
+```text
+legal_info {}
+legal_info {document:"privacy"}
+```
 
 ## Pitfalls
 

@@ -24,6 +24,8 @@
     <string>public.app-category.developer-tools</string>
     <key>LSMinimumSystemVersion</key>
     <string>15.0</string>
+    <key>NSHumanReadableCopyright</key>
+    <string>© 2026 AmirHossein (Amir) Razlighi</string>
     <key>NSHighResolutionCapable</key>
     <true/>
     <key>NSPrincipalClass</key>
