@@ -126,7 +126,7 @@ out, and the `ProcessGate` (`scene/Process.h`) is refreshed. Every system then a
 | System | While the game is paused | Time scale |
 |---|---|---|
 | Wander | stopped instances keep their coroutines, timers and state; they still get `on pause` / `on resume`; events with a handler (and the last contacts) wait and arrive when they run again; input and clicks are dropped | per-instance `dt`, timers, waits |
-| Physics + navigation | the world holds, unless the `physics_world` entity runs (`always`) | step `dt * scale`, split into ≤ 1-tick substeps above 1 |
+| Physics (3D and 2D) + navigation | the world holds, unless the `physics_world` entity runs (`always`) | step `dt * scale`, split into ≤ 1-tick substeps above 1 |
 | Animation, sequences | animators and cutscenes hold their pose | per entity |
 | Particles (CPU) | emitters hold | per emitter; GPU effects follow the game clock |
 | Sprites, 2D cameras, dialogue | hold | per entity |
