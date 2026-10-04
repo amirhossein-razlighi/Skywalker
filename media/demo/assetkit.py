@@ -23,7 +23,7 @@ Manifest format (JSON, `format: skywalker.assets`):
         "source": {"kind": "itch", "page": "https://quaternius.itch.io/universal-animation-library",
                    "file": "Universal Animation Library[Standard].zip"},
         "sha256": "...", "size": 15904933, "path": "quaternius/ual1",
-        "extract": {"include": ["*/Unreal-Godot/*.glb", "*/License.txt"], "strip": 1}},
+        "extract": {"include": ["*_Standard*.glb", "*/License.txt"], "exclude": ["*.fbx"], "strip": 1}},
        {"id": "polyhaven/wooden_crate_01", "license": "CC0-1.0", "author": "...", "source_page": "https://polyhaven.com/a/wooden_crate_01",
         "polyhaven": {"type": "model", "id": "wooden_crate_01", "res": "2k"},
         "files": [{"url": "https://dl.polyhaven.org/...", "path": "polyhaven/wooden_crate_01/wooden_crate_01.gltf", "sha256": "...", "size": 5612}, ...]}
