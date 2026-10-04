@@ -232,6 +232,19 @@ TEST_CASE("fx: tools, Wander and water queries") {
     CHECK(schema.contains("water"));
 }
 
+TEST_CASE("fx: fx_create position is world space under a parent") {
+    auto e = makeFxEngine();
+    callTool(*e, "entity_create", R"({"name":"Car","position":[5,0,40],"rotation":[0,90,0],"scale":[2,2,2]})");
+    Json smoke = callTool(*e, "fx_create", R"({"effect":"smoke","parent":"Car","position":[3,1,38]})");
+    EntityId id = static_cast<EntityId>(smoke.get("entity").asInt());
+    REQUIRE(id != kNoEntity);
+    CHECK(e->scene().record(id)->parent == e->scene().find("Car"));
+    Vec3 w = e->scene().worldMatrix(id).translation();
+    CHECK(w.x == doctest::Approx(3).epsilon(1e-4));
+    CHECK(w.y == doctest::Approx(1).epsilon(1e-4));
+    CHECK(w.z == doctest::Approx(38).epsilon(1e-4));
+}
+
 TEST_CASE("fx: ocean evaluation cost (manual)" * doctest::skip()) {
     Water w;
     fx::Ocean o;
