@@ -75,6 +75,8 @@ std::string describe(const Scene& s, EntityId e) {
         for (const auto& t : r->tags) os << " " << t;
     }
     if (!r->enabled) os << " [disabled]";
+    if (r->unique) os << " [unique]";
+    if (r->prefab.linked() && r->prefab.instance == e) os << " [prefab " << r->prefab.source << "]";
     return os.str();
 }
 
@@ -87,6 +89,7 @@ Json briefJson(const Scene& s, EntityId e) {
     if (s.get<Behavior>(e)) comps.push("behaviors");
     Json j = Json::object({{"id", e}, {"name", r->name}, {"parent", r->parent}, {"enabled", r->enabled}, {"components", comps}});
     if (const auto* t = s.get<Transform>(e)) j["position"] = reflect::vec3ToJson(t->position);
+    if (r->prefab.linked()) j["prefab"] = r->prefab.instance == e ? Json(r->prefab.source) : Json(r->prefab.instance);
     return j;
 }
 
@@ -129,17 +132,15 @@ Json presetPatch(const std::string& name) {
 
 void duplicateTree(Scene& s, EntityId src, EntityId newParent, const std::string& name, Vec3 offset, bool root,
                    std::vector<EntityId>& created) {
-    Json doc = s.entityToJson(src);
-    doc.erase("id");
-    doc.erase("parent");
-    EntityId copy = s.create(name.empty() ? doc.get("name").asString() : name, newParent);
-    doc.erase("name");
-    (void)s.applyEntityJson(copy, doc);
+    // Links inside the copied subtree point at the copies; prefab instances stay linked.
+    std::vector<EntityId> roots = s.cloneTrees(s, {src}, newParent);
+    if (roots.empty()) return;
+    EntityId copy = roots.front();
+    if (!name.empty()) (void)s.rename(copy, name);
     if (root) {
         if (auto* t = s.get<Transform>(copy)) t->position += offset;
     }
-    created.push_back(copy);
-    for (EntityId c : s.children(src)) duplicateTree(s, c, copy, "", {}, false, created);
+    collectSubtree(s, copy, created);
 }
 
 // ---------------------------------------------------------------------------
@@ -316,6 +317,7 @@ void addSceneTools(Engine& engine, ToolRegistry& reg) {
                      {"enabled", boolean("Enable/disable")},
                      {"tags", array(Json::object({{"type", "string"}}), "Replace tags")},
                      {"vars", Json::object({{"type", "object"}, {"description", "Merge into vars (null deletes)"}})},
+                     {"unique", boolean("Unique name in its prefab instance / scene: Wander find(\"%Name\") finds it")},
                      {"components", Json::object({{"type", "object"}, {"description", "Component name -> partial fields"}})}},
                     {"entity"}),
              true, false, [&engine](const Json& a, ToolContext& ctx) {
@@ -323,10 +325,26 @@ void addSceneTools(Engine& engine, ToolRegistry& reg) {
                  if (!id) return ToolResult::error(id.error());
                  Json doc = a;
                  doc.erase("entity");
-                 Status st = engine.edit(ctx.actor, "Edit " + engine.scene().record(*id)->name,
+                 std::string oldName = engine.scene().record(*id)->name;
+                 Status st = engine.edit(ctx.actor, "Edit " + oldName,
                                          [&] { return engine.scene().applyEntityJson(*id, doc); });
                  if (!st) return fail(st);
-                 return entityResult(engine, *id, "updated");
+                 ToolResult r = entityResult(engine, *id, "updated");
+                 if (engine.scene().record(*id)->name != oldName) {
+                     // Links store ids: they follow the rename. Name-only links (and Wander find("Old")) do not.
+                     size_t byId = 0, byName = 0;
+                     for (EntityId e : engine.scene().entities()) {
+                         for (const auto& l : engine.scene().linksFrom(e)) {
+                             if (l.target == *id) ++byId;
+                             if (!l.target && !l.link.id && l.link.name == oldName) ++byName;
+                         }
+                     }
+                     std::string note = "renamed \"" + oldName + "\": " + std::to_string(byId) + " link(s) follow it";
+                     if (byName) note += "; " + std::to_string(byName) + " name-only link(s) still say \"" + oldName + "\" (entity_refs lists them)";
+                     if (!r.content.empty()) r.content.front().text = note + "\n" + r.content.front().text;
+                     r.structured["renamed"] = Json::object({{"from", oldName}, {"links_following", byId}, {"links_broken", byName}});
+                 }
+                 return r;
              }});
 
     reg.add({"transform", "Transform entity",
@@ -386,28 +404,59 @@ void addSceneTools(Engine& engine, ToolRegistry& reg) {
              }});
 
     reg.add({"entity_duplicate", "Duplicate entity",
-             "Copy an entity (with children, components and behaviors). Optional new name and position offset.",
+             "Copy an entity (with children, components and behaviors). Optional new name and position offset. "
+             "`entities` duplicates several together: links between them (joint targets, look-at, follow...) point at "
+             "the copies, so a duplicated rig stays wired to itself. Prefab instances stay linked.",
              "entity",
              object({{"entity", schema::entity()},
-                     {"name", string("Name of the copy")},
+                     {"entities", array(schema::entity(), "Several entities duplicated as one group")},
+                     {"name", string("Name of the copy (single entity)")},
                      {"offset", vec3("Offset added to the copy's position")},
-                     {"count", integer("Number of copies (default 1, max 100); offsets accumulate")}},
-                    {"entity"}),
+                     {"count", integer("Number of copies (default 1, max 100); offsets accumulate")}}),
              true, false, [&engine](const Json& a, ToolContext& ctx) {
-                 auto id = resolve(engine, a.get("entity"));
-                 if (!id) return ToolResult::error(id.error());
+                 std::vector<EntityId> sources;
+                 if (a.contains("entity")) {
+                     auto id = resolve(engine, a.get("entity"));
+                     if (!id) return ToolResult::error(id.error());
+                     sources.push_back(*id);
+                 }
+                 for (const auto& e : a.get("entities").elements()) {
+                     auto id = resolve(engine, e);
+                     if (!id) return ToolResult::error(id.error());
+                     sources.push_back(*id);
+                 }
+                 if (sources.empty()) {
+                     return ToolResult::error(Error::make("invalid_arguments", "give `entity` or `entities`"));
+                 }
                  Scene& s = engine.scene();
+                 // Children of another source come along with it.
+                 std::vector<EntityId> tops;
+                 for (EntityId e : sources) {
+                     bool inside = std::find(tops.begin(), tops.end(), e) != tops.end();
+                     for (EntityId p = s.record(e)->parent; p && !inside; p = s.record(p)->parent) {
+                         inside = std::find(sources.begin(), sources.end(), p) != sources.end();
+                     }
+                     if (!inside) tops.push_back(e);
+                 }
+                 sources = std::move(tops);
                  Vec3 offset{0, 0, 0};
                  reflect::jsonToVec3(a.get("offset"), offset);
                  int count = static_cast<int>(std::clamp<int64_t>(a.get("count").asInt(1), 1, 100));
                  std::vector<EntityId> roots;
-                 Status st = engine.edit(ctx.actor, "Duplicate " + s.record(*id)->name, [&]() -> Status {
+                 Status st = engine.edit(ctx.actor, "Duplicate " + s.record(sources.front())->name, [&]() -> Status {
                      for (int i = 0; i < count; ++i) {
-                         std::vector<EntityId> created;
-                         std::string name = a.get("name").asString(s.record(*id)->name + " copy");
-                         if (count > 1) name += " " + std::to_string(i + 1);
-                         duplicateTree(s, *id, s.record(*id)->parent, name, offset * static_cast<float>(i + 1), true, created);
-                         roots.push_back(created.front());
+                         // One clone call per copy: links among the sources are remapped onto the copies.
+                         std::vector<EntityId> copies = s.cloneTrees(s, sources, kNoEntity);
+                         for (size_t k = 0; k < copies.size() && k < sources.size(); ++k) {
+                             EntityId c = copies[k];
+                             if (EntityId p = s.record(sources[k])->parent) (void)s.setParent(c, p);
+                             std::string name = sources.size() == 1 ? a.get("name").asString(s.record(sources[k])->name + " copy")
+                                                                    : s.record(sources[k])->name + " copy";
+                             if (count > 1) name += " " + std::to_string(i + 1);
+                             (void)s.rename(c, name);
+                             if (auto* t = s.get<Transform>(c)) t->position += offset * static_cast<float>(i + 1);
+                             roots.push_back(c);
+                         }
                      }
                      return {};
                  });
@@ -875,8 +924,16 @@ void addHistoryAndFileTools(Engine& engine, ToolRegistry& reg) {
              [&engine](const Json& a, ToolContext&) {
                  Status s = engine.loadScene(a.get("path").asString());
                  if (!s) return fail(s);
-                 return ToolResult::text("loaded \"" + engine.scene().name + "\" (" + std::to_string(engine.scene().size()) +
-                                         " entities)");
+                 std::string text = "loaded \"" + engine.scene().name + "\" (" + std::to_string(engine.scene().size()) + " entities)";
+                 Json warnings = Json::array();
+                 for (const auto& w : engine.scene().loadWarnings()) {
+                     warnings.push(w);
+                     text += "\nwarning: " + w;
+                 }
+                 return ToolResult::json(Json::object({{"name", engine.scene().name},
+                                                       {"entities", engine.scene().size()},
+                                                       {"warnings", warnings}}),
+                                         text);
              }});
 
     reg.add({"scene_new", "New scene",
@@ -1057,6 +1114,7 @@ void registerEngineTools(Engine& engine) {
     tools::addImpostorTools(engine, reg);
     tools::addGameTools(engine, reg);  // engine/src/agent/GameTools.cpp
     tools::addMovieTools(engine, reg);  // engine/src/agent/MovieTools.cpp (movie render queue)
+    tools::addPrefabTools(engine, reg);  // engine/src/agent/PrefabTools.cpp (entity links, linked prefabs)
 }
 
 }  // namespace sky

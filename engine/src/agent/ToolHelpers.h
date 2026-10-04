@@ -60,5 +60,6 @@ void addHairTools(Engine& engine, ToolRegistry& reg);
 void addImpostorTools(Engine& engine, ToolRegistry& reg);  // ImpostorTools.cpp: foliage impostors
 void addGameTools(Engine& engine, ToolRegistry& reg);  // GameTools.cpp: game_build, game_run, game_settings
 void addMovieTools(Engine& engine, ToolRegistry& reg);  // MovieTools.cpp: movie_render (docs/MOVIE_RENDER.md)
+void addPrefabTools(Engine& engine, ToolRegistry& reg);  // PrefabTools.cpp: entity_refs, copy/paste, prefab_overrides...
 
 }  // namespace sky::tools

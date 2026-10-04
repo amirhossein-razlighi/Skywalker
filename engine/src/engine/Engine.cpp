@@ -1498,6 +1498,9 @@ Result<std::shared_ptr<const PrefabTemplate>> Engine::prefabTemplateAsset(const 
         path = rec->path;
     } else if (str::startsWith(path, "guid:")) {
         return Error::make("not_found", "no prefab with " + path, "use asset_list type=prefab to see prefabs");
+    } else if (std::error_code ec; !fs::exists(resolvePath(path), ec)) {
+        prefabs_.erase(path);  // deleted since it was cached
+        return Error::make("not_found", "no prefab " + path, "use asset_list type=prefab to see prefabs");
     }
     auto doc = loadPrefabAsset(path);
     if (!doc) return doc.error();

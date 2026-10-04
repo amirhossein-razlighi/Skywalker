@@ -63,7 +63,7 @@ EntityId Scene::findUnique(std::string_view wanted, EntityId from) const {
         }
         return kNoEntity;
     };
-    // Like Godot: an instance root sees the unique names inside its own instance first, then its owner's.
+    // An instance root sees the unique names inside its own instance first, then its owner's.
     if (const EntityRecord* r = record(from); r && r->prefab.linked() && r->prefab.instance == from) {
         if (EntityId e = search(from)) return e;
     }

@@ -4,8 +4,7 @@
 // Placing a prefab creates a *linked instance*: real entities in the scene (so rendering, physics and Wander see
 // nothing special) whose records remember the instance root and the prefab-local id ("pid") of the node each one
 // came from. Differences between an instance and its prefab are *overrides*. They are computed, never tracked:
-// an override is any field whose value differs from the prefab (the way Godot's PackedScene packs only changed
-// properties), so every edit path (tools, editor, Wander in edit mode) produces them for free.
+// an override is any field whose value differs from the prefab, so every edit path (tools, editor, Wander in edit mode) produces them for free.
 //
 //   * Scene files store an instance as its root record plus {"source", "guid", "ids", "overrides", "removed"}.
 //     Loading expands it from the current prefab, so editing the prefab updates every scene that uses it.

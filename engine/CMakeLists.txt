@@ -140,6 +140,8 @@ set(SKY_ENGINE_SOURCES
     src/render/MovieWriter.cpp
     src/engine/Movie.cpp
     src/agent/MovieTools.cpp
+    # Entity links and linked prefabs (docs/PREFABS.md)
+    src/agent/PrefabTools.cpp
 )
 
 # DCC bridge: the Python helper library and the Blender add-on are embedded so the engine can

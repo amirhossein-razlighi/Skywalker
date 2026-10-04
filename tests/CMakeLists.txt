@@ -51,6 +51,7 @@ set(SKY_TEST_SOURCES
     test_integrations.cpp
     test_game.cpp
     test_movie.cpp
+    test_prefab.cpp
 )
 
 add_executable(skywalker_tests ${SKY_TEST_SOURCES})
