@@ -1,8 +1,9 @@
 {
   "format": "skywalker.prefab",
-  "version": 1,
+  "version": 2,
   "name": "inkwell",
   "root": {
+    "pid": 1,
     "name": "inkwell",
     "enabled": true,
     "components": {
@@ -10,6 +11,7 @@
     },
     "children": [
       {
+        "pid": 2,
         "name": "ink_glass",
         "enabled": true,
         "components": {
@@ -20,6 +22,7 @@
         }
       },
       {
+        "pid": 3,
         "name": "brass",
         "enabled": true,
         "components": {

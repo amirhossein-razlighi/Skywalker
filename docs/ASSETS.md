@@ -111,6 +111,10 @@ You can create and place prefabs in several ways:
 - **Scatter:** `scatter {prefab, count, …}`.
 - **At runtime:** from Wander, `spawn("prefab:prefabs/coin.prefab.json", (x, y, z))`.
 
+Placed prefabs are **linked**. The scene stores only what each instance changes (its overrides), and editing the
+prefab updates every instance. Inspect them with `prefab_overrides`, and use `prefab_revert`, `prefab_apply` and
+`prefab_unpack` to resolve them. See [PREFABS.md](PREFABS.md).
+
 ## Agent tools
 
 | Tool | Use |
@@ -123,6 +127,7 @@ You can create and place prefabs in several ways:
 | `asset_move` | Renames or moves an asset. The GUID and `.meta` follow it, and scene references are rewritten. |
 | `material_create` / `material_update` / `material_assign` | Create, change and use materials. |
 | `prefab_create` / `prefab_instantiate` | Build once, reuse everywhere. |
+| `prefab_overrides` / `prefab_revert` / `prefab_apply` / `prefab_unpack` / `prefab_relink` | See and resolve how linked instances differ from their prefab ([PREFABS.md](PREFABS.md)). |
 | `raycast`, `place_on_surface`, `scatter` | Spatial placement on real geometry. |
 | `viewport_multi` | Perspective plus top, front and side orthographic views in one image. |
 

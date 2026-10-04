@@ -24,7 +24,7 @@ const TypeInfo& Animator::type() {
             SKY_FIELD_ENUM(Animator, preview, "Editor preview: rest = bind pose, pose = frame at `time`, play = animate live",
                            "rest", "pose", "play"),
             SKY_FIELD_RANGE(Animator, time, Float, "Editor preview time (seconds into the default state / clip)", 0.f, 600.f),
-            SKY_FIELD(Animator, lookAt, String, "Entity the head and spine turn towards (look-at IK); empty = off"),
+            SKY_FIELD_ENTITY(Animator, lookAt, "Entity the head and spine turn towards (look-at IK); empty = off"),
             SKY_FIELD_RANGE(Animator, lookAtWeight, Float, "How strongly the head follows lookAt", 0.f, 1.f),
             SKY_FIELD_RANGE(Animator, lookAtLimit, Float, "Maximum head/spine turn (degrees)", 0.f, 180.f),
         }};
@@ -36,7 +36,7 @@ const TypeInfo& BoneAttachment::type() {
         "attach",
         "Keeps this entity on a bone of an animated character (weapon in a hand, hat on a head, lantern on a belt).",
         {
-            SKY_FIELD(BoneAttachment, character, String, "Entity with the animator; empty = nearest ancestor that has one"),
+            SKY_FIELD_ENTITY(BoneAttachment, character, "Entity with the animator; empty = nearest ancestor that has one"),
             SKY_FIELD(BoneAttachment, bone, String, "Bone name, e.g. RightHand or mixamorig:Head (animation_list shows them)"),
             SKY_FIELD(BoneAttachment, offset, Vec3, "Position offset in the bone's space (meters)"),
             SKY_FIELD(BoneAttachment, rotation, Vec3, "Rotation offset in the bone's space (Euler degrees)"),
@@ -50,7 +50,7 @@ const TypeInfo& IkTarget::type() {
         "ik",
         "Two-bone IK effector: the character's hand or foot (and elbow or knee) reaches this entity's position.",
         {
-            SKY_FIELD(IkTarget, character, String, "Entity with the animator; empty = nearest ancestor that has one"),
+            SKY_FIELD_ENTITY(IkTarget, character, "Entity with the animator; empty = nearest ancestor that has one"),
             SKY_FIELD(IkTarget, bone, String, "End bone that reaches here: LeftHand, RightFoot... (animation_list lists bones)"),
             SKY_FIELD_RANGE(IkTarget, weight, Float, "Blend between the animation (0) and the target (1)", 0.f, 1.f),
             SKY_FIELD(IkTarget, pole, Vec3, "Bend direction in the character's space (e.g. [0,0,-1] knees forward); [0,0,0] keeps the animated bend"),

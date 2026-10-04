@@ -33,7 +33,7 @@ const TypeInfo& Groom::type() {
             SKY_FIELD(Groom, source, String,
                       "Groom file (.hair = Cem Yuksel's format, .groom.json, .skygroom), project-relative; \"\" = grow "
                       "procedurally on the mesh"),
-            SKY_FIELD(Groom, target, String, "Entity whose mesh grows the hair (\"\" = this entity)"),
+            SKY_FIELD_ENTITY(Groom, target, "Entity whose mesh grows the hair (empty = this entity)"),
             SKY_FIELD_RANGE(Groom, importScale, Float, "Imported files: scale to meters (0.01 for centimeters)", 1e-5f, 1000.f),
             SKY_FIELD(Groom, importZUp, Bool, "Imported files: the source is Z-up"),
             SKY_FIELD_RANGE(Groom, strands, Int, "Rendered strands (head of hair 50k-150k; fur 100k+). Imported files: cap",
@@ -87,7 +87,7 @@ const TypeInfo& Groom::type() {
             SKY_FIELD_RANGE(Groom, damping, Float, "Velocity damping", 0.f, 1.f),
             SKY_FIELD_RANGE(Groom, wind, Float, "Environment wind influence", 0.f, 10.f),
             SKY_FIELD(Groom, collide, Bool, "Collide with the mesh (sphere/capsule proxy) and `colliders`"),
-            SKY_FIELD(Groom, colliders, String, "Comma-separated entity names that hair collides with (shoulders, hands)"),
+            SKY_FIELD_ENTITIES(Groom, colliders, "Entities the hair collides with (shoulders, hands)"),
             SKY_FIELD_ENUM(Groom, lod, "auto = strands up close, cards far away; strands; cards (cheapest)", "auto", "strands",
                            "cards"),
             SKY_FIELD_RANGE(Groom, cardsBelow, Float, "auto LOD: draw cards when the groom is smaller than this (pixels)", 0.f,
@@ -1202,43 +1202,18 @@ Json groomPreset(const std::string& name) {
 // Scene helpers and the groom cache
 // ---------------------------------------------------------------------------------------
 
-EntityId findNear(const Scene& scene, EntityId self, const std::string& name) {
-    if (name.empty()) return kNoEntity;
-    auto search = [&](EntityId root) -> EntityId {
-        std::vector<EntityId> stack{root};
-        while (!stack.empty()) {
-            EntityId e = stack.back();
-            stack.pop_back();
-            const EntityRecord* r = scene.record(e);
-            if (r && e != self && str::lower(r->name) == str::lower(name)) return e;
-            for (EntityId c : scene.children(e)) stack.push_back(c);
-        }
-        return kNoEntity;
-    };
-    if (scene.exists(self)) {
-        if (EntityId e = search(self)) return e;
-        const EntityRecord* r = scene.record(self);
-        if (r && r->parent) {
-            if (EntityId e = search(r->parent)) return e;
-        }
-    }
-    return scene.find(name);
-}
-
 EntityId groomMeshEntity(const Scene& scene, EntityId e) {
     const Groom* g = scene.get<Groom>(e);
     if (g && !g->target.empty()) {
-        if (EntityId t = findNear(scene, e, g->target)) return t;
+        if (EntityId t = scene.resolve(g->target, e)) return t;
     }
     return e;
 }
 
-std::vector<FxCollider> collidersFromNames(const Scene& scene, EntityId self, const std::string& names) {
+std::vector<FxCollider> collidersFromLinks(const Scene& scene, EntityId self, const std::vector<EntityLink>& links) {
     std::vector<FxCollider> out;
-    for (const std::string& raw : str::split(names, ',')) {
-        std::string name = str::trim(raw);
-        if (name.empty()) continue;
-        EntityId e = findNear(scene, self, name);
+    for (const EntityLink& link : links) {
+        EntityId e = scene.resolve(link, self);
         if (!e || !scene.isActive(e)) continue;
         Mat4 w = scene.worldMatrix(e);
         const MeshRenderer* m = scene.get<MeshRenderer>(e);
@@ -1382,7 +1357,7 @@ void GroomSystem::gather(const Scene& scene, const MeshProvider& meshes, const P
                 c.radius *= s;
                 item.colliders.push_back(c);
             }
-            for (const auto& c : collidersFromNames(scene, e, g->colliders)) item.colliders.push_back(c);
+            for (const auto& c : collidersFromLinks(scene, e, g->colliders)) item.colliders.push_back(c);
         }
         out.push_back(std::move(item));
     }

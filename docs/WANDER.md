@@ -173,6 +173,9 @@ Subsystems can register further trigger words (`wander_reference` lists them).
 - Entity properties: `position rotation scale color name id enabled tags parent state`,
   components `e.light.intensity`, vars `e.hp`. Vectors: `.x .y .z .length`; colors
   `.r .g .b .a`; lists and strings `.length`; maps `.key`.
+- Entity-link fields (`self.joint.target`, `self.camera2d.follow`, `self.animator.lookAt`...) read as the linked
+  entity, or `none`. Assign an entity (rename-proof) or a name. `find("%Muzzle")` finds the entity marked unique
+  inside the caller's prefab instance, so each copy finds its own part ([PREFABS.md](PREFABS.md)).
 - **Lists and maps are values**: assignment copies (copy-on-write, so it is cheap), so
   `let copy = items` never aliases. Mutate in place with methods: `self.items.push(x)`.
   This keeps every value serializable (vars are JSON) and makes cycles impossible.

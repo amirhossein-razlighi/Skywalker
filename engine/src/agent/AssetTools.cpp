@@ -417,12 +417,14 @@ void addAssetTools(Engine& engine, ToolRegistry& reg) {
 
     reg.add({"prefab_create", "Save prefab",
              "Save an entity and all its children (components, behaviors, vars, tags) as a reusable prefab asset. "
-             "Instantiate it with prefab_instantiate, scatter, or Wander spawn(\"prefab:path\").",
+             "Instantiate it with prefab_instantiate, scatter, or Wander spawn(\"prefab:path\"). By default the entity "
+             "itself becomes a linked instance of the new prefab (link=false leaves it unlinked).",
              "asset",
              object({{"entity", entity()},
                      {"path", string("Project-relative path ending in .prefab.json, e.g. prefabs/cottage.prefab.json")},
                      {"description", string("What it is")},
-                     {"tags", array(Json::object({{"type", "string"}}), "Tags")}},
+                     {"tags", array(Json::object({{"type", "string"}}), "Tags")},
+                     {"link", boolean("Link the entity to the new prefab (default true)")}},
                     {"entity", "path"}),
              true, false, [&engine](const Json& a, ToolContext& ctx) {
                  auto id = resolve(engine, a.get("entity"));
@@ -441,11 +443,30 @@ void addAssetTools(Engine& engine, ToolRegistry& reg) {
                  if (a.contains("description")) meta["description"] = a.get("description");
                  if (a.contains("tags")) meta["tags"] = a.get("tags");
                  (void)engine.assets().updateMeta(engine.assets().relative(full), meta);
-                 return ToolResult::text("saved prefab " + path);
+                 if (!a.get("link").asBool(true)) return ToolResult::text("saved prefab " + path);
+                 // The source entity becomes the first linked instance.
+                 std::string linked = "";
+                 Status st = engine.edit(ctx.actor, "Link to prefab", [&]() -> Status {
+                     Scene& s = engine.scene();
+                     auto tmpl = engine.prefabTemplateAsset(engine.assets().relative(full));
+                     if (!tmpl) return tmpl.error();
+                     if (EntityId old = prefab::instanceOf(s, *id); old == *id) prefab::unpack(s, *id);
+                     std::unordered_map<uint32_t, EntityId> members;
+                     if (!prefab::match(s, *id, **tmpl, members)) {
+                         linked = " (not linked: it contains other prefab instances; nested prefabs are flattened)";
+                         return {};
+                     }
+                     return prefab::link(s, *id, *tmpl, members);
+                 });
+                 if (!st) return fail(st);
+                 return ToolResult::text("saved prefab " + path +
+                                         (linked.empty() ? "; " + engine.scene().record(*id)->name + " is now linked to it" : linked));
              }});
 
     reg.add({"prefab_instantiate", "Place prefab",
-             "Create an instance of a prefab. Optionally drop it onto the surface below its position.", "asset",
+             "Create a linked instance of a prefab: the scene stores only what you change on it (prefab_overrides), and "
+             "editing the prefab updates every instance. Optionally drop it onto the surface below its position.",
+             "asset",
              object({{"prefab", string("Prefab path")},
                      {"position", vec3("World position (default origin)")},
                      {"yaw", number("Rotation around Y in degrees")},

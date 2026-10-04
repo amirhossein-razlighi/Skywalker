@@ -10,9 +10,10 @@ full descriptions; `component_schema` and each tool's input schema list every fi
 |---|---|
 | Orient | `engine_info`, `scene_overview {max_entities}`, `scene_query {name glob, tag, component, near, radius, limit}` |
 | Create | `entity_create {name*, mesh, color, position, rotation, scale, tags, vars, parent, components}` |
-| Change | `entity_update {entity*, name, enabled, tags, vars, parent, components}` (merge; null removes a component), `transform {entity*, position, rotation, scale, translate, rotate, space:local\|world}` |
+| Change | `entity_update {entity*, name, enabled, tags, vars, parent, unique, components}` (merge; null removes a component), `transform {entity*, position, rotation, scale, translate, rotate, space:local\|world}` |
 | Inspect | `entity_get {entity*}` (all components, vars, behaviors), `component_schema {component}` |
-| Copy / remove | `entity_duplicate {entity*, name, offset, count}`, `entity_delete {entity*}` (with children) |
+| Copy / remove | `entity_duplicate {entity, entities, name, offset, count}` (a group keeps its internal links), `entity_copy {entities*}` + `entity_paste {data*, parent, offset}`, `entity_delete {entity*}` (with children) |
+| References | `entity_refs {entity}` (incoming/outgoing links; without entity: dangling links, name-only links, duplicate unique names, broken prefabs) |
 | Many edits | `batch {operations*:[{tool, args}], label}` atomic, one undo step |
 | Files | `scene_new {name, empty}`, `scene_save {path}`, `scene_load {path*}` |
 | Undo | `history {action*: undo\|redo\|list, steps, limit}` |
@@ -40,7 +41,8 @@ full descriptions; `component_schema` and each tool's input schema list every fi
 | Water | `fx_create {effect: ocean\|calm_sea\|storm\|lake\|pool\|puddle ...}`, `water_query {points*}` |
 | Place on ground | `raycast {origin, direction, x, y, width, height, exclude}`, `place_on_surface {entities*, offset}`, `scatter {source\|prefab, count*, center, size\|radius, min_distance, yaw, scale, on_surface, surface, seed, group}` |
 | Effects | `fx_create {effect*, name, position, parent, overrides}`, `fx_burst {entity*, count}` |
-| Reusable sets | `prefab_create {entity*, path*}`, `prefab_instantiate {prefab*, position, yaw, rotation, scale, parent, name, on_surface}` |
+| Reusable sets | `prefab_create {entity*, path*, link}`, `prefab_instantiate {prefab*, position, yaw, rotation, scale, parent, name, on_surface}` (linked instances) |
+| Prefab instances | `prefab_overrides {entity, prefab}`, `prefab_revert {entity*, property, all}`, `prefab_apply {entity*, property}`, `prefab_unpack {entity*}`, `prefab_relink {prefab*, entities, max_overrides, dry_run}` |
 
 ## Look and materials
 

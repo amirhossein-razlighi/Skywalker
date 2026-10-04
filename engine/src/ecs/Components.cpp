@@ -249,11 +249,11 @@ const TypeInfo& ParticleEmitter::type() {
                       "props, rain splashing on roofs"),
             SKY_FIELD(ParticleEmitter, stick, Bool, "gpu: particles stick where they collide (paint, snow, blood)"),
             SKY_FIELD_RANGE(ParticleEmitter, friction, Float, "gpu: tangential slow-down on bounce", 0.f, 1.f),
-            SKY_FIELD(ParticleEmitter, colliders, String,
-                      "gpu: comma-separated entity names: sphere meshes collide as spheres, planes/quads as planes, "
+            SKY_FIELD_ENTITIES(ParticleEmitter, colliders,
+                      "gpu: entities particles bounce off: sphere meshes collide as spheres, planes/quads as planes, "
                       "other meshes as bounding spheres"),
-            SKY_FIELD(ParticleEmitter, subEmitter, String,
-                      "gpu: name of another gpu particles entity spawned where these particles die/hit (sparks -> embers, "
+            SKY_FIELD_ENTITY(ParticleEmitter, subEmitter,
+                      "gpu: another gpu particles entity spawned where these particles die/hit (sparks -> embers, "
                       "rockets -> fireworks)"),
             SKY_FIELD_ENUM(ParticleEmitter, subEmitOn, "When sub-emitter particles spawn", "death", "collision", "both"),
             SKY_FIELD_RANGE(ParticleEmitter, subEmitCount, Int, "Sub-emitter particles per event", 1.f, 1024.f),

@@ -142,7 +142,7 @@ const TypeInfo& Camera2D::type() {
                             "Game pixels tall (e.g. 180 or 270): integer upscaling for crisp pixel art; 0 = camera.orthoSize", 0, 8192),
             SKY_FIELD(Camera2D, pixelSnap, Bool, "Snap the view to the texel grid (no shimmering)"),
             SKY_FIELD_RANGE(Camera2D, zoom, Float, "Zoom factor (> 1 = closer)", 0.01f, 100.f),
-            SKY_FIELD(Camera2D, follow, String, "Entity to follow (name)"),
+            SKY_FIELD_ENTITY(Camera2D, follow, "Entity to follow; empty = none"),
             SKY_FIELD_RANGE(Camera2D, smoothing, Float, "Follow lag in seconds (0 = rigid)", 0.f, 10.f),
             SKY_FIELD(Camera2D, deadZone, Vec2, "Half-size of the box the target moves in without moving the camera"),
             SKY_FIELD(Camera2D, offset, Vec2, "Framing offset from the target"),

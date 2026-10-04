@@ -9,6 +9,8 @@ set(SKY_ENGINE_SOURCES
     src/scene/Scene.cpp
     src/scene/History.cpp
     src/scene/Process.cpp
+    src/scene/SceneLinks.cpp
+    src/scene/PrefabLink.cpp
     src/wander/Value.cpp
     src/wander/Parser.cpp
     src/wander/Format.cpp
@@ -153,6 +155,8 @@ set(SKY_ENGINE_SOURCES
     src/render/RenderLayers.cpp
     src/agent/RenderLayerTools.cpp
     src/engine/RenderBuiltins.cpp
+    # Entity links and linked prefabs (docs/PREFABS.md)
+    src/agent/PrefabTools.cpp
 )
 
 # DCC bridge: the Python helper library and the Blender add-on are embedded so the engine can

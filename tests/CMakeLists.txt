@@ -53,6 +53,7 @@ set(SKY_TEST_SOURCES
     test_profiler.cpp
     test_render_layers.cpp
     test_process.cpp
+    test_prefab.cpp
 )
 
 add_executable(skywalker_tests ${SKY_TEST_SOURCES})

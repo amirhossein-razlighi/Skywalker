@@ -104,6 +104,7 @@ Engine::Engine(EngineConfig config)
         placement.name = name;
         return instantiatePrefabAsset(ref, placement);
     };
+    scene_->setPrefabResolver([this](const std::string& ref) { return prefabTemplateAsset(ref); });  // linked prefabs
     registerEngineBuiltins();
     runtime_->provide<Engine>(this);  // engine-side Wander builtins reach subsystems through this
     runtime_->setProjectDir(config_.projectDir);
@@ -1112,7 +1113,7 @@ Status Engine::saveScene(const std::string& path) {
     fs::create_directories(fs::path(full).parent_path(), ec);
     std::ofstream f(full);
     if (!f) return Error::make("io_error", "cannot write " + full);
-    f << scene_->toJson().dump(2) << "\n";
+    f << scene_->toFileJson().dump(2) << "\n";  // linked prefab instances are saved as source + overrides
     scenePath_ = target;
     emitEvent(Json::object({{"type", "scene"}, {"action", "save"}, {"path", target}}));
     return {};
@@ -1175,11 +1176,15 @@ std::vector<std::string> Engine::refreshAssets() {
             }
             case AssetType::Texture: renderer_->invalidate(resolvePath(path)); break;
             case AssetType::Material: materials_.erase(path); break;
-            case AssetType::Prefab: prefabs_.erase(path); break;
+            case AssetType::Prefab:
+                prefabs_.erase(path);
+                prefabSyncPending_ = true;
+                break;
             case AssetType::Audio: audio_->invalidate(path); break;
             default: break;
         }
     }
+    syncPrefabInstances();
     if (!changed.empty()) {
         Json arr = Json::array();
         for (size_t i = 0; i < changed.size() && i < 50; ++i) arr.push(changed[i]);
@@ -1510,9 +1515,50 @@ Result<Json> Engine::loadPrefabAsset(const std::string& path) {
 }
 
 Result<EntityId> Engine::instantiatePrefabAsset(const std::string& path, const PrefabPlacement& placement) {
-    auto prefab = loadPrefabAsset(path);
-    if (!prefab) return prefab.error();
-    return instantiatePrefab(*scene_, prefab.value(), placement);
+    auto tmpl = prefabTemplateAsset(path);
+    if (!tmpl) return tmpl.error();
+    return instantiatePrefab(*scene_, *tmpl, placement, true);
+}
+
+Result<std::shared_ptr<const PrefabTemplate>> Engine::prefabTemplateAsset(const std::string& ref) {
+    // "guid:..." (rename-proof) or a path; unregistered prefabs get a .meta so their GUID is stable.
+    std::string path = stripAssetPrefix(ref);
+    const AssetRecord* rec = assets_->find(path);
+    if (rec) {
+        if (!rec->persisted) {
+            if (auto r = assets_->registerFile(rec->path)) rec = *r;
+        }
+        path = rec->path;
+    } else if (str::startsWith(path, "guid:")) {
+        return Error::make("not_found", "no prefab with " + path, "use asset_list type=prefab to see prefabs");
+    } else if (std::error_code ec; !fs::exists(resolvePath(path), ec)) {
+        prefabs_.erase(path);  // deleted since it was cached
+        return Error::make("not_found", "no prefab " + path, "use asset_list type=prefab to see prefabs");
+    }
+    auto doc = loadPrefabAsset(path);
+    if (!doc) return doc.error();
+    std::string rel = assets_->relative(resolvePath(path));
+    if (rel.empty()) rel = path;
+    CachedPrefab& c = prefabs_[rel];
+    uint64_t version = std::hash<std::string>{}(doc->dump());
+    if (!c.tmpl || c.tmplHash != version) {
+        auto t = buildPrefabTemplate(*doc, rel, rec ? rec->guid : std::string());
+        if (!t) return t.error();
+        c.tmpl = *t;
+        c.tmplHash = version;
+    }
+    return c.tmpl;
+}
+
+void Engine::syncPrefabInstances() {
+    if (!prefabSyncPending_) return;
+    if (playState_ != PlayState::Editing) return;  // play restores its snapshot first; synced on the next scan
+    prefabSyncPending_ = false;
+    (void)edit("asset", "Update prefab instances", [this]() -> Status {
+        auto n = prefab::sync(*scene_);
+        if (n && *n) emitEvent(Json::object({{"type", "prefab"}, {"action", "sync"}, {"instances", *n}}));
+        return {};
+    });
 }
 
 size_t Engine::rewriteAssetReferences(const std::string& from, const std::string& to) {
@@ -1537,8 +1583,10 @@ std::vector<EntityId> Engine::assetUsage(const std::string& path) const {
     std::vector<EntityId> out;
     for (EntityId e : scene_->entities()) {
         const MeshRenderer* m = scene_->get<MeshRenderer>(e);
-        if (m && (m->mesh == "asset:" + path || str::startsWith(m->mesh, "asset:" + path + "#") || m->texture == path ||
-                  m->material == path)) {
+        const EntityRecord* r = scene_->record(e);
+        bool instance = r->prefab.linked() && r->prefab.instance == e && r->prefab.source == path;  // linked prefabs
+        if (instance || (m && (m->mesh == "asset:" + path || str::startsWith(m->mesh, "asset:" + path + "#") ||
+                               m->texture == path || m->material == path))) {
             out.push_back(e);
         }
     }

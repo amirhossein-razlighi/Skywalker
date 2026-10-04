@@ -103,7 +103,7 @@ const TypeInfo& Joint::type() {
         "Breaks above breakForce (fires `on event \"joint_broken\"` on this entity).",
         {
             SKY_FIELD_ENUM(Joint, kind, "Joint type", "fixed", "hinge", "ball", "slider", "distance", "spring"),
-            SKY_FIELD(Joint, target, String, "Other entity (name or #id); empty = attached to the world"),
+            SKY_FIELD_ENTITY(Joint, target, "Other entity (name, #id or {\"id\"}); empty = attached to the world"),
             SKY_FIELD(Joint, anchor, Vec3, "Pivot point in this entity's local space"),
             SKY_FIELD(Joint, connectedAnchor, Vec3,
                       "distance/spring: the other end in the target's local space (a world point when attached to the world)"),

@@ -1,8 +1,9 @@
 {
   "format": "skywalker.prefab",
-  "version": 1,
+  "version": 2,
   "name": "Blast",
   "root": {
+    "pid": 1,
     "name": "Blast",
     "enabled": true,
     "tags": [],
@@ -38,6 +39,7 @@
     ],
     "children": [
       {
+        "pid": 2,
         "name": "Blast Core",
         "enabled": true,
         "tags": [],
@@ -94,6 +96,7 @@
         }
       },
       {
+        "pid": 3,
         "name": "Blast Shell",
         "enabled": true,
         "tags": [],

@@ -1,8 +1,9 @@
 {
   "format": "skywalker.prefab",
-  "version": 1,
+  "version": 2,
   "name": "Gravestone",
   "root": {
+    "pid": 1,
     "name": "Gravestone",
     "enabled": true,
     "tags": [],
@@ -28,6 +29,7 @@
     },
     "children": [
       {
+        "pid": 2,
         "name": "Gravestone Slab",
         "enabled": true,
         "tags": [],
@@ -79,6 +81,7 @@
         }
       },
       {
+        "pid": 3,
         "name": "Gravestone Top",
         "enabled": true,
         "tags": [],
@@ -130,6 +133,7 @@
         }
       },
       {
+        "pid": 4,
         "name": "Gravestone Moss",
         "enabled": true,
         "tags": [],

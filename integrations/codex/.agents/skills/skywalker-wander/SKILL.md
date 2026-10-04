@@ -95,7 +95,7 @@ end
 - **Names**: `self`, `other`, `dt`, `time`, `frame`, `state`, `state_time`, `data`. Properties: `e.position e.rotation e.scale e.color e.name e.tags e.enabled`, components `e.light.intensity`, vars `e.hp`.
 - Reserved words cannot be names: `fn return for in while do break continue wait until state go goto const test expect use with param other step`.
 - **Idioms**: always multiply per-tick change by `dt`; smooth follow `self.position = lerp(self.position, goal, 1 - exp(-8 * dt))`; prefer `state` over boolean flags; cooldown `var cd = 0` / `cd -= dt`;
-  find things with `nearest("enemy", 10)`, `find_all("coin")`, `find("Door")` and test `if x then` before using a maybe-none; share code with `use`.
+  find things with `nearest("enemy", 10)`, `find_all("coin")`, `find("Door")` and test `if x then` before using a maybe-none; inside a prefab, mark parts unique (`entity_update {entity, unique: true}`) and use `find("%Muzzle")` so each copy finds its own part; share code with `use`.
 
 **Pause, slow motion, smoothing.** `pause_game()` / `resume_game()` / `is_paused()`, `time_scale(0.3)` (slow motion; `dt`, timers and
 waits scale), `unscaled_dt()` / `unscaled_time()` (real time), `teleport(self, find("Spawn"))` (jump without a render smear). All apply from

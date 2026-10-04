@@ -1,8 +1,9 @@
 {
   "format": "skywalker.prefab",
-  "version": 1,
+  "version": 2,
   "name": "Autumn Tree",
   "root": {
+    "pid": 1,
     "name": "Autumn Tree",
     "enabled": true,
     "tags": [],
@@ -28,6 +29,7 @@
     },
     "children": [
       {
+        "pid": 2,
         "name": "Autumn Tree Trunk",
         "enabled": true,
         "tags": [],
@@ -79,6 +81,7 @@
         }
       },
       {
+        "pid": 3,
         "name": "Autumn Tree Leaves 1",
         "enabled": true,
         "tags": [],
@@ -130,6 +133,7 @@
         }
       },
       {
+        "pid": 4,
         "name": "Autumn Tree Leaves 2",
         "enabled": true,
         "tags": [],
@@ -181,6 +185,7 @@
         }
       },
       {
+        "pid": 5,
         "name": "Autumn Tree Leaves 3",
         "enabled": true,
         "tags": [],
@@ -232,6 +237,7 @@
         }
       },
       {
+        "pid": 6,
         "name": "Autumn Tree Leaves 4",
         "enabled": true,
         "tags": [],

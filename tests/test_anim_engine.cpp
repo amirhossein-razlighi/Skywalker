@@ -324,7 +324,7 @@ TEST_CASE("anim look-at: the head turns toward a target, within the angle limit"
     float full = turned();
     CHECK(early < full * 0.5f);
     CHECK(full > 75.f);
-    p.scene().get<Animator>(hero)->lookAt.clear();  // a gameplay change while playing
+    p.scene().get<Animator>(hero)->lookAt = {};  // a gameplay change while playing
     p.engine->step(2);
     float fading = turned();
     CHECK(fading > full * 0.5f);

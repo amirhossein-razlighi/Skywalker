@@ -1,8 +1,9 @@
 {
   "format": "skywalker.prefab",
-  "version": 1,
+  "version": 2,
   "name": "city_b",
   "root": {
+    "pid": 1,
     "name": "city_b",
     "enabled": true,
     "components": {
@@ -10,6 +11,7 @@
     },
     "children": [
       {
+        "pid": 2,
         "name": "stone_302824",
         "enabled": true,
         "components": {
@@ -20,6 +22,7 @@
         }
       },
       {
+        "pid": 3,
         "name": "roof_tile_121315",
         "enabled": true,
         "components": {
@@ -30,6 +33,7 @@
         }
       },
       {
+        "pid": 4,
         "name": "roof_tile_040505",
         "enabled": true,
         "components": {
@@ -40,6 +44,7 @@
         }
       },
       {
+        "pid": 5,
         "name": "stone_292723",
         "enabled": true,
         "components": {
@@ -50,6 +55,7 @@
         }
       },
       {
+        "pid": 6,
         "name": "stone_282622",
         "enabled": true,
         "components": {
@@ -60,6 +66,7 @@
         }
       },
       {
+        "pid": 7,
         "name": "roof_tile_241208",
         "enabled": true,
         "components": {
@@ -70,6 +77,7 @@
         }
       },
       {
+        "pid": 8,
         "name": "plaster_312822",
         "enabled": true,
         "components": {
@@ -80,6 +88,7 @@
         }
       },
       {
+        "pid": 9,
         "name": "roof_tile_191008",
         "enabled": true,
         "components": {
@@ -90,6 +99,7 @@
         }
       },
       {
+        "pid": 10,
         "name": "roof_tile_281610",
         "enabled": true,
         "components": {
@@ -100,6 +110,7 @@
         }
       },
       {
+        "pid": 11,
         "name": "roof_tile_100504",
         "enabled": true,
         "components": {
@@ -110,6 +121,7 @@
         }
       },
       {
+        "pid": 12,
         "name": "plaster_322924",
         "enabled": true,
         "components": {
@@ -120,6 +132,7 @@
         }
       },
       {
+        "pid": 13,
         "name": "roof_tile_070403",
         "enabled": true,
         "components": {
@@ -130,6 +143,7 @@
         }
       },
       {
+        "pid": 14,
         "name": "plaster_343126",
         "enabled": true,
         "components": {
@@ -140,6 +154,7 @@
         }
       },
       {
+        "pid": 15,
         "name": "roof_tile_241108",
         "enabled": true,
         "components": {
@@ -150,6 +165,7 @@
         }
       },
       {
+        "pid": 16,
         "name": "roof_tile_080403",
         "enabled": true,
         "components": {
@@ -160,6 +176,7 @@
         }
       },
       {
+        "pid": 17,
         "name": "roof_tile_210907",
         "enabled": true,
         "components": {
@@ -170,6 +187,7 @@
         }
       },
       {
+        "pid": 18,
         "name": "roof_tile_070302",
         "enabled": true,
         "components": {
@@ -180,6 +198,7 @@
         }
       },
       {
+        "pid": 19,
         "name": "roof_tile_261309",
         "enabled": true,
         "components": {
@@ -190,6 +209,7 @@
         }
       },
       {
+        "pid": 20,
         "name": "plaster_353327",
         "enabled": true,
         "components": {
@@ -200,6 +220,7 @@
         }
       },
       {
+        "pid": 21,
         "name": "plaster_353431",
         "enabled": true,
         "components": {
@@ -210,6 +231,7 @@
         }
       },
       {
+        "pid": 22,
         "name": "plaster_373532",
         "enabled": true,
         "components": {
@@ -220,6 +242,7 @@
         }
       },
       {
+        "pid": 23,
         "name": "roof_tile_090503",
         "enabled": true,
         "components": {
@@ -230,6 +253,7 @@
         }
       },
       {
+        "pid": 24,
         "name": "plaster_383735",
         "enabled": true,
         "components": {
@@ -240,6 +264,7 @@
         }
       },
       {
+        "pid": 25,
         "name": "leaf_120906",
         "enabled": true,
         "components": {
@@ -250,6 +275,7 @@
         }
       },
       {
+        "pid": 26,
         "name": "leaf_121708",
         "enabled": true,
         "components": {
@@ -260,6 +286,7 @@
         }
       },
       {
+        "pid": 27,
         "name": "leaf_091306",
         "enabled": true,
         "components": {

@@ -21,7 +21,7 @@ struct Animator {
     bool rootMotion = false; // move the entity by the animation's root (hips) movement
     std::string preview = "pose";  // editor: rest (bind pose) | pose (frame at `time`) | play (live)
     float time = 0.f;        // editor preview time in seconds
-    std::string lookAt;      // entity the head turns towards (look-at IK); "" = off
+    EntityLink lookAt;       // entity the head turns towards (look-at IK); empty = off
     float lookAtWeight = 1.f;
     float lookAtLimit = 70.f;  // max head/spine turn in degrees
 
@@ -30,7 +30,7 @@ struct Animator {
 
 /// Keeps this entity on a bone of an animated character (weapons in hands, hats, lanterns).
 struct BoneAttachment {
-    std::string character;  // entity with the Animator; "" = the nearest ancestor that has one
+    EntityLink character;   // entity with the Animator; empty = the nearest ancestor that has one
     std::string bone;       // bone name ("RightHand", "mixamorig:Head"...)
     Vec3 offset{0.f};    // position in the bone's space (meters)
     Vec3 rotation{0.f};  // Euler degrees in the bone's space
@@ -43,7 +43,7 @@ struct BoneAttachment {
 /// entity — a hand on a door handle, rail or lever, a foot planted on a step. The end bone's
 /// parent and grandparent bend; bone lengths never change.
 struct IkTarget {
-    std::string character;  // entity with the Animator; "" = the nearest ancestor that has one
+    EntityLink character;   // entity with the Animator; empty = the nearest ancestor that has one
     std::string bone;       // end bone: LeftHand, RightFoot, ...
     float weight = 1.f;     // 0 = animation only, 1 = fully on the target
     Vec3 pole{0.f};         // bend direction in the character's space (knees: [0,0,-1] forward); 0 = keep the animated bend

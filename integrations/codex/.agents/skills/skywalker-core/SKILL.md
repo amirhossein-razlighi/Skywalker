@@ -48,6 +48,7 @@ viewport_capture {annotate:true}     # ids are drawn on the image
 ## Efficiency rules
 
 - Minimize round trips: `batch`, `scatter`, `foliage_add`, `prefab_instantiate` instead of loops of single creates.
+- Entity-link fields (joint `target`, camera2d `follow`, animator `lookAt`, ...) store ids and survive renames. Before renaming or deleting something others point at, run `entity_refs {entity}`; after big edits, `entity_refs {}` lists dangling links with the fix. Duplicate rigs together (`entity_duplicate {entities}`) so their links stay internal.
 - `scene_query` (name glob, tag, component, proximity) beats re-reading `scene_overview` on big scenes.
   `scene_overview {max_entities}` limits output.
 - Iterate cheap, finish expensive: `viewport_capture {width:640, height:360, samples:1}` while exploring,
