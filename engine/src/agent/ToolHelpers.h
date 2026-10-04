@@ -54,5 +54,6 @@ void addPhysicsTools(Engine& engine, ToolRegistry& reg);
 void addNavTools(Engine& engine, ToolRegistry& reg);
 void addAnimationTools(Engine& engine, ToolRegistry& reg);  // AnimationTools.cpp (+ SequenceTools.cpp)
 void addHairTools(Engine& engine, ToolRegistry& reg);
+void addImpostorTools(Engine& engine, ToolRegistry& reg);  // ImpostorTools.cpp: foliage impostors
 
 }  // namespace sky::tools

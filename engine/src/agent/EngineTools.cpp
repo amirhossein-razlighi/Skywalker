@@ -636,9 +636,10 @@ void addViewTools(Engine& engine, ToolRegistry& reg) {
                      {"samples", integer("Supersampling: jittered sub-frames accumulated (default 4; 1 = fastest preview, "
                                          "16-32 = final-quality stills with noise-free GI and reflections)")},
                      {"clay", boolean("Render every surface as matte white clay (judge form and light; film 'sketch to fill' beats)")},
-                     {"debug_view", enumeration({"final", "albedo", "normals", "material", "gi", "reflections", "ao", "depth", "lighting", "sketch"},
+                     {"debug_view", enumeration({"final", "albedo", "normals", "material", "gi", "reflections", "ao", "depth", "lighting", "sketch", "impostors"},
                                                 "Buffer visualization for diagnosing looks: material = roughness (red) / metallic (green), "
-                                                "gi = bounce light, lighting = before screen-space GI/reflections")},
+                                                "gi = bounce light, lighting = before screen-space GI/reflections, impostors = the final image "
+                                                "with foliage meshes tinted green and distant impostors magenta")},
                      {"include_image", boolean("Return the image (default true); false = only the entity list")},
                      {"save_path", string("Also write the PNG to this project-relative path")}}),
              false, false, [&engine](const Json& a, ToolContext&) {
@@ -665,9 +666,9 @@ void addViewTools(Engine& engine, ToolRegistry& reg) {
                  o.editorOverlays = a.get("overlays").asBool(true);
                  o.samples = static_cast<int>(std::clamp<int64_t>(a.get("samples").asInt(4), 1, 64));
                  {
-                     static const char* kViews[] = {"final", "albedo", "normals", "material", "gi", "reflections", "ao", "depth", "lighting", "sketch"};
+                     static const char* kViews[] = {"final", "albedo", "normals", "material", "gi", "reflections", "ao", "depth", "lighting", "sketch", "impostors"};
                      std::string dv = a.get("debug_view").asString();
-                     for (int i = 0; i < 10; ++i) if (dv == kViews[i]) o.debugView = i;
+                     for (int i = 0; i < 11; ++i) if (dv == kViews[i]) o.debugView = i;
                      o.clay = a.get("clay").asBool(false);
                  }
                  auto cap = engine.capture(o);
@@ -1035,6 +1036,7 @@ void registerEngineTools(Engine& engine) {
     tools::addPhysicsTools(engine, reg);
     tools::addAnimationTools(engine, reg);
     tools::addHairTools(engine, reg);
+    tools::addImpostorTools(engine, reg);
 }
 
 }  // namespace sky

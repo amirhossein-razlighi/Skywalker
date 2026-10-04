@@ -840,6 +840,7 @@ vertex MeshOut gpuMeshParticleVertex(uint vid [[vertex_id]], uint iid [[instance
     float alpha;
     float3 rgb = particleColorAt(P, t, p.misc2.x, alpha);
     MeshOut o;
+    o.fade = 0.0;
     o.position = f.viewProj * float4(world, 1.0);
     o.worldPos = world;
     o.normal = R * float3(v.normal);

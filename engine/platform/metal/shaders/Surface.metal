@@ -14,6 +14,7 @@ vertex MeshOut meshVertex(uint vid [[vertex_id]],
     o.normal = (d.normalMatrix * float4(float3(v.normal), 0.0)).xyz;
     o.uv = float2(v.uv);
     o.color = float4(v.color);
+    o.fade = 0.0;
     return o;
 }
 
@@ -148,6 +149,73 @@ static float3 applyFog(float3 color, float3 worldPos, float3 V, constant FrameUn
     return mix(color, fogC, fogAmt);
 }
 
+// Material evaluation shared by every lit surface path (meshes, instanced foliage) and the
+// impostor bake, so impostors match their meshes exactly: base color x vertex color x maps,
+// the alpha test, ORM and normal maps (tangent space or triplanar). `hardAlphaTest` cuts at the
+// cutoff (bakes); otherwise the edge is sharpened to a ~1 px ramp for alpha-to-coverage.
+struct MaterialSample {
+    SurfaceData s;
+    float3 emissive;
+    float3 Ngeo;
+};
+
+static MaterialSample evaluateMaterial(float3 worldPos, float3 normal, float2 uvIn, float4 vertexColor, bool frontFacing,
+                                       constant DrawUniforms& d, texture2d<float> albedoTex, texture2d<float> normalTex,
+                                       texture2d<float> ormTex, texture2d<float> emissiveTex, bool hardAlphaTest) {
+    MaterialSample m;
+    m.Ngeo = normalize(normal) * (frontFacing ? 1.0 : -1.0);
+    bool tri = d.material2.w > 0.5;
+    float2 uv = uvIn * d.material2.xy;
+    Triplanar tp = triplanar(worldPos, m.Ngeo, d.material2.xy);
+
+    SurfaceData s;
+    s.albedo = d.color.rgb * vertexColor.rgb;
+    s.alpha = d.color.a * vertexColor.a;
+    if (d.maps.x > 0.5) {
+        float4 t = tri ? sampleTri(albedoTex, tp) : albedoTex.sample(materialSampler, uv);
+        if (d.material4.y < 0.5) s.albedo *= t.rgb;
+        s.alpha *= t.a;
+        if (d.material4.x > 0.0) {
+            if (hardAlphaTest) {
+                if (s.alpha < d.material4.x) discard_fragment();
+                s.alpha = 1.0;
+            } else {
+                // Alpha test, sharpened to a ~1 px ramp so alpha-to-coverage antialiases the edge.
+                s.alpha = saturate((s.alpha - d.material4.x) / max(fwidth(s.alpha), 1e-4) + 0.5);
+                if (s.alpha <= 0.0) discard_fragment();
+            }
+        } else if (s.alpha < 0.02) {
+            discard_fragment();
+        }
+    }
+    m.emissive = d.emissive.rgb * d.emissive.w;
+    if (d.maps.w > 0.5) m.emissive *= (tri ? sampleTri(emissiveTex, tp) : emissiveTex.sample(materialSampler, uv)).rgb;
+
+    s.metallic = d.material.x;
+    s.roughness = d.material.y;
+    s.ao = 1.0;
+    if (d.maps.z > 0.5) {
+        float3 orm = (tri ? sampleTri(ormTex, tp) : ormTex.sample(materialSampler, uv)).rgb;
+        s.ao = mix(1.0, orm.r, saturate(d.maps.z - 1.0));
+        s.roughness *= orm.g;
+        s.metallic *= orm.b;
+    }
+    s.N = m.Ngeo;
+    if (d.maps.y > 0.5) {
+        if (tri) {
+            s.N = triplanarNormal(normalTex, tp, m.Ngeo, d.material2.z);
+        } else {
+            float3 mapN = normalTex.sample(materialSampler, uv).xyz * 2.0 - 1.0;
+            mapN.xy *= d.material2.z;
+            s.N = perturbNormal(m.Ngeo, worldPos, uv, normalize(mapN));
+        }
+    }
+    s.clearcoat = d.material3.x;
+    s.subsurface = d.material3.y;
+    m.s = s;
+    return m;
+}
+
 fragment MainOut meshFragment(MeshOut in [[stage_in]],
                               bool frontFacing [[front_facing]],
                               constant DrawUniforms& d [[buffer(0)]],
@@ -163,54 +231,19 @@ fragment MainOut meshFragment(MeshOut in [[stage_in]],
                               texturecube<float> envTex [[texture(5)]],
                               texture2d<float> brdfLut [[texture(6)]],
                               texture3d<float> cloudShape [[texture(7)]]) {
-    float3 Ngeo = normalize(in.normal) * (frontFacing ? 1.0 : -1.0);
+    // Foliage crossfading into its impostor: complementary dither (the impostor keeps the rest).
+    if (in.fade > 0.0 && ditherNoise(in.position.xy, f.temporal) < in.fade) discard_fragment();
     float3 V = normalize(f.cameraPos.xyz - in.worldPos);
     if (f.cameraForward.w > 0.5) V = -f.cameraForward.xyz;
-    bool tri = d.material2.w > 0.5;
-    float2 uv = in.uv * d.material2.xy;
-    Triplanar tp = triplanar(in.worldPos, Ngeo, d.material2.xy);
-
-    SurfaceData s;
-    s.albedo = d.color.rgb * in.color.rgb;
-    s.alpha = d.color.a * in.color.a;
-    if (d.maps.x > 0.5) {
-        float4 t = tri ? sampleTri(albedoTex, tp) : albedoTex.sample(materialSampler, uv);
-        if (d.material4.y < 0.5) s.albedo *= t.rgb;
-        s.alpha *= t.a;
-        if (d.material4.x > 0.0) {
-            // Alpha test, sharpened to a ~1 px ramp so alpha-to-coverage antialiases the edge.
-            s.alpha = saturate((s.alpha - d.material4.x) / max(fwidth(s.alpha), 1e-4) + 0.5);
-            if (s.alpha <= 0.0) discard_fragment();
-        } else if (s.alpha < 0.02) {
-            discard_fragment();
-        }
-    }
-    float3 emissive = d.emissive.rgb * d.emissive.w;
-    if (d.maps.w > 0.5) emissive *= (tri ? sampleTri(emissiveTex, tp) : emissiveTex.sample(materialSampler, uv)).rgb;
+    MaterialSample m = evaluateMaterial(in.worldPos, in.normal, in.uv, in.color, frontFacing, d, albedoTex, normalTex, ormTex,
+                                        emissiveTex, false);
+    SurfaceData s = m.s;
+    float3 Ngeo = m.Ngeo;
+    float3 emissive = m.emissive;
 
     int shading = int(d.material.w + 0.5);
     if (shading == 2) {  // unlit: flat color, still emissive
         return mainOut(float4(s.albedo + emissive, s.alpha), s.albedo, 1.0, Ngeo, 1.0, kGbufNoLighting);
-    }
-
-    s.metallic = d.material.x;
-    s.roughness = d.material.y;
-    s.ao = 1.0;
-    if (d.maps.z > 0.5) {
-        float3 orm = (tri ? sampleTri(ormTex, tp) : ormTex.sample(materialSampler, uv)).rgb;
-        s.ao = mix(1.0, orm.r, saturate(d.maps.z - 1.0));
-        s.roughness *= orm.g;
-        s.metallic *= orm.b;
-    }
-    s.N = Ngeo;
-    if (d.maps.y > 0.5) {
-        if (tri) {
-            s.N = triplanarNormal(normalTex, tp, Ngeo, d.material2.z);
-        } else {
-            float3 mapN = normalTex.sample(materialSampler, uv).xyz * 2.0 - 1.0;
-            mapN.xy *= d.material2.z;
-            s.N = perturbNormal(Ngeo, in.worldPos, uv, normalize(mapN));
-        }
     }
     if (shading == 3) {
         // Water: a sum of wind-driven directional waves (analytic slopes) plus fine ripples,
@@ -245,8 +278,6 @@ fragment MainOut meshFragment(MeshOut in [[stage_in]],
     float alpha = s.roughness * s.roughness;
     alpha = sqrt(alpha * alpha + min(2.0 * variance, 0.18));
     s.roughness = clamp(sqrt(alpha), 0.045, 1.0);
-    s.clearcoat = d.material3.x;
-    s.subsurface = d.material3.y;
     bool toon = shading == 1;
 
     float3 color = shadeSurface(s, Ngeo, in.worldPos, in.position.xy, V, toon, d.material3.z, f, lights, clusterCells,

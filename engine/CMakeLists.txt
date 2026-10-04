@@ -39,6 +39,7 @@ set(SKY_ENGINE_SOURCES
     src/render/ColorGrading.cpp
     src/render/LightClusters.cpp
     src/render/MeshLod.cpp
+    src/render/Impostor.cpp
     src/fx/Groom.cpp
     src/fx/GpuParticles.cpp
     src/render/MeshFormats.cpp
@@ -62,6 +63,7 @@ set(SKY_ENGINE_SOURCES
     src/dcc/Manager.cpp
     src/dcc/Embedded.cpp
     src/agent/HairTools.cpp
+    src/agent/ImpostorTools.cpp
     src/agent/McpServer.cpp
     src/agent/SocketServer.cpp
     src/engine/Engine.cpp
@@ -233,7 +235,7 @@ if(SKY_HAS_METAL)
         COMMENT "Embedding Metal skinning shader source")
 
     target_sources(skywalker_engine PRIVATE platform/metal/MetalRenderer.mm platform/metal/MetalFx.mm
-        platform/metal/MetalGpuParticles.mm platform/metal/MetalHair.mm ${_shader_inc} ${_skin_inc})
+        platform/metal/MetalGpuParticles.mm platform/metal/MetalHair.mm platform/metal/MetalFoliage.mm ${_shader_inc} ${_skin_inc})
     target_include_directories(skywalker_engine PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/generated)
     target_compile_definitions(skywalker_engine PUBLIC $<$<COMPILE_LANGUAGE:C,CXX,OBJCXX>:SKY_HAS_METAL=1>)
     target_link_libraries(skywalker_engine PUBLIC

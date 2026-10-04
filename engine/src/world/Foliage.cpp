@@ -68,6 +68,10 @@ std::vector<FoliageLayer> foliageLayersFromJson(const Json& layers) {
         if (src.contains("terrainLayer")) l.terrainLayer = static_cast<int>(src.get("terrainLayer").asInt(-1));
         if (src.contains("castShadows")) l.castShadows = src.get("castShadows").asBool(true);
         if (src.contains("seed")) l.seed = static_cast<uint32_t>(src.get("seed").asInt());
+        l.impostors = src.get("impostors").asBool(true);
+        rd("impostorDistance", l.impostorDistance);
+        l.impostorResolution = static_cast<int>(std::clamp<int64_t>(src.get("impostorResolution").asInt(0), 0, 4096));
+        l.impostorFrames = static_cast<int>(std::clamp<int64_t>(src.get("impostorFrames").asInt(12), 4, 32));
         l.density = std::clamp(l.density, 0.f, 64.f);
         l.cullDistance = std::clamp(l.cullDistance, 4.f, 4000.f);
         if (l.scaleMax < l.scaleMin) std::swap(l.scaleMin, l.scaleMax);

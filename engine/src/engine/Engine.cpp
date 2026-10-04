@@ -19,6 +19,7 @@
 #include "skywalker/native/NativeModules.h"
 #include "skywalker/assets/Prefab.h"
 #include "skywalker/render/Gltf.h"
+#include "skywalker/render/Impostor.h"
 #include "skywalker/render/MeshData.h"
 #include "skywalker/studio/Playtest.h"
 #include "skywalker/studio/Studio.h"
@@ -115,6 +116,10 @@ Engine::Engine(EngineConfig config)
         const MeshData* m = cpuMesh(key);
         if (!m) return std::nullopt;
         return m->bounds;
+    };
+    hooks.meshTriangles = [this](const std::string& key) -> size_t {  // impostor heuristics
+        const MeshData* m = cpuMesh(key);
+        return m ? m->indices.size() / 3 : 0;
     };
     hooks.meshReady = [this](const std::string& key) {
         ensureMeshUploaded(key);
@@ -595,11 +600,14 @@ FrameData Engine::frame(const CaptureOptions& opts) {
     std::erase_if(oceans_, [&](const auto& kv) { return std::find(waterIds.begin(), waterIds.end(), kv.first) == waterIds.end(); });
     // Terrain and foliage (resolved texture paths included). Captures generate all foliage
     // in range; the live viewport streams a few chunks per frame.
+    f.quality = opts.quality;  // impostor transition distances depend on the tier
     world_->gather(*scene_, view, f, opts.samples <= 1);
     {
         std::vector<std::string> meshes;
         for (const auto& b : f.instances) {
-            if (std::find(meshes.begin(), meshes.end(), b.mesh) == meshes.end()) meshes.push_back(b.mesh);
+            for (const auto& p : *b.parts) {
+                if (std::find(meshes.begin(), meshes.end(), p.mesh) == meshes.end()) meshes.push_back(p.mesh);
+            }
         }
         for (const auto& m : meshes) ensureMeshUploaded(m);
         for (auto& t : f.terrains) {
@@ -617,11 +625,29 @@ FrameData Engine::frame(const CaptureOptions& opts) {
             s.shading = s.shading == Shading::Water ? s.shading : Shading::Pbr;
         };
         for (auto& d : f.draws) clay(d.surface);
+        auto clayParts = [&](const std::shared_ptr<const std::vector<InstancePart>>& parts) {
+            auto out = std::make_shared<std::vector<InstancePart>>(*parts);
+            for (auto& p : *out) {
+                std::string tex = p.surface.alphaCutoff > 0.f ? p.surface.texture : "";  // keep leaf cut-outs
+                clay(p.surface);
+                p.surface.texture = tex;
+                p.surface.textureAlphaOnly = true;
+            }
+            return std::shared_ptr<const std::vector<InstancePart>>(std::move(out));
+        };
+        std::unordered_map<const void*, std::shared_ptr<const std::vector<InstancePart>>> clayed;
         for (auto& b : f.instances) {
-            std::string tex = b.surface.alphaCutoff > 0.f ? b.surface.texture : "";  // keep leaf cut-outs
-            clay(b.surface);
-            b.surface.texture = tex;
-            b.surface.textureAlphaOnly = true;
+            auto& c = clayed[b.parts.get()];
+            if (!c) c = clayParts(b.parts);
+            b.parts = c;
+        }
+        for (auto& m : f.impostors) {  // clay impostors are baked (and cached) separately
+            auto& c = clayed[m.parts.get()];
+            if (!c) c = clayParts(m.parts);
+            m.parts = c;
+            m.source += "|clay";
+            m.key = impostor::cacheKey(m);
+            if (!m.cachePath.empty()) m.cachePath = (fs::path(m.cachePath).parent_path() / (m.key + ".skyimp")).string();
         }
         for (auto& t : f.terrains) {
             for (auto& l : t.layers) clay(l.surface);
@@ -629,7 +655,9 @@ FrameData Engine::frame(const CaptureOptions& opts) {
     }
     if (!pendingMeshes_.empty()) {  // not streamed in yet: draw nothing rather than a placeholder cube
         std::erase_if(f.draws, [&](const DrawItem& d) { return pendingMeshes_.count(d.mesh) > 0; });
-        std::erase_if(f.instances, [&](const InstanceBatch& b) { return pendingMeshes_.count(b.mesh) > 0; });
+        std::erase_if(f.instances, [&](const InstanceBatch& b) {
+            return std::any_of(b.parts->begin(), b.parts->end(), [&](const InstancePart& p) { return pendingMeshes_.count(p.mesh) > 0; });
+        });
     }
     resolveTexturePaths(f);
     if (bo.editorOverlays && selection_.size() == 1 && scene_->exists(selection_[0]) && !opts.annotate) {

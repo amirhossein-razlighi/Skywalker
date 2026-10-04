@@ -499,12 +499,18 @@ void addWorldTools(Engine& engine, ToolRegistry& reg) {
              "Frame cost and scene complexity: GPU and CPU frame time, draw calls, lights, terrain nodes, foliage "
              "instances, entities, behaviors and assets. Pass frames (e.g. 30) to benchmark real-time rendering of the "
              "current view at width x height (temporal AA, no supersampling) and get average/min/max GPU ms. Check "
-             "after big scatters, generators or look changes; 16.6 ms = 60 fps.",
+             "after big scatters, generators or look changes; 16.6 ms = 60 fps. view is \"editor\", \"scene\" or a "
+             "custom camera {eye, target, fov}; quality benchmarks an editor viewport tier. The gpu section includes "
+             "foliage impostor stats (impostorInstances, meshInstances, impostorsBaked, impostorBakeMs). Example: "
+             "{\"frames\":30,\"view\":{\"eye\":[0,300,-600],\"target\":[0,80,0]}}.",
              "render",
              object({{"frames", integer("Benchmark this many real-time frames first (default 0 = just report)")},
                      {"width", integer("Benchmark width (default 1920)")},
                      {"height", integer("Benchmark height (default 1080)")},
-                     {"view", enumeration({"editor", "scene"}, "Camera for the benchmark (default editor)")}}),
+                     {"view", any("Camera for the benchmark: \"editor\" (default), \"scene\", or {eye: [x,y,z], target: "
+                                  "[x,y,z], fov: degrees}")},
+                     {"quality", enumeration({"full", "balanced", "fast"},
+                                             "Viewport quality tier to benchmark (default full, as in play mode and captures)")}}),
              false, false, [&engine](const Json& a, ToolContext&) {
                  Json bench = Json::object();
                  int frames = static_cast<int>(std::clamp<int64_t>(a.get("frames").asInt(0), 0, 600));
@@ -513,7 +519,23 @@ void addWorldTools(Engine& engine, ToolRegistry& reg) {
                      o.width = static_cast<int>(std::clamp<int64_t>(a.get("width").asInt(1920), 64, 4096));
                      o.height = static_cast<int>(std::clamp<int64_t>(a.get("height").asInt(1080), 64, 4096));
                      o.samples = 1;
-                     o.useSceneCamera = a.get("view").asString() == "scene";
+                     const Json& view = a.get("view");
+                     if (view.isObject()) {
+                         Vec3 eye, target;
+                         if (!reflect::jsonToVec3(view.get("eye"), eye)) {
+                             return ToolResult::error(Error::make("invalid_argument", "view.eye must be [x, y, z]",
+                                                                  "e.g. {\"view\": {\"eye\": [0, 50, -120], \"target\": [0, 20, 0]}}"));
+                         }
+                         o.hasCustomView = true;
+                         o.customView = engine.camera().toView();
+                         o.customView.eye = eye;
+                         if (reflect::jsonToVec3(view.get("target"), target)) o.customView.target = target;
+                         if (view.contains("fov")) o.customView.fovDeg = std::clamp(view.get("fov").asFloat(), 5.f, 150.f);
+                     } else {
+                         o.useSceneCamera = view.asString() == "scene";
+                     }
+                     const std::string q = a.get("quality").asString("full");
+                     o.quality = q == "fast" ? 2 : q == "balanced" ? 1 : 0;
                      o.editorOverlays = false;
                      double sum = 0, lo = 1e9, hi = 0, cpu = 0;
                      for (int i = 0; i < frames + 3; ++i) {  // 3 warm-up frames
