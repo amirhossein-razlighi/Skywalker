@@ -101,6 +101,7 @@ void Scene::registerKinds() {
     kinds_.push_back(makeReflectedKind<ReflectionProbe>());  // render/ReflectionProbes.h
     kinds_.push_back(makeReflectedKind<Vehicle>());      // wheeled vehicles (physics/Vehicles.cpp)
     kinds_.push_back(makeReflectedKind<ChaseCamera>());  // chase camera for vehicles
+    kinds_.push_back(makeReflectedKind<Particles2D>());  // pixel-art 2D particles (ecs/Particles2D.h)
 }
 
 const ComponentKind* Scene::componentKind(std::string_view n) const {

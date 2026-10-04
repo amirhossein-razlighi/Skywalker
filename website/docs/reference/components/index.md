@@ -5,7 +5,7 @@ title: "Components"
 
 # Components
 
-Every component is a plain struct with a reflected field table. The same table drives JSON scene files, the JSON Schema agents read (`component_schema`), the editor's property grid and Wander access (`self.light.intensity`). There are **37 components** plus the scene-wide environment.
+Every component is a plain struct with a reflected field table. The same table drives JSON scene files, the JSON Schema agents read (`component_schema`), the editor's property grid and Wander access (`self.light.intensity`). There are **38 components** plus the scene-wide environment.
 
 Set them with `entity_create` / `entity_update` (component objects are merged field by field), from the editor's Details panel, or from Wander. Unknown fields fail with a *did you mean …?* hint.
 
@@ -28,6 +28,7 @@ Set them with `entity_create` / `entity_update` (component objects are merged fi
 | [`sprite_anim`](2d-ui.md#sprite_anim) | 2D, text and UI | Flipbook animation for the entity's sprite. clips: {"run": {"frames": "4-11", "fps": 12, "loop": true, "events": {"3": "footstep"}}}. frames: index ranges ("0-3,6"), lists ([0, 1, 2] or ["run_0", ...]) or an atlas name pattern ("run_*"); a clip may switch sheets with "texture", "columns", "rows". Frame events reach the entity's behaviors as `on anim "footstep"`; non-looping clips send `on anim "finished"`. |
 | [`tilemap`](2d-ui.md#tilemap) | 2D, text and UI | A grid of tiles in layers. Cell (0, 0) is the top-left at the entity position; cells go right (+x) and down (-y) in world space. Tile ids: 0 = empty, n = the n-th tile of the tileset (1-based, left-&gt;right, top-&gt;bottom). Edit with tilemap_paint / tilemap_from_ascii; layer data is compact text ("rle:..." or "b64z:..."). |
 | [`light2d`](2d-ui.md#light2d) | 2D, text and UI | A 2D light: point, spot (cone along the entity's local +Y) or global (ambient for the whole 2D scene). With any 2D light in the scene, lit sprites are dark except where light falls; normal maps add relief. |
+| [`particles2d`](2d-ui.md#particles2d) | 2D, text and UI | Pixel-art particles on the 2D plane: rain streaks, snow, falling leaves and petals, fireflies, chimney puffs, puddle ripples. Drawn as sprites (nearest sampling, texel snapping, sorting layers) from a sheet or as solid pixel rectangles; simulated deterministically on fixed ticks. wrap = true tiles the emission box endlessly so weather fills whatever the camera shows. Create tuned ones with particles2d_create. |
 | [`parallax`](2d-ui.md#parallax) | 2D, text and UI | Parallax scrolling for this entity and its children (2D, orthographic cameras): they move at `factor` of the camera's motion. 0 = fixed to the camera (sky), 0.1-0.6 = far layers, 1 = normal, &gt; 1 = near foreground. |
 | [`camera2d`](2d-ui.md#camera2d) | 2D, text and UI | 2D camera behavior (put it on the camera entity): orthographic, pixel-perfect integer scaling, texel snapping, smooth target following with a dead zone, and level bounds. |
 | [`text`](2d-ui.md#text) | 2D, text and UI | Text in the world (signs, labels, damage numbers, speech bubbles). SDF-rendered: crisp at any zoom. Supports rich text: &lt;b&gt; &lt;i&gt; &lt;u&gt; &lt;s&gt; &lt;color=#f80&gt; &lt;size=150%&gt; &lt;font=serif&gt; &lt;br&gt;. |

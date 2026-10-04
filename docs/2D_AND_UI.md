@@ -26,10 +26,11 @@ Conventions:
 
 | Component | What it is | Key fields |
 |---|---|---|
-| `sprite` | Textured quad | `texture` (png / `*.atlas.json`), `frame` (name or index), `columns`/`rows` (grid sheets), `region`, `pivot` ([0.5, 0] = feet), `size` or `pixelsPerUnit`, `color`, `flipX/Y`, `sortingLayer`, `order`, `filter` (nearest for pixel art), `normalMap`, `emissive`, `billboard` (none/y/full for 2.5D), `lit`, `castShadows`, `alphaCutoff` |
+| `sprite` | Textured quad | `texture` (png / `*.atlas.json`), `frame` (name or index), `columns`/`rows` (grid sheets), `region`, `pivot` ([0.5, 0] = feet), `size` or `pixelsPerUnit`, `color`, `flipX/Y`, `sortingLayer`, `order`, `filter` (nearest for pixel art), `normalMap`, `emissive`, `billboard` (none/y/full for 2.5D), `lit`, `castShadows`, `alphaCutoff`, `ySort` (top-down depth), `palette` (palette swap) |
 | `sprite_anim` | Flipbook | `clips` `{"run": {"frames": "4-11" \| [..] \| "run_*", "fps": 12, "loop": true, "events": {"3": "footstep"}, "texture"?}}`, `clip`, `playing`, `speed`. Frame events reach the entity's behaviors as `on anim "footstep"`, a non-looping clip's end as `on anim "finished"` |
-| `tilemap` | Layers of tiles | `tileset` (png or `*.tileset.json`), `tileSize`, `cellSize`, `width`, `height`, `layers` (`[{name, data, solid, z, tint, sortingLayer, order}]`), `solidTiles`, `autotile` (terrains), `sortingLayer`, `filter`, `lit`, `castShadows` |
-| `light2d` | 2D light | `kind` point/spot/global (ambient), `color`, `intensity` (HDR), `radius`, `falloff`, `innerAngle`/`outerAngle` (spot along local +Y), `height` (normal maps), `shadows`, `shadowSoftness`, `halo` (glow in the air), `flicker` |
+| `tilemap` | Layers of tiles | `tileset` (png or `*.tileset.json`), `tileSize`, `cellSize`, `width`, `height`, `layers` (`[{name, data, solid, z, tint, sortingLayer, order, ySort}]`), `solidTiles`, `autotile` (terrains), `sortingLayer`, `filter`, `lit`, `castShadows`, `palette` |
+| `particles2d` | Pixel-art particles | `texture` (sheet/atlas, or empty for solid `pixelSize` rectangles), `columns`/`rows`, `frames`, `animate` (random/life/loop), `rate`, `burst`, `lifetime`, `area`, `wrap` (weather fills any view), `velocity`, `gravity`, `sway`, `flutter`, `color`, `emissive`, `pulse`, `fadeIn`/`fadeOut`, `sortingLayer`, `lit`, `seed` |
+| `light2d` | 2D light | `kind` point/spot/global (ambient), `color`, `intensity` (HDR), `radius`, `falloff`, `innerAngle`/`outerAngle` (spot along local +Y), `height` (normal maps), `shadows`, `shadowSoftness`, `halo` (glow in the air), `flicker`, `bands` (pixel-art stepped, dithered falloff) |
 | `parallax` | Parallax layer (entity + children) | `factor` (0 = fixed to camera, <1 far, >1 near), `origin`, `repeatX/Y`, `spacing` |
 | `camera2d` | On the camera entity | `pixelsPerUnit`, `referenceHeight` (e.g. 180 → integer upscaling), `pixelSnap`, `zoom`, `follow` + `smoothing` + `deadZone` + `offset`, `bounds` |
 | `text` | World text (signs, damage numbers) | `text` (rich), `font`, `size` (world em), `color`, `align`, `valign`, `maxWidth`, `outline`, `shadowColor`, `emissive` (neon), `billboard`, `sortingLayer` |
@@ -72,7 +73,9 @@ fonts. Wrapping prefers spaces, breaks long words, and handles CJK.
   `shadowBlur`, `opacity`, `padding`, `font`, `fontSize`, `color`, `textAlign`, `verticalAlign`,
   `bold`, `italic`, `lineSpacing`, `letterSpacing`, `textTransform`, `textOutline`,
   `textOutlineColor`, `textShadowColor`, `textShadowOffset`, `accent`, `track`, `knob`,
-  `trackHeight`, `knobSize`, `placeholderColor`, `imageFit`, `transition`. Text properties inherit.
+  `trackHeight`, `knobSize`, `placeholderColor`, `imageFit`, `transition`, `imageFilter` (linear/nearest:
+  crisp pixel-art images and 9-slices; the `pixel` theme samples images nearest), `sliceScale` (canvas pixels per
+  image pixel of 9-slice borders, e.g. 4 for pixel-art frames). Text properties inherit.
   Every theme defines the classes `primary ghost danger title heading subtitle muted small large
   accent card hud` and the dialogue parts `dialogue_box dialogue_name dialogue_text
   dialogue_choice dialogue_portrait dialogue_hint`.
@@ -204,6 +207,8 @@ editor with `ui_create {"template": "dialogue"}`. Set `ui: "none"` to draw your 
 | `tilemap_from_ascii` | Create or update a tilemap from an ASCII map and a legend (tile ids, terrains, names) |
 | `tilemap_paint` | set / fill / flood / clear cells, with auto-tiling terrains |
 | `tilemap_inspect` | ASCII view of every layer with a legend, plus merged collision rectangles |
+| `particles2d_create` | Pixel particles from a preset: rain, drizzle, snow, leaves, petals, fireflies, smoke, ripples, dust, sparkle |
+| `particles2d_info` | Live particle counts, caps and bounds of `particles2d` emitters |
 
 Captures (`viewport_capture`) include sprites, tiles, world text and UI, with real screen boxes
 for each — also on machines without a GPU (the CPU rasterizer draws the same Frame2D).
@@ -285,6 +290,55 @@ sprite_sheet_slice {"image": "art/knight.png", "cell": [32, 32], "entity": "Knig
                  "attack": {"frames": "16-21", "fps": 14, "loop": false, "events": {"3": "hit"}}}}
 sprite_atlas_pack {"folder": "art/props", "output": "art/props.atlas.json"}
 ```
+
+### A top-down farm or RPG
+
+Top-down games need three things side games do not: depth from screen height, ground that lives, and a
+world that changes with time. All three are data on the components above.
+
+**Y-sorting.** Sprites with `ySort: true` in the same sorting layer and `order` draw by the world y of
+their pivot: lower on screen is in front (pivot `[0.5, 0]` puts the sort point at the feet). Plain
+entries of that layer and order (ground) draw first. A tilemap layer with `"ySort": true` (give it
+`"sortingLayer": "default"`) emits one entry per row, sorted by the row's bottom edge, so fences, tall
+grass and hedges interleave with characters. A y-sorted layer keeps the map/layer `order` whatever its
+index (plain layers still stack by index). Tall tiles sort with their base row through the tileset:
+
+```json
+// art/tiles.tileset.json
+{"image": "tiles.png", "tileSize": 16,
+ "sortOffset": {"40": 1, "41": 1},                          // tree tops sort one row lower, with their trunks
+ "animations": {"17": {"frames": [17, 64, 111, 158], "fps": 3, "stagger": true}}}
+```
+
+**Animated tiles.** `animations` maps a tile id to the ids it cycles through (`[17, "64-66"]`) at
+`fps`; `stagger` offsets each cell's phase so water and flowers do not move in lockstep. Auto-tiling and
+`tile_at` keep seeing the base id; only the drawn tile changes.
+
+**Palette swaps (seasons, variants).** `sprite.palette` and `tilemap.palette` recolor the image through
+a `*.palette.json` (`{"swap": {"#53983f": "#d6e2ee", "#2b5e33": "#00000000"}}`; the target's alpha
+multiplies the pixel's) or a 2-row png strip (row 0 sources, row 1 targets). Only exact color matches
+change, so author nature in its own ramps and one palette per season repaints grass, foliage, roofs and
+water while clothes stay as they are. Swapped images are built once on the CPU and cached until either
+file changes; both backends draw them.
+
+```wander
+for e in find_all("seasonal")
+  e.sprite.palette = "palettes/winter.palette.json"
+end
+find("Ground").tilemap.palette = "palettes/winter.palette.json"
+```
+
+**Pixel-art light pools.** Smooth 2D light falloff bands visibly on 8-bit displays and looks airbrushed
+next to pixel art. `light2d.bands` (4-8) quantizes the falloff (and the halo) into flat steps whose
+outer third is an ordered 4x4 Bayer dither on the art texel grid (the camera2d pixel snap), the way
+pixel artists paint lamp light. The CPU rasterizer lights per sprite and ignores bands.
+
+**Pixel particles.** `particles2d` emitters draw sprites (nearest sampling, texel snapping, sorting
+layers) and simulate on fixed ticks with a seeded generator, so runs replay exactly and reset on stop.
+`wrap: true` tiles the emission box endlessly: one rain or snow emitter fills whatever the camera shows.
+`animate: "life"` plays a sheet over each particle's life (ripple rings, smoke puffs); `pulse` twinkles
+fireflies; `flutter` makes them wander. `burst(find("Dust"), 6)` in Wander spawns particles on the next
+tick (a tilled-soil puff). `particles2d_create` makes tuned ones from presets.
 
 ## Limits
 

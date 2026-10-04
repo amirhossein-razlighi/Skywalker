@@ -129,7 +129,7 @@ struct Emitter {
 
     /// Image fitted into `r` (stretch | contain | cover), or 9-sliced when `slice` is set.
     void fittedImage(const Rect& r, const std::string& ref, const std::string& fit, Vec4 slice, Vec4 tint, float radius, float opacity,
-                     const Rect& clip) {
+                     const Rect& clip, bool nearest = false, float sliceScale = 1.f) {
         render2d::FrameRef fr;
         if (!frame(ref, fr)) {
             // Missing image: a visible placeholder so the layout reads in captures.
@@ -141,15 +141,16 @@ struct Emitter {
             // 9-slice: corners keep their size (in canvas units), edges and center stretch.
             const float xs[4] = {fr.x, fr.x + slice.w, fr.x + fr.w - slice.y, fr.x + fr.w};
             const float ys[4] = {fr.y, fr.y + slice.x, fr.y + fr.h - slice.z, fr.y + fr.h};
-            float l = std::min(slice.w * scale, r.w * 0.5f), rr = std::min(slice.y * scale, r.w * 0.5f);
-            float t = std::min(slice.x * scale, r.h * 0.5f), b = std::min(slice.z * scale, r.h * 0.5f);
+            const float k = scale * std::max(0.01f, sliceScale);  // pixel art: whole canvas pixels per image pixel
+            float l = std::min(slice.w * k, r.w * 0.5f), rr = std::min(slice.y * k, r.w * 0.5f);
+            float t = std::min(slice.x * k, r.h * 0.5f), b = std::min(slice.z * k, r.h * 0.5f);
             const float dx[4] = {r.x, r.x + l, r.x + r.w - rr, r.x + r.w};
             const float dy[4] = {r.y, r.y + t, r.y + r.h - b, r.y + r.h};
             for (int j = 0; j < 3; ++j) {
                 for (int i = 0; i < 3; ++i) {
                     Rect cell{dx[i], dy[j], dx[i + 1] - dx[i], dy[j + 1] - dy[j]};
                     if (cell.w <= 0.f || cell.h <= 0.f) continue;
-                    image(cell, fr, xs[i], ys[j], xs[i + 1], ys[j + 1], tint, 0.f, opacity, clip, false);
+                    image(cell, fr, xs[i], ys[j], xs[i + 1], ys[j + 1], tint, 0.f, opacity, clip, nearest);
                 }
             }
             return;
@@ -176,7 +177,7 @@ struct Emitter {
                 v1 = v0 + keep;
             }
         }
-        image(d, fr, u0, v0, u1, v1, tint, radius, opacity, clip, false);
+        image(d, fr, u0, v0, u1, v1, tint, radius, opacity, clip, nearest);
     }
 
     /// Text inside a content rect. Returns the layout (for carets).
@@ -235,7 +236,8 @@ struct Emitter {
         if (w != "spacer") {
             shadow(r, st.shadowColor, st.shadowOffset * scale, radius, st.shadowBlur * scale, op, clip);
             if (!st.backgroundImage.empty()) {
-                fittedImage(r, st.backgroundImage, "stretch", st.slice, st.imageTint, radius, op, clip);
+                fittedImage(r, st.backgroundImage, "stretch", st.slice, st.imageTint, radius, op, clip, st.imageFilter == "nearest",
+                            st.sliceScale);
                 if (st.borderWidth > 0.f) rect(r, {}, {}, radius, st.borderWidth * scale, st.borderColor, op, clip);
             } else {
                 rect(r, st.background, st.background2, radius, st.borderWidth * scale, st.borderColor, op, clip);
@@ -244,7 +246,9 @@ struct Emitter {
         auto rev = reveal.find(n.entity);
         const int revealChars = rev == reveal.end() ? -1 : rev->second;
         if (w == "image") {
-            if (!n.el.image.empty()) fittedImage(content, n.el.image, st.imageFit, {}, st.imageTint, radius, op, clip);
+            if (!n.el.image.empty()) {
+                fittedImage(content, n.el.image, st.imageFit, {}, st.imageTint, radius, op, clip, st.imageFilter == "nearest");
+            }
         } else if (w == "toggle") {
             float h = std::max(16.f, st.fontSize * 1.15f) * scale, sw = h * 1.8f;
             Rect track{content.x, content.y + (content.h - h) * 0.5f, sw, h};

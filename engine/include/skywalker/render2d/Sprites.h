@@ -28,6 +28,13 @@ struct FrameRef {
     float offsetX = 0, offsetY = 0;    // drawn rect inside the untrimmed frame (from its top-left)
 };
 
+/// An animated tile: the ids it cycles through (water shimmer, swaying flowers).
+struct TileAnimation {
+    std::vector<uint32_t> frames;
+    float fps = 4.f;
+    bool stagger = false;  // offset the phase per cell so neighbouring tiles do not move in lockstep
+};
+
 struct Tileset {
     std::string image;  // absolute path
     int tileSize = 16, spacing = 0, margin = 0;
@@ -36,9 +43,24 @@ struct Tileset {
     std::vector<uint32_t> solid;
     Json terrains = Json::object();
     std::map<std::string, uint32_t> names;
+    std::map<uint32_t, TileAnimation> animations;  // tile id -> its animation ("animations" in *.tileset.json)
+    std::map<uint32_t, int> sortOffset;            // ySort layers: a tall tile sorts with the row n cells below it
     /// Pixel rect of tile `id` (1-based).
     void rect(uint32_t id, int& x, int& y) const;
+    /// The tile drawn for `id` in cell (x, y) at `time` (animated tiles cycle, others are `id`).
+    uint32_t animated(uint32_t id, float time, int x, int y) const;
 };
+
+/// Parses a tileset's "animations" ({"17": {"frames": [17, 18, "19-20"], "fps": 4, "stagger": true}}) and
+/// "sortOffset" ({"12": 1, "30-33": 2}) blocks.
+Status parseTileAnimations(const Json& doc, Tileset& out);
+
+/// A palette swap: exact sRGB colors (0xRRGGBB) -> replacement (0xRRGGBBAA; alpha multiplies the source's).
+using PaletteSwap = std::map<uint32_t, uint32_t>;
+/// Reads a *.palette.json ({"swap": {"#3a7d44": "#d8e4ec", ...}}) or a 2-row png (row 0 sources, row 1 targets).
+Result<PaletteSwap> loadPalette(const std::string& absolutePath);
+/// Recolors every pixel whose rgb is a key of `swap`; returns how many pixels changed.
+size_t applyPalette(Image& image, const PaletteSwap& swap);
 
 /// A parsed animation clip.
 struct Clip {
@@ -73,9 +95,19 @@ public:
     /// Parsed clip `name` of an animator (cached while the clips are unchanged).
     Result<Clip> clip(const SpriteAnimator& anim, const std::string& name, const std::string& texture, int columns, int rows);
 
+    /// The image `imageAbs` (absolute) with its colors swapped by `palette` (project-relative
+    /// *.palette.json or 2-row png strip); cached until either file changes.
+    Result<TextureImagePtr> paletted(const std::string& imageAbs, const std::string& palette);
+
     void invalidate(const std::string& absolutePath);
 
 private:
+    struct CachedPalette {
+        int64_t imageTime = -2, paletteTime = -2;
+        Result<TextureImagePtr> image = Error::make("not_loaded", "");
+    };
+    std::unordered_map<std::string, CachedPalette> palettes_;
+    uint64_t paletteVersion_ = 0;
     std::string projectDir_;
     ImageCache images_;
     text::FontLibrary fonts_;

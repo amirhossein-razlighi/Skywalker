@@ -25,14 +25,14 @@ struct Sprite2DUniforms {
     float4 cameraPos;   // xyz
     float4 fog;         // rgb linear, a = density
     float4 ambient;     // rgb, a = 1 when 2D lighting is on
-    float4 params;      // x = light count, y = time, z = shadows available, w = unused
+    float4 params;      // x = light count, y = time, z = shadows available, w = world units per art texel (0 = screen pixels)
     float4 viewport;    // w, h, 1/w, 1/h
 };
 
 struct Light2D {
     float4 positionRadius;  // xyz, radius
     float4 colorFalloff;    // rgb (intensity applied), falloff exponent
-    float4 directionCone;   // xyz spot axis, w = kind (1 point, 2 spot)
+    float4 directionCone;   // xyz spot axis, w = kind (1 point, 2 spot) + 4 * bands (stepped, dithered falloff)
     float4 extra;           // x = cos inner, y = cos outer, z = height, w = shadows (softness if > 0, -1 = none)
 };
 
@@ -79,6 +79,24 @@ vertex VOut spriteVertex(uint vid [[vertex_id]], uint iid [[instance_id]],
     return o;
 }
 
+// 4x4 ordered (Bayer) dither threshold in [0, 1) for a cell of the art's texel grid (or the screen).
+static float bayer4(float2 world, float2 screen, constant Sprite2DUniforms& u) {
+    float2 cell = u.params.w > 0.0 ? floor(world / u.params.w) : floor(screen);
+    int x = int(fmod(fmod(cell.x, 4.0) + 4.0, 4.0)), y = int(fmod(fmod(cell.y, 4.0) + 4.0, 4.0));
+    const float m[16] = {0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5};
+    return (m[y * 4 + x] + 0.5) / 16.0;
+}
+
+// Pixel-art falloff: `bands` flat steps; the last third of each step is an ordered-dither fringe into
+// the next one (flat pools of light with crisp, stippled rims instead of a smooth 8-bit ramp).
+static float stepped(float v, float bands, float threshold) {
+    if (bands < 0.5) return v;
+    float t = saturate(v) * bands;
+    float f = floor(t);
+    float fringe = saturate((t - f - 0.66) / 0.34);
+    return (f + (fringe > threshold ? 1.0 : 0.0)) / bands;
+}
+
 static float shadowAt(float2 fragUv, float3 lightPos, constant Sprite2DUniforms& u, texture2d<float> occluders, sampler smp,
                       float softness) {
     float4 clip = u.viewProj * float4(lightPos, 1.0);
@@ -107,9 +125,10 @@ fragment SpriteOut spriteFragment(VOut in [[stage_in]],
                                sampler smp [[sampler(0)]]) {
     SpriteInstance s = instances[in.instance];
     int mode = int(s.params.x + 0.5);
-    if (mode == 2) {  // halo: soft radial glow, additive
+    if (mode == 2) {  // halo: soft radial glow, additive (stepped + dithered for banded lights)
         float r = saturate(1.0 - length(in.local * 2.0 - 1.0));
-        return spriteOut(float4(s.color.rgb * r * r, 0.0), float3(0.0));
+        float g = stepped(r * r, s.params.y, bayer4(in.world.xy, in.position.xy, u));
+        return spriteOut(float4(s.color.rgb * g, 0.0), float3(0.0));
     }
     float4 tex = albedo.sample(smp, in.uv);
     float4 c;
@@ -147,6 +166,7 @@ fragment SpriteOut spriteFragment(VOut in [[stage_in]],
         }
         float3 light = u.ambient.rgb;
         float2 fragUv = in.position.xy * u.viewport.zw;
+        float dither = bayer4(in.world.xy, in.position.xy, u);
         int count = int(u.params.x);
         for (int i = 0; i < count; ++i) {
             Light2D l = lights[i];
@@ -154,7 +174,10 @@ fragment SpriteOut spriteFragment(VOut in [[stage_in]],
             float planar = length(toLight - N0 * dot(toLight, N0));
             float atten = pow(saturate(1.0 - planar / max(l.positionRadius.w, 1e-3)), l.colorFalloff.w);
             if (atten <= 0.0) continue;
-            if (l.directionCone.w > 1.5) {  // spot
+            float kind = fmod(l.directionCone.w, 4.0);
+            atten = stepped(atten, floor(l.directionCone.w / 4.0), dither);
+            if (atten <= 0.0) continue;
+            if (kind > 1.5) {  // spot
                 float3 dir = normalize(-toLight + N0 * dot(toLight, N0) + float3(1e-6));
                 atten *= smoothstep(l.extra.y, l.extra.x, dot(dir, normalize(l.directionCone.xyz)));
             }

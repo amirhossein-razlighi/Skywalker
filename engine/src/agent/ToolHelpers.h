@@ -74,5 +74,6 @@ void addCustomToolTools(Engine& engine, ToolRegistry& reg);  // CustomToolTools.
 void addAgentLinkTools(Engine& engine, ToolRegistry& reg);  // AgentLinkTools.cpp: events_poll, tool_host_* (docs/PYTHON_AGENTS.md)
 void addAuditTools(Engine& engine, ToolRegistry& reg);   // AuditTools.cpp: scene_audit (look-dev quality gate)
 void addVehicleTools(Engine& engine, ToolRegistry& reg);  // VehicleTools.cpp: vehicle_create/tune/info/test_drive
+void addParticles2DTools(Engine& engine, ToolRegistry& reg);  // Particles2DTools.cpp: particles2d_create, particles2d_info
 
 }  // namespace sky::tools

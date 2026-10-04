@@ -1330,6 +1330,14 @@
    "visible": {
     "type": "boolean",
     "description": "Whether the sprite is drawn"
+   },
+   "ySort": {
+    "type": "boolean",
+    "description": "Top-down depth: among ySort sprites and tile rows of the same layer and order, the one lower on screen (smaller world y at the pivot) draws in front"
+   },
+   "palette": {
+    "type": "string",
+    "description": "Palette swap: *.palette.json ({\"swap\": {\"#3a7d44\": \"#d8e4ec\"}}) or a 2-row png (row 0 source colors, row 1 targets); recolors the texture (seasons, variants)"
    }
   },
   "additionalProperties": false
@@ -1392,7 +1400,7 @@
      "type": "object"
     },
     "x-sky-json": true,
-    "description": "[{name, data, solid (true | \"tiles\"), visible, z, tint, sortingLayer, order}] bottom to top"
+    "description": "[{name, data, solid (true | \"tiles\"), visible, z, tint, sortingLayer, order, ySort}] bottom to top; a ySort layer draws row by row, interleaved with ySort sprites (tall tiles: the tileset's sortOffset)"
    },
    "solidTiles": {
     "type": "array",
@@ -1437,6 +1445,10 @@
    "castShadows": {
     "type": "boolean",
     "description": "Solid tiles block shadow-casting 2D lights"
+   },
+   "palette": {
+    "type": "string",
+    "description": "Palette swap for the tileset image (*.palette.json or a 2-row png strip)"
    }
   },
   "additionalProperties": false
@@ -1514,6 +1526,10 @@
     "minimum": 0,
     "maximum": 1,
     "description": "Candle/torch flicker amount"
+   },
+   "bands": {
+    "type": "integer",
+    "description": "Pixel-art falloff: 0 = smooth gradient; n = n stepped rings joined by an ordered dither on the art's texel grid (no 8-bit banding; 4-8 suits pixel art)"
    }
   },
   "additionalProperties": false
@@ -3940,6 +3956,216 @@
    "collide": {
     "type": "boolean",
     "description": "Pull the camera in when a wall blocks the view"
+   }
+  },
+  "additionalProperties": false
+ },
+ "particles2d": {
+  "type": "object",
+  "description": "Pixel-art particles on the 2D plane: rain streaks, snow, falling leaves and petals, fireflies, chimney puffs, puddle ripples. Drawn as sprites (nearest sampling, texel snapping, sorting layers) from a sheet or as solid pixel rectangles; simulated deterministically on fixed ticks. wrap = true tiles the emission box endlessly so weather fills whatever the camera shows. Create tuned ones with particles2d_create.",
+  "properties": {
+   "emitting": {
+    "type": "boolean",
+    "description": "Spawn new particles (live ones finish their life)"
+   },
+   "texture": {
+    "type": "string",
+    "description": "Grid sheet (png) or atlas; empty = solid rectangles of pixelSize texels"
+   },
+   "columns": {
+    "type": "integer",
+    "description": "Sheet columns"
+   },
+   "rows": {
+    "type": "integer",
+    "description": "Sheet rows"
+   },
+   "frames": {
+    "type": "string",
+    "description": "Frames to use (\"0-3,6\"; empty = all)"
+   },
+   "animate": {
+    "type": "string",
+    "enum": [
+     "random",
+     "life",
+     "loop"
+    ],
+    "description": "random: each particle keeps one frame; life: frames play over its life; loop: at fps"
+   },
+   "fps": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 120,
+    "description": "Frames per second (animate = loop)"
+   },
+   "pixelsPerUnit": {
+    "type": "number",
+    "minimum": 0.01,
+    "maximum": 100000,
+    "description": "Texels per world unit (match the art, e.g. 16)"
+   },
+   "pixelSize": {
+    "type": "array",
+    "items": {
+     "type": "number"
+    },
+    "minItems": 2,
+    "maxItems": 2,
+    "description": "Untextured particles: [w, h] in texels (rain streak: [1, 4])"
+   },
+   "rate": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 100000,
+    "description": "Particles per second"
+   },
+   "burst": {
+    "type": "integer",
+    "description": "Particles emitted at once when play starts"
+   },
+   "maxParticles": {
+    "type": "integer",
+    "description": "Cap on live particles"
+   },
+   "lifetime": {
+    "type": "number",
+    "minimum": 0.01,
+    "maximum": 600,
+    "description": "Seconds a particle lives"
+   },
+   "lifetimeJitter": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1,
+    "description": "Random fraction of the lifetime"
+   },
+   "area": {
+    "type": "array",
+    "items": {
+     "type": "number"
+    },
+    "minItems": 2,
+    "maxItems": 2,
+    "description": "Emission box [w, h] in world units, centered on the entity"
+   },
+   "wrap": {
+    "type": "boolean",
+    "description": "Tile the box endlessly around the view (weather that fills any camera)"
+   },
+   "velocity": {
+    "type": "array",
+    "items": {
+     "type": "number"
+    },
+    "minItems": 2,
+    "maxItems": 2,
+    "description": "Initial velocity (world units/s)"
+   },
+   "velocityJitter": {
+    "type": "array",
+    "items": {
+     "type": "number"
+    },
+    "minItems": 2,
+    "maxItems": 2,
+    "description": "Random +- added per axis"
+   },
+   "gravity": {
+    "type": "array",
+    "items": {
+     "type": "number"
+    },
+    "minItems": 2,
+    "maxItems": 2,
+    "description": "Acceleration (world units/s^2); [0.3, 0] works as wind"
+   },
+   "drag": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 100,
+    "description": "Velocity damping per second"
+   },
+   "sway": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 100,
+    "description": "Side-to-side drift speed (leaves, snow)"
+   },
+   "swayFrequency": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 50,
+    "description": "Sway cycles per second"
+   },
+   "flutter": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 100,
+    "description": "Random-walk wander (fireflies, butterflies)"
+   },
+   "color": {
+    "description": "Tint and opacity — hex string \"#rrggbb[aa]\" or [r,g,b(,a)] in 0..1"
+   },
+   "colorJitter": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1,
+    "description": "Per-particle brightness variation"
+   },
+   "emissive": {
+    "description": "Glow color, alpha = strength (blooms) — hex string \"#rrggbb[aa]\" or [r,g,b(,a)] in 0..1"
+   },
+   "pulse": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1,
+    "description": "Twinkle depth of opacity and glow (fireflies)"
+   },
+   "pulseFrequency": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 50,
+    "description": "Twinkles per second"
+   },
+   "fadeIn": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1,
+    "description": "Fraction of the life spent fading in"
+   },
+   "fadeOut": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1,
+    "description": "Fraction of the life spent fading out"
+   },
+   "sortingLayer": {
+    "type": "string",
+    "enum": [
+     "background",
+     "midground",
+     "default",
+     "foreground",
+     "overlay"
+    ],
+    "description": "Draw layer"
+   },
+   "order": {
+    "type": "integer",
+    "description": "Order within the layer"
+   },
+   "lit": {
+    "type": "boolean",
+    "description": "Lit by 2D lights (else full bright)"
+   },
+   "prewarm": {
+    "type": "boolean",
+    "description": "Start as if it had been running for a while"
+   },
+   "seed": {
+    "type": "integer",
+    "description": "Random seed (same seed, same particles)"
    }
   },
   "additionalProperties": false

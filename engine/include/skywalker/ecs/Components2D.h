@@ -39,6 +39,8 @@ struct Sprite {
     bool castShadows = false;         // blocks 2D lights that cast shadows
     float alphaCutoff = 0.f;          // > 0: hard cutout below this alpha
     bool visible = true;
+    bool ySort = false;               // top-down depth: within its layer and order, lower on screen (smaller y) draws in front
+    std::string palette;              // palette swap (*.palette.json or a 2-row png strip): recolors the texture
 
     static const TypeInfo& type();
     static const std::vector<std::string>& sortingLayers();
@@ -76,6 +78,7 @@ struct Tilemap {
     std::string filter = "nearest";
     bool lit = true;
     bool castShadows = false;       // solid tiles block shadow-casting 2D lights
+    std::string palette;            // palette swap for the tileset image (*.palette.json or a 2-row png strip)
 
     // Runtime cache key (not serialized).
     uint64_t revision_ = 0;
@@ -97,6 +100,7 @@ struct Light2D {
     float shadowSoftness = 0.4f;
     float halo = 0.f;            // visible glow in the air around the light (additive)
     float flicker = 0.f;         // 0..1 candle/torch flicker (deterministic)
+    int bands = 0;               // pixel-art falloff: 0 = smooth, n = n brightness steps blended by ordered (Bayer) dither
 
     static const TypeInfo& type();
 };

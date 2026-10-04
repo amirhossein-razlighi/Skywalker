@@ -34,6 +34,8 @@ A textured quad on the entity's XY plane (2D characters, props, backgrounds, pix
 | `castShadows` | boolean | Blocks shadow-casting 2D lights |  |
 | `alphaCutoff` | number | Hard cutout below this alpha (0 = soft edges) | 0 .. 1 |
 | `visible` | boolean | Whether the sprite is drawn |  |
+| `ySort` | boolean | Top-down depth: among ySort sprites and tile rows of the same layer and order, the one lower on screen (smaller world y at the pivot) draws in front |  |
+| `palette` | string | Palette swap: *.palette.json ({"swap": {"#3a7d44": "#d8e4ec"}}) or a 2-row png (row 0 source colors, row 1 targets); recolors the texture (seasons, variants) |  |
 
 === "Tool call"
 
@@ -81,7 +83,7 @@ A grid of tiles in layers. Cell (0, 0) is the top-left at the entity position; c
 | `cellSize` | number | World units per cell | 0.001 .. 1000 |
 | `width` | integer | Columns |  |
 | `height` | integer | Rows |  |
-| `layers` | object[] | [{name, data, solid (true \| "tiles"), visible, z, tint, sortingLayer, order}] bottom to top |  |
+| `layers` | object[] | [{name, data, solid (true \| "tiles"), visible, z, tint, sortingLayer, order, ySort}] bottom to top; a ySort layer draws row by row, interleaved with ySort sprites (tall tiles: the tileset's sortOffset) |  |
 | `solidTiles` | array | Tile ids that collide in layers with solid: "tiles" ([3, "10-20"]) |  |
 | `autotile` | object | Terrains for auto-tiling: {"wall": {"mode": "blob47" \| "wang16", "first": 33}} or "tiles": [ids] |  |
 | `color` | color | Tint — hex string "#rrggbb[aa]" or [r,g,b(,a)] in 0..1 |  |
@@ -90,6 +92,7 @@ A grid of tiles in layers. Cell (0, 0) is the top-left at the entity position; c
 | `filter` | string | Texture sampling | `nearest` `linear` |
 | `lit` | boolean | Lit by 2D lights |  |
 | `castShadows` | boolean | Solid tiles block shadow-casting 2D lights |  |
+| `palette` | string | Palette swap for the tileset image (*.palette.json or a 2-row png strip) |  |
 
 === "Tool call"
 
@@ -121,6 +124,7 @@ A 2D light: point, spot (cone along the entity's local +Y) or global (ambient fo
 | `shadowSoftness` | number | Penumbra softness | 0 .. 1 |
 | `halo` | number | Visible glow in the air around the light | 0 .. 10 |
 | `flicker` | number | Candle/torch flicker amount | 0 .. 1 |
+| `bands` | integer | Pixel-art falloff: 0 = smooth gradient; n = n stepped rings joined by an ordered dither on the art's texel grid (no 8-bit banding; 4-8 suits pixel art) |  |
 
 === "Tool call"
 
@@ -132,6 +136,60 @@ A 2D light: point, spot (cone along the entity's local +Y) or global (ambient fo
 
     ```text
     self.light2d.kind          -- read or write any field
+    ```
+
+## `particles2d` { #particles2d }
+
+Pixel-art particles on the 2D plane: rain streaks, snow, falling leaves and petals, fireflies, chimney puffs, puddle ripples. Drawn as sprites (nearest sampling, texel snapping, sorting layers) from a sheet or as solid pixel rectangles; simulated deterministically on fixed ticks. wrap = true tiles the emission box endlessly so weather fills whatever the camera shows. Create tuned ones with particles2d_create.
+
+| Field | Type | Description | Values |
+|---|---|---|---|
+| `emitting` | boolean | Spawn new particles (live ones finish their life) |  |
+| `texture` | string | Grid sheet (png) or atlas; empty = solid rectangles of pixelSize texels |  |
+| `columns` | integer | Sheet columns |  |
+| `rows` | integer | Sheet rows |  |
+| `frames` | string | Frames to use ("0-3,6"; empty = all) |  |
+| `animate` | string | random: each particle keeps one frame; life: frames play over its life; loop: at fps | `random` `life` `loop` |
+| `fps` | number | Frames per second (animate = loop) | 0 .. 120 |
+| `pixelsPerUnit` | number | Texels per world unit (match the art, e.g. 16) | 0.01 .. 100000 |
+| `pixelSize` | number[2] | Untextured particles: [w, h] in texels (rain streak: [1, 4]) |  |
+| `rate` | number | Particles per second | 0 .. 100000 |
+| `burst` | integer | Particles emitted at once when play starts |  |
+| `maxParticles` | integer | Cap on live particles |  |
+| `lifetime` | number | Seconds a particle lives | 0.01 .. 600 |
+| `lifetimeJitter` | number | Random fraction of the lifetime | 0 .. 1 |
+| `area` | number[2] | Emission box [w, h] in world units, centered on the entity |  |
+| `wrap` | boolean | Tile the box endlessly around the view (weather that fills any camera) |  |
+| `velocity` | number[2] | Initial velocity (world units/s) |  |
+| `velocityJitter` | number[2] | Random +- added per axis |  |
+| `gravity` | number[2] | Acceleration (world units/s^2); [0.3, 0] works as wind |  |
+| `drag` | number | Velocity damping per second | 0 .. 100 |
+| `sway` | number | Side-to-side drift speed (leaves, snow) | 0 .. 100 |
+| `swayFrequency` | number | Sway cycles per second | 0 .. 50 |
+| `flutter` | number | Random-walk wander (fireflies, butterflies) | 0 .. 100 |
+| `color` | color | Tint and opacity — hex string "#rrggbb[aa]" or [r,g,b(,a)] in 0..1 |  |
+| `colorJitter` | number | Per-particle brightness variation | 0 .. 1 |
+| `emissive` | color | Glow color, alpha = strength (blooms) — hex string "#rrggbb[aa]" or [r,g,b(,a)] in 0..1 |  |
+| `pulse` | number | Twinkle depth of opacity and glow (fireflies) | 0 .. 1 |
+| `pulseFrequency` | number | Twinkles per second | 0 .. 50 |
+| `fadeIn` | number | Fraction of the life spent fading in | 0 .. 1 |
+| `fadeOut` | number | Fraction of the life spent fading out | 0 .. 1 |
+| `sortingLayer` | string | Draw layer | `background` `midground` `default` `foreground` `overlay` |
+| `order` | integer | Order within the layer |  |
+| `lit` | boolean | Lit by 2D lights (else full bright) |  |
+| `prewarm` | boolean | Start as if it had been running for a while |  |
+| `seed` | integer | Random seed (same seed, same particles) |  |
+
+=== "Tool call"
+
+    ```tool
+    entity_update {"entity": "Crate", "components": {"particles2d": {}}}
+    ```
+
+=== "Wander"
+
+    ```text
+    self.particles2d.emitting          -- read or write any field
     ```
 
 ## `parallax` { #parallax }

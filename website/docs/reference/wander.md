@@ -485,7 +485,7 @@ start_dialogue("Intro")
 burst(entity_or_count: number|entity, count: number?)
 ```
 
-Emits particles right now from self's particles component: burst(n), or burst(entity, n) for another emitter. Explosions, muzzle flashes, impacts.
+Emits particles right now from self's particles (or particles2d) component: burst(n), or burst(entity, n) for another emitter. Explosions, muzzle flashes, impacts, dust puffs.
 
 | Parameter | Type | |
 |---|---|---|
@@ -2778,7 +2778,7 @@ let w = vehicle_wheel(self, "rear_left")
         dialogue_var(name: string, value?) -> any — Reads (or with a value, sets) a dialogue variable ($trust = "trust") of the first dialogue component.
         start_dialogue(entity_or_node: entity|string, node: string?) — Starts a conversation at a node: start_dialogue("Intro") on the first dialogue component, or start_dialogue(entity, "Intro").
       [effects]
-        burst(entity_or_count: number|entity, count: number?) — Emits particles right now from self's particles component: burst(n), or burst(entity, n) for another emitter. Explosions, muzzle flashes, impacts.
+        burst(entity_or_count: number|entity, count: number?) — Emits particles right now from self's particles (or particles2d) component: burst(n), or burst(entity, n) for another emitter. Explosions, muzzle flashes, impacts, dust puffs.
         water_height(x_or_point: number|vector|entity, z: number?) -> number — Height of the animated water surface at (x, z) or at a point — the same surface that is rendered (0 where there is no water). Boats, buoyancy, splashes.
       [input]
         action(name: string) -> bool — Whether an input action is held ("jump", "fire" from input.json).

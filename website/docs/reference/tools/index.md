@@ -5,7 +5,7 @@ title: "Tools"
 
 # Tools
 
-Skywalker exposes **203 tools** (engine 0.1.0). The editor, its in-app agents, the CLI and every MCP client call the same tools with the same JSON arguments, so anything you read here works everywhere. 122 tools change the project; every such change is undoable and attributed to whoever made it.
+Skywalker exposes **205 tools** (engine 0.1.0). The editor, its in-app agents, the CLI and every MCP client call the same tools with the same JSON arguments, so anything you read here works everywhere. 123 tools change the project; every such change is undoable and attributed to whoever made it.
 
 Arguments are validated before a tool runs: unknown keys, wrong types and bad enum values fail with a *did you mean …?* hint. Each tool page shows the arguments, the annotations MCP clients use for approvals, and the same call as a tool call, a CLI command and a raw MCP request.
 
@@ -15,7 +15,7 @@ Arguments are validated before a tool runs: unknown keys, wrong types and bad en
 | [Entity](entity.md) | 10 | Create, read, change, move, duplicate and delete entities; read component schemas. |
 | [History](history.md) | 1 | Undo, redo and the attributed edit history. |
 | [View](view.md) | 9 | See the scene: captures with entity boxes, debug views, multi-view sheets, selection and the editor camera. |
-| [Render](render.md) | 20 | Environment, effects, hair, shaders, render layers, impostors, benchmarks and the movie renderer. |
+| [Render](render.md) | 22 | Environment, effects, hair, shaders, render layers, impostors, benchmarks and the movie renderer. |
 | [World](world.md) | 15 | Terrain, foliage, water queries and spatial placement on real geometry. |
 | [Asset](asset.md) | 27 | The asset database, import and download, materials, textures, prefabs, audio generation and previews. |
 | [Wander](wander.md) | 9 | Write, check, test, graph and inspect Wander behaviors. |
@@ -75,6 +75,8 @@ Arguments are validated before a tool runs: unknown keys, wrong types and bad en
 | [`impostor_bake`](render.md#impostor_bake) | Render | Bake the octahedral impostors of foliage layers now: each heavy model (an imported tree, bush, rock or grass clump; one mesh or every part of a prefab) is captured from up to 32x32 directions into an atlas of albedo, normal and depth, and instances beyond the layer's transition distance render as impostors (lit, shadowed and depth-correct like real geometry). |
 | [`light_shadows`](render.md#light_shadows) | Render | Turn shadows of point/spot lights on or off and tune them, for one light, a list, or every light ("all", optionally only one kind). |
 | [`movie_render`](render.md#movie_render) | Render | Render a cinematic to video or a PNG sequence, offline and deterministically (the movie renderer). |
+| [`particles2d_create`](render.md#particles2d_create) | Render | Create pixel-art particles for a 2D game from a preset, ready to tweak: rain (streaks over the whole view), drizzle, snow (drifting flakes), leaves and petals (falling, swaying), fireflies (glowing, twinkling, wandering), smoke (chimney puffs), ripples (puddle rings while it rains), dust (motes in sunlight), sparkle (water glints). |
+| [`particles2d_info`](render.md#particles2d_info) | Render | Live state of particles2d emitters: particles alive, cap, rate, box, wrap, and the bounds the live particles cover (world units). |
 | [`perf_stats`](render.md#perf_stats) | Render | Frame cost and scene complexity: GPU and CPU frame time, draw calls, lights, terrain nodes, foliage instances, entities, behaviors and assets. |
 | [`probe_add`](render.md#probe_add) | Render | Add a reflection probe: a captured cubemap that glossy floors, metal and glass inside its volume reflect instead of the sky (box-projected, so reflections line up with the walls), and that gives them their ambient light. |
 | [`probe_bake`](render.md#probe_bake) | Render | Re-capture reflection probes now (after moving furniture, changing lights or the sky): renders one still frame of `view`, which captures every invalidated probe in full regardless of the per-frame face budget, and returns their state (slot, captures, GPU time) plus warnings. |

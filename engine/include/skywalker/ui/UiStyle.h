@@ -62,6 +62,8 @@ struct Style {
     Vec4 placeholderColor{1, 1, 1, 0.4f};
     std::string imageFit = "contain";    // image widgets: stretch | contain | cover
     float transition = 0.1f;             // seconds to blend hover/pressed looks
+    std::string imageFilter = "linear";  // images and 9-slices: linear (smooth) | nearest (crisp pixel art)
+    float sliceScale = 1;                // 9-slice: canvas pixels per image pixel of the borders (pixel art: 4, 5, 6)
 };
 
 /// The interaction state an element is drawn in.

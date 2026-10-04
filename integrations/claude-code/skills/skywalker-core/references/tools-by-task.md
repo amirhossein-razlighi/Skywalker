@@ -75,7 +75,8 @@ Native code: `wander_compile_native {entity, force, auto}`, `native_template {na
 `sprite_sheet_slice {image*, cell, columns, rows, names, animations, entity}`, `sprite_atlas_pack {folder, inputs, output, padding, trim, extrude, fps}`, `tilemap_from_ascii {map*, legend*, entity, name, tileset, tile_size, autotile, solid, solid_tiles, position}`,
 `tilemap_paint {entity*, action*: set\|fill\|flood\|clear, tile, cells, rect, at, layer}`, `tilemap_inspect {entity*, layer, max_rects}`, `ui_create {root, elements, template, parent, canvas, width, height}`, `ui_inspect {canvas, element, width, height}`,
 `ui_interact {element, at, action: click\|set_value\|type\|scroll\|focus, value, text}`, `ui_style {canvas, theme, path, rules, vars, element, style, css, list}`, `dialogue_check {path, source, entity, start}`,
-`dialogue_preview {path, source, entity, start, choices, vars}`, `dialogue_control {action*: start\|advance\|choose\|stop\|state, entity, node, choice}`. See skywalker-2d-ui.
+`dialogue_preview {path, source, entity, start, choices, vars}`, `dialogue_control {action*: start\|advance\|choose\|stop\|state, entity, node, choice}`,
+`particles2d_create {preset*: rain\|drizzle\|snow\|leaves\|petals\|fireflies\|smoke\|ripples\|dust\|sparkle, name, position, parent, overrides}`, `particles2d_info {entity}`. See skywalker-2d-ui.
 
 ## Animation and sequences
 

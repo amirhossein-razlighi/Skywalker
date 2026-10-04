@@ -81,6 +81,7 @@ struct Light2DItem {
     float height = 0.5f;      // light height above the sprite plane (normal mapping)
     bool shadows = false;
     float shadowSoftness = 0.5f;
+    int bands = 0;            // 0 = smooth falloff; n = n steps with an ordered dither (pixel art)
 };
 
 /// UI primitive kinds (UI.metal and the CPU rasterizer interpret them identically).
@@ -133,6 +134,7 @@ struct Frame2D {
     std::vector<Light2DItem> lights;      // point/spot lights (up to kMaxLights are used)
     Vec3 ambient{1, 1, 1};                // linear; sum of global 2D lights
     bool lit = false;                     // any 2D light in the scene: lit sprites use 2D lighting
+    float texel = 0.f;                    // world units per art texel (camera2d pixel snap): dither grid of banded lights
     std::vector<UIQuad> ui;
     std::vector<UIBatch> uiBatches;
     std::vector<UICanvasItem> uiCanvases;

@@ -11031,6 +11031,96 @@
    "_meta": {
     "skywalker/category": "physics"
    }
+  },
+  {
+   "name": "particles2d_create",
+   "title": "Create 2D particles",
+   "description": "Create pixel-art particles for a 2D game from a preset, ready to tweak: rain (streaks over the whole view), drizzle, snow (drifting flakes), leaves and petals (falling, swaying), fireflies (glowing, twinkling, wandering), smoke (chimney puffs), ripples (puddle rings while it rains), dust (motes in sunlight), sparkle (water glints). Weather presets (rain, drizzle, snow, ripples) wrap: their box tiles endlessly so they fill whatever the camera shows, wherever the entity is. Untextured particles are solid pixel rectangles (`pixelSize` texels); give a `texture` sheet (with `columns`/`rows`, `frames`, `animate` random|life|loop) for leaves, flakes or ripple rings. `overrides` patches fields, e.g. {\"rate\": 400, \"color\": \"#9fc4ff\", \"pixelsPerUnit\": 16}. Simulated on fixed ticks while playing (deterministic, reset on stop). Example: particles2d_create {\"preset\": \"fireflies\", \"position\": [12, 4, 0], \"overrides\": {\"area\": [14, 6]}}.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "preset": {
+      "type": "string",
+      "enum": [
+       "rain",
+       "drizzle",
+       "snow",
+       "leaves",
+       "petals",
+       "fireflies",
+       "smoke",
+       "ripples",
+       "dust",
+       "sparkle"
+      ],
+      "description": "Preset"
+     },
+     "name": {
+      "type": "string",
+      "description": "Entity name (default: the preset's name)"
+     },
+     "position": {
+      "type": "array",
+      "items": {
+       "type": "number"
+      },
+      "minItems": 3,
+      "maxItems": 3,
+      "description": "World position (center of the emission box)"
+     },
+     "parent": {
+      "type": [
+       "integer",
+       "string"
+      ],
+      "description": "Parent entity (e.g. a chimney)"
+     },
+     "overrides": {
+      "type": "object",
+      "description": "particles2d fields to change"
+     }
+    },
+    "additionalProperties": false,
+    "required": [
+     "preset"
+    ]
+   },
+   "annotations": {
+    "title": "Create 2D particles",
+    "readOnlyHint": false,
+    "destructiveHint": false,
+    "openWorldHint": false
+   },
+   "_meta": {
+    "skywalker/category": "render"
+   }
+  },
+  {
+   "name": "particles2d_info",
+   "title": "2D particle stats",
+   "description": "Live state of particles2d emitters: particles alive, cap, rate, box, wrap, and the bounds the live particles cover (world units). Use it to check that weather is running while playing, or to find emitters that hit their maxParticles cap. Without `entity` lists every emitter in the scene.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "entity": {
+      "type": [
+       "integer",
+       "string"
+      ],
+      "description": "Emitter (default: all)"
+     }
+    },
+    "additionalProperties": false
+   },
+   "annotations": {
+    "title": "2D particle stats",
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "openWorldHint": false
+   },
+   "_meta": {
+    "skywalker/category": "render"
+   }
   }
  ]
 }

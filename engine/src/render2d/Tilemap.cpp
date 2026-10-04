@@ -244,9 +244,10 @@ Result<Grid> Grid::fromComponent(const Tilemap& map) {
         if (lj.contains("tint")) (void)reflect::jsonToColor(lj.get("tint"), l.tint);
         l.sortingLayer = lj.get("sortingLayer").asString();
         l.order = static_cast<int>(lj.get("order").asInt(0));
+        l.ySort = lj.get("ySort").asBool(false);
         for (const auto& [k, v] : lj.members()) {
             if (k != "name" && k != "data" && k != "solid" && k != "visible" && k != "z" && k != "tint" && k != "sortingLayer" &&
-                k != "order") {
+                k != "order" && k != "ySort") {
                 l.extra[k] = v;
             }
         }
@@ -268,6 +269,7 @@ void Grid::writeTo(Tilemap& map) const {
         if (!(l.tint == Vec4{1, 1, 1, 1})) j["tint"] = reflect::colorToJson(l.tint);
         if (!l.sortingLayer.empty()) j["sortingLayer"] = l.sortingLayer;
         if (l.order != 0) j["order"] = l.order;
+        if (l.ySort) j["ySort"] = true;
         for (const auto& [k, v] : l.extra.members()) j[k] = v;
         arr.push(std::move(j));
     }

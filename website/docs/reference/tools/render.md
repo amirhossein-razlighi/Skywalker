@@ -7,7 +7,7 @@ title: "Render tools"
 
 Environment, effects, hair, shaders, render layers, impostors, benchmarks and the movie renderer.
 
-20 tools in the `render` category. Badges: **read-only** tools never change the project; **mutating** tools are undoable and attributed; **open-world** tools reach outside the engine and MCP clients ask before running them.
+22 tools in the `render` category. Badges: **read-only** tools never change the project; **mutating** tools are undoable and attributed; **open-world** tools reach outside the engine and MCP clients ask before running them.
 
 | Tool | Summary |
 |---|---|
@@ -31,6 +31,8 @@ Environment, effects, hair, shaders, render layers, impostors, benchmarks and th
 | [`probe_add`](#probe_add) | Add a reflection probe: a captured cubemap that glossy floors, metal and glass inside its volume reflect instead of the sky (box-projected, so reflections line up with the walls), and that gives them their ambient light. |
 | [`probe_bake`](#probe_bake) | Re-capture reflection probes now (after moving furniture, changing lights or the sky): renders one still frame of `view`, which captures every invalidated probe in full regardless of the per-frame face budget, and returns their state (slot, captures, GPU time) plus warnings. |
 | [`probe_info`](#probe_info) | Reflection probes and their atlas: the budget (Environment.probeBudget probes, probeUpdates faces per frame), atlas resolution / slots / memory, and per probe: slot and debug color (the reflection_probes debug view draws it), whether it is captured, lighting this view, waiting for the face budget, over budget or out of view, captures so far, last capture GPU time, `stale` (something in range changed since a once probe was captured: run probe_bake), size, update mode. |
+| [`particles2d_create`](#particles2d_create) | Create pixel-art particles for a 2D game from a preset, ready to tweak: rain (streaks over the whole view), drizzle, snow (drifting flakes), leaves and petals (falling, swaying), fireflies (glowing, twinkling, wandering), smoke (chimney puffs), ripples (puddle rings while it rains), dust (motes in sunlight), sparkle (water glints). |
+| [`particles2d_info`](#particles2d_info) | Live state of particles2d emitters: particles alive, cap, rate, box, wrap, and the bounds the live particles cover (world units). |
 
 ### `environment_get` { #environment_get }
 
@@ -1000,6 +1002,95 @@ Reflection probes and their atlas: the budget (Environment.probeBudget probes, p
         "arguments": {
           "entity": "Hall Probe"
         }
+      }
+    }
+    ```
+
+### `particles2d_create` { #particles2d_create }
+
+**Create 2D particles** <span class="sky-badge sky-badge--mut" title="Changes the project; undoable and attributed">mutating</span>
+
+Create pixel-art particles for a 2D game from a preset, ready to tweak: rain (streaks over the whole view), drizzle, snow (drifting flakes), leaves and petals (falling, swaying), fireflies (glowing, twinkling, wandering), smoke (chimney puffs), ripples (puddle rings while it rains), dust (motes in sunlight), sparkle (water glints). Weather presets (rain, drizzle, snow, ripples) wrap: their box tiles endlessly so they fill whatever the camera shows, wherever the entity is. Untextured particles are solid pixel rectangles (`pixelSize` texels); give a `texture` sheet (with `columns`/`rows`, `frames`, `animate` random|life|loop) for leaves, flakes or ripple rings. `overrides` patches fields, e.g. {"rate": 400, "color": "#9fc4ff", "pixelsPerUnit": 16}. Simulated on fixed ticks while playing (deterministic, reset on stop). Example: particles2d_create {"preset": "fireflies", "position": [12, 4, 0], "overrides": {"area": [14, 6]}}.
+
+| Argument | Type | Required | Description | Values |
+|---|---|---|---|---|
+| `preset` | string | yes | Preset | `rain` `drizzle` `snow` `leaves` `petals` `fireflies` `smoke` `ripples` `dust` `sparkle` |
+| `name` | string |  | Entity name (default: the preset's name) |  |
+| `position` | number[3] |  | World position (center of the emission box) |  |
+| `parent` | integer \| string |  | Parent entity (e.g. a chimney) |  |
+| `overrides` | object |  | particles2d fields to change |  |
+
+=== "Tool call"
+
+    ```tool
+    particles2d_create {"preset": "fireflies", "position": [12, 4, 0], "overrides": {"area": [14, 6]}}
+    ```
+
+=== "CLI"
+
+    ```bash
+    skywalker call particles2d_create '{"preset": "fireflies", "position": [12, 4, 0], "overrides": {"area": [14, 6]}}' --project my_game
+    ```
+
+=== "MCP request"
+
+    ```json
+    {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "method": "tools/call",
+      "params": {
+        "name": "particles2d_create",
+        "arguments": {
+          "preset": "fireflies",
+          "position": [
+            12,
+            4,
+            0
+          ],
+          "overrides": {
+            "area": [
+              14,
+              6
+            ]
+          }
+        }
+      }
+    }
+    ```
+
+### `particles2d_info` { #particles2d_info }
+
+**2D particle stats** <span class="sky-badge sky-badge--ro" title="Never changes the scene">read-only</span>
+
+Live state of particles2d emitters: particles alive, cap, rate, box, wrap, and the bounds the live particles cover (world units). Use it to check that weather is running while playing, or to find emitters that hit their maxParticles cap. Without `entity` lists every emitter in the scene.
+
+| Argument | Type | Required | Description | Values |
+|---|---|---|---|---|
+| `entity` | integer \| string |  | Emitter (default: all) |  |
+
+=== "Tool call"
+
+    ```tool
+    particles2d_info {}
+    ```
+
+=== "CLI"
+
+    ```bash
+    skywalker call particles2d_info '{}' --project my_game
+    ```
+
+=== "MCP request"
+
+    ```json
+    {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "method": "tools/call",
+      "params": {
+        "name": "particles2d_info",
+        "arguments": {}
       }
     }
     ```

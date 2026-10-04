@@ -1,6 +1,7 @@
 #include "skywalker/render2d/Sprites.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <filesystem>
 #include <fstream>
@@ -8,6 +9,7 @@
 
 #include "skywalker/core/Log.h"
 #include "skywalker/core/Strings.h"
+#include "skywalker/render2d/Particles2D.h"
 #include "skywalker/text/TextLayout.h"
 
 namespace sky::render2d {
@@ -28,6 +30,78 @@ void Tileset::rect(uint32_t id, int& x, int& y) const {
     int cols = std::max(1, columns);
     x = margin + static_cast<int>(i % static_cast<uint32_t>(cols)) * (tileSize + spacing);
     y = margin + static_cast<int>(i / static_cast<uint32_t>(cols)) * (tileSize + spacing);
+}
+
+uint32_t Tileset::animated(uint32_t id, float time, int x, int y) const {
+    if (animations.empty()) return id;
+    auto it = animations.find(id);
+    if (it == animations.end() || it->second.frames.empty()) return id;
+    const TileAnimation& a = it->second;
+    const auto n = static_cast<int64_t>(a.frames.size());
+    auto step = static_cast<int64_t>(std::floor(std::max(0.f, time) * a.fps));
+    if (a.stagger) step += static_cast<int64_t>((static_cast<uint32_t>(x) * 73856093u) ^ (static_cast<uint32_t>(y) * 19349663u)) % n;
+    return a.frames[static_cast<size_t>(step % n)];
+}
+
+Status parseTileAnimations(const Json& doc, Tileset& out) {
+    auto ordered = [](const Json& list, std::vector<uint32_t>& ids) -> Status {
+        auto add = [&](const Json& v) -> Status {
+            if (v.isNumber() && v.asNumber() >= 1) {
+                ids.push_back(static_cast<uint32_t>(v.asNumber()));
+                return {};
+            }
+            if (v.isString()) {
+                for (const auto& part : str::split(v.asString(), ',')) {
+                    std::string p = str::trim(part);
+                    double a = 0, b = 0;
+                    size_t dash = p.find('-', 1);
+                    if (dash != std::string::npos && str::parseDouble(p.substr(0, dash), a) && str::parseDouble(p.substr(dash + 1), b) &&
+                        a >= 1 && b >= 1 && std::fabs(b - a) <= 1024) {
+                        const int step = b >= a ? 1 : -1;
+                        for (auto i = static_cast<int64_t>(a);; i += step) {
+                            ids.push_back(static_cast<uint32_t>(i));
+                            if (i == static_cast<int64_t>(b)) break;
+                        }
+                    } else if (str::parseDouble(p, a) && a >= 1) {
+                        ids.push_back(static_cast<uint32_t>(a));
+                    } else if (!p.empty()) {
+                        return Error::make("invalid_tileset", "animation frame \"" + p + "\" is not a tile id or range",
+                                           "frames are 1-based tile ids: [17, 18, \"19-22\"]");
+                    }
+                }
+                return {};
+            }
+            return Error::make("invalid_tileset", "animation frames are tile ids (numbers or \"a-b\" ranges)");
+        };
+        if (list.isArray()) {
+            for (const auto& v : list.elements()) {
+                if (Status s = add(v); !s) return s;
+            }
+            return {};
+        }
+        return add(list);
+    };
+    for (const auto& [key, spec] : doc.get("animations").members()) {
+        double id = 0;
+        if (!str::parseDouble(key, id) || id < 1) {
+            return Error::make("invalid_tileset", "animations: key \"" + key + "\" is not a tile id", "keys are 1-based tile ids: {\"17\": ...}");
+        }
+        TileAnimation a;
+        const Json& frames = spec.isObject() ? spec.get("frames") : spec;
+        if (Status s = ordered(frames, a.frames); !s) return s;
+        if (spec.isObject()) {
+            a.fps = std::clamp(spec.get("fps").asFloat(4.f), 0.f, 120.f);
+            a.stagger = spec.get("stagger").asBool(false);
+        }
+        if (a.frames.empty()) return Error::make("invalid_tileset", "animations: tile " + key + " has no frames");
+        out.animations[static_cast<uint32_t>(id)] = std::move(a);
+    }
+    for (const auto& [key, rows] : doc.get("sortOffset").members()) {
+        auto ids = tiles::parseIdList(Json(key));
+        if (!ids) return Error::make("invalid_tileset", "sortOffset: key \"" + key + "\" is not a tile id or range");
+        for (uint32_t id : ids.value()) out.sortOffset[id] = static_cast<int>(rows.asInt(0));
+    }
+    return {};
 }
 
 // ---------------------------------------------------------------------------
@@ -53,6 +127,124 @@ void Assets2D::invalidate(const std::string& absolutePath) {
     atlases_.erase(absolutePath);
     tilesets_.erase(absolutePath);
     clips_.clear();
+    palettes_.clear();
+}
+
+namespace {
+
+/// "#rgb", "#rrggbb" or "#rrggbbaa" -> 0xRRGGBBAA.
+bool parseHexColor(std::string s, uint32_t& out) {
+    s = str::trim(s);
+    if (!s.empty() && s[0] == '#') s.erase(0, 1);
+    if (s.size() == 3) s = {s[0], s[0], s[1], s[1], s[2], s[2]};
+    if (s.size() == 6) s += "ff";
+    if (s.size() != 8) return false;
+    uint32_t v = 0;
+    for (char ch : s) {
+        int d = std::isdigit(static_cast<unsigned char>(ch)) ? ch - '0'
+                : (ch >= 'a' && ch <= 'f')                    ? ch - 'a' + 10
+                : (ch >= 'A' && ch <= 'F')                    ? ch - 'A' + 10
+                                                              : -1;
+        if (d < 0) return false;
+        v = (v << 4) | static_cast<uint32_t>(d);
+    }
+    out = v;
+    return true;
+}
+
+}  // namespace
+
+Result<PaletteSwap> loadPalette(const std::string& path) {
+    PaletteSwap swap;
+    const std::string lowerPath = str::lower(path);
+    if (lowerPath.size() >= 5 && lowerPath.compare(lowerPath.size() - 5, 5, ".json") == 0) {
+        std::ifstream f(path);
+        if (!f) return Error::make("not_found", "cannot read palette " + path);
+        std::stringstream ss;
+        ss << f.rdbuf();
+        auto doc = Json::parse(ss.str());
+        if (!doc) return Error::make("invalid_palette", path + ": " + doc.error().message);
+        const Json& map = doc.value().get("swap");
+        if (!map.isObject()) {
+            return Error::make("invalid_palette", path + " has no \"swap\" object",
+                               "{\"swap\": {\"#3a7d44\": \"#d8e4ec\", \"#2b5e33\": \"#00000000\"}}");
+        }
+        for (const auto& [from, to] : map.members()) {
+            uint32_t a = 0, b = 0;
+            if (!parseHexColor(from, a) || !to.isString() || !parseHexColor(to.asString(), b)) {
+                return Error::make("invalid_palette", path + ": bad swap \"" + from + "\"", "use hex colors: \"#rrggbb\": \"#rrggbb[aa]\"");
+            }
+            swap[a >> 8] = b;
+        }
+        return swap;
+    }
+    auto img = loadImage(path);
+    if (!img) return img.error();
+    if (img->height < 2) return Error::make("invalid_palette", path + " must have 2 rows (sources, then targets)");
+    for (int x = 0; x < img->width; ++x) {
+        const uint8_t* s = img->at(x, 0);
+        const uint8_t* t = img->at(x, 1);
+        if (s[3] == 0) continue;  // unused column
+        swap[(uint32_t{s[0]} << 16) | (uint32_t{s[1]} << 8) | s[2]] =
+            (uint32_t{t[0]} << 24) | (uint32_t{t[1]} << 16) | (uint32_t{t[2]} << 8) | t[3];
+    }
+    return swap;
+}
+
+size_t applyPalette(Image& image, const PaletteSwap& swap) {
+    if (swap.empty()) return 0;
+    size_t changed = 0;
+    uint32_t lastKey = 0xFFFFFFFFu;
+    const uint32_t* lastVal = nullptr;
+    for (size_t i = 0; i + 3 < image.pixels.size(); i += 4) {
+        uint8_t* p = image.pixels.data() + i;
+        if (p[3] == 0) continue;
+        uint32_t key = (uint32_t{p[0]} << 16) | (uint32_t{p[1]} << 8) | p[2];
+        if (key != lastKey) {
+            auto it = swap.find(key);
+            lastKey = key;
+            lastVal = it == swap.end() ? nullptr : &it->second;
+        }
+        if (!lastVal) continue;
+        const uint32_t v = *lastVal;
+        p[0] = static_cast<uint8_t>(v >> 24);
+        p[1] = static_cast<uint8_t>(v >> 16);
+        p[2] = static_cast<uint8_t>(v >> 8);
+        p[3] = static_cast<uint8_t>((static_cast<uint32_t>(p[3]) * (v & 0xFFu) + 127u) / 255u);
+        ++changed;
+    }
+    return changed;
+}
+
+Result<TextureImagePtr> Assets2D::paletted(const std::string& imageAbs, const std::string& palette) {
+    const std::string palAbs = resolve(palette);
+    CachedPalette& c = palettes_[imageAbs + "|" + palAbs];
+    const int64_t mi = fileMTime(imageAbs), mp = fileMTime(palAbs);
+    if (mi == c.imageTime && mp == c.paletteTime) return c.image;
+    c.imageTime = mi;
+    c.paletteTime = mp;
+    auto swap = loadPalette(palAbs);
+    if (!swap) {
+        log::warn("render", swap.error().message);
+        c.image = swap.error();
+        return c.image;
+    }
+    auto img = images_.image(imageAbs);
+    if (!img) {
+        c.image = Error::make("not_found", "cannot open image " + imageAbs);
+        return c.image;
+    }
+    Image copy = *img;
+    applyPalette(copy, swap.value());
+    auto out = std::make_shared<TextureImage>();
+    out->key = "palette:" + imageAbs + "|" + palAbs;
+    out->width = copy.width;
+    out->height = copy.height;
+    out->channels = 4;
+    out->pixels = std::move(copy.pixels);
+    out->version = ++paletteVersion_;
+    c.image = TextureImagePtr(std::move(out));
+    return c.image;
 }
 
 Result<std::shared_ptr<const Atlas>> Assets2D::atlas(const std::string& path) {
@@ -181,6 +373,10 @@ Result<Tileset> Assets2D::tileset(const std::string& path, int tileSize) {
         if (solid) t.solid = solid.value();
         if (d.get("terrains").isObject()) t.terrains = d.get("terrains");
         for (const auto& [name, id] : d.get("names").members()) t.names[name] = static_cast<uint32_t>(std::max(0.0, id.asNumber()));
+        if (Status s = parseTileAnimations(d, t); !s) {
+            c.tileset = Error::make(s.error().code, path + ": " + s.error().message, s.error().hint);
+            return c.tileset;
+        }
     } else {
         t.image = abs;
     }
@@ -472,6 +668,8 @@ struct Entry {
     size_t first = 0, count = 0;
     TextureRef texture, normalMap;
     bool nearest = false, additive = false;
+    bool ySort = false;  // sorted by sortY (higher first) after the plain entries of its layer and order
+    float sortY = 0;
     EntityId entity = kNoEntity;
 };
 
@@ -657,8 +855,13 @@ void gatherSprite(Ctx& c, EntityId e, size_t sceneIndex, const Sprite& sp) {
 
     Entry& en = c.begin(e, layerIndex(sp.sortingLayer), sp.order, c.depthOf(pos), sceneIndex, 0);
     en.texture.path = fr.path;
+    if (!sp.palette.empty() && !fr.path.empty()) {
+        if (auto img = c.assets.paletted(fr.path, sp.palette)) en.texture.image = img.value();
+    }
     if (!sp.normalMap.empty()) en.normalMap.path = c.assets.resolve(sp.normalMap);
     en.nearest = sp.filter == "nearest";
+    en.ySort = sp.ySort;
+    en.sortY = pos.y;
     // Repeats (endless parallax backgrounds) cover the view along the repeated axes.
     int nx0 = 0, nx1 = 0, ny0 = 0, ny1 = 0;
     Vec3 stepX = wx * (par && par->spacing > 0.f ? par->spacing : size.x);
@@ -753,15 +956,24 @@ void gatherTilemap(Ctx& c, EntityId e, size_t sceneIndex, const Tilemap& map) {
     // Texels kept away from the tile's edges so filtering never reads the neighbouring tile in the
     // sheet: nearest only needs a hair, bilinear reads half a texel around the sample point.
     const float inset = map.filter == "nearest" ? 0.02f : 0.5f;
+    TextureRef tilesTexture;
+    if (ts) {
+        tilesTexture.path = ts->image;
+        if (!map.palette.empty()) {
+            if (auto img = c.assets.paletted(ts->image, map.palette)) tilesTexture.image = img.value();
+        }
+    }
     for (size_t li = 0; li < grid.layers.size(); ++li) {
         const tiles::Layer& layer = grid.layers[li];
         if (!layer.visible) continue;
         Vec3 layerOrigin = origin + wz * layer.z;
         int sortLayer = layerIndex(layer.sortingLayer.empty() ? map.sortingLayer : layer.sortingLayer);
-        Entry& en = c.begin(e, sortLayer, map.order + layer.order + static_cast<int>(li), c.depthOf(layerOrigin), sceneIndex,
-                            static_cast<int>(li));
-        if (ts) en.texture.path = ts->image;
-        en.nearest = map.filter == "nearest";
+        // Plain layers stack by index; y-sorted layers keep the map/layer order so they interleave with
+        // ySort sprites of the same order (characters walking behind fences and tall grass).
+        const int layerOrder = map.order + layer.order + (layer.ySort ? 0 : static_cast<int>(li));
+        // y-sorted layers emit one entry per row (keyed by the row a tile sorts with), others one entry.
+        std::map<int, std::vector<SpriteInstance>> rowsOut;
+        const size_t poolStart = c.pool.size();
         Vec4 tint = toLinear(Vec4{map.color.x * layer.tint.x, map.color.y * layer.tint.y, map.color.z * layer.tint.z,
                                   map.color.w * layer.tint.w});
         for (int y = y0; y <= y1; ++y) {
@@ -769,6 +981,11 @@ void gatherTilemap(Ctx& c, EntityId e, size_t sceneIndex, const Tilemap& map) {
                 uint32_t raw = layer.cells[static_cast<size_t>(y) * static_cast<size_t>(grid.width) + static_cast<size_t>(x)];
                 uint32_t id = raw & tiles::kIdMask;
                 if (id == 0) continue;
+                int sortRow = y;
+                if (ts && layer.ySort && !ts->sortOffset.empty()) {
+                    if (auto so = ts->sortOffset.find(id); so != ts->sortOffset.end()) sortRow += so->second;
+                }
+                if (ts) id = ts->animated(id, c.opts.time, x, y);
                 // The quad in cell units: origin (u, v) and edge vectors; flips mirror them (Tiled order:
                 // diagonal first, then horizontal, then vertical).
                 Vec2 qo{0, 0}, qa{1, 0}, qb{0, 1};
@@ -802,14 +1019,94 @@ void gatherTilemap(Ctx& c, EntityId e, size_t sceneIndex, const Tilemap& map) {
                 set4(s.params, static_cast<float>(SpriteMode::Color), map.lit ? 1.f : 0.f, 0.f, 0.f);
                 bool casts = !solidCells.empty() && solidCells[static_cast<size_t>(y) * static_cast<size_t>(grid.width) + static_cast<size_t>(x)];
                 set4(s.extra, casts ? 1.f : 0.f, 0.f, 0.f, 0.f);
-                c.pool.push_back(s);
+                if (layer.ySort) rowsOut[sortRow].push_back(s);
+                else c.pool.push_back(s);
             }
         }
-        c.end(en);
+        auto open = [&](int sub) -> Entry& {
+            Entry& en = c.begin(e, sortLayer, layerOrder, c.depthOf(layerOrigin), sceneIndex, sub);
+            en.texture = tilesTexture;
+            en.nearest = map.filter == "nearest";
+            return en;
+        };
+        if (!layer.ySort) {
+            Entry& en = open(static_cast<int>(li));
+            en.first = poolStart;
+            c.end(en);
+            continue;
+        }
+        for (auto& [row, quads] : rowsOut) {
+            Entry& en = open(static_cast<int>(li));
+            en.ySort = true;
+            en.sortY = (layerOrigin + cy * static_cast<float>(row + 1)).y;  // the row's bottom edge (feet line)
+            c.pool.insert(c.pool.end(), quads.begin(), quads.end());
+            c.end(en);
+        }
     }
     // Screen box: the whole map rectangle.
     SpriteInstance whole = quad(origin, cx * static_cast<float>(grid.width), cy * static_cast<float>(grid.height), 0, 0, 1, 1, {});
     addBox(c, e, whole, static_cast<int64_t>(c.entries.size()));
+}
+
+void gatherParticles(Ctx& c, EntityId e, size_t sceneIndex, const Particles2D& p) {
+    if (p.particles_.empty()) return;
+    const std::vector<int> frames = particleFrames(c.assets, p);
+    const int nFrames = static_cast<int>(frames.size());
+    const float ppu = std::max(0.01f, p.pixelsPerUnit);
+    std::vector<FrameRef> refs(frames.size());
+    std::vector<bool> ok(frames.size(), false);
+    auto frameRef = [&](int i) -> const FrameRef* {
+        if (p.texture.empty()) return nullptr;
+        if (!ok[static_cast<size_t>(i)]) {
+            if (!c.assets.frameAt(p.texture, frames[static_cast<size_t>(i)], p.columns, p.rows, refs[static_cast<size_t>(i)])) return nullptr;
+            ok[static_cast<size_t>(i)] = true;
+        }
+        return refs[static_cast<size_t>(i)].path.empty() ? nullptr : &refs[static_cast<size_t>(i)];
+    };
+    Mat4 world = c.scene.worldMatrix(e);
+    const Vec3 origin = world.translation();
+    Entry& en = c.begin(e, layerIndex(p.sortingLayer), p.order, c.depthOf(origin), sceneIndex, 0);
+    en.nearest = true;
+    if (!p.texture.empty()) {
+        if (const FrameRef* fr = frameRef(0)) en.texture.path = fr->path;
+    }
+    const Vec4 base = toLinear(p.color);
+    const Vec4 glow = toLinear(Vec4{p.emissive.x, p.emissive.y, p.emissive.z, 1.f}) * p.emissive.w;
+    const float tau = 6.2831853f;
+    for (const Particle2D& q : p.particles_) {
+        const float t = std::clamp(q.age / std::max(1e-4f, q.life), 0.f, 1.f);
+        float alpha = 1.f;
+        if (p.fadeIn > 0.f && t < p.fadeIn) alpha *= t / p.fadeIn;
+        if (p.fadeOut > 0.f && t > 1.f - p.fadeOut) alpha *= (1.f - t) / p.fadeOut;
+        if (p.pulse > 0.f) alpha *= 1.f - p.pulse * (0.5f + 0.5f * std::sin(q.phase + q.age * p.pulseFrequency * tau));
+        if (alpha <= 0.002f) continue;
+        int fi = std::clamp(q.frame, 0, nFrames - 1);
+        if (p.animate == "life") fi = std::min(nFrames - 1, static_cast<int>(t * static_cast<float>(nFrames)));
+        else if (p.animate == "loop") fi = (q.frame + static_cast<int>(q.age * p.fps)) % std::max(1, nFrames);
+        const FrameRef* fr = frameRef(fi);
+        float w = p.pixelSize.x / ppu, h = p.pixelSize.y / ppu, u0 = 0, v0 = 0, u1 = 1, v1 = 1;
+        float offX = 0, offY = 0;
+        if (fr) {
+            w = fr->w / ppu;
+            h = fr->h / ppu;
+            offX = (fr->offsetX - (fr->sourceW - fr->w) * 0.5f) / ppu;   // trimmed atlas frames keep their place
+            offY = (fr->offsetY - (fr->sourceH - fr->h) * 0.5f) / ppu;
+            u0 = fr->x / static_cast<float>(fr->texW);
+            v0 = fr->y / static_cast<float>(fr->texH);
+            u1 = (fr->x + fr->w) / static_cast<float>(fr->texW);
+            v1 = (fr->y + fr->h) / static_cast<float>(fr->texH);
+        }
+        Vec3 pos = particleWorldPosition(p, q, origin, c.eye);
+        Vec3 o{pos.x - w * 0.5f + offX, pos.y + h * 0.5f - offY, pos.z};
+        if (c.opts.pixelSnap > 0.f) o = snap(o, c.opts.pixelSnap);
+        Vec4 col{base.x * q.shade, base.y * q.shade, base.z * q.shade, base.w * alpha};
+        SpriteInstance s = quad(o, {w, 0, 0}, {0, -h, 0}, u0, v0, u1, v1, col);
+        set4(s.emission, glow.x * alpha, glow.y * alpha, glow.z * alpha, 0.f);
+        set4(s.params, static_cast<float>(SpriteMode::Color), p.lit ? 1.f : 0.f, 0.f, 0.f);
+        set4(s.extra, 0.f, 0.f, 0.f, 0.f);
+        c.pool.push_back(s);
+    }
+    c.end(en);
 }
 
 void gatherText(Ctx& c, EntityId e, size_t sceneIndex, const Text& t) {
@@ -908,13 +1205,14 @@ void gatherLight(Ctx& c, EntityId e, const Light2D& l) {
     li.height = l.height;
     li.shadows = l.shadows;
     li.shadowSoftness = l.shadowSoftness;
+    li.bands = std::clamp(l.bands, 0, 32);
     f.lights.push_back(li);
     if (l.halo > 0.f) {
         float r = l.radius * 0.75f;
         Vec3 o = li.position - c.right * r + c.up * r;
         SpriteInstance s = quad(o, c.right * (2.f * r), c.up * (-2.f * r), 0, 0, 1, 1,
                                 {rgb.x * l.halo * 0.35f, rgb.y * l.halo * 0.35f, rgb.z * l.halo * 0.35f, 1.f});
-        set4(s.params, static_cast<float>(SpriteMode::Halo), 0.f, 0.f, 0.f);
+        set4(s.params, static_cast<float>(SpriteMode::Halo), static_cast<float>(li.bands), 0.f, 0.f);
         Entry& en = c.begin(e, 4, 1 << 29, c.depthOf(li.position), 0, 0);
         en.additive = true;
         c.pool.push_back(s);
@@ -934,6 +1232,7 @@ void gather2D(const Scene& scene, Assets2D& assets, FrameData& frame, const Gath
     c.up = normalize(inv.transformDir({0, 1, 0}));
     Frame2D& f = frame.render2d;
     f.ambient = {0, 0, 0};
+    f.texel = opts.pixelSnap;
 
     const auto& order = scene.entities();
     for (size_t i = 0; i < order.size(); ++i) {
@@ -942,6 +1241,7 @@ void gather2D(const Scene& scene, Assets2D& assets, FrameData& frame, const Gath
         if (const Light2D* l = scene.get<Light2D>(e)) gatherLight(c, e, *l);
         if (const Sprite* s = scene.get<Sprite>(e); s && s->visible) gatherSprite(c, e, i, *s);
         if (const Tilemap* t = scene.get<Tilemap>(e)) gatherTilemap(c, e, i, *t);
+        if (const Particles2D* p = scene.get<Particles2D>(e)) gatherParticles(c, e, i, *p);
         if (const Text* t = scene.get<Text>(e); t && t->visible && !t->text.empty()) gatherText(c, e, i, *t);
     }
     if (!f.lit) f.ambient = {1, 1, 1};
@@ -957,6 +1257,8 @@ void gather2D(const Scene& scene, Assets2D& assets, FrameData& frame, const Gath
     std::stable_sort(c.entries.begin(), c.entries.end(), [](const Entry& a, const Entry& b) {
         if (a.layer != b.layer) return a.layer < b.layer;
         if (a.order != b.order) return a.order < b.order;
+        if (a.ySort != b.ySort) return b.ySort;  // plain entries (ground) first, then the y-sorted ones
+        if (a.ySort && std::fabs(a.sortY - b.sortY) > 1e-5f) return a.sortY > b.sortY;  // higher on screen first
         if (std::fabs(a.depth - b.depth) > 1e-5f) return a.depth > b.depth;  // far first
         if (a.sceneIndex != b.sceneIndex) return a.sceneIndex < b.sceneIndex;
         return a.sub < b.sub;
