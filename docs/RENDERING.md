@@ -200,7 +200,10 @@ In the editor, click the stats overlay's frame line to expand the same list.
    for the expensive area and `profile.passes` for the pass.
 2. `main` or `shadows` high: look at `viewport_capture {"debug_view": "overdraw"}` (stacked
    transparent quads, dense grass) and `{"debug_view": "lod"}` (red/magenta near the
-   camera is fine; green far away means LODs are missing or `lodBias` is off).
+   camera is fine; green far away means the mesh has no LOD chain: chains are built
+   automatically only for meshes of 3,000+ triangles, and the level is picked by on-screen
+   error, so there is no per-mesh bias to tune; decimate the model or turn it into foliage
+   with impostors).
 3. Many lights: `{"debug_view": "light_complexity"}` — orange/red areas evaluate 7+ lights
    per pixel; shorten `range` or merge lights.
 4. `ssgi`/`ssr`/`clouds`/`volumetrics` high: lower `gi`, `ssr`, cloud quality or `godRays`

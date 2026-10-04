@@ -20,7 +20,7 @@ scene, reads the keyboard, mouse and gamepads, plays sound and needs no editor, 
 ```bash
 cmake --preset release && cmake --build --preset release          # builds skywalker and skywalker-player
 build/release/bin/skywalker build --project examples/sky_dash --out ~/Builds --release
-open "~/Builds/Sky Dash.app"
+open ~/Builds/"Sky Dash.app"
 ```
 
 Without building anything, play a project folder directly:

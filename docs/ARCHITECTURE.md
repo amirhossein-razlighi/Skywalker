@@ -81,9 +81,18 @@ from a snapshot if they fail.
   headless runs working without a GPU.
 - Shaders compile at runtime from embedded source. They can be hot-reloaded
   (`shader_set`), and compile errors come back as diagnostics.
-- Lighting: linear-space PBR (GGX), one sun with a 3×3-PCF shadow map, up to 16
-  point/spot/directional lights, hemisphere ambient, fog and ACES tonemapping, with 4× MSAA
-  into an sRGB target.
+- Lighting: linear-space PBR (GGX) on a G-buffer with 4× MSAA. Clustered forward lighting:
+  the view is split into 16×9×24 clusters on the CPU (`render/LightClusters.h`, unit-tested),
+  each listing at most 128 lights, and up to 1024 lights are kept per frame (`FrameData::kMaxLights`,
+  directional first, then the point and spot lights nearest to what the camera looks at). The 16
+  most important (`kMaxEffectLights`) also light water, particles, fluids and volumetric fog.
+- Shadows: the sun has 4 cascades in a 4096² atlas (bounding-sphere fit, texel snapping,
+  rotated-Poisson PCF). Point and spot lights share a separate local shadow atlas
+  (`render/ShadowAtlas.h`: 4 quadrants of 1, 4, 16 and 64 slots, cube or dual-paraboloid
+  point lights, a static cache), bounded per frame by `Environment.localShadowLights`
+  (default 16, max 64 shadowed lights) and `localShadowUpdates` (default 24 face renders).
+  Image-based sky light from a prefiltered cubemap, screen-space GI and reflections, height fog,
+  and a choice of tonemappers (ACES, AgX, neutral, filmic). Details: [RENDERING.md](RENDERING.md).
 - Editor overlays: selection outline (inverted hull) and gizmos.
 
 ## Game pause, process modes and time scale

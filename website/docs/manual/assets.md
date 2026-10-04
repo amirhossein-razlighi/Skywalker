@@ -59,7 +59,7 @@ for everyone on the team.
 
 | Format | What is imported |
 |---|---|
-| glTF 2.0 / GLB | The node hierarchy (flattened), normals, UVs, vertex colors and the materials: base color, metal/roughness, emissive, normal, ORM and emissive maps, alpha mask or blend, double-sided. A model with several materials becomes *parts* (`asset:model.gltf#<material>`), one entity each, saved together as `<model>.prefab.json`. Embedded, data-URI and external buffers all load; external textures are referenced in place. |
+| glTF 2.0 / GLB | The node hierarchy (flattened), normals, UVs, vertex colors and the materials: base color, metal/roughness, emissive, normal, ORM and emissive maps, alpha mask or blend, double-sided. A model with several materials becomes *parts* (`asset:model.gltf#<material index>`), one entity each, saved together as `<model>.prefab.json`. Embedded, data-URI and external buffers all load; external textures are referenced in place. |
 | OBJ + MTL | Polygons (triangulated), normals, UVs, `v x y z r g b` vertex colors and the first `.mtl` material (`Kd`, `d`, `Ns`/`Pr` to roughness, `Pm`, `Ke`, `map_Kd`, `map_Bump`/`norm`). |
 | PLY | ASCII and binary (both byte orders): positions, normals, UVs, vertex colors, polygon faces. Point clouds without faces are rejected with a hint. |
 | STL | ASCII and binary, flat-shaded facets (CAD and 3D-printing models). |

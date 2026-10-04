@@ -35,7 +35,7 @@ Types are recognized by file name:
 
 | Format | What is imported |
 |---|---|
-| glTF 2.0 / GLB | Node hierarchy (flattened), normals, UVs, vertex colors and **every material** (base color, metal/roughness, emissive, normal / ORM / emissive maps, alpha mask or blend, double-sided). Models with several materials become *parts* (`asset:model.gltf#<material>`), one entity each, saved together as `<model>.prefab.json`. External textures are referenced in place. |
+| glTF 2.0 / GLB | Node hierarchy (flattened), normals, UVs, vertex colors and **every material** (base color, metal/roughness, emissive, normal / ORM / emissive maps, alpha mask or blend, double-sided). Models with several materials become *parts* (`asset:model.gltf#<material index>`), one entity each with its own `<model>_<material name>.mat.json`, saved together as `<model>.prefab.json`. External textures are referenced in place; embedded ones are extracted once as `<model>_img<N>.<ext>`. |
 | OBJ + MTL | Polygons (triangulated), normals, UVs, `v x y z r g b` vertex colors, and the first `.mtl` material (`Kd`, `d`, `Ns`/`Pr` → roughness, `Pm`, `Ke`, `map_Kd`, `map_Bump`/`norm`). |
 | PLY | ASCII and binary (both endians): positions, normals, UVs, vertex colors, polygon faces. Point clouds without faces are rejected with a hint. |
 | STL | ASCII and binary, flat-shaded facets (CAD and 3D-printing models). |
@@ -75,10 +75,14 @@ The tool is **open-world**:
 - **glTF and GLB** import supports:
   - embedded, data-URI and external buffers;
   - strided accessors and indexed or non-indexed triangles;
-  - the full node hierarchy (TRS or matrix), flattened into one mesh;
-  - the first material's base color, metallic/roughness, emissive and base-color texture.
-- **Importing a glTF file** also writes `<name>.mat.json` next to it, plus the extracted
-  texture (`<name>_albedo.png`). The new entity uses that material.
+  - the full node hierarchy (TRS or matrix), flattened;
+  - every material: base color, metallic/roughness, emissive, normal, ORM and emissive maps,
+    alpha mode and double-sidedness.
+- **Importing a glTF file** writes the materials next to it. A model with one material gets
+  `<name>.mat.json`, and the new entity uses it. A model with several materials is split into
+  one part per material (`asset:<file>#<material index>`), each with `<name>_<material>.mat.json`,
+  and saved as `<name>.prefab.json`; the import result lists the `parts` and the `prefab`.
+  Embedded images are extracted once as `<name>_img<N>.<ext>`; external images are used in place.
 - **Normalization.** Meshes are scaled to fit a 1 m cube and centered on the ground, so
   output from generation models arrives at a predictable size.
 - **CPU copies.** A CPU copy of every mesh is kept, for triangle-accurate `raycast`,

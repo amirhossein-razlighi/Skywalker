@@ -153,6 +153,7 @@ variables, jumps and commands.
 title: Start
 ---
 <<declare $trust = 1>>
+<<declare $name = "Envoy">>
 Narrator: The council chamber falls silent. #mood:tense
 Vale: You're late, {$name}. #portrait:vale_cold
 -> I was delayed by the riots.
@@ -166,6 +167,11 @@ Vale: You're late, {$name}. #portrait:vale_cold
     Vale: Sit.
 <<endif>>
 <<lights_dim 0.5>>
+===
+title: Confrontation
+---
+Vale: Then we understand each other. #mood:cold
+<<stop>>
 ===
 ```
 
