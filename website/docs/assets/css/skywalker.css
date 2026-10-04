@@ -166,3 +166,6 @@ a.sky-card:hover { transform: translateY(-2px); border-color: var(--sky-blue); }
   .md-typeset .sky-hero h1 { font-size: 1.6rem; }
   .sky-hero__content { padding: 1.2rem 1rem; }
 }
+
+/* The home page hero takes the full width: no edit/view buttons beside it. */
+.md-content__inner:has(.sky-hero) > .md-content__button { display: none; }
