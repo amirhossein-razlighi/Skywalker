@@ -84,7 +84,9 @@ and commands (`/new-game`) use Cursor's native formats. Restart Cursor (or toggl
 ### Any other MCP client or SDK
 
 `{"mcpServers": {"skywalker": {"command": "/path/to/skywalker", "args": ["mcp", "--auto"]}}}`. SDK examples (OpenAI Agents SDK with a studio loop, Anthropic tool runner) are in
-[`integrations/examples`](../integrations/examples/README.md).
+[`integrations/examples`](../integrations/examples/README.md). For Python harnesses, [skywalker-agents](PYTHON_AGENTS.md) wraps all of
+this (typed client, agents, memory, workflows) and adapts engine tools to LangGraph, CrewAI, the OpenAI Agents SDK, Pydantic AI and the
+Claude Agent SDK; `sky-agents serve-mcp` shares its memory with any MCP client.
 
 ## What the skills cover
 

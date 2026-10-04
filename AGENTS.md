@@ -33,6 +33,7 @@ Useful: `./build/headless/bin/skywalker tools --markdown` (tool catalogue), `sky
 | `tests/` | doctest suite (one file per area) |
 | `docs/` | Documentation; `docs/TOOLS.md` is generated from the registry |
 | `integrations/` | Agent integrations. **Edit `integrations/skills-src/`, never the generated copies** |
+| `python/` | The Python agent layer (`cd python && uv sync && uv run pytest`); after changing engine tools run `uv run sky-agents gen-tools` |
 
 ## Conventions
 

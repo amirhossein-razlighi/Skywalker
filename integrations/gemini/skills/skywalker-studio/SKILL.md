@@ -102,6 +102,26 @@ You collect the reports and call `studio_loop_advance` (reports may arrive one a
 
 Unattended: `skywalker studio run --project DIR --loop NAME --iterations 3` (needs an API key in the environment) runs the same loop with its own models.
 
+## 7. Harnesses, the event stream, shared tools and the Python layer
+
+Your own orchestration (a script, a long-running harness, several coding-agent sessions) plugs into the same studio:
+
+- **Follow what happens** without polling every list: `events_poll {since:0, types:["studio.message", "studio.task"]}` returns events after a cursor
+  (tool calls with their actor, studio changes, play state, scene saves) and `next`; pass it back as `since`. `wait_ms` long-polls (agent socket only;
+  give the poll its own connection). Filters: `types` (`"studio"` or `"studio.message"`), `actors`, `exclude_actors`.
+- **Structured messages:** `studio_message_send {text:"Can you widen the bridge?", to:["level_designer"], kind:"request", data:{"width":3}}`; reply in the
+  thread with `reply_to`; read one conversation with `studio_inbox {thread:"M-12"}` (add `after` to get only newer messages).
+- **Show you are working:** `studio_presence {status:"working", activity:"T-4 widen the bridge", as:"level_designer"}` and `status:"idle"` when done: the
+  editor's roster shows it live, like the crew.
+- **Share tools with every agent:** a process registers tools with `tool_host_register {tools:[{name:"memory_recall", description:"Search shared memory"}]}`;
+  they appear to everyone as `py_<name>`. The host fetches calls with `tool_host_poll` and answers with `tool_host_reply`; `tool_host_list` shows who serves what.
+- **A headless engine others can join:** `skywalker serve --project DIR [--socket PATH]` serves the agent socket like the editor does, so several clients
+  (Claude Code via `skywalker mcp --attach PATH`, Python agents, scripts) work on one live engine.
+- **The Python layer** (`python/`, `pip install skywalker-agents`): typed engine client, agents that run any roster member (`studio_agent_brief`) on Claude or
+  OpenAI-compatible models, shared memory (SQLite + FTS5, optional vectors), message bus over studio threads, workflows (YAML or Python) with checkpoints,
+  budgets, approvals in `#approvals`, record/replay, evals and tracing. `sky-agents run workflow.yaml`, `sky-agents serve-mcp` (shared memory for this
+  session), `sky-agents trace show latest`. See [references/python-agents.md](references/python-agents.md) and `skywalker://docs/PYTHON_AGENTS`.
+
 ## Reporting token usage
 
 Tool calls are counted automatically. Tokens spent with your **own** model (a custom runner, a subagent) are not visible to the engine: report them so budgets and cost tracking are real.
