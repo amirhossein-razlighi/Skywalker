@@ -161,7 +161,8 @@ directly. Settings live in `game.json`. → [docs/SHIPPING.md](docs/SHIPPING.md)
 
 ## License
 
-See [LICENSE](LICENSE) and [docs/LICENSING.md](docs/LICENSING.md). The intended model is
-free for individuals and small companies with a commercial license above a size/revenue
-threshold; the repository currently still carries the original CC0 file — **see the
-licensing doc before publishing.**
+Skywalker is source available under the **Business Source License 1.1** ([LICENSE](LICENSE)).
+It is **free** for individuals, for companies under US$1M in annual revenue and under US$1M in
+funding, and for non-profits, education and non-commercial use, including shipping and selling
+your games. Larger organizations need a commercial license. Games you make are yours, and each
+version becomes Apache-2.0 four years after release. See [docs/LICENSING.md](docs/LICENSING.md).

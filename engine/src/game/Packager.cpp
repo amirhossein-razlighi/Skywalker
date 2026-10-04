@@ -17,6 +17,7 @@
 #include <sstream>
 
 #include "../native/Process.h"
+#include "skywalker/agent/Resources.h"
 #include "skywalker/core/Log.h"
 #include "skywalker/core/Strings.h"
 #include "skywalker/engine/Engine.h"
@@ -88,6 +89,32 @@ void writeFile(const fs::path& p, const std::string& text) {
     std::ofstream f(p, std::ios::binary);
     f << text;
     if (!f) fail("io_error", "cannot write " + p.string());
+}
+
+/// License notices every packaged app carries: Skywalker's license (its runtime is inside the app)
+/// and the third-party notices for what the runtime links or bundles.
+void writeLicenseNotices(const fs::path& dir) {
+    std::error_code ec;
+    fs::create_directories(dir, ec);
+    writeFile(dir / "Skywalker-LICENSE.txt",
+#include "skywalker_license.inc"
+    );
+    writeFile(dir / "Inter-OFL.txt",
+#include "ofl_inter.inc"
+    );
+    writeFile(dir / "EBGaramond-OFL.txt",
+#include "ofl_ebgaramond.inc"
+    );
+    writeFile(dir / "JetBrainsMono-OFL.txt",
+#include "ofl_jetbrainsmono.inc"
+    );
+    if (const EmbeddedAsset* doc = findEmbeddedAsset("docs/LICENSING.md")) {
+        std::string text = doc->content;
+        auto third = text.find("## Third-party");
+        writeFile(dir / "THIRD-PARTY-NOTICES.md",
+                  "# Third-party notices\n\nThis app is built with Skywalker. It includes the components below.\n\n" +
+                      (third == std::string::npos ? text : text.substr(third)));
+    }
 }
 
 native::ProcessResult run(const std::vector<std::string>& argv, int timeout = 120) {
@@ -427,6 +454,7 @@ Result<PackageReport> buildGame(const PackageOptions& options) {
                                           {"native", nativeRel},
                                           {"files", files}});
             writeFile(resources / "build.json", manifest.dump(1) + "\n");
+            writeLicenseNotices(resources / "Licenses");
         }
 
         // Strip, sign, verify.

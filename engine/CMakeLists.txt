@@ -237,6 +237,23 @@ foreach(_hdr value aot sdk)
     list(APPEND _sky_native_inc ${_out})
 endforeach()
 target_sources(skywalker_engine PRIVATE ${_sky_native_inc})
+
+# License notices `skywalker build` puts into every packaged app (Contents/Resources/Licenses).
+set(_sky_license_inc)
+foreach(_pair "LICENSE:skywalker_license" "assets/fonts/Inter-OFL.txt:ofl_inter"
+              "assets/fonts/EBGaramond-OFL.txt:ofl_ebgaramond" "assets/fonts/JetBrainsMono-OFL.txt:ofl_jetbrainsmono")
+    string(REPLACE ":" ";" _parts "${_pair}")
+    list(GET _parts 0 _rel)
+    list(GET _parts 1 _name)
+    set(_out ${CMAKE_CURRENT_BINARY_DIR}/generated/${_name}.inc)
+    add_custom_command(
+        OUTPUT ${_out}
+        COMMAND ${CMAKE_COMMAND} -DINPUT=${PROJECT_SOURCE_DIR}/${_rel} -DOUTPUT=${_out} -P ${PROJECT_SOURCE_DIR}/cmake/EmbedText.cmake
+        DEPENDS ${PROJECT_SOURCE_DIR}/${_rel} ${PROJECT_SOURCE_DIR}/cmake/EmbedText.cmake
+        COMMENT "Embedding license notice ${_rel}")
+    list(APPEND _sky_license_inc ${_out})
+endforeach()
+target_sources(skywalker_engine PRIVATE ${_sky_license_inc})
 target_include_directories(skywalker_engine PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/generated)
 target_link_libraries(skywalker_engine PUBLIC sky::options PRIVATE ZLIB::ZLIB CURL::libcurl Threads::Threads ${CMAKE_DL_LIBS})
 # Third-party header: included as a system path and compiled without our warning set.

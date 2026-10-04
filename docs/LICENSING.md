@@ -1,41 +1,56 @@
-# Licensing (draft — decision needed)
+# Licensing
 
-> **Not legal advice.** This page describes the intended model and the options for getting
-> there. Have a lawyer review the final license before release.
+Skywalker is **source available** under the **Business Source License 1.1** (`LICENSE`), with
+an Additional Use Grant that makes it free for most people, and a commercial license for larger
+organizations. Each version converts to the **Apache License 2.0** four years after its release.
 
-## Current state
+> **Not legal advice.** This page explains the license in plain words. If anything here
+> differs from `LICENSE`, `LICENSE` wins.
 
-The repository's `LICENSE` file is **CC0 1.0**, a public-domain dedication. It conflicts
-with the intended model below: anything published under CC0 can be used by anyone, for
-anything, forever, including large companies. **Replace the license before the first
-public release.** Code already published under CC0 stays available under CC0.
+## Who can use it for free
 
-## Intended model
+You can use Skywalker for free, including shipping and selling games made with it, if you are:
+- an **individual**, or a **company with under US$1M in annual revenue and under US$1M in
+  funding raised** over the last twelve months, counting affiliates; or
+- a **non-profit**, a **school or university**, or using it for **non-commercial research,
+  teaching or personal projects**.
 
-- Free to use, modify and ship games with, for individuals, hobbyists, education and
-  smaller companies.
-- A paid commercial license for organizations above a size or revenue threshold.
-- Source available, with community contributions welcome.
+Anyone may also read, modify and build the source, and use it for evaluation and development,
+regardless of size. Production use above the thresholds needs a commercial license.
 
-## Options
+## Who needs a commercial license
 
-| Option | What it is | Fit |
-|---|---|---|
-| **Custom "community license" with a threshold** (the Unreal / Unity approach) | Free below a set revenue or funding (e.g. under US$1M in annual revenue); a commercial agreement above it. | Matches the intent exactly. Must be drafted carefully: define "revenue" and "affiliates", and decide whether royalties or seats apply. |
-| **Business Source License 1.1 (BSL)** | Source available. An "Additional Use Grant" can allow production use below a threshold. Each version converts to an open license after N years. | Well understood, with a time-delayed open-source guarantee. |
-| **Functional Source License (FSL)** | Source available; blocks competing commercial use; converts to Apache/MIT after 2 years. | Simple, but prohibits *competing* use rather than setting a size threshold. |
-| **Dual license: AGPL-3.0 + commercial** | Open source; companies that can't comply with AGPL buy a commercial license. | OSI-approved, but AGPL obligations can deter game developers. |
-| **PolyForm Small Business** | Free for organizations with fewer than 100 people and under US$1M revenue; others need a separate license. | The closest off-the-shelf match to "free below a size/revenue threshold". |
+- **Organizations above either threshold** (revenue or funding, including affiliates). You keep
+  60 days to arrange a license after you cross a threshold.
+- **Anyone offering Skywalker itself as a competing engine, tool or hosted service**, whatever
+  their size.
 
-**Recommendation:** start from **PolyForm Small Business 1.0.0** for the engine and editor,
-plus a separate commercial license (with optional royalties) for larger organizations. Keep
-**games and content created with Skywalker** fully owned by their creators, with no license
-obligations on them. That separation matters to studios.
+Contact the licensor for terms.
 
-Also decide:
-- A contributor agreement (CLA or DCO), so contributions can be dual-licensed.
-- Trademark policy for the name "Skywalker". It is a well-known term in entertainment, so
-  check trademark availability before branding a product with it.
+## Your games are yours
+
+Games, applications, assets, scripts, scenes and other content you create with Skywalker belong
+to you. Under the free grant there are no royalties or fees, and no obligations on your games
+beyond shipping the license notices.
+
+`skywalker build` puts the required notices into every app it packages, in
+`Contents/Resources/Licenses/`: Skywalker's `LICENSE` and the third-party licenses below.
+
+## Every version becomes open source
+
+Four years after a version is first published, that version is also licensed under the Apache
+License 2.0. Newer versions stay under the Business Source License until their own change date.
+
+## Contributing
+
+Contributions are welcome under the terms in `CONTRIBUTING.md`. You keep the copyright to your
+contribution, and grant the licensor the right to distribute it under this license, the
+commercial license and the Change License.
+
+## Trademark
+
+The license grants no rights to the Skywalker name or logo. Check trademark availability for
+"Skywalker" before a public commercial launch: it is a well-known term in entertainment.
 
 ## Third-party
 
