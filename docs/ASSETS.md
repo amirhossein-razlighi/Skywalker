@@ -45,8 +45,13 @@ Import options for `asset_import` and `asset_download`:
   (photoscanned assets from libraries are already in meters). The result reports the model's
   `bounds`, so agents can place it precisely.
 - `z_up` rotates Z-up sources (CAD, scans, some exporters) to Y-up.
+- `lods` (`asset_import`, default true): meshes of 3,000+ triangles get an automatic LOD chain when they
+  load. `false` keeps only the full mesh, for geometry whose edges must stay exact: voxel or terrain
+  chunks that meet their neighbours, modular pieces that tile. Keep such meshes under 20,000 triangles per
+  part (`scene_audit` warns about heavier meshes without LODs). A generator can also write the setting
+  itself: `"import": {"normalize": false, "lods": false}` in the file's `.meta`.
 
-Both options are stored in the asset's `.meta`, so the model loads the same way every time.
+These options are stored in the asset's `.meta`, so the model loads the same way every time.
 
 ### Downloading models from the web
 

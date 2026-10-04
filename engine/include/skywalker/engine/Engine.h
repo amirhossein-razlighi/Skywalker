@@ -271,6 +271,7 @@ public:
         bool normalize = true;  // fit a 1 m cube (handy for generated models); false keeps real units
         bool zUp = false;       // source is Z-up (CAD, scans, some exporters)
         bool keepRiggedScale = true;  // rigged characters keep their real size unless normalize was asked for explicitly
+        bool lods = true;       // false: never build the automatic LOD chain (voxel chunks, pieces with exact seams)
     };
     Result<Json> importMeshAsset(const std::string& path, const MeshImportOptions& options);
     Result<Json> importMeshAsset(const std::string& path) { return importMeshAsset(path, MeshImportOptions{}); }
@@ -389,6 +390,8 @@ private:
     /// Real-time frames stream asset meshes: parsing and LOD building run on background
     /// threads and the mesh appears once uploaded (captures still load synchronously).
     void requestMeshAsync(const std::string& meshKey);
+    /// False when the asset's import settings say `lods: false` (no automatic LOD chain).
+    bool autoLods(const std::string& file) const;
     void drainStreamedMeshes();
     std::optional<audio::ListenerPose> listenerPose();
     void resolveTexturePaths(FrameData& f) const;
