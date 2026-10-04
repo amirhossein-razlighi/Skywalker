@@ -137,6 +137,7 @@ directly. Settings live in `game.json`. → [docs/SHIPPING.md](docs/SHIPPING.md)
 | [INTEGRATIONS](docs/INTEGRATIONS.md) | Skills, subagents and setup for Claude Code, Codex, Gemini CLI and Cursor; MCP resources and prompts |
 | [ASSETS](docs/ASSETS.md) | Asset database, glTF, materials, prefabs, spatial tools |
 | [RENDERING](docs/RENDERING.md) | PBR + toon surfaces, IBL, cascaded shadows, SSAO, sky, post, recipes |
+| [MOVIE_RENDER](docs/MOVIE_RENDER.md) | Movie Render Queue: offline cinematic renders to H.264 / HEVC / ProRes / PNG with motion blur, progress, resume |
 | [BRAND](docs/BRAND.md) | Logo, app icon, colors, typography |
 | [TOOLS](docs/TOOLS.md) | Generated reference of every tool |
 | [DEVELOPMENT](docs/DEVELOPMENT.md) | Building, testing, sanitizers, profiling, conventions |

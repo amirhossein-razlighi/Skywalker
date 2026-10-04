@@ -74,7 +74,8 @@ See the `terrain_*` and `foliage_add` tools.
 
 - **Lens** (camera component, or `viewport_capture` `aperture` / `focus_distance`):
   `aperture` (f-stop; 0 = everything sharp), `focusDistance` (0 = autofocus on the center)
-  and `motionBlur` (shutter fraction).
+  and `motionBlur` (shutter fraction; a post-process blur in real time, a real accumulated shutter in
+  movie renders, see [MOVIE_RENDER](MOVIE_RENDER.md)).
 - **Exposure:** `autoExposure`, `exposureCompensation` (EV), `adaptationSpeed`. Manual
   `exposure` still multiplies.
 - **Looks:** `look` is one of `warm`, `cool`, `teal_orange`, `golden_hour`, `bleach`,

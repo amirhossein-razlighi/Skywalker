@@ -587,6 +587,10 @@ struct Job::Impl {
             const double t = std::max(0.0, timing.frameTime(firstK - warmupLeft));
             --warmupLeft;
             auto r = render(t, 1, 0, frameDt, true);
+            if (!r && r.error().code == "gpu_error") {  // nothing is written from warmup frames: carry on
+                log::warn("movie", "warmup frame hit a GPU error (" + r.error().message + "), continuing");
+                return {};
+            }
             return r ? Status{} : Status(r.error());
         }
         if (subTimes.empty()) {
@@ -595,10 +599,24 @@ struct Job::Impl {
             sub = 0;
             acc = FrameBuffer(o.width, o.height);
             frameStart_ = std::chrono::steady_clock::now();
+            retried = false;
         }
         const float weight = 1.f / static_cast<float>(subTimes.size());
-        auto img = render(subTimes[sub], split.spatial, static_cast<int>(sub) * split.spatial, frameDt * weight, sub == 0);
-        if (!img) return img.error();
+        const int spatial = retried ? std::max(1, split.spatial / 2) : split.spatial;
+        auto img = render(subTimes[sub], spatial, static_cast<int>(sub) * spatial, frameDt * weight, sub == 0);
+        if (!img) {
+            // A faulted GPU frame (watchdog timeout, page fault) never reaches the outputs: the whole
+            // frame is rendered again once with half the samples (the renderer is in safe mode by then),
+            // and the render stops if that fails too.
+            if (img.error().code != "gpu_error" || retried) return img.error();
+            log::warn("movie", "frame " + std::to_string(timing.firstFrame + k) + ": " + img.error().message + "; retrying it at lower samples");
+            retried = true;
+            ++gpuRetries;
+            sub = 0;
+            acc = FrameBuffer(o.width, o.height);
+            lastView.reset();  // re-meter after the fault
+            return {};
+        }
         acc.accumulate(*img, weight);
         if (++sub < subTimes.size()) return {};
         // The frame is complete.
@@ -621,6 +639,8 @@ struct Job::Impl {
         return {};
     }
     std::chrono::steady_clock::time_point frameStart_;
+    bool retried = false;  // this frame already failed once on the GPU
+    int gpuRetries = 0;
 
     void report() {
         Json p = status();
@@ -682,6 +702,7 @@ struct Job::Impl {
                                {"outputs", outs}});
         if (state == State::Rendering && written > 0) j["eta_s"] = std::round(perFrame * (total - written));
         if (firstK > 0) j["resumed_at"] = timing.firstFrame + firstK;
+        if (gpuRetries > 0) j["gpu_retries"] = gpuRetries;
         if (error) {
             j["error"] = error->message;
             if (!error->hint.empty()) j["hint"] = error->hint;

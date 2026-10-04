@@ -36,6 +36,14 @@ struct AnimationScrubBar: View {
                 .font(Theme.monoSmall)
                 .foregroundStyle(Theme.textDim)
                 .frame(width: 52, alignment: .trailing)
+            if !isAnimator {
+                Button { engine.movieRequest = MovieRequest(sequence: entityID) } label: {
+                    Image(systemName: "film").font(.system(size: 10)).foregroundStyle(Theme.textDim).frame(width: 18, height: 18)
+                }
+                .buttonStyle(.borderless)
+                .disabled(engine.movie?.finished == false)
+                .help("Render this sequence to a movie…")
+            }
         }
         .padding(.horizontal, 10)
         .padding(.bottom, 6)
