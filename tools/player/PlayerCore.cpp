@@ -6,6 +6,8 @@
 
 #include "skywalker/core/Strings.h"
 #include "skywalker/game/SaveGame.h"
+#include "skywalker/locale/Localization.h"
+#include "skywalker/ui/World2D.h"
 #include "skywalker/native/NativeModules.h"
 #include "skywalker/render/Image.h"
 
@@ -169,6 +171,8 @@ Result<std::unique_ptr<Session>> openSession(const Options& options, const std::
     // Save games: a shipped app keeps them in the user's data folder; a project run from its folder keeps
     // them in <project>/.skywalker/saves like the editor (docs/SAVE_GAMES.md).
     if (session->location.bundled) engine.saves().setDirectory(game::userSaveDir(s.id.empty() ? game::slugify(s.displayName()) : s.id));
+    // Localization: the player's language (game.json localization.useSystemLocale decides whether it wins).
+    engine.world2d().localization().setSystemLocale(loc::systemLocale());
     return session;
 }
 

@@ -80,5 +80,6 @@ void addCharacterTools(Engine& engine, ToolRegistry& reg);  // CharacterTools.cp
 /// `groomRenderMs` < 0 = not measured (perf_stats measures it by benchmarking with grooms hidden).
 Json characterPerfStats(Engine& engine, double groomRenderMs = -1.0);
 void addSaveTools(Engine& engine, ToolRegistry& reg);    // SaveTools.cpp: save_game, load_game, save_list, save_inspect, save_delete
+void addLocaleTools(Engine& engine, ToolRegistry& reg);  // LocaleTools.cpp: locale_list, locale_set, locale_check, locale_extract, locale_pseudo
 
 }  // namespace sky::tools

@@ -13,6 +13,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "skywalker/locale/Localization.h"
 #include "skywalker/render/Renderer.h"
 #include "skywalker/render2d/Sprites.h"
 #include "skywalker/ui/Dialogue.h"
@@ -34,6 +35,8 @@ public:
 
     render2d::Assets2D& assets() { return *assets_; }
     ui::UiSystem& ui() { return *ui_; }
+    /// String tables and the game's locale; "@key" texts and #line:<id> dialogue lines go through it (docs/LOCALIZATION.md).
+    loc::Localization& localization() { return *localization_; }
 
     // --- Frame ------------------------------------------------------------------------
     /// camera2d: orthographic size, pixel snapping and bounds for the camera entity's view.
@@ -83,6 +86,7 @@ private:
         bool awaitingRelease = false;
     };
     void syncState(Scene& scene, EntityId e, Conversation& c);
+    std::string localizedText(const std::string& text, const Scene& scene, EntityId e);
     void updateDefaultUi(Scene& scene, EntityId e, Conversation& c, wander::Runtime* runtime);
     void hideDefaultUi(Scene& scene);
     dialogue::VarStore vars(Scene& scene, EntityId e);
@@ -92,6 +96,7 @@ private:
 
     std::unique_ptr<render2d::Assets2D> assets_;
     std::unique_ptr<ui::UiSystem> ui_;
+    std::unique_ptr<loc::Localization> localization_;
     std::unordered_map<EntityId, Conversation> conversations_;
     struct CachedScript {
         int64_t mtime = -2;

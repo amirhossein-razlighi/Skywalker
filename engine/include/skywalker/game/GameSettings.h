@@ -53,6 +53,8 @@ struct GameSettings {
     render::LayerNames renderLayers;
     // Save games: "saves": {"version": 2, "maxSlots": 20, "compress": false, "migrate": "..."} (game/SaveGame.h)
     Json saves;
+    // Localization: "localization": {"source": "en", "locale": "fr", "useSystemLocale": true} (locale/Localization.h)
+    Json localization;
 
     bool fromFile = false;  // a game.json was found
 

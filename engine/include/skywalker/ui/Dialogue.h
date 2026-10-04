@@ -52,6 +52,7 @@ struct TextTemplate {
         ExprPtr expr;
     };
     std::vector<Part> parts;
+    std::string source;  // the text as written (localization looks it up / replaces it)
 };
 
 struct Option {
@@ -116,6 +117,8 @@ struct Script {
 
 /// Parses a script. Syntax errors become diagnostics (the script still contains what parsed).
 std::shared_ptr<const Script> parse(std::string_view source);
+/// Parses one line of text with {expression} interpolations (a translated line, for example).
+TextTemplate parseTemplate(std::string_view text);
 
 /// Lints a parsed script: syntax errors, unknown jump targets (with did-you-mean), missing start
 /// node, unreachable nodes, variables read but never set or declared, empty nodes.
@@ -131,6 +134,11 @@ struct VarStore {
 struct RunnerEvents {
     std::function<void(const std::string& command, const std::vector<std::string>& args)> command;
     std::function<void(const std::string& node)> node;
+    /// Localization (docs/LOCALIZATION.md): the text to show for a line or choice with the `#line:<id>` tag
+    /// (`lineId`, else "") and the script's text `source`; returning `source` keeps it. Unset = no localization.
+    std::function<std::string(const std::string& lineId, const std::string& source)> localize;
+    /// The display name of a speaker (unset = as written).
+    std::function<std::string(const std::string& speaker)> speaker;
 };
 
 /// Executes a script one blocking step at a time (a line to show, choices to pick, a wait).

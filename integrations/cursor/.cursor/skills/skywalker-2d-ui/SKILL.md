@@ -147,6 +147,25 @@ dialogue_control {action:"advance"}
 dialogue_control {action:"choose", choice:1}
 ```
 
+## Workflow D: localization
+
+Engine doc: `skywalker://docs/LOCALIZATION`. Strings live in `locale/*.csv` (`key,en,fr,pt-BR` + optional `comment`, `max` columns) or gettext `locale/<code>.po`. Texts refer to keys:
+`ui.text` / `ui.placeholder` / `text.text` written `"@menu.play"` (the entity's vars fill `{placeholders}`), `tr("hud.coins", {n: coins})` in Wander, `#line:<id>` on dialogue lines and choices.
+Messages: `{name}`, `{n, number}`, `{n, plural, one {# coin} other {# coins}}` (CLDR rules: ru needs `few`/`many`, ar `zero`..`many`, ja only `other`), `{g, select, ... other {...}}`.
+
+1. `locale_extract {}` lists hard-coded texts with proposed keys; `locale_extract {apply:true}` writes `locale/strings.csv`, rewrites the open scene's fields to `@key` (undoable) and tags dialogue lines. Replace reported script strings with `tr()`.
+2. Add a column per locale (keep placeholders and plural keywords), then `locale_check {}` until missing, undefined, placeholders, syntax and plurals are clean; `glyphs` lists characters no built-in font covers (CJK, Arabic: add a font).
+3. Layout: `locale_pseudo {}` (en-XA: accented, 30% longer), then `viewport_capture` / `ui_inspect` each screen for clipping and texts left plain; `locale_set {locale:"de"}` for the longest real language; `locale_set {locale:""}` to return.
+4. Wander: `set_locale("fr")` (language menu; undone when play stops), `locale()`, `locales()`. game.json `localization: {source, locale, useSystemLocale, maxLengthRatio}`.
+
+```text
+locale_extract {apply:true}
+locale_check {budget:1.3}
+locale_pseudo {}
+locale_set {locale:"fr"}
+locale_list {}
+```
+
 ## Wander for 2D (validate with `wander_check`)
 
 ```wander

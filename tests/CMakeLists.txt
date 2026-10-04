@@ -64,6 +64,7 @@ set(SKY_TEST_SOURCES
     test_audit.cpp
     test_characters.cpp
     test_save_games.cpp
+    test_localization.cpp
 )
 
 add_executable(skywalker_tests ${SKY_TEST_SOURCES})

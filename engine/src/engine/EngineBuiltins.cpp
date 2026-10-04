@@ -17,6 +17,7 @@ void registerProbeBuiltins(wander::BuiltinRegistry& reg);  // ProbeBuiltins.cpp:
 void registerVehicleBuiltins(wander::BuiltinRegistry& reg);      // VehicleBuiltins.cpp: vehicle_*
 void registerCharacterBuiltins(wander::BuiltinRegistry& reg);  // CharacterBuiltins.cpp: hand_ik, foot_ik, turn_in_place, look_at
 void registerSaveBuiltins(wander::BuiltinRegistry& reg);  // game/SaveBuiltins.cpp: save_game, load_game, game_var
+void registerLocaleBuiltins(wander::BuiltinRegistry& reg);  // locale/LocaleBuiltins.cpp: tr, set_locale, locale, locales
 
 namespace {
 
@@ -172,6 +173,7 @@ void registerEngineBuiltins() {
         registerVehicleBuiltins(reg);      // vehicles (VehicleBuiltins.cpp)
         registerCharacterBuiltins(reg);  // character IK and turning (CharacterBuiltins.cpp)
         registerSaveBuiltins(reg);  // save games (game/SaveBuiltins.cpp)
+        registerLocaleBuiltins(reg);  // localization (locale/LocaleBuiltins.cpp)
     });
 }
 

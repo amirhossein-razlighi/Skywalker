@@ -52,6 +52,11 @@ Rich text tags: `<b> <i> <u> <s> <color=#f80> <color=gold> <alpha=0.5> <size=24|
 <font=serif> <br> <noparse>`. UTF-8 throughout; missing glyphs fall back to the other built-in
 fonts. Wrapping prefers spaces, breaks long words, and handles CJK.
 
+**Localized texts.** A `text.text`, `ui.text` or `ui.placeholder` written `"@menu.play"` shows the
+string for that key in the current locale (`locale/*.csv` or `*.po`); `{placeholders}` come from
+the entity's vars and `"@@"` writes a literal `@`. Scripts use `tr("key", {n: 3})`. See
+[LOCALIZATION](LOCALIZATION.md), which also covers fonts for scripts the built-in fonts lack.
+
 ## UI layout and styling
 
 - **Anchors**: `top_left, top, top_right, left, center, right, bottom_left, bottom, bottom_right`
@@ -179,7 +184,8 @@ Vale: Then we understand each other. #mood:cold
 ```
 
 Lines are `Speaker: text` with trailing `#tags` (`#portrait:name` shows `portraits/name.png` in
-the default dialogue box). `{expr}` interpolates. Commands: `set` (`to = += -= *= /=`),
+the default dialogue box; `#line:<id>` localizes the line or choice through the string tables, with
+the script's text as the source-language fallback, see [LOCALIZATION](LOCALIZATION.md)). `{expr}` interpolates. Commands: `set` (`to = += -= *= /=`),
 `declare`, `if/elseif/else/endif`, `jump`, `wait`, `stop`; anything else (`<<shake 2>>`) becomes
 the Wander event `dialogue:shake` with the arguments in the runner's vars `dialogue_command`,
 `dialogue_args`, `dialogue_arg`. Variables live in the runner entity's vars (`$trust` = var
@@ -202,6 +208,9 @@ editor with `ui_create {"template": "dialogue"}`. Set `ui: "none"` to draw your 
 | `dialogue_check` | Lint a script (syntax, missing nodes with did-you-mean, unreachable nodes, unset variables) |
 | `dialogue_preview` | Simulate a branch path and read the transcript and final variables |
 | `dialogue_control` | Start / advance / choose / stop / read a live conversation |
+| `locale_list` / `locale_set` | Locales, coverage and the current one; preview or switch the language |
+| `locale_check` | Missing / unused / undefined keys, placeholder and plural problems, overlong strings, uncovered glyphs |
+| `locale_extract` / `locale_pseudo` | Turn hard-coded texts into keys; a pseudo-locale (accented, 30% longer) for layout tests |
 | `sprite_atlas_pack` | Pack a folder of images into an atlas (trimmed, padded, extruded) + suggested clips |
 | `sprite_sheet_slice` | Name the frames of a grid sheet, turn rows into clips, apply them to an entity |
 | `tilemap_from_ascii` | Create or update a tilemap from an ASCII map and a legend (tile ids, terrains, names) |
@@ -344,7 +353,8 @@ tick (a tilled-soil puff). `particles2d_create` makes tuned ones from presets.
 
 - 32 2D lights per frame (nearest to the view); 2D shadows are screen-space (casters must be on
   screen) and the CPU rasterizer lights per sprite without normal maps or shadows.
-- Text shaping is per code point (kerning, no ligatures or complex scripts such as Arabic/Indic).
+- Text shaping is per code point (kerning, no ligatures or complex scripts such as Arabic/Indic, no
+  right-to-left layout).
 - The UI blends in linear light on the GPU and in sRGB on the CPU (tiny differences on soft edges).
 - World-space canvases are hit-tested through the game camera; focus navigation is order-based.
 - The editor shows UI and sprites in the viewport (click selects them); for the exact 2D framing

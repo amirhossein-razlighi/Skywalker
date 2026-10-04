@@ -114,6 +114,10 @@ public:
     void clearReveal(EntityId e) { reveal_.erase(e); }
     void reset();
 
+    /// Localization (docs/LOCALIZATION.md): maps an element's text / placeholder as written ("@menu.play") to what is shown.
+    using TextResolver = std::function<std::string(const std::string& text, const Scene& scene, EntityId element)>;
+    void setTextResolver(TextResolver resolver) { textResolver_ = std::move(resolver); }
+
     /// Editor selection: selected elements get an outline.
     void setSelection(std::vector<EntityId> selection) { selection_ = std::move(selection); }
     EntityId hovered() const { return hovered_; }
@@ -139,6 +143,7 @@ private:
     std::vector<EntityId> selection_;
     mutable std::unordered_map<std::string, text::TextLayout> textCache_;
     float time_ = 0;
+    TextResolver textResolver_;
 };
 
 /// Anchor presets: anchorMin, anchorMax, pivot (all y down).

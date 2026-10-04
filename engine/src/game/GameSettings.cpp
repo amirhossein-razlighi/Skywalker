@@ -10,6 +10,7 @@
 #include "skywalker/core/Strings.h"
 #include "skywalker/ecs/Components.h"
 #include "skywalker/game/SaveGame.h"
+#include "skywalker/locale/Localization.h"
 
 namespace sky::game {
 
@@ -152,7 +153,7 @@ Result<GameSettings> GameSettings::fromJson(const Json& j) {
     static const std::vector<std::string> keys{"id", "title", "genre", "mood", "pitch", "assets", "startScene", "window", "quality",
                                                "renderScale", "quitOnEscape", "pauseOnFocusLoss", "icon", "bundleId",
                                                "version", "copyright", "include", "exclude", "render", "mounts",
-                                               "saves"};
+                                               "saves", "localization"};
     if (Status s = checkKeys(j, "game.json", keys); !s) return s.error();
     for (auto [key, out] : std::initializer_list<std::pair<const char*, std::string*>>{
              {"id", &g.id}, {"title", &g.title}, {"genre", &g.genre}, {"mood", &g.mood}, {"pitch", &g.pitch}, {"assets", &g.assets},
@@ -217,6 +218,11 @@ Result<GameSettings> GameSettings::fromJson(const Json& j) {
         auto saves = SaveSettings::fromJson(*sv);
         if (!saves) return saves.error();
         g.saves = *sv;
+    }
+    if (const Json* lo = j.find("localization"); lo && !lo->isNull()) {  // validated by LocaleSettings
+        auto settings = loc::LocaleSettings::fromJson(*lo);
+        if (!settings) return settings.error();
+        g.localization = *lo;
     }
 
     if (!validVersion(g.version)) {
@@ -286,6 +292,7 @@ Json GameSettings::toJson() const {
         j["saves"] = saves;
     }
     if (Json layers = renderLayers.toJson(); !layers.members().empty()) j["render"] = Json::object({{"layers", layers}});
+    if (!localization.isNull()) j["localization"] = localization;
     return j;
 }
 

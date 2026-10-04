@@ -443,6 +443,7 @@ public:
 
     TextTemplate tmpl(std::string_view src, int line) {
         TextTemplate t;
+        t.source = std::string(src);
         std::string lit;
         for (size_t i = 0; i < src.size(); ++i) {
             if (src[i] == '\\' && i + 1 < src.size() && (src[i + 1] == '{' || src[i + 1] == '}' || src[i + 1] == '#')) {
@@ -747,6 +748,12 @@ private:
 
 }  // namespace
 
+TextTemplate parseTemplate(std::string_view text) {
+    Script scratch;
+    Parser parser(scratch);
+    return parser.tmpl(text, 0);
+}
+
 std::shared_ptr<const Script> parse(std::string_view source) {
     auto script = std::make_shared<Script>();
     Parser parser(*script);
@@ -970,6 +977,18 @@ Status Runner::update(float dt, VarStore& vars, const RunnerEvents& events) {
     return run(vars, events);
 }
 
+namespace {
+/// The template a line or choice shows: its localized text (by `#line:<id>` tag, or "@key" text) when the
+/// localizer has one, otherwise the script's own.
+TextTemplate localized(const TextTemplate& t, const Json& tags, const RunnerEvents& events) {
+    if (!events.localize) return t;
+    const std::string id = tags.get("line").isString() ? tags.get("line").asString() : std::string();
+    if (id.empty() && (t.source.empty() || t.source[0] != '@')) return t;
+    std::string text = events.localize(id, t.source);
+    return text == t.source ? t : parseTemplate(text);
+}
+}  // namespace
+
 Status Runner::run(VarStore& vars, const RunnerEvents& events) {
     Eval ev{vars, rng_, visits_, {}};
     for (int steps = 0; steps < 100000; ++steps) {
@@ -983,8 +1002,8 @@ Status Runner::run(VarStore& vars, const RunnerEvents& events) {
             case Instr::Op::Line: {
                 ++pc_;
                 if (in.condition && !truthy(ev(in.condition))) break;
-                line_.speaker = in.speaker;
-                line_.text = ev.text(in.text);
+                line_.speaker = events.speaker && !in.speaker.empty() ? events.speaker(in.speaker) : in.speaker;
+                line_.text = ev.text(localized(in.text, in.tags, events));
                 line_.tags = in.tags;
                 state_ = State::Line;
                 return {};
@@ -994,7 +1013,7 @@ Status Runner::run(VarStore& vars, const RunnerEvents& events) {
                 for (size_t k = 0; k < in.options.size(); ++k) {
                     const Option& o = in.options[k];
                     if (o.condition && !truthy(ev(o.condition))) continue;
-                    choices_.push_back({ev.text(o.text), o.tags, static_cast<int>(k)});
+                    choices_.push_back({ev.text(localized(o.text, o.tags, events)), o.tags, static_cast<int>(k)});
                 }
                 if (choices_.empty()) {
                     pc_ = in.target;  // nothing available: skip the group
