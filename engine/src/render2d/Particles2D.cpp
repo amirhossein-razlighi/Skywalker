@@ -160,6 +160,13 @@ void stepParticles2D(Particles2D& p, Vec3 origin, float dt, int frameCount, uint
         }
     }
     simulate(p, origin, dt, frameCount);
+    for (; p.pendingBurst_ > 0; --p.pendingBurst_) {
+        if (static_cast<int>(p.particles_.size()) >= p.maxParticles) {
+            p.pendingBurst_ = 0;
+            break;
+        }
+        spawn(p, origin, frameCount);
+    }
 }
 
 void tickParticles2D(Scene& scene, Assets2D& assets, float dt, const ProcessGate* gate) {

@@ -35,12 +35,12 @@ struct EntityDetails: View {
                                          "foliage", "audio", "listener", "body", "collider", "character", "joint", "nav_agent",
                                          "navmesh", "physics_world", "animator", "attach", "ik", "sequencer", "sprite",
                                          "sprite_anim", "tilemap", "light2d", "parallax", "camera2d", "text", "ui_canvas", "ui",
-                                         "dialogue", "process"]
+                                         "dialogue", "process", "particles2d"]
     /// Components offered by Add Component (transform is always present).
     private static let addable = ["mesh", "light", "camera", "particles", "groom", "water", "terrain", "foliage", "audio",
                                   "listener", "body", "collider", "character", "joint", "nav_agent", "navmesh", "physics_world",
                                   "animator", "attach", "ik", "sequencer", "sprite", "sprite_anim", "tilemap", "light2d",
-                                  "parallax", "camera2d", "text", "ui_canvas", "ui", "dialogue", "process"]
+                                  "parallax", "camera2d", "text", "ui_canvas", "ui", "dialogue", "process", "particles2d"]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -120,6 +120,7 @@ struct EntityDetails: View {
         case "ik": "hand.point.up.left"
         case "sequencer": "film.stack"
         case "process": "pause.circle"
+        case "particles2d": "cloud.snow"
         default: "puzzlepiece"
         }
     }
@@ -138,6 +139,7 @@ struct EntityDetails: View {
         case "attach": "Bone Attachment"
         case "ik": "IK Target"
         case "process": "Process (Pause / Time)"
+        case "particles2d": "Particles 2D"
         default: comp.capitalized
         }
     }

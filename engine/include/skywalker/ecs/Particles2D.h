@@ -67,6 +67,7 @@ struct Particles2D {
     float carry_ = 0.f;
     uint64_t rng_ = 0;
     bool started_ = false;
+    int pendingBurst_ = 0;            // burst(entity, n) from Wander: spawned on the next tick
 
     static const TypeInfo& type();
 };

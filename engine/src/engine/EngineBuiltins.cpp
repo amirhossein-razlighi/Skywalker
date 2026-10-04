@@ -24,8 +24,8 @@ void registerEffectsBuiltins(BuiltinRegistry& reg) {
     burst.params = {{"entity_or_count", kTEntity | kTNumber}, {"count", kTNumber, true}};
     burst.returns = kTNone;
     burst.category = "effects";
-    burst.doc = "Emits particles right now from self's particles component: burst(n), or burst(entity, n) for another "
-                "emitter. Explosions, muzzle flashes, impacts.";
+    burst.doc = "Emits particles right now from self's particles (or particles2d) component: burst(n), or burst(entity, n) "
+                "for another emitter. Explosions, muzzle flashes, impacts, dust puffs.";
     burst.example = "burst(40)";
     burst.owner = "engine";
     burst.fn = [](CallContext& c) -> Value {
@@ -37,7 +37,11 @@ void registerEffectsBuiltins(BuiltinRegistry& reg) {
         } else {
             count = c.number(0);
         }
-        if (!c.scene().get<ParticleEmitter>(target)) c.fail("burst(): the entity has no particles component");
+        if (Particles2D* p2 = c.scene().get<Particles2D>(target)) {  // pixel particles: spawned on the next 2D tick
+            p2->pendingBurst_ = std::min(20000, p2->pendingBurst_ + static_cast<int>(std::clamp(count, 0.0, 20000.0)));
+            return Value();
+        }
+        if (!c.scene().get<ParticleEmitter>(target)) c.fail("burst(): the entity has no particles or particles2d component");
         if (Engine* engine = c.service<Engine>()) {
             engine->particles().burst(target, static_cast<int>(std::clamp(count, 0.0, 20000.0)));
         }

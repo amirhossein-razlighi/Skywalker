@@ -71,6 +71,29 @@ tilemap_inspect {entity:"Level"}      # ASCII per layer, legend with counts, mer
   (see skywalker-physics).
 - From Wander: `tile_at(map, pos)`, `set_tile(map, pos, id|"terrain")`.
 
+### Top-down games (farm sims, RPGs): depth, living tiles, seasons, weather
+
+- **Depth.** Give characters, trees, buildings and props `sprite.ySort:true` (same sorting layer and `order`, pivot at the feet): lower on screen draws in front. A tilemap
+  layer with `"ySort": true` (and `"sortingLayer": "default"`) draws row by row among them, so fences and tall grass hide feet correctly. Tall tiles (the top half of a
+  tree in a tileset) sort with their base through the tileset's `"sortOffset": {"12": 1}`. The ground layers stay plain and draw first.
+- **Living tiles.** A `*.tileset.json` can animate tiles: `"animations": {"17": {"frames": [17, 64, 111, 158], "fps": 3, "stagger": true}}` (water shimmer,
+  swaying flowers; `stagger` desyncs neighbouring cells). Auto-tiled terrains keep working: animate each of the terrain's tiles.
+- **Seasons and variants.** `sprite.palette` / `tilemap.palette` recolor art through a `*.palette.json` (`{"swap": {"#53983f": "#d6e2ee"}}`, alpha 0 hides a color) or a
+  2-row png strip. Author nature in its own ramps, then one palette per season repaints the land, foliage and roofs; switch from Wander: `e.sprite.palette = "palettes/winter.palette.json"`.
+- **Weather and ambient life.** `particles2d_create` makes pixel particles: rain (with ripples), snow, leaves, petals, fireflies, chimney smoke, sparkles. Weather presets wrap,
+  so one emitter fills any camera view. `burst(find("Dust"), 6)` in Wander puffs a `particles2d` emitter; `particles2d_info` reports live counts.
+- **Pixel UI.** Style 9-slice frames with `backgroundImage`, `slice:[5,5,5,5]`, `sliceScale:4` and `imageFilter:"nearest"` (the `pixel` theme samples images nearest); use a
+  pixel `.ttf` from the project as the canvas `font`, at sizes that are whole multiples of its pixel grid.
+
+```text
+particles2d_create {preset:"rain", overrides:{pixelSize:[1, 5], rate:1200}}
+particles2d_create {preset:"fireflies", position:[16, 12, 0], overrides:{area:[20, 10]}}
+particles2d_create {preset:"smoke", name:"Chimney Smoke", parent:"Farmhouse", position:[1.2, 3.8, 0]}
+particles2d_info {}
+entity_update {entity:"Ground", components:{tilemap:{palette:"palettes/winter.palette.json"}}}
+entity_update {entity:"Oak", components:{sprite:{ySort:true, pivot:[0.5, 0], palette:"palettes/autumn.palette.json"}}}
+```
+
 ## Workflow B: UI (HUD, menus, inventory)
 
 `ui_create` builds a whole tree in one undoable step and returns ids plus computed rects in pixels. Node types: `panel image text button toggle slider progress scroll input spacer`.

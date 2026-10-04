@@ -968,7 +968,9 @@ void gatherTilemap(Ctx& c, EntityId e, size_t sceneIndex, const Tilemap& map) {
         if (!layer.visible) continue;
         Vec3 layerOrigin = origin + wz * layer.z;
         int sortLayer = layerIndex(layer.sortingLayer.empty() ? map.sortingLayer : layer.sortingLayer);
-        const int layerOrder = map.order + layer.order + static_cast<int>(li);
+        // Plain layers stack by index; y-sorted layers keep the map/layer order so they interleave with
+        // ySort sprites of the same order (characters walking behind fences and tall grass).
+        const int layerOrder = map.order + layer.order + (layer.ySort ? 0 : static_cast<int>(li));
         // y-sorted layers emit one entry per row (keyed by the row a tile sorts with), others one entry.
         std::map<int, std::vector<SpriteInstance>> rowsOut;
         const size_t poolStart = c.pool.size();

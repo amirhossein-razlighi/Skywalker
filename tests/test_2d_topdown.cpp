@@ -108,7 +108,10 @@ TEST_CASE("2d topdown: ySort tile rows interleave with sprites; tall tiles sort 
     tm.height = 4;
     tm.sortingLayer = "default";
     // Row 0: a tall tile's top (2) whose base is row 1 (1).
-    tm.layers = Json::array({Json::object({{"name", "objects"}, {"data", "rle:2,1,0,3"}, {"ySort", true}})});
+    // An empty plain layer first: a ySort layer keeps the map/layer order whatever its index, so it still
+    // interleaves with ySort sprites of order 0.
+    tm.layers = Json::array({Json::object({{"name", "ground"}, {"data", "rle:4*0"}}),
+                             Json::object({{"name", "objects"}, {"data", "rle:2,1,0,3"}, {"ySort", true}})});
     EntityId hero = s.create("Hero");
     s.get<Transform>(hero)->position = {5, 2.5f, 0};  // between row 1's base (y = 2) and row 0's (y = 3)
     Sprite& sp = s.add<Sprite>(hero);
@@ -137,10 +140,11 @@ TEST_CASE("2d topdown: ySort tile rows interleave with sprites; tall tiles sort 
     // The layer's ySort flag survives the round trip through the editable grid.
     auto grid = tiles::Grid::fromComponent(tm);
     REQUIRE(grid);
-    CHECK(grid->layers[0].ySort);
+    CHECK(grid->layers[1].ySort);
+    CHECK_FALSE(grid->layers[0].ySort);
     Tilemap copy;
     grid->writeTo(copy);
-    CHECK(copy.layers.elements()[0].get("ySort").asBool());
+    CHECK(copy.layers.elements()[1].get("ySort").asBool());
     // Bad animation specs are explained.
     writeText(dir / "bad.tileset.json", R"({"image": "tiles.png", "animations": {"x": [1]}})");
     auto bad = assets.tileset("bad.tileset.json", 16);
@@ -228,6 +232,17 @@ TEST_CASE("2d topdown: particles2d simulate deterministically, cap, wrap around 
         CHECK(std::fabs(w.x - 500.f) <= 5.001f);  // the tiling copy nearest the eye, far from the entity
         CHECK(std::fabs(w.y + 20.f) <= 3.001f);
     }
+    // burst() from Wander queues particles that appear on the next step, even on a silent emitter.
+    Particles2D puff;
+    puff.rate = 0;
+    puff.maxParticles = 8;
+    render2d::stepParticles2D(puff, {0, 0, 0}, 1.f / 60.f, 1, 1);
+    CHECK(puff.particles_.empty());
+    puff.pendingBurst_ = 12;
+    render2d::stepParticles2D(puff, {0, 0, 0}, 1.f / 60.f, 1, 1);
+    CHECK(puff.particles_.size() == 8);  // capped
+    CHECK(puff.pendingBurst_ == 0);
+
     Particles2D other = a;
     other.particles_.clear();
     other.started_ = false;
