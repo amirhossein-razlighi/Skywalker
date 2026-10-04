@@ -165,7 +165,7 @@ struct ResolveUniforms {
 };
 
 struct TemporalUniforms {
-    simd_float4 params, texel;
+    simd_float4 params, texel, clouds;
 };
 
 struct TerrainUniformsGpu {
@@ -2428,8 +2428,11 @@ private:
         TemporalUniforms t{};
         t.params = simd_make_float4(static_cast<float>(mode), weight, 0.9f, volumetricActive_ ? 1.f : 0.f);
         t.texel = simd_make_float4(1.f / hdr_.width, 1.f / hdr_.height, 1.f / volumetric_.width, 1.f / volumetric_.height);
+        t.clouds = simd_make_float4(cloudsActive_ ? 1.f : 0.f, 0, 0, 0);  // clouds seen in front of geometry from above
         id<MTLTexture> dst = taa_[taaCurrent_ ^ 1];
-        fullscreenFU(cmd, temporalPipeline_, dst, {lit_, volumetric_, taa_[taaCurrent_], depthResolved_, fx_->reactiveMask()}, fu, &t, sizeof(t),  // [hair+vfx] reactive
+        fullscreenFU(cmd, temporalPipeline_, dst,
+                     {lit_, volumetric_, taa_[taaCurrent_], depthResolved_, fx_->reactiveMask(), cloudsActive_ ? cloudOut_ : clearCloud_},
+                     fu, &t, sizeof(t),  // [hair+vfx] reactive
                      mode == 1 ? @"TAA" : (mode == 2 ? @"Accumulate" : @"Scene resolve"));
         taaCurrent_ ^= 1;
         (void)frame;

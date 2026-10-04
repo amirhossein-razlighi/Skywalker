@@ -103,6 +103,7 @@ static float3 tonemapFilmic(float3 c) { return saturate(hable(c * 2.0) / hable(f
 struct TemporalUniforms {
     float4 params;  // x = mode, y = accumulation weight (1/(n+1)), z = TAA feedback, w = has volumetric
     float4 texel;   // xy = full-res texel, zw = volumetric texel
+    float4 clouds;  // x = volumetric clouds are active (composite them over geometry seen through the layer)
 };
 
 static float3 toYCoCg(float3 c) {
@@ -110,8 +111,39 @@ static float3 toYCoCg(float3 c) {
 }
 static float3 fromYCoCg(float3 c) { return float3(c.x + c.y - c.z, c.x + c.z, c.x - c.y - c.z); }
 
-static float3 sceneAt(texture2d<float> lit, texture2d<float> vol, constant TemporalUniforms& t, float2 uv) {
+// Volumetric clouds in front of geometry. The sky pass composites the cloud layer over the sky only;
+// when the camera is above (or inside) the layer, e.g. a strategy map or a flight seen from high up,
+// the ground is seen *through* the clouds. The half-resolution cloud march does not depend on the
+// scene there (it covers the slab between the camera and the layer's base), so it is composited over
+// every pixel whose surface lies beyond the point where its ray enters the layer.
+static float3 cloudsOverGeometry(float3 c, constant FrameUniforms& f, texture2d<float> cloudTex, depth2d<float> depthTex,
+                                 float2 uv) {
+    float d = depthTex.sample(pointClamp, uv);
+    if (d >= 0.999999) return c;  // sky: already composited by the sky pass
+    CloudParams cp = cloudParams(f);
+    float3 ro = f.cameraPos.xyz;
+    float camR = length(ro + float3(0, kEarthRadius, 0));
+    float rIn = kEarthRadius + cp.base, rOut = rIn + cp.thickness;
+    if (camR < rIn) return c;  // below the layer: clouds never hide the ground
+    float3 p = reconstructWorld(f, uv, d);
+    float3 rd = p - ro;
+    float dist = length(rd);
+    rd /= max(dist, 1e-4);
+    float tEnter = 0.0;
+    if (camR >= rOut) {
+        float2 s = cloudShell(ro, rd, rOut);
+        if (s.x < 0.0) return c;
+        tEnter = s.x;
+    }
+    if (tEnter >= dist) return c;
+    float4 cl = cloudTex.sample(linearClamp, uv);
+    return c * cl.a + cl.rgb;
+}
+
+static float3 sceneAt(texture2d<float> lit, texture2d<float> vol, constant TemporalUniforms& t, float2 uv,
+                      constant FrameUniforms& f, texture2d<float> cloudTex, depth2d<float> depthTex) {
     float3 c = lit.sample(pointClamp, uv).rgb;
+    if (t.clouds.x > 0.5) c = cloudsOverGeometry(c, f, cloudTex, depthTex, uv);
     if (t.params.w > 0.5) {
         float4 v = vol.sample(linearClamp, uv);
         c = c * v.a + v.rgb;  // haze dims what lies behind it and glows where light crosses it
@@ -156,9 +188,10 @@ fragment float2 motionVectorFragment(FullscreenOut in [[stage_in]], constant Fra
 fragment float4 temporalFragment(FullscreenOut in [[stage_in]], constant FrameUniforms& f [[buffer(0)]],
                                  constant TemporalUniforms& t [[buffer(1)]], texture2d<float> lit [[texture(0)]],
                                  texture2d<float> vol [[texture(1)]], texture2d<float> history [[texture(2)]],
-                                 depth2d<float> depthTex [[texture(3)]], texture2d<float> reactive [[texture(4)]]) {
+                                 depth2d<float> depthTex [[texture(3)]], texture2d<float> reactive [[texture(4)]],
+                                 texture2d<float> cloudTex [[texture(5)]]) {
     float2 uv = uvOf(in);
-    float3 cur = sceneAt(lit, vol, t, uv);
+    float3 cur = sceneAt(lit, vol, t, uv, f, cloudTex, depthTex);
     int mode = int(t.params.x + 0.5);
     if (mode == 0) return float4(cur, 1.0);
     if (mode == 2) {
@@ -174,7 +207,7 @@ fragment float4 temporalFragment(FullscreenOut in [[stage_in]], constant FrameUn
     for (int y = -1; y <= 1; ++y) {
         for (int x = -1; x <= 1; ++x) {
             float2 suv = uv + float2(x, y) * t.texel.xy;
-            float3 c = toYCoCg(sceneAt(lit, vol, t, suv));
+            float3 c = toYCoCg(sceneAt(lit, vol, t, suv, f, cloudTex, depthTex));
             m1 += c;
             m2 += c * c;
             mn = min(mn, c);
