@@ -123,6 +123,30 @@ vars are mirrored into `entity_get` after every tick; replacing a behavior while
 `wander_inspect {entity}` (while playing): current state and its age for each state machine, handlers waiting in `wait`, and vars. Then `logs`, `sim_trace`, `sim_control step` a few ticks at a time.
 Emit events and tags that `playtest_run` understands (`death`, `fail`, `damage`, `objective`, `checkpoint`, `pickup`; tags `player goal hazard enemy`) so bots can measure the game (skywalker-studio).
 
+## Save games (checkpoints, autosave, Continue)
+
+Engine doc: `skywalker://docs/SAVE_GAMES`. Mark what a save restores with the `persist` component: `{id: "player"}` on the player, `{}` on doors and pickups placed in
+the scene, `{spawned: true}` on the root of prefabs spawned at run time, `{mode: "fields", fields: ["transform.position"]}` to save only some fields. Game-wide state goes in
+`game_var(name, value)`, not on a random entity. A save also keeps the exact behavior state (states, timers, waiting handlers, random generator), so a load replays the
+original run; behaviors keep the game's current code.
+
+```text
+on event "checkpoint" with cp
+  game_var("checkpoint", cp.name)
+  save_game("autosave", {title: cp.title, chapter: game_var("chapter")})   -- runs at the end of the tick
+end
+on ui "Continue"
+  load_game("autosave")      -- false when the slot is empty; `on loaded` follows next tick
+end
+on loaded
+  find("Chapter").text.text = "Chapter " + str(game_var("chapter"))
+end
+```
+
+Also `has_save(slot)`, `list_saves()`, `delete_save(slot)`, `on saved`, `on event "save_failed"`. Verify while playing: `save_game {slot:"t"}`, `sim_control {action:"step", ticks:300}`,
+`load_game {slot:"t"}`, then `save_inspect {slot:"t"}`: every persisted entity must read `same`; `differs` rows name the fields that did not restore. `save_list` shows slots and
+damaged files. When the shape of saved data changes, bump `game.json` `saves.version` and add `fn migrate(from, data)` (`saves.migrate`).
+
 ## Graph view and specs
 
 `behavior_graph {entity, name, palette:true}` returns a visual node graph (`format: wander-graph`): bodies for each handler/fn/test/state, exec-flow nodes wired by exec pins, data nodes for expressions, inline literal pins, saved layout.
