@@ -257,6 +257,8 @@ public:
     Status saveScene(const std::string& path);
     const std::string& scenePath() const { return scenePath_; }
     std::string resolvePath(const std::string& path) const;
+    /// Re-reads game.json "mounts" (shared folders such as an asset kit, see AssetMount); returns warnings.
+    std::vector<std::string> reloadMounts();
     Result<std::string> importMesh(const std::string& path);
 
     // --- Asset system ------------------------------------------------------------------

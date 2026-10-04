@@ -332,7 +332,9 @@ Result<PackageReport> buildGame(const PackageOptions& options) {
             if (rel == "game.json") continue;  // written below, with the resolved settings
             fs::path to = gameDir / rel;
             fs::create_directories(to.parent_path(), ec);
-            fs::copy_file(project / rel, to, fs::copy_options::overwrite_existing, ec);
+            auto src = collected->mounted.find(rel);
+            fs::copy_file(src != collected->mounted.end() ? fs::path(src->second) : project / rel, to,
+                          fs::copy_options::overwrite_existing, ec);
             if (ec) fail("io_error", "cannot copy " + rel + ": " + ec.message());
             shipped.emplace_back(rel, fs::file_size(to, ec));
         }
@@ -340,6 +342,7 @@ Result<PackageReport> buildGame(const PackageOptions& options) {
             GameSettings shippedSettings = settings;
             shippedSettings.include.clear();  // build-time only
             shippedSettings.exclude.clear();
+            shippedSettings.mounts.clear();  // mounted files were copied in under their mount names
             std::string text = shippedSettings.toJson().dump(2) + "\n";
             writeFile(gameDir / "game.json", text);
             shipped.emplace_back("game.json", text.size());

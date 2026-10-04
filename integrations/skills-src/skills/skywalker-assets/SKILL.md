@@ -73,6 +73,22 @@ after import, capture it next to a 1.8 m reference and fix scale with `transform
 - Rename or move with `asset_move {asset, to}` (GUID and scene references follow); never rename files on disk behind the engine's back.
   `asset_refresh` rescans after you add files with other tools.
 
+## Shared kits outside the project (game.json `mounts`)
+
+A folder of assets shared by several projects (characters, props, materials) is mounted under a top-level name:
+`game_settings {operation:"set", settings:{mounts:{kit:"../_kit"}}}` (or edit `game.json`). Then `kit/...` paths work
+everywhere a project path does: `prefab_instantiate {prefab:"kit/characters/guard.prefab.json"}`, materials, textures,
+animation libraries, `asset_list {query:"kit/props/*"}`. The kit's files keep their `.meta` import settings, and
+`game_build` copies the mounted files a game uses into the package. Kit prefabs are tagged `kit-character` / `kit-prop`,
+which `scene_audit` uses to suggest replacements for placeholder shapes.
+
+## Pinned downloads for a whole project (`media/demo/assetkit.py`)
+
+For many assets, keep them out of version control in a pinned manifest instead of one `asset_download` call each:
+`python3 media/demo/assetkit.py add-polyhaven assets.json model wooden_crate_01 --res 2k`, `add-ambientcg`, then `pin`
+(downloads and records sha256), `fetch` (parallel, resumable, verified; into the ignored `downloads/` folder), `check`
+(every license in the allowlist: CC0, CC-BY, MIT, Apache, OFL) and `credits` (writes CREDITS.md).
+
 ## Checklist after bringing an asset in
 
 1. `asset_preview` or a capture next to a reference-size object: scale, orientation (faces -Z), pivot at the feet, materials present.

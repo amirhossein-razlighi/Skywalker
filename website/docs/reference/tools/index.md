@@ -5,7 +5,7 @@ title: "Tools"
 
 # Tools
 
-Skywalker exposes **195 tools** (engine 0.1.0). The editor, its in-app agents, the CLI and every MCP client call the same tools with the same JSON arguments, so anything you read here works everywhere. 119 tools change the project; every such change is undoable and attributed to whoever made it.
+Skywalker exposes **196 tools** (engine 0.1.0). The editor, its in-app agents, the CLI and every MCP client call the same tools with the same JSON arguments, so anything you read here works everywhere. 119 tools change the project; every such change is undoable and attributed to whoever made it.
 
 Arguments are validated before a tool runs: unknown keys, wrong types and bad enum values fail with a *did you mean …?* hint. Each tool page shows the arguments, the annotations MCP clients use for approvals, and the same call as a tool call, a CLI command and a raw MCP request.
 
@@ -14,7 +14,7 @@ Arguments are validated before a tool runs: unknown keys, wrong types and bad en
 | [Scene](scene.md) | 7 | Orient yourself, query and save scenes, and batch many edits into one undo step. |
 | [Entity](entity.md) | 10 | Create, read, change, move, duplicate and delete entities; read component schemas. |
 | [History](history.md) | 1 | Undo, redo and the attributed edit history. |
-| [View](view.md) | 8 | See the scene: captures with entity boxes, debug views, multi-view sheets, selection and the editor camera. |
+| [View](view.md) | 9 | See the scene: captures with entity boxes, debug views, multi-view sheets, selection and the editor camera. |
 | [Render](render.md) | 17 | Environment, effects, hair, shaders, render layers, impostors, benchmarks and the movie renderer. |
 | [World](world.md) | 15 | Terrain, foliage, water queries and spatial placement on real geometry. |
 | [Asset](asset.md) | 27 | The asset database, import and download, materials, textures, prefabs, audio generation and previews. |
@@ -55,6 +55,7 @@ Arguments are validated before a tool runs: unknown keys, wrong types and bad en
 | [`transform`](entity.md#transform) | Entity | Move/rotate/scale an entity. |
 | [`history`](history.md#history) | History | Undo or redo edits (by anyone), or list recent history entries with who made them. |
 | [`camera_set`](view.md#camera_set) | View | Point the editor camera (what the human sees and the default capture view). |
+| [`scene_audit`](view.md#scene_audit) | View | Quality gate before filming or screenshots (read-only, CPU, no GPU needed). |
 | [`selection_get`](view.md#selection_get) | View | Entities the human currently has selected in the editor ("this", "these" usually means them). |
 | [`selection_set`](view.md#selection_set) | View | Select entities in the editor to show the human what you mean. |
 | [`viewport_capture`](view.md#viewport_capture) | View | Render the scene and return a PNG plus every visible entity with its on-screen box [x, y, w, h]. |
@@ -213,7 +214,7 @@ Arguments are validated before a tool runs: unknown keys, wrong types and bad en
 | [`dcc_session_stop`](dcc.md#dcc_session_stop) | DCC | Stop the bridge. |
 | [`game_build`](files.md#game_build) | Files | Package the project as a standalone macOS app (Name.app): the player runtime, the scenes, the assets they reference (computed from scenes, prefabs, materials and Wander scripts; all_assets ships everything), scripts, the project's native module (compiled now), Info.plist, an icon made from the game.json icon, and an ad-hoc code signature. |
 | [`game_run`](files.md#game_run) | Files | Start the standalone player on the current project as a separate process to try the game like a player would (real window, real input, audio). |
-| [`game_settings`](files.md#game_settings) | Files | Read or change the project's shipping settings in game.json: startScene, window {width,height,fullscreen,resizable,vsync}, quality (low\|medium\|high\|ultra), renderScale, quitOnEscape, pauseOnFocusLoss, icon (a PNG, 1024x1024 recommended), bundleId (reverse-DNS), version, copyright, plus include/exclude globs for packaging, and the description fields (id, title, genre, mood, pitch). |
+| [`game_settings`](files.md#game_settings) | Files | Read or change the project's shipping settings in game.json: startScene, window {width,height,fullscreen,resizable,vsync}, quality (low\|medium\|high\|ultra), renderScale, quitOnEscape, pauseOnFocusLoss, icon (a PNG, 1024x1024 recommended), bundleId (reverse-DNS), version, copyright, plus include/exclude globs for packaging, and the description fields (id, title, genre, mood, pitch), and mounts: shared folders outside the project addressed by a top-level name, e.g. |
 | [`legal_info`](files.md#legal_info) | Files | Skywalker's Terms of Use, Privacy Notice and license: their versions and effective dates, MCP resource URIs (skywalker://docs/legal/TERMS, skywalker://docs/legal/PRIVACY, skywalker://docs/LICENSING), whether a person has accepted the current versions on this computer (status current, outdated, not_recorded), and a verified summary of data practices (no telemetry; data leaves the computer only to the AI provider or download URL the human chose). |
 | [`asset_download`](network.md#asset_download) | Network | Download an openly licensed asset (3D model .glb/.gltf/.obj/.ply/.stl, texture, .hdr sky panorama, audio, or a .zip pack of them) from a URL into the project, record its license and author, add it to CREDITS.md, and (for models) import it — optionally placing it in the scene. |
 | [`tool_approve`](tools.md#tool_approve) | Custom tools | A HUMAN approves (or rejects with approve:false) the current definition of a custom tool that needs approval (it mutates, writes files or reaches the network, or the policy is "ask"). |

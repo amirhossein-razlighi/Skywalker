@@ -7,7 +7,7 @@ title: "View tools"
 
 See the scene: captures with entity boxes, debug views, multi-view sheets, selection and the editor camera.
 
-8 tools in the `view` category. Badges: **read-only** tools never change the project; **mutating** tools are undoable and attributed; **open-world** tools reach outside the engine and MCP clients ask before running them.
+9 tools in the `view` category. Badges: **read-only** tools never change the project; **mutating** tools are undoable and attributed; **open-world** tools reach outside the engine and MCP clients ask before running them.
 
 | Tool | Summary |
 |---|---|
@@ -19,6 +19,7 @@ See the scene: captures with entity boxes, debug views, multi-view sheets, selec
 | [`selection_get`](#selection_get) | Entities the human currently has selected in the editor ("this", "these" usually means them). |
 | [`selection_set`](#selection_set) | Select entities in the editor to show the human what you mean. |
 | [`viewport_multi`](#viewport_multi) | One image with four views of the scene (or an entity): perspective (top-left), top (top-right), front (bottom-left) and side (bottom-right). |
+| [`scene_audit`](#scene_audit) | Quality gate before filming or screenshots (read-only, CPU, no GPU needed). |
 
 ### `viewport_capture` { #viewport_capture }
 
@@ -355,6 +356,57 @@ One image with four views of the scene (or an entity): perspective (top-left), t
         "arguments": {
           "focus": "Village",
           "size": 1024
+        }
+      }
+    }
+    ```
+
+### `scene_audit` { #scene_audit }
+
+**Audit what the camera sees** <span class="sky-badge sky-badge--ro" title="Never changes the scene">read-only</span>
+
+Quality gate before filming or screenshots (read-only, CPU, no GPU needed). Builds the frame a camera sees and reports: visible builtin PRIMITIVE meshes (cube, sphere, capsule, cylinder, plane, cone, quad, torus) with entity and screen coverage % (occlusion-aware: a ground plane hidden under terrain or water does not count); PRIMITIVE CHARACTERS (an animator / character controller / nav agent on primitive meshes, or primitive parts arranged like a body, e.g. a sphere head on a capsule) with a kit character to replace them; DEFAULT grey or UNTEXTURED materials on visible meshes; missing texture / material / HDRI files; big meshes without LODs; texel-density outliers; a default sky; lights without shadows on hero meshes. Returns `pass` and `warnings` [{severity, code, message, hint, entity}]. Views: `camera` {eye, target, fov}, several `cameras`, `camera_entity`, `view` (editor | scene), or a `sequence` (path or sequencer entity) at `times` (seconds; default: 12 evenly spaced shots). strict=true fails when primitives (or default materials) cover more than 0.1% of any view (default limit 2%); override with max_primitive_coverage (percent). stylized=true accepts flat-colored materials (a deliberate stylized look). Examples: {"view": "scene", "strict": true}, {"sequence": "sequences/hero.sequence.json", "times": [1, 4, 8], "strict": true}, {"camera": {"eye": [0, 1.7, 5], "target": [0, 1.2, 0], "fov": 40}}.
+
+| Argument | Type | Required | Description | Values |
+|---|---|---|---|---|
+| `camera` | object |  | Custom view {eye: [x,y,z], target: [x,y,z], fov: degrees} |  |
+| `cameras` | object[] |  | Several custom views [{eye, target, fov, label?}] |  |
+| `camera_entity` | integer \| string |  | Audit through this camera entity |  |
+| `view` | string |  | Editor camera (default) or the scene's primary camera | `editor` `scene` |
+| `sequence` | any |  | Sequence path (.sequence.json) or an entity with a sequencer: audit its live camera |  |
+| `times` | number[] |  | Sequence times in seconds (default: 12 shots across it) |  |
+| `strict` | boolean |  | Fail when primitives or default materials cover more than 0.1% of a view (showcase bar) |  |
+| `max_primitive_coverage` | number |  | Primitive coverage limit in percent (default 0.1 strict, 2 otherwise) |  |
+| `stylized` | boolean |  | Deliberately stylized look: flat-colored materials are info, not warnings |  |
+| `width` | integer |  | Frame width for the aspect ratio (default 1920) |  |
+| `height` | integer |  | Frame height (default 1080) |  |
+| `resolution` | integer |  | Coverage raster width in pixels (default 320, max 1280); higher = finer coverage |  |
+| `details` | boolean |  | Include per-view details when auditing several views (default true) |  |
+
+=== "Tool call"
+
+    ```tool
+    scene_audit {"view": "scene", "strict": true}
+    ```
+
+=== "CLI"
+
+    ```bash
+    skywalker call scene_audit '{"view": "scene", "strict": true}' --project my_game
+    ```
+
+=== "MCP request"
+
+    ```json
+    {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "method": "tools/call",
+      "params": {
+        "name": "scene_audit",
+        "arguments": {
+          "view": "scene",
+          "strict": true
         }
       }
     }

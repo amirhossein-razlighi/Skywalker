@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstdlib>
 #include <deque>
 #include <filesystem>
 #include <fstream>
@@ -93,32 +94,50 @@ class Collector {
 public:
     explicit Collector(const fs::path& root) : root_(root) {}
 
-    void scanProject() {
-        std::error_code ec;
-        for (fs::recursive_directory_iterator it(root_, fs::directory_options::skip_permission_denied, ec), end; it != end;
-             it.increment(ec)) {
-            if (ec) break;
-            std::string name = it->path().filename().string();
-            if (it->is_directory(ec)) {
-                if (neverShippedDir(name)) it.disable_recursion_pending();
-                continue;
-            }
-            if (!it->is_regular_file(ec) || editorOnlyFile(name)) continue;
-            std::string rel = fs::relative(it->path(), root_, ec).generic_string();
-            if (rel.empty()) continue;
-            all_.insert(rel);
-        }
-        // GUID references ("guid:...") resolve through the .meta sidecars, which ship with their asset.
+    void scanProject(const std::vector<std::pair<std::string, std::string>>& mounts = {}) {
+        scanFolder(root_, "", mounts);
+        for (const auto& [name, folder] : mounts) scanFolder(folder, name, {});
         for (const auto& rel : all_) {
             if (!endsWith(rel, ".meta")) continue;
             std::string target = rel.substr(0, rel.size() - 5);
             if (!all_.count(target)) continue;
-            if (auto j = Json::parse(readText(root_ / rel, 1 << 20)); j && j->isObject()) {
+            if (auto j = Json::parse(readText(abs(rel), 1 << 20)); j && j->isObject()) {
                 const std::string& guid = j->get("guid").asString();
                 if (!guid.empty()) guids_.emplace(guid, target);
             }
         }
     }
+
+    /// Absolute source of a project path (mounted files live outside the project).
+    fs::path abs(const std::string& rel) const {
+        if (auto it = mounted_.find(rel); it != mounted_.end()) return it->second;
+        return root_ / rel;
+    }
+    const std::map<std::string, std::string>& mounted() const { return mounted_; }
+
+    void scanFolder(const fs::path& folder, const std::string& prefix, const std::vector<std::pair<std::string, std::string>>& mounts) {
+        std::error_code ec;
+        for (fs::recursive_directory_iterator it(folder, fs::directory_options::skip_permission_denied, ec), end; it != end;
+             it.increment(ec)) {
+            if (ec) break;
+            std::string name = it->path().filename().string();
+            if (it->is_directory(ec)) {
+                bool shadowed = prefix.empty() && it.depth() == 0 &&
+                                std::any_of(mounts.begin(), mounts.end(), [&](const auto& m) { return m.first == name; });
+                if (neverShippedDir(name) || shadowed) it.disable_recursion_pending();
+                continue;
+            }
+            if (!it->is_regular_file(ec) || editorOnlyFile(name)) continue;
+            std::string rel = fs::relative(it->path(), folder, ec).generic_string();
+            if (rel.empty()) continue;
+            if (!prefix.empty()) {
+                rel = prefix + "/" + rel;
+                mounted_[rel] = it->path().string();
+            }
+            all_.insert(rel);
+        }
+    }
+
 
     const std::set<std::string>& all() const { return all_; }
     bool has(const std::string& rel) const { return all_.count(rel) > 0; }
@@ -238,7 +257,7 @@ private:
 
     void visit(const std::string& rel) {
         std::string l = str::lower(rel);
-        fs::path path = root_ / rel;
+        fs::path path = abs(rel);
         if (endsWith(l, ".json") || endsWith(l, ".meta") || endsWith(l, ".gltf") || endsWith(l, ".anim")) {
             std::string text = readText(path);
             size_t first = text.find_first_not_of(" \t\r\n");
@@ -263,6 +282,7 @@ private:
 
     fs::path root_;
     std::set<std::string> all_, shipped_;
+    std::map<std::string, std::string> mounted_;  // "kit/a.png" -> absolute file
     std::unordered_map<std::string, std::string> guids_;
     std::map<std::string, std::string> missing_;
     std::deque<std::string> queue_;
@@ -304,7 +324,18 @@ Result<CollectedFiles> collectGameFiles(const std::string& projectDir, const Gam
     out.startScene = *scene;
 
     Collector c(root);
-    c.scanProject();
+    std::vector<std::pair<std::string, std::string>> mounts;
+    for (const auto& [name, folder] : settings.mounts) {
+        fs::path p = folder;
+        if (!folder.empty() && folder[0] == '~') {
+            const char* home = std::getenv("HOME");
+            p = fs::path(home ? home : "") / folder.substr(folder.size() > 1 ? 2 : 1);
+        } else if (p.is_relative()) {
+            p = root / p;
+        }
+        if (fs::is_directory(p, ec)) mounts.emplace_back(name, p.lexically_normal().string());
+    }
+    c.scanProject(mounts);
     for (const char* rootFile : {"game.json", "input.json", "audio.json", "CREDITS.md", "LICENSE", "LICENSE.md", "LICENSE.txt",
                                  "NOTICE", "NOTICE.md", "NOTICE.txt"}) {
         c.addRoot(rootFile);
@@ -319,6 +350,9 @@ Result<CollectedFiles> collectGameFiles(const std::string& projectDir, const Gam
     c.run();
 
     out.files = c.take();
+    for (const auto& f : out.files) {
+        if (auto it = c.mounted().find(f); it != c.mounted().end()) out.mounted.emplace(f, it->second);
+    }
     out.referenced = c.referenced();
     out.missing = c.takeMissing();
     for (auto it = out.files.begin(); it != out.files.end();) {
@@ -330,7 +364,7 @@ Result<CollectedFiles> collectGameFiles(const std::string& projectDir, const Gam
         }
     }
     for (const auto& f : out.files) {
-        auto size = fs::file_size(root / f, ec);
+        auto size = fs::file_size(out.mounted.count(f) ? fs::path(out.mounted.at(f)) : root / f, ec);
         if (!ec) out.bytes += size;
     }
     return out;

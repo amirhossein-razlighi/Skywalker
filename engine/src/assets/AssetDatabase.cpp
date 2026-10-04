@@ -73,25 +73,73 @@ Json AssetRecord::toJson() const {
 
 AssetDatabase::AssetDatabase(std::string root) : root_(fs::path(root).lexically_normal().string()) {}
 
+namespace {
+/// "kit/a/b.png" -> ("kit", "a/b.png"); ("", path) without a separator.
+std::pair<std::string_view, std::string_view> firstComponent(std::string_view p) {
+    size_t slash = p.find_first_of("/\\");
+    if (slash == std::string_view::npos) return {p, {}};
+    return {p.substr(0, slash), p.substr(slash + 1)};
+}
+
+/// `abs` relative to `root` ("" when outside it), lexically first, canonically as a fallback.
+std::string relativeTo(const fs::path& abs, const std::string& root) {
+    std::error_code ec;
+    std::string s = abs.lexically_normal().lexically_relative(fs::path(root).lexically_normal()).generic_string();
+    if (s.empty() || s.rfind("..", 0) == 0) {
+        fs::path rel = fs::relative(abs.lexically_normal(), fs::path(root), ec);
+        s = ec ? std::string() : rel.generic_string();
+    }
+    if (s.empty() || s == "." || s.rfind("..", 0) == 0) return {};
+    return s;
+}
+}  // namespace
+
+void AssetDatabase::setMounts(std::vector<AssetMount> mounts) {
+    for (auto& m : mounts) m.root = fs::path(m.root).lexically_normal().string();
+    while (true) {  // forget records of mounts that went away (they are rescanned on refresh)
+        bool erased = false;
+        for (auto it = records_.begin(); it != records_.end(); ++it) {
+            const AssetMount* old = mountOf(it->first);
+            if (!old) continue;
+            bool kept = std::any_of(mounts.begin(), mounts.end(), [&](const AssetMount& m) { return m.name == old->name && m.root == old->root; });
+            if (kept) continue;
+            byGuid_.erase(it->second.guid);
+            records_.erase(it);
+            erased = true;
+            break;
+        }
+        if (!erased) break;
+    }
+    mounts_ = std::move(mounts);
+}
+
+const AssetMount* AssetDatabase::mountOf(std::string_view projectPath) const {
+    if (mounts_.empty()) return nullptr;
+    auto [head, rest] = firstComponent(projectPath);
+    for (const auto& m : mounts_) {
+        if (head == m.name) return &m;
+    }
+    return nullptr;
+}
+
 std::string AssetDatabase::absolute(std::string_view projectPath) const {
     fs::path p(projectPath);
     if (p.is_absolute()) return p.string();
+    if (const AssetMount* m = mountOf(projectPath)) {
+        return (fs::path(m->root) / std::string(firstComponent(projectPath).second)).lexically_normal().string();
+    }
     return (fs::path(root_) / p).lexically_normal().string();
 }
 
 std::string AssetDatabase::relative(std::string_view path) const {
-    std::error_code ec;
-    fs::path abs = fs::path(path).is_absolute() ? fs::path(path) : fs::path(root_) / path;
     // Lexical first: this runs for every material / prefab lookup of a frame, and the
     // canonicalizing fs::relative costs several file-system calls. Symlinked spellings of the
     // root (e.g. /tmp vs /private/tmp) fall back to it.
-    std::string s = abs.lexically_normal().lexically_relative(fs::path(root_).lexically_normal()).generic_string();
-    if (s.empty() || s.rfind("..", 0) == 0) {
-        fs::path rel = fs::relative(abs.lexically_normal(), fs::path(root_), ec);
-        s = ec ? std::string() : rel.generic_string();
+    fs::path abs = fs::path(path).is_absolute() ? fs::path(path) : fs::path(absolute(path));
+    for (const auto& m : mounts_) {
+        if (std::string s = relativeTo(abs, m.root); !s.empty()) return m.name + "/" + s;
     }
-    if (s.empty() || s.rfind("..", 0) == 0) return {};
-    return s;
+    return relativeTo(abs, root_);
 }
 
 std::string AssetDatabase::newGuid() {
@@ -161,14 +209,33 @@ std::vector<std::string> AssetDatabase::refresh() {
     std::unordered_map<std::string, bool> present;
     std::error_code ec;
     if (!fs::exists(root_, ec)) return changed;
-    fs::recursive_directory_iterator it(root_, fs::directory_options::skip_permission_denied, ec), end;
+    scanFolder(root_, present, changed, true);
+    for (const auto& m : mounts_) scanFolder(m.root, present, changed, false);
+    for (auto rit = records_.begin(); rit != records_.end();) {
+        if (!present.count(rit->first)) {
+            byGuid_.erase(rit->second.guid);
+            rit = records_.erase(rit);
+        } else {
+            ++rit;
+        }
+    }
+    return changed;
+}
+
+void AssetDatabase::scanFolder(const std::string& folder, std::unordered_map<std::string, bool>& present,
+                               std::vector<std::string>& changed, bool skipMountNames) {
+    std::error_code ec;
+    if (!fs::exists(folder, ec)) return;
+    fs::recursive_directory_iterator it(folder, fs::directory_options::skip_permission_denied, ec), end;
     size_t visited = 0;
     for (; it != end && visited < 50000; it.increment(ec)) {
         if (ec) break;
         ++visited;
         const fs::path& p = it->path();
         if (it->is_directory(ec)) {
-            if (skippedDir(p)) it.disable_recursion_pending();
+            // A project folder named like a mount is shadowed by the mount.
+            const bool shadowed = skipMountNames && it.depth() == 0 && mountOf(p.filename().string() + "/x");
+            if (skippedDir(p) || shadowed) it.disable_recursion_pending();
             continue;
         }
         AssetType type = assetTypeForPath(p.filename().string());
@@ -209,15 +276,6 @@ std::vector<std::string> AssetDatabase::refresh() {
         records_[rel] = std::move(r);
         changed.push_back(rel);
     }
-    for (auto rit = records_.begin(); rit != records_.end();) {
-        if (!present.count(rit->first)) {
-            byGuid_.erase(rit->second.guid);
-            rit = records_.erase(rit);
-        } else {
-            ++rit;
-        }
-    }
-    return changed;
 }
 
 const AssetRecord* AssetDatabase::find(std::string_view ref) const {

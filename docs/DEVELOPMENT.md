@@ -107,3 +107,30 @@ both a 600-tick simulation with a Metal render and the full test suite.
   to use the tool and what it returns.
 - Swift: Swift 6 language mode, `@MainActor` stores, `@Observable`, and `Sendable` values
   across awaits.
+
+## Showcase builds and the quality gate
+
+Showcase games are built by scripts that drive the engine through its tools (`media/demo/games/*.py`, `media/demo/kit.py`).
+Three pieces keep them reproducible and at the quality bar:
+
+- **Pinned assets** (`media/demo/assetkit.py`, see [ASSETS](ASSETS.md#pinned-asset-manifests-media-demo-assetkit-py)):
+  every third-party file in an `assets.json` manifest with URL, sha256, license, author and source page; `fetch` brings
+  them into the gitignored `downloads/`, `check` refuses licenses outside the allowlist, `credits` writes CREDITS.md.
+- **Shared kits**: characters, props and materials used by several showcases live in one kit folder next to them,
+  mounted by each project's game.json (`"mounts": {"kit": "../_kit"}`), so prefabs are referenced as
+  `kit/characters/....prefab.json` ([ASSETS](ASSETS.md#shared-kits-mounts-in-gamejson)).
+- **The gate**, before filming or reporting a showcase done:
+
+```bash
+python3 media/demo/showcase_gate.py examples/my_game --preview          # 1280x720, 8 samples: while iterating
+python3 media/demo/showcase_gate.py examples/my_game                    # 1920x1080, 16 samples: the final sheet
+python3 media/demo/showcase_gate.py examples/my_game --sequences sequences/intro.sequence.json,sequences/chase.sequence.json
+```
+
+It spreads 12 shots over the project's sequences (every `*.sequence.json` played by an entity of the scene, or the ones
+given), renders each through the sequence's live camera, audits it with `scene_audit` (strict: visible builtin primitives or
+default materials above 0.1% of the image, primitive characters and missing files fail), benchmarks the first hero views with
+`perf_stats` (GPU ms, `gpuFaults` must be 0), and writes `shots/shot_NN.jpg` (<= 400 KB), `shots/contact_sheet.jpg`
+(<= 1.5 MB) and `shots/gate_report.json`. It prints PASS or FAIL and exits non-zero on FAIL. `--stylized` accepts flat-colored
+materials for a deliberate stylized look; `--no-strict` uses the 2% limit. Renders take the GPU lock, so run one gate at a time.
+The gate is a floor, not the bar: look at the sheet as an art director would (composition, light, scale, stretching).

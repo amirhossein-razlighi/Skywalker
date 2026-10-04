@@ -132,7 +132,9 @@ void addGameTools(Engine& engine, ToolRegistry& reg) {
             "Read or change the project's shipping settings in game.json: startScene, window {width,height,fullscreen,resizable,vsync}, "
             "quality (low|medium|high|ultra), renderScale, quitOnEscape, pauseOnFocusLoss, icon (a PNG, 1024x1024 recommended), "
             "bundleId (reverse-DNS), version, copyright, plus include/exclude globs for packaging, and the description fields "
-            "(id, title, genre, mood, pitch). `get` returns the effective settings, the resolved start scene and validation "
+            "(id, title, genre, mood, pitch), and mounts: shared folders outside the project addressed by a top-level name, e.g. "
+            "{\"mounts\": {\"kit\": \"../_kit\"}} makes kit/characters/guard.prefab.json resolve into ../_kit (assets, prefabs, materials "
+            "and animations load from it; game_build copies what the game uses). `get` returns the effective settings, the resolved start scene and validation "
             "problems. `set` merges the given fields (null removes one) and validates them. Example: {\"operation\":\"set\","
             "\"settings\":{\"title\":\"Sky Dash\",\"startScene\":\"scenes/main.sky.json\",\"window\":{\"width\":1280,\"height\":720}}}",
             "files",
@@ -167,6 +169,11 @@ void addGameTools(Engine& engine, ToolRegistry& reg) {
                     std::ofstream out(file);
                     out << current.dump(2) << "\n";
                     if (!out) return ToolResult::error(Error::make("io_error", "cannot write " + file.string()));
+                    out.close();
+                    if (a.get("settings").contains("mounts")) {
+                        engine.reloadMounts();
+                        engine.refreshAssets();
+                    }
                 }
                 auto settings = game::GameSettings::load(dir);
                 if (!settings) return ToolResult::error(settings.error());
@@ -174,6 +181,11 @@ void addGameTools(Engine& engine, ToolRegistry& reg) {
                 if (auto scene = game::resolveStartScene(dir, *settings)) j["start_scene"] = *scene;
                 else j["start_scene_problem"] = scene.error().message;
                 j["bundle_id"] = settings->effectiveBundleId();
+                if (!engine.assets().mounts().empty()) {
+                    Json m = Json::object();
+                    for (const auto& mt : engine.assets().mounts()) m[mt.name] = mt.root;
+                    j["mounted"] = m;
+                }
                 return ToolResult::json(j, settings->fromFile ? "game.json is valid" : "no game.json yet: showing the defaults");
             }};
         def.openWorld = false;

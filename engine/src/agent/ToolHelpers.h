@@ -69,5 +69,6 @@ void addPrefabTools(Engine& engine, ToolRegistry& reg);  // PrefabTools.cpp: ent
 void addLegalTools(Engine& engine, ToolRegistry& reg);  // LegalTools.cpp: legal_info (docs/legal/)
 void addCustomToolTools(Engine& engine, ToolRegistry& reg);  // CustomToolTools.cpp: tool_define, tool_test, ... (docs/CUSTOM_TOOLS.md)
 void addAgentLinkTools(Engine& engine, ToolRegistry& reg);  // AgentLinkTools.cpp: events_poll, tool_host_* (docs/PYTHON_AGENTS.md)
+void addAuditTools(Engine& engine, ToolRegistry& reg);   // AuditTools.cpp: scene_audit (look-dev quality gate)
 
 }  // namespace sky::tools

@@ -147,6 +147,38 @@ fluids are not part of them.
 `clay: true` renders every surface as matte white clay. Sketch, clay and final make
 "sketch to fill" sequences.
 
+### Scene audit (`scene_audit`): the quality gate before filming
+
+`scene_audit` answers "is anything on camera a placeholder?" for any view: a custom `camera` {eye, target, fov}, several
+`cameras`, a `camera_entity`, the `scene` or editor view, or a `sequence` at `times` (default: 12 shots spread over it).
+It builds the frame the camera would render and rasterizes it on the CPU into a coarse depth buffer (320 px wide by
+default, `resolution` up to 1280): every draw (skinned characters in their current pose), terrains and water. Coverage is
+therefore occlusion-aware: a ground plane under terrain or water, or a cube behind a wall, does not count. Very heavy
+meshes are rasterized from a coarser LOD. No GPU is used, so it runs in tests and headless CI.
+
+| Finding | What it means | Severity |
+|---|---|---|
+| `primitives` | builtin cube, sphere, plane, cylinder, cone, quad, capsule, torus on screen, each with its entity and coverage % | `primitive_coverage` error when the total exceeds the limit (2%, 0.1% with `strict`, or `max_primitive_coverage`) |
+| `primitiveCharacters` | an animator, character controller or nav agent on primitive meshes, or primitive parts arranged like a body (a sphere head resting on a capsule or cylinder torso, or parts named head / body / arm / leg) | error, with a kit character `suggestion` when a kit is mounted (`kit-character` prefabs) |
+| `materials` | `default` (the grey default surface, no material) and `untextured` (a flat color: no base-color texture, not emissive, not unlit) | default: error above the limit; untextured: warning (`stylized: true` makes it info) |
+| `missing_texture`, `missing_material`, `missing_mesh`, `missing_hdri` | files that do not load (e.g. downloads not fetched) | error |
+| `missing_lods` | a visible mesh of 20,000+ triangles without an LOD chain | warning |
+| `texelDensity` | base-color texels per meter on large visible surfaces: below 64 (blurry) or above 16,384 | warning for blurry |
+| `default_sky` | the default gradient sky covers more than 2% of the image | warning |
+| `lightsWithoutShadows` | a point or spot light reaching a hero mesh (3%+ of the image, or an animated character) without `castShadows` | warning |
+| `proceduralMeshes` | builtin grass / rock / fern / flowers meshes on screen | warning above 1% |
+
+The result has `pass` (no errors), `warnings` [{severity, code, message, hint, entity}] sorted by severity, and `stats`
+(draws, visible draws, rasterized triangles, terrain / water / sky coverage). Several views also report the worst primitive
+coverage and the union of primitive characters. Long lists keep their largest 40 entries (`primitivesTotal` says how many
+there were). `media/demo/showcase_gate.py` runs it on every shot of a showcase (see DEVELOPMENT.md).
+
+```text
+scene_audit {"view": "scene", "strict": true}
+scene_audit {"sequence": "sequences/hero.sequence.json", "times": [1.5, 4, 7.25], "strict": true}
+scene_audit {"cameras": [{"eye": [0, 1.7, 6], "target": [0, 1.2, 0], "label": "close"}, {"eye": [0, 20, 40], "target": [0, 0, 0]}]}
+```
+
 ### Performance
 
 - `perf_stats {passes: true}` shows where the frame time goes (see

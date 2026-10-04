@@ -8784,7 +8784,7 @@
   {
    "name": "game_settings",
    "title": "Game settings (game.json)",
-   "description": "Read or change the project's shipping settings in game.json: startScene, window {width,height,fullscreen,resizable,vsync}, quality (low|medium|high|ultra), renderScale, quitOnEscape, pauseOnFocusLoss, icon (a PNG, 1024x1024 recommended), bundleId (reverse-DNS), version, copyright, plus include/exclude globs for packaging, and the description fields (id, title, genre, mood, pitch). `get` returns the effective settings, the resolved start scene and validation problems. `set` merges the given fields (null removes one) and validates them. Example: {\"operation\":\"set\",\"settings\":{\"title\":\"Sky Dash\",\"startScene\":\"scenes/main.sky.json\",\"window\":{\"width\":1280,\"height\":720}}}",
+   "description": "Read or change the project's shipping settings in game.json: startScene, window {width,height,fullscreen,resizable,vsync}, quality (low|medium|high|ultra), renderScale, quitOnEscape, pauseOnFocusLoss, icon (a PNG, 1024x1024 recommended), bundleId (reverse-DNS), version, copyright, plus include/exclude globs for packaging, and the description fields (id, title, genre, mood, pitch), and mounts: shared folders outside the project addressed by a top-level name, e.g. {\"mounts\": {\"kit\": \"../_kit\"}} makes kit/characters/guard.prefab.json resolve into ../_kit (assets, prefabs, materials and animations load from it; game_build copies what the game uses). `get` returns the effective settings, the resolved start scene and validation problems. `set` merges the given fields (null removes one) and validates them. Example: {\"operation\":\"set\",\"settings\":{\"title\":\"Sky Dash\",\"startScene\":\"scenes/main.sky.json\",\"window\":{\"width\":1280,\"height\":720}}}",
    "inputSchema": {
     "type": "object",
     "properties": {
@@ -10457,6 +10457,90 @@
    },
    "_meta": {
     "skywalker/category": "agent"
+   }
+  },
+  {
+   "name": "scene_audit",
+   "title": "Audit what the camera sees",
+   "description": "Quality gate before filming or screenshots (read-only, CPU, no GPU needed). Builds the frame a camera sees and reports: visible builtin PRIMITIVE meshes (cube, sphere, capsule, cylinder, plane, cone, quad, torus) with entity and screen coverage % (occlusion-aware: a ground plane hidden under terrain or water does not count); PRIMITIVE CHARACTERS (an animator / character controller / nav agent on primitive meshes, or primitive parts arranged like a body, e.g. a sphere head on a capsule) with a kit character to replace them; DEFAULT grey or UNTEXTURED materials on visible meshes; missing texture / material / HDRI files; big meshes without LODs; texel-density outliers; a default sky; lights without shadows on hero meshes. Returns `pass` and `warnings` [{severity, code, message, hint, entity}]. Views: `camera` {eye, target, fov}, several `cameras`, `camera_entity`, `view` (editor | scene), or a `sequence` (path or sequencer entity) at `times` (seconds; default: 12 evenly spaced shots). strict=true fails when primitives (or default materials) cover more than 0.1% of any view (default limit 2%); override with max_primitive_coverage (percent). stylized=true accepts flat-colored materials (a deliberate stylized look). Examples: {\"view\": \"scene\", \"strict\": true}, {\"sequence\": \"sequences/hero.sequence.json\", \"times\": [1, 4, 8], \"strict\": true}, {\"camera\": {\"eye\": [0, 1.7, 5], \"target\": [0, 1.2, 0], \"fov\": 40}}.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "camera": {
+      "type": "object",
+      "description": "Custom view {eye: [x,y,z], target: [x,y,z], fov: degrees}"
+     },
+     "cameras": {
+      "type": "array",
+      "items": {
+       "type": "object"
+      },
+      "description": "Several custom views [{eye, target, fov, label?}]"
+     },
+     "camera_entity": {
+      "type": [
+       "integer",
+       "string"
+      ],
+      "description": "Audit through this camera entity"
+     },
+     "view": {
+      "type": "string",
+      "enum": [
+       "editor",
+       "scene"
+      ],
+      "description": "Editor camera (default) or the scene's primary camera"
+     },
+     "sequence": {
+      "description": "Sequence path (.sequence.json) or an entity with a sequencer: audit its live camera"
+     },
+     "times": {
+      "type": "array",
+      "items": {
+       "type": "number"
+      },
+      "description": "Sequence times in seconds (default: 12 shots across it)"
+     },
+     "strict": {
+      "type": "boolean",
+      "description": "Fail when primitives or default materials cover more than 0.1% of a view (showcase bar)"
+     },
+     "max_primitive_coverage": {
+      "type": "number",
+      "description": "Primitive coverage limit in percent (default 0.1 strict, 2 otherwise)"
+     },
+     "stylized": {
+      "type": "boolean",
+      "description": "Deliberately stylized look: flat-colored materials are info, not warnings"
+     },
+     "width": {
+      "type": "integer",
+      "description": "Frame width for the aspect ratio (default 1920)"
+     },
+     "height": {
+      "type": "integer",
+      "description": "Frame height (default 1080)"
+     },
+     "resolution": {
+      "type": "integer",
+      "description": "Coverage raster width in pixels (default 320, max 1280); higher = finer coverage"
+     },
+     "details": {
+      "type": "boolean",
+      "description": "Include per-view details when auditing several views (default true)"
+     }
+    },
+    "additionalProperties": false
+   },
+   "annotations": {
+    "title": "Audit what the camera sees",
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "openWorldHint": false
+   },
+   "_meta": {
+    "skywalker/category": "view"
    }
   }
  ]
