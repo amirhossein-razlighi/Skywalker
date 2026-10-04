@@ -254,3 +254,29 @@ TEST_CASE("fx: ocean evaluation cost (manual)" * doctest::skip()) {
     auto ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count() / 20;
     MESSAGE("evaluate: " << ms << " ms");
 }
+
+TEST_CASE("fx: warm() starts prewarmed emitters for stills without advancing running ones") {
+    Scene scene;
+    EntityId a = scene.create("Smoke");
+    scene.add<Transform>(a);
+    auto& em = scene.add<ParticleEmitter>(a);
+    em.rate = 20.f;
+    em.lifetime = 2.f;
+    em.prewarm = true;
+    EntityId b = scene.create("Cold");
+    scene.add<Transform>(b);
+    auto& cold = scene.add<ParticleEmitter>(b);
+    cold.rate = 20.f;
+    cold.prewarm = false;
+    fx::ParticleSystem warmed, played;
+    warmed.warm(scene);
+    CHECK(warmed.liveCount(a) > 20);   // fully developed, like the first played tick
+    CHECK(warmed.liveCount(b) == 0);   // not prewarmed: starts empty
+    const size_t before = warmed.liveCount(a);
+    warmed.warm(scene);
+    CHECK(warmed.liveCount(a) == before);  // running emitters are not advanced
+    // warm() then a tick replays exactly what a played first tick produces
+    warmed.update(scene, 1.f / 60.f);
+    played.update(scene, 1.f / 60.f);
+    CHECK(warmed.liveCount(a) == played.liveCount(a));
+}

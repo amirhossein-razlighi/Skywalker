@@ -345,7 +345,10 @@ surfaces are sorted back to front and don't cast shadows.
 ### Particles (`particles` component, `fx_create`)
 
 Particles are simulated by the engine, not the GPU, so they are deterministic in play mode
-(seeded per emitter) and agents can count and test them. They preview live while editing.
+(seeded per emitter) and agents can count and test them. They preview live while editing. Stills captured
+while editing without an editor loop (headless agents, `sequence_scrub`, quality gates) start every
+`prewarm` emitter that has not run yet, so fires, smoke and fireflies appear fully developed, exactly as
+on the first played tick.
 With `simulation: "gpu"` a particles component runs on compute shaders instead: millions of
 particles, depth-buffer collisions, sub-emitters, ribbons, mesh particles and flipbooks (visuals
 only) — see [HAIR_AND_VFX.md](HAIR_AND_VFX.md), which also covers strand hair and fur (`groom`).

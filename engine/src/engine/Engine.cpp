@@ -666,6 +666,7 @@ FrameData Engine::buildFrameData(const CaptureOptions& opts) {
     // Effects: simulated particles (+ the light fires cast) and FFT water.
     {
         SKY_PROFILE_SCOPE("particles.gather");
+        if (playState_ == PlayState::Editing) particles_.warm(*scene_);  // stills without an editor loop: prewarmed effects show
         particles_.gather(*scene_, view, f.particles, f.lights);
     }
     {  // [hair+vfx] GPU particles, hair grooms, and the lights GPU effects cast (from a recent frame)

@@ -60,6 +60,10 @@ public:
     size_t liveCount(EntityId emitter) const;
     size_t totalLive() const;
     size_t emitterCount() const { return states_.size(); }
+    /// Starts emitters that have never been simulated (prewarm included) without advancing the others.
+    /// Stills captured while editing without an editor loop (headless agents, quality gates, sequence
+    /// scrubs) then show fires, smoke and fireflies fully developed, exactly as the first played tick would.
+    void warm(const Scene& scene);
 
     /// Emitters with simulation "gpu" as renderer items (the GPU simulates them; the CPU
     /// only resolves meshes, textures, colliders, sub-emitters and bakes curves).
