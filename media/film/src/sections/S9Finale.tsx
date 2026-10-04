@@ -1,6 +1,6 @@
 import React from "react";
 import { AbsoluteFill, interpolate, Sequence, useCurrentFrame } from "remotion";
-import { Footage } from "../components/Footage";
+import { clipOffset, Footage } from "../components/Footage";
 import { Lockup } from "../components/Logo";
 import { Backdrop, LightLeak } from "../components/Overlays";
 import { SketchReveal } from "../components/SketchReveal";
@@ -49,7 +49,8 @@ const Triptych: React.FC = () => {
               t={{ draw: [o, o + 60], sketch: [o + 24, o + 60], clay: [o + 52, o + 82], final: [o + 80, o + 112] }}
               origin={[50, 20]}
               wipeAngle={180}
-              move={{ from: [0, 0, 1.0], to: [0, 0, 1.08], duration: 2 * BAR }}
+              playAt={o + 40}
+              move={{ from: [0, 0, 1.0], to: [0, 0, 1.04], duration: 2 * BAR }}
             />
             <div style={{ position: "absolute", inset: 0, background: "linear-gradient(0deg, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0) 35%)" }} />
             <div style={{ position: "absolute", left: 0, right: 0, bottom: 90, display: "flex", justifyContent: "center" }}>
@@ -64,7 +65,8 @@ const Triptych: React.FC = () => {
   );
 };
 
-const CUTS = ["rs_ocean", "rs_clouds", "rs_gi", "rs_rain", "var_zen", "rs_canyon", "var_cozy", "rs_aurora", "var_platformer3d", "rs_vortex", "rs_fire", "rs_galleon"];
+/** Every world once more, faster and faster: city, sea, front, valley, rain, pond, 2D, fire, hall, signs, berries, sun. */
+const CUTS = ["rs_neon_skyline", "rs_isle_swash", "var_front", "rs_peaks_lake", "rs_neon_puddle", "rs_farm_pond", "var_gloam_run", "rs_isle_campfire", "rs_peaks_hall", "rs_neon_holo", "rs_farm_rows", "rs_isle_palms"];
 
 /** Cuts that accelerate into the impact: 2 beats, then 1 beat, then half beats. */
 const Accelerate: React.FC = () => {
@@ -81,7 +83,7 @@ const Accelerate: React.FC = () => {
       {shots.map((s, i) => (
         <Sequence key={s.slot} from={s.from} durationInFrames={s.dur}>
           <AbsoluteFill style={{ transform: `scale(${1.04 + i * 0.01})` }}>
-            <Footage slot={s.slot} duration={s.dur} kb={{ from: [0, 0, 1.0], to: [i % 2 ? 1 : -1, 0, 1.06] }} />
+            <Footage slot={s.slot} duration={s.dur} offset={clipOffset(s.slot, s.dur)} kb={{ from: [0, 0, 1.0], to: [i % 2 ? 1 : -1, 0, 1.06] }} />
           </AbsoluteFill>
         </Sequence>
       ))}

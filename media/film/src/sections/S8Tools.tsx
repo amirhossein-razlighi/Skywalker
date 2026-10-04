@@ -1,5 +1,4 @@
 import React from "react";
-import { evolvePath } from "@remotion/paths";
 import { AbsoluteFill, Sequence, useCurrentFrame, useVideoConfig } from "remotion";
 import { Footage } from "../components/Footage";
 import { Backdrop } from "../components/Overlays";
@@ -15,7 +14,7 @@ import { Caret, Chip, ToolCall, typed, Window } from "../ui/kit";
 const SETUP = "skywalker setup claude";
 const OUT = [
   { t: "✓ MCP server   skywalker  (attaches to the editor, else headless)", c: C.green },
-  { t: "✓ 12 skills    agent loop, world building, look dev, Blender…", c: C.green },
+  { t: "✓ 13 skills    agent loop, world building, look dev, Blender…", c: C.green },
   { t: "✓ 8 subagents  director, level designer, playtester, critic…", c: C.green },
   { t: "✓ 5 commands   /new-game  /look-dev  /playtest-loop …", c: C.green },
 ];
@@ -88,23 +87,19 @@ const Setup: React.FC = () => {
   );
 };
 
-/** A procedural ruined tower drawing itself, as if arriving from Blender. */
-const TOWER = [
-  "M 760 880 L 760 420 L 800 380 L 800 330 L 840 330 L 840 360 L 880 360 L 880 320 L 920 320 L 920 370 L 960 370 L 960 330 L 990 330 L 1000 880",
-  "M 760 880 L 1000 880",
-  "M 790 470 L 790 520 L 830 520 L 830 470 Q 810 450 790 470",
-  "M 900 560 L 900 620 L 940 620 L 940 560 Q 920 540 900 560",
-  "M 830 700 L 830 880 M 930 700 L 930 880 M 830 700 Q 880 640 930 700",
-  "M 760 600 L 1000 610 M 760 740 L 1000 745 M 760 480 L 860 482",
-  "M 1000 880 L 1060 880 L 1040 860 L 1080 870 M 700 880 L 740 860 L 760 880",
-  "M 600 900 L 1200 900",
-];
-
+/**
+ * The Blender bridge, shown on real footage: the Ashen Peaks monastery kit was modelled by an agent in headless
+ * Blender (dcc_run_script) and imported as glTF. The orbit plays in clay, then the lit final wipes across it.
+ */
 const Blender: React.FC = () => {
   const frame = useCurrentFrame();
-  const draw = prog(frame, 30, 120, EASE.inOut);
-  const shade = prog(frame, 110, 150, EASE.inOut);
-  const exit = prog(frame, 174, 188, EASE.in);
+  const { fps } = useVideoConfig();
+  const exit = prog(frame, 176, 190, EASE.in);
+  const card = sp(frame, fps, 8, SPRING.gentle);
+  const wipe = prog(frame, 92, 132, EASE.inOut);
+  const wpos = lerp(-12, 112, wipe);
+  const mask = `linear-gradient(100deg, black ${wpos - 10}%, transparent ${wpos}%)`;
+  const label = wipe < 0.5 ? "Clay" : "Lit";
   return (
     <Backdrop y={60}>
       <AbsoluteFill style={{ opacity: 1 - exit }}>
@@ -113,7 +108,14 @@ const Blender: React.FC = () => {
           <Words text="Round-trip with Blender." at={6} size={64} weight={700} align="left" />
         </div>
         <div style={{ position: "absolute", left: 96, top: 300, width: 600 }}>
-          <ToolCall tool="dcc_generate" args={'{"recipe": "tower", "params": {"ruin": 0.6}}'} at={14} actor="agent:Terra" result="RuinedTower.glb placed at (10, 0, 4)" width={600} />
+          <ToolCall
+            tool="dcc_run_script"
+            args={'{"script": "monastery.py", "out_dir": "dcc/monastery"}'}
+            at={14}
+            actor="agent:Pixel"
+            result="Monastery kit → glTF, imported"
+            width={600}
+          />
           <div style={{ marginTop: 30, display: "flex", flexWrap: "wrap", gap: 12, width: 600 }}>
             {["FBX", "OBJ", "USD", "Alembic", ".blend", "→ glTF"].map((f, i) => (
               <div key={f} style={{ opacity: prog(frame, 60 + i * 5, 72 + i * 5) }}>
@@ -122,29 +124,59 @@ const Blender: React.FC = () => {
             ))}
           </div>
           <div style={{ marginTop: 26, fontFamily: FONT.body, fontSize: 22, color: C.dim, lineHeight: 1.5, opacity: prog(frame, 90, 110) }}>
-            Headless Blender scripts and a live-session add-on. Every asset lands in glTF, with its provenance.
+            Headless Blender scripts and a live-session add-on. This pagoda was modelled that way, by an agent.
           </div>
         </div>
-        <svg width={1920} height={1080} style={{ position: "absolute", inset: 0 }} viewBox="-300 -40 1920 1080">
-          <defs>
-            <linearGradient id="towerfill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0" stopColor="#c9b79a" />
-              <stop offset="1" stopColor="#6d5d4c" />
-            </linearGradient>
-          </defs>
-          <path d={TOWER[0]} fill="url(#towerfill)" opacity={shade * 0.92} />
-          {TOWER.map((d, i) => {
-            const p = Math.max(0, Math.min(1, draw * 1.6 - i * 0.08));
-            const e = evolvePath(EASE.inOut(p), d);
-            return <path key={i} d={d} fill="none" stroke={lerp(0, 1, shade) > 0.5 ? "#3a2f25" : "#e9edff"} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" strokeDasharray={e.strokeDasharray} strokeDashoffset={e.strokeDashoffset} />;
-          })}
-        </svg>
+        {/* the footage card: clay orbit, then the lit final wipes across it */}
+        <div
+          style={{
+            position: "absolute",
+            left: 776,
+            top: 286,
+            width: 1048,
+            height: 590,
+            borderRadius: 18,
+            overflow: "hidden",
+            boxShadow: "0 40px 100px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.08)",
+            opacity: card,
+            transform: `translateY(${(1 - card) * 40}px) scale(${0.96 + 0.04 * card})`,
+          }}
+        >
+          <Footage slot="tools_blender_clay" placeholderLabel={false} />
+          <AbsoluteFill style={{ WebkitMaskImage: mask, maskImage: mask }}>
+            <Footage slot="tools_blender" placeholderLabel={false} />
+          </AbsoluteFill>
+          {wipe > 0 && wipe < 1 && (
+            <AbsoluteFill
+              style={{
+                background: `linear-gradient(100deg, transparent ${wpos - 12}%, rgba(255,214,170,${0.4 * Math.sin(Math.PI * wipe)}) ${wpos - 2}%, transparent ${wpos + 1}%)`,
+                mixBlendMode: "screen",
+              }}
+            />
+          )}
+          <div
+            style={{
+              position: "absolute",
+              left: 18,
+              top: 16,
+              padding: "6px 12px",
+              borderRadius: 8,
+              background: "rgba(8,10,20,0.6)",
+              backdropFilter: "blur(8px)",
+              fontFamily: FONT.mono,
+              fontSize: 17,
+              color: "#fff",
+            }}
+          >
+            {label} · Ashen Peaks
+          </div>
+        </div>
       </AbsoluteFill>
     </Backdrop>
   );
 };
 
-const BUILD = "skywalker build --project examples/sky_dash --release";
+const BUILD = "skywalker build --project examples/gloamwater --out dist --release";
 
 const Ship: React.FC = () => {
   const frame = useCurrentFrame();
@@ -172,13 +204,13 @@ const Ship: React.FC = () => {
                 <div style={{ width: 520, height: 10, borderRadius: 5, background: "rgba(255,255,255,0.08)", overflow: "hidden" }}>
                   <div style={{ width: `${bar * 100}%`, height: "100%", background: `linear-gradient(90deg, ${C.sky}, ${C.violet})` }} />
                 </div>
-                <span style={{ color: C.dim, fontSize: 19 }}>{bar < 1 ? "packaging scenes, assets, behaviors…" : <span style={{ color: C.green }}>✓ Sky Dash.app</span>}</span>
+                <span style={{ color: C.dim, fontSize: 19 }}>{bar < 1 ? "packaging scenes, assets, behaviors…" : <span style={{ color: C.green }}>✓ Gloamwater.app</span>}</span>
               </div>
             )}
           </div>
         </Window>
         <div style={{ marginTop: 26, display: "flex", gap: 12, opacity: prog(frame, cmdDone + 50, cmdDone + 64) }}>
-          {["Standalone player", "Gamepads", "MetalFX", "Signed .app"].map((c, i) => (
+          {["Standalone player", "Gamepads", "MetalFX", "Native full screen"].map((c, i) => (
             <Chip key={c} color={i % 2 ? C.violet : C.sky}>{c}</Chip>
           ))}
         </div>
@@ -198,11 +230,11 @@ const Ship: React.FC = () => {
           boxShadow: "0 40px 100px rgba(0,0,0,0.6)",
         }}
       >
-        <Footage slot="tools_app" duration={200} kb={{ from: [0, 0, 1.6 - 0.6 * launch], to: [0, 0, 1.6 - 0.6 * launch] }} placeholderLabel={false} />
+        <Footage slot="tools_app" offset={12} playAt={cmdDone + 52} moveVideo duration={200} kb={{ from: [0, 0, 1.6 - 0.6 * launch], to: [0, 0, 1.6 - 0.6 * launch] }} placeholderLabel={false} />
         <div style={{ position: "absolute", inset: 0, background: "linear-gradient(160deg, rgba(255,255,255,0.25), transparent 40%)", opacity: 1 - launch }} />
       </div>
       <div style={{ position: "absolute", left: 1330, top: 700, width: 380, textAlign: "center", fontFamily: FONT.body, fontWeight: 600, fontSize: 26, color: C.text, opacity: icon * (1 - launch) }}>
-        Sky Dash
+        Gloamwater
       </div>
     </Backdrop>
   );
