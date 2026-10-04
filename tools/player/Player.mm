@@ -17,6 +17,7 @@
 #include <unistd.h>
 
 #include <cstdio>
+#include <cstdlib>
 #include <exception>
 #include <set>
 #include <string>
@@ -24,7 +25,9 @@
 #include "Player.h"
 #include "skywalker/core/Log.h"
 #include "skywalker/input/InputState.h"
+#include "skywalker/locale/Localization.h"
 #include "skywalker/render/Image.h"
+#include "skywalker/ui/World2D.h"
 
 using namespace sky;
 using sky::player::Options;
@@ -634,9 +637,24 @@ NSString* keyNameForEvent(NSEvent* event) {
 
 namespace sky::player {
 
+/// The player's language from macOS (System Settings > General > Language & Region), as a BCP-47 code
+/// ("pt-BR", "zh-Hans-CN"). Apps opened from Finder get no LANG; a Terminal's LANG usually says nothing about
+/// the user's language either, so only an explicit LC_ALL / LC_MESSAGES (testing a translation) wins over it.
+std::string macSystemLocale() {
+    for (const char* var : {"LC_ALL", "LC_MESSAGES"}) {
+        const char* v = std::getenv(var);
+        if (v && *v) return loc::systemLocale();
+    }
+    NSArray<NSString*>* preferred = [NSLocale preferredLanguages];
+    if (preferred.count == 0) return loc::systemLocale();
+    return loc::normalizeLocale(preferred.firstObject.UTF8String);
+}
+
 int runWindowed(Session& session, const Options& options) {
     @autoreleasepool {
         installCrashReporting(session.settings.displayName());
+        // game.json localization.useSystemLocale decides whether this wins over the game's own locale.
+        session.engine->world2d().localization().setSystemLocale(macSystemLocale());
         SkyPlayer* player = [[SkyPlayer alloc] initWithSession:&session options:options];
         [player run];
     }

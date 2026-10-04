@@ -95,7 +95,9 @@ The locale shown, from first to last choice:
    sessions replay; store the player's choice in a save game to keep it.
 2. `locale_set` while editing: a preview language for the editor, kept until changed.
 3. The player's system locale in a shipped game, when `useSystemLocale` is on and the game has strings
-   for it (the standalone player passes it in; the editor and tests never do).
+   for it (the standalone player passes it in; the editor and tests never do). On macOS that is the first
+   language in System Settings > General > Language & Region (`pt-BR`, `zh-Hans-CN`); an explicit `LC_ALL`
+   or `LC_MESSAGES` overrides it for testing. On Linux it comes from `LC_ALL`, `LC_MESSAGES` or `LANG`.
 4. `game.json` `localization.locale`.
 5. The source language.
 
