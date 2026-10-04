@@ -1,0 +1,14 @@
+{
+  "guid": "86ab7aed557641560e29a4099ffe574b",
+  "type": "mesh",
+  "tags": [],
+  "description": "",
+  "source": {},
+  "import": {
+    "normalize": false,
+    "zUp": false,
+    "vertexColors": false,
+    "material": "generated/office/sconce_brass.mat.json",
+    "prefab": "generated/office/sconce.prefab.json"
+  }
+}

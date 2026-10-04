@@ -1,0 +1,34 @@
+{
+  "format": "skywalker.prefab",
+  "version": 1,
+  "name": "inkwell",
+  "root": {
+    "name": "inkwell",
+    "enabled": true,
+    "components": {
+      "transform": {}
+    },
+    "children": [
+      {
+        "name": "ink_glass",
+        "enabled": true,
+        "components": {
+          "mesh": {
+            "mesh": "asset:generated/office/inkwell.glb#0",
+            "material": "generated/office/inkwell_ink_glass.mat.json"
+          }
+        }
+      },
+      {
+        "name": "brass",
+        "enabled": true,
+        "components": {
+          "mesh": {
+            "mesh": "asset:generated/office/inkwell.glb#1",
+            "material": "generated/office/inkwell_brass.mat.json"
+          }
+        }
+      }
+    ]
+  }
+}

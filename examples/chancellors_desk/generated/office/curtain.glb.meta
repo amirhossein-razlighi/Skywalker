@@ -1,0 +1,13 @@
+{
+  "guid": "f493ebd078bb4e131b1c637a4c4844a6",
+  "type": "mesh",
+  "tags": [],
+  "description": "",
+  "source": {},
+  "import": {
+    "normalize": false,
+    "zUp": false,
+    "vertexColors": false,
+    "material": "generated/office/curtain.mat.json"
+  }
+}

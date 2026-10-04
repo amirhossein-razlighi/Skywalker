@@ -1,0 +1,72 @@
+{
+  "format": "skywalker.sequence",
+  "version": 1,
+  "name": "the_office",
+  "duration": 8,
+  "tracks": [
+    {
+      "type": "shot",
+      "camera": "Cam the_office",
+      "keys": [
+        {
+          "t": 0,
+          "shot": "path",
+          "duration": 8,
+          "target": [
+            0,
+            1.2,
+            -2.4
+          ],
+          "points": [
+            [
+              -0.35,
+              1.52,
+              4.05
+            ],
+            [
+              -0.15,
+              1.47,
+              3.55
+            ],
+            [
+              0.05,
+              1.43,
+              3.1
+            ]
+          ],
+          "fov": 40
+        }
+      ]
+    },
+    {
+      "type": "camera",
+      "keys": [
+        {
+          "t": 0,
+          "camera": "Cam the_office"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.exposure",
+      "keys": [
+        {
+          "t": 0,
+          "value": 1.75,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "event",
+      "keys": [
+        {
+          "t": 0,
+          "event": "hud_hide",
+          "target": "Chancellery"
+        }
+      ]
+    }
+  ]
+}

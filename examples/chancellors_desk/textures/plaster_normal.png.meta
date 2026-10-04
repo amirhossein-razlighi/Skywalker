@@ -1,0 +1,16 @@
+{
+  "guid": "1a1fdf6e731c0ff493df7597e43e91fd",
+  "type": "texture",
+  "tags": [
+    "generated",
+    "noise"
+  ],
+  "description": "",
+  "source": {
+    "generator": "texgen",
+    "kind": "noise",
+    "seed": 1,
+    "by": "mcp:director"
+  },
+  "import": {}
+}

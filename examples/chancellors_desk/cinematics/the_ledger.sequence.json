@@ -1,0 +1,71 @@
+{
+  "format": "skywalker.sequence",
+  "version": 1,
+  "name": "the_ledger",
+  "duration": 7,
+  "tracks": [
+    {
+      "type": "shot",
+      "camera": "Cam the_ledger",
+      "keys": [
+        {
+          "t": 0,
+          "shot": "path",
+          "duration": 7,
+          "target": [
+            0.3,
+            1.2,
+            -2.4
+          ],
+          "points": [
+            [
+              -1.4,
+              1.6,
+              2.2
+            ],
+            [
+              -1.2,
+              1.58,
+              1.9
+            ],
+            [
+              -1,
+              1.56,
+              1.6
+            ]
+          ],
+          "fov": 40
+        }
+      ]
+    },
+    {
+      "type": "camera",
+      "keys": [
+        {
+          "t": 0,
+          "camera": "Cam the_ledger"
+        }
+      ]
+    },
+    {
+      "type": "event",
+      "keys": [
+        {
+          "t": 0,
+          "event": "hud_show",
+          "target": "Chancellery"
+        },
+        {
+          "t": 0.005,
+          "event": "no_autoplay",
+          "target": "Chancellery"
+        },
+        {
+          "t": 0.3,
+          "event": "paper_show",
+          "target": "Chancellery"
+        }
+      ]
+    }
+  ]
+}

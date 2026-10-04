@@ -1,0 +1,14 @@
+{
+  "guid": "bb89cab0f4cdc9a97142c33702ad2a70",
+  "type": "mesh",
+  "tags": [],
+  "description": "",
+  "source": {},
+  "import": {
+    "normalize": false,
+    "zUp": false,
+    "vertexColors": false,
+    "material": "generated/office/inkwell_ink_glass.mat.json",
+    "prefab": "generated/office/inkwell.prefab.json"
+  }
+}

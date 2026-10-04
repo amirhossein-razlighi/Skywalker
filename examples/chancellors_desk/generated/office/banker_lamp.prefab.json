@@ -1,0 +1,44 @@
+{
+  "format": "skywalker.prefab",
+  "version": 1,
+  "name": "banker_lamp",
+  "root": {
+    "name": "banker_lamp",
+    "enabled": true,
+    "components": {
+      "transform": {}
+    },
+    "children": [
+      {
+        "name": "brass",
+        "enabled": true,
+        "components": {
+          "mesh": {
+            "mesh": "asset:generated/office/banker_lamp.glb#0",
+            "material": "generated/office/banker_lamp_brass.mat.json"
+          }
+        }
+      },
+      {
+        "name": "glass_green",
+        "enabled": true,
+        "components": {
+          "mesh": {
+            "mesh": "asset:generated/office/banker_lamp.glb#1",
+            "material": "generated/office/banker_lamp_glass_green.mat.json"
+          }
+        }
+      },
+      {
+        "name": "shade_inner",
+        "enabled": true,
+        "components": {
+          "mesh": {
+            "mesh": "asset:generated/office/banker_lamp.glb#2",
+            "material": "generated/office/banker_lamp_shade_inner.mat.json"
+          }
+        }
+      }
+    ]
+  }
+}

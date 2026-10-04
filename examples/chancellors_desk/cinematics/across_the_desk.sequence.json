@@ -1,0 +1,61 @@
+{
+  "format": "skywalker.sequence",
+  "version": 1,
+  "name": "across_the_desk",
+  "duration": 8,
+  "tracks": [
+    {
+      "type": "shot",
+      "camera": "Cam across_the_desk",
+      "keys": [
+        {
+          "t": 0,
+          "shot": "path",
+          "duration": 8,
+          "target": [
+            0.02,
+            0.79,
+            -1.74
+          ],
+          "points": [
+            [
+              -1.45,
+              1.22,
+              -0.95
+            ],
+            [
+              -0.85,
+              1.12,
+              -1.18
+            ],
+            [
+              -0.2,
+              1.06,
+              -1.3
+            ]
+          ],
+          "fov": 36
+        }
+      ]
+    },
+    {
+      "type": "camera",
+      "keys": [
+        {
+          "t": 0,
+          "camera": "Cam across_the_desk"
+        }
+      ]
+    },
+    {
+      "type": "event",
+      "keys": [
+        {
+          "t": 0,
+          "event": "hud_hide",
+          "target": "Chancellery"
+        }
+      ]
+    }
+  ]
+}

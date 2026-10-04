@@ -1,0 +1,15 @@
+{
+  "id": "chancellors_desk",
+  "title": "The Chancellor's Desk",
+  "genre": "Narrative Political Drama",
+  "mood": "rain, lamplight, consequence",
+  "pitch": "One desk. One rainy night. The republic is three weeks old and the pen is in your hand.",
+  "assets": "Poly Haven (CC0) furniture, props and photoscanned materials; Blender-modeled desk, lamp and flags; procedural art",
+  "startScene": "scenes/main.sky.json",
+  "include": [
+    "art/*",
+    "art/portraits/*.png",
+    "ui/*",
+    "story/*"
+  ]
+}
