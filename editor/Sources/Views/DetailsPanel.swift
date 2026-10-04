@@ -34,14 +34,15 @@ struct EntityDetails: View {
     private static let componentOrder = ["transform", "mesh", "light", "reflection_probe", "camera", "particles", "groom",
                                          "water", "terrain", "foliage", "audio", "listener", "body", "collider", "character",
                                          "joint", "vehicle", "chase_camera", "nav_agent", "navmesh", "physics_world", "animator", "characterIk", "attach", "ik", "sequencer",
-                                         "sprite", "sprite_anim", "tilemap", "light2d", "parallax", "camera2d", "text", "ui_canvas",
+                                         "sprite", "sprite_anim", "tilemap", "body2d", "collider2d", "character2d", "joint2d",
+                                         "physics2d_world", "light2d", "parallax", "camera2d", "text", "ui_canvas",
                                          "ui", "dialogue", "process", "particles2d", "persist", "carry"]
     /// Components offered by Add Component (transform is always present).
     private static let addable = ["mesh", "light", "reflection_probe", "camera", "particles", "groom", "water", "terrain",
                                   "foliage", "audio", "listener", "body", "collider", "character", "joint", "vehicle", "chase_camera",
                                   "nav_agent", "navmesh",
                                   "physics_world", "animator", "characterIk", "attach", "ik", "sequencer", "sprite", "sprite_anim",
-                                  "tilemap",
+                                  "tilemap", "body2d", "collider2d", "character2d", "joint2d", "physics2d_world",
                                   "light2d", "parallax", "camera2d", "text", "ui_canvas", "ui", "dialogue", "process", "particles2d",
                                   "persist", "carry"]
 
@@ -128,6 +129,11 @@ struct EntityDetails: View {
         case "sequencer": "film.stack"
         case "process": "pause.circle"
         case "particles2d": "cloud.snow"
+        case "body2d": "square.on.circle"
+        case "collider2d": "square.dashed.inset.filled"
+        case "character2d": "figure.run.square.stack"
+        case "joint2d": "link.circle"
+        case "physics2d_world": "globe.desk"
         case "persist": "square.and.arrow.down.on.square"
         case "carry": "suitcase"
         default: "puzzlepiece"
@@ -152,6 +158,11 @@ struct EntityDetails: View {
         case "process": "Process (Pause / Time)"
         case "reflection_probe": "Reflection Probe"
         case "particles2d": "Particles 2D"
+        case "body2d": "Rigid Body 2D"
+        case "collider2d": "Collider 2D"
+        case "character2d": "Character 2D"
+        case "joint2d": "Joint 2D"
+        case "physics2d_world": "Physics 2D Settings"
         case "persist": "Persist (Save Games)"
         case "carry": "Carry (Scene Changes)"
         default: comp.capitalized
