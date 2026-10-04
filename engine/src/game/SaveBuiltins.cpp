@@ -100,8 +100,7 @@ void registerSaveBuiltins(BuiltinRegistry& reg) {
                 if (Status st = s.setGlobal(name, toTaggedJson(c.arg(1))); !st) c.fail("game_var(): " + st.error().message);
                 return c.arg(1);
             }
-            Json all = s.globalsJson();
-            const Json* v = all.find(name);
+            const Json* v = s.globalsJson().find(name);
             return v ? fromTaggedJson(*v) : Value();
         });
     reg.addTrigger({"saved", "A save_game() finished: on saved — data.slot, data.meta.", "{slot: string, meta: map}", "save"});

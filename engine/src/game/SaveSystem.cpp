@@ -422,9 +422,9 @@ struct SaveSystem::Impl {
             out.sceneChanged = scene;
             if (Status st = switchScene(scene); !st) return st;
         }
-        std::map<std::string, EntityId> current;
+        std::map<std::string, EntityId> current;  // entities inside a spawned subtree come back with their root
         for (EntityId e : s.entities()) {
-            if (s.get<Persist>(e)) current.emplace(keyOf(s, e), e);
+            if (s.get<Persist>(e) && spawnedRootAbove(s, e) == kNoEntity) current.emplace(keyOf(s, e), e);
         }
         std::set<std::string> saved;
         for (const auto& ej : doc.get("entities").elements()) saved.insert(ej.get("key").asString());
@@ -528,7 +528,7 @@ void SaveSystem::endTick() {
     }
 }
 
-Json SaveSystem::globalsJson() const { return impl_->globals; }
+const Json& SaveSystem::globalsJson() const { return impl_->globals; }
 
 Status SaveSystem::setGlobal(const std::string& name, const Json& taggedValue) {
     if (name.empty()) return Error::make("invalid_argument", "a game variable needs a name");
@@ -565,7 +565,6 @@ Status requirePlaying(const Engine& engine, const char* what) {
 }  // namespace
 
 Result<SaveSystem::Outcome> SaveSystem::save(const std::string& slot, const Json& meta, const std::string& actor) {
-    (void)actor;
     if (Status s = validateSlotName(slot); !s) return s.error();
     if (Status s = requirePlaying(impl_->engine, "saving"); !s) return s.error();
     if (!meta.isObject() && !meta.isNull()) {
@@ -631,7 +630,7 @@ Result<Json> SaveSystem::inspect(const std::string& slot, size_t maxDiffs) {
     Scene& s = impl_->engine.scene();
     std::map<std::string, EntityId> current;
     for (EntityId e : s.entities()) {
-        if (s.get<Persist>(e)) current.emplace(keyOf(s, e), e);
+        if (s.get<Persist>(e) && spawnedRootAbove(s, e) == kNoEntity) current.emplace(keyOf(s, e), e);
     }
     size_t budget = maxDiffs;
     Json entities = Json::array();

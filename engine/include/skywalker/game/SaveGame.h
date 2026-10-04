@@ -128,7 +128,7 @@ public:
     void endTick();
 
     /// Global game variables (Wander game_var): kept per play session, saved with every slot. Exact values.
-    Json globalsJson() const;
+    const Json& globalsJson() const;
     Status setGlobal(const std::string& name, const Json& taggedValue);
     /// Seconds of play in this save line: the loaded save's play time plus real time since.
     double playTime() const;
