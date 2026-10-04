@@ -1,5 +1,5 @@
 // Runtime scene flow (docs/SCENE_FLOW.md): changing scenes while playing and stopping back to the
-// edited scene, persistent entities and their running behaviors, transitions, loading scenes with
+// edited scene, carried entities and their running behaviors, transitions, loading scenes with
 // progress, additive sub-scenes with ownership, determinism across a change, did-you-mean errors.
 
 #include <doctest/doctest.h>
@@ -60,7 +60,7 @@ on scene_loaded
   heard_loaded = data.id
 end)";
 
-/// menu (with a persistent game manager and player), level1 (its own copy of the manager, a spawn
+/// menu (with a carried game manager and player), level1 (its own copy of the manager, a spawn
 /// point, scenery), loading (a loading screen), rooms/cellar (a sub-scene), six prefabs for preloading.
 void buildGame(const Project& p) {
     p.write("game.json", R"({"id": "flow", "scenes": {"menu": "scenes/menu.sky.json", "level1": "scenes/level1.sky.json",
@@ -71,8 +71,8 @@ void buildGame(const Project& p) {
                     R"(", "enabled": true, "components": {"transform": {}}}})");
     }
     p.write("scenes/menu.sky.json",
-            scene("Menu", R"({"id": 1, "name": "GameManager", "components": {"persistent": {"id": "gm"}}, )" + behavior(kManager) + R"(},
-                             {"id": 2, "name": "Player", "tags": ["player"], "components": {"persistent": {}, "transform": {"position": [0, 1, 0]}}},
+            scene("Menu", R"({"id": 1, "name": "GameManager", "components": {"carry": {"id": "gm"}}, )" + behavior(kManager) + R"(},
+                             {"id": 2, "name": "Player", "tags": ["player"], "components": {"carry": {}, "transform": {"position": [0, 1, 0]}}},
                              {"id": 3, "name": "Title", "components": {"transform": {"position": [0, 3, 0]}}},
                              {"id": 4, "name": "MenuLogic", )" + behavior("on key \"enter\"\n  change_scene(\"level1\", {transition: \"fade\", duration: 0.1, spawn_at: \"Spawn\"})\nend\n"
                                                                          "on scene_unloading\n  find(\"GameManager\").menu_heard = data.to\nend") + "}"));
@@ -82,7 +82,7 @@ void buildGame(const Project& p) {
                  std::to_string(i) + R"(.prefab.json"}})";
     }
     p.write("scenes/level1.sky.json",
-            scene("Level 1", R"({"id": 1, "name": "GameManager", "components": {"persistent": {"id": "gm"}}, )" + behavior(kManager) + R"(},
+            scene("Level 1", R"({"id": 1, "name": "GameManager", "components": {"carry": {"id": "gm"}}, )" + behavior(kManager) + R"(},
                                 {"id": 2, "name": "Spawn", "components": {"transform": {"position": [10, 0, -4], "rotation": [0, 90, 0]}}},
                                 {"id": 3, "name": "Wall", "components": {"transform": {"position": [5, 0, 5]}}},
                                 {"id": 4, "name": "Roller", )" + behavior("var r = 0\non tick\n  r += random(0, 1)\nend") + "}" + props));
@@ -161,7 +161,7 @@ TEST_CASE("scene flow: changing scenes during play, then stop returns the editor
     e->stop();
 }
 
-TEST_CASE("scene flow: persistent entities survive with their running behaviors; duplicates give way; spawn_at") {
+TEST_CASE("scene flow: carried entities survive with their running behaviors; duplicates give way; spawn_at") {
     Project p("persist");
     buildGame(p);
     auto e = makeEngine(p);
@@ -197,10 +197,10 @@ TEST_CASE("scene flow: persistent entities survive with their running behaviors;
     CHECK(var(*e, gm, "heard_unloading").asString() == "level1");
     CHECK(var(*e, gm, "heard_loaded").asString() == "level1");
     CHECK(var(*e, gm, "menu_heard").asString() == "level1");  // the leaving scene heard it before it went
-    // scene_flow_info lists the persistent entities.
+    // scene_flow_info lists the carried entities.
     Json info = call(*e, "scene_flow_info", "{}");
     std::vector<std::string> kept;
-    for (const auto& n : info.get("persistent").elements()) kept.push_back(n.asString());
+    for (const auto& n : info.get("carried").elements()) kept.push_back(n.asString());
     CHECK(std::find(kept.begin(), kept.end(), "GameManager") != kept.end());
     CHECK(std::find(kept.begin(), kept.end(), "Player") != kept.end());
 }
@@ -356,7 +356,9 @@ TEST_CASE("scene flow: unknown scenes get a did-you-mean; changes need play mode
     CHECK(logged);
     CHECK(e->sceneFlow().current() == "menu");
     // game.json validation.
-    CHECK_FALSE(game::GameSettings::fromJson(Json::parse(R"({"sceneFlow": {"persistant": ["A"]}})").value()));
+    CHECK_FALSE(game::GameSettings::fromJson(Json::parse(R"({"sceneFlow": {"cary": ["A"]}})").value()));
+    CHECK_FALSE(game::GameSettings::fromJson(Json::parse(R"({"sceneFlow": {"persistent": ["A"]}})").value()));  // the old name
+    CHECK(game::GameSettings::fromJson(Json::parse(R"({"sceneFlow": {"carry": ["Music"]}})").value()));
     CHECK_FALSE(game::GameSettings::fromJson(Json::parse(R"({"scenes": {"menu": 3}})").value()));
     CHECK(game::GameSettings::fromJson(Json::parse(R"({"scenes": {"menu": "scenes/menu.sky.json"}, "sceneFlow": {"transition": "fade"}})").value()));
 }

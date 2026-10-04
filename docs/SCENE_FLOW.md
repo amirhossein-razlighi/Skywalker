@@ -2,13 +2,13 @@
 
 Games move between scenes while they run: a menu, levels, a credits roll. The editor's `scene_load`
 opens a scene for editing; **scene flow** is what the running game does: `change_scene` replaces the
-world while entities marked `persistent` (a game manager, the player, the music) carry over, sub-scenes
+world while entities marked `carry` (a game manager, the player, the music) are carried over, sub-scenes
 (rooms, streaming chunks, UI overlays) come and go additively, assets preload behind a loading screen,
 and the screen fades or crossfades. Stopping play throws it all away: the editor gets back the scene
 that was open when play started.
 
 - [Changing scenes](#changing-scenes)
-- [Persistent entities](#persistent-entities)
+- [Carried entities](#carried-entities)
 - [Sub-scenes (additive)](#sub-scenes-additive)
 - [Loading and progress](#loading-and-progress)
 - [Transitions](#transitions)
@@ -36,34 +36,34 @@ A change never happens while scripts run. It goes:
 3. **Out**: the screen fades to the transition color (`fade`), or nothing happens (`none`, `crossfade`).
 4. **Loading**: an optional loading scene replaces the world; the target's assets preload a few per tick
    (`loading_progress()` climbs to 1).
-5. **Swap** (end of a tick): persistent entities stay, everything else is removed, the new scene is
+5. **Swap** (end of a tick): carried entities stay, everything else is removed, the new scene is
    cloned in, `spawn_at` moves the player, `on scene_loaded` follows on the next tick.
 6. **In**: the screen fades back (or crossfades from the old picture).
 
 New scene entities get fresh entity ids. Ids are never reused during a play session, so a reference a
-persistent entity holds (`target = find("Boss")`) can never land on something in the next scene: it
+carried entity holds (`target = find("Boss")`) can never land on something in the next scene: it
 simply stops existing.
 
-## Persistent entities
+## Carried entities
 
 Three ways to carry an entity (and its children) over:
 
 | How | Use |
 |---|---|
-| A `persistent` component | `{"id": "game_manager", "spawn": false}`: the usual way |
-| game.json `sceneFlow.persistent: ["Music"]` | Entity names, without touching the scenes |
+| A `carry` component | `{"id": "game_manager", "spawn": false}`: the usual way |
+| game.json `sceneFlow.carry: ["Music"]` | Entity names, without touching the scenes |
 | `keep: ["Companion"]` in a change | Just this once |
 
-Persistent entities keep running: their behaviors are not restarted, timers and waits continue, vars
-keep their values. Put the same game manager (same `persistent.id`, or the same name) in every level so
+Carried entities keep running: their behaviors are not restarted, timers and waits continue, vars
+keep their values. Put the same game manager (same `carry.id`, or the same name) in every level so
 each level also runs on its own; when the game arrives from another scene, the level's copy gives way to
 the running one.
 
-`spawn_at` names an entity of the new scene; persistent entities with `persistent.spawn: true` (or,
+`spawn_at` names an entity of the new scene; carried entities with `carry.spawn: true` (or,
 without any, those tagged `player`) move to its position and rotation, without interpolation smear.
 
-A persistent child of a non-persistent parent becomes a root entity (keeping its local transform).
-Persistent entities should normally be roots.
+A carried child of a parent that is not carried becomes a root entity (keeping its local transform).
+Carried entities should normally be roots.
 
 ## Sub-scenes (additive)
 
@@ -78,7 +78,7 @@ A sub-scene's entities join the running scene (fresh ids, optionally under `pare
 created**: unloading removes those and nothing else. Entities the game added under them at run time
 (loot dropped in a room) are kept and moved to the root; the unload result lists them as `orphans`.
 Handles default to the alias or file name and are made unique (`cellar`, `cellar#2`). A scene change
-removes every sub-scene that is not persistent.
+removes every sub-scene (carried entities inside one are kept).
 
 From Wander, loads happen at the end of the tick and unloads one tick after `on scene_unloading` was
 heard; the tools load and unload immediately (between ticks).
@@ -91,7 +91,7 @@ real-time window they load on background threads and the loading phase waits for
 `sim_control step`, tools) they load at once, so a run replays tick for tick.
 
 A **loading scene** (`sceneFlow.loadingScene`, or `loading` in a change) replaces the world for the
-loading phase, with the persistent entities still there; read `loading_progress()` in it to fill a bar.
+loading phase, with the carried entities still there; read `loading_progress()` in it to fill a bar.
 
 ```text
 -- scenes/loading.sky.json: a ui_canvas with a progress widget named "Bar"
@@ -121,7 +121,7 @@ keeps. They advance on the fixed tick (real seconds, not affected by `time_scale
   "startScene": "scenes/menu.sky.json",
   "scenes": {"menu": "scenes/menu.sky.json", "level1": "scenes/level1.sky.json", "credits": "scenes/credits.sky.json"},
   "sceneFlow": {
-    "persistent": ["Music"],
+    "carry": ["Music"],
     "loadingScene": "scenes/loading.sky.json",
     "transition": {"kind": "fade", "duration": 0.4, "color": "#000000"},
     "preloadPerTick": 4
@@ -151,14 +151,14 @@ defaults that each change can override.
 
 | Tool | Use |
 |---|---|
-| `scene_flow_info {}` | Current scene, pending change, progress, transition phase and alpha, sub-scenes, persistent entities, aliases, scene files |
+| `scene_flow_info {}` | Current scene, pending change, progress, transition phase and alpha, sub-scenes, carried entities, aliases, scene files |
 | `scene_change {scene, transition?, duration?, keep?, spawn_at?, loading?, immediate?}` | Change scene while playing; it runs over the next ticks (`sim_control step`), or now with `immediate: true` |
 | `scene_additive_load {scene, id?, parent?, offset?}` | Load a sub-scene now; returns its handle and entity count |
 | `scene_additive_unload {handle}` | Remove exactly what it loaded; returns `removed` and `orphans` |
 
 ## Recipes
 
-**Menu → level → credits.** A `GameManager` with `persistent: {id: "gm"}` in every scene:
+**Menu → level → credits.** A `GameManager` with `carry: {id: "gm"}` in every scene:
 
 ```text
 -- on the Play button's canvas in the menu
@@ -202,7 +202,7 @@ end
 sim_control {"action": "play"}
 scene_change {"scene": "level1", "transition": "fade"}
 sim_control {"action": "step", "ticks": 60}
-scene_flow_info {}                    -- current: level1, phase idle, persistent: GameManager, Player
+scene_flow_info {}                    -- current: level1, phase idle, carried: GameManager, Player
 viewport_capture {}
 sim_control {"action": "stop"}       -- back to the edited scene
 ```
@@ -211,13 +211,13 @@ sim_control {"action": "stop"}       -- back to the edited scene
 
 - Deterministic: changes apply at tick boundaries in a fixed order, and headless preloading takes a fixed
   number of ticks, so the same inputs replay the same flow (tests/test_scene_flow.cpp).
-- Stop restores the edited scene exactly; scene changes, sub-scenes and persistent state never leak into the
+- Stop restores the edited scene exactly; scene changes, sub-scenes and carried state never leak into the
   editor.
 - Runtime ids differ from the ids in the scene file (scene files keep theirs; the running copy gets fresh ones).
-- Particles, animation and audio of entities that leave stop with them; persistent entities' physics bodies are
+- Particles, animation and audio of entities that leave stop with them; carried entities' physics bodies are
   rebuilt (from their transform and `body.velocity`) at the swap.
 - Save games ([SAVE_GAMES](SAVE_GAMES.md)) record the current scene and its runtime ids. Loading a save made in
-  another scene is an immediate change through the scene flow (no transition, no loading scene): persistent
+  another scene is an immediate change through the scene flow (no transition, no loading scene): carried
   entities come along and keep running, the scene's entities get their saved ids back, and a change under way is
-  dropped. `persist` (what a save restores) and `persistent` (what survives a change) are separate; a player
+  dropped. `persist` (what a save restores) and `carry` (what survives a change) are separate; a player
   usually has both.

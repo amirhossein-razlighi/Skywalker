@@ -1,9 +1,9 @@
-// Runtime scene flow (docs/SCENE_FLOW.md): scene changes with persistent entities, additive sub-scenes,
+// Runtime scene flow (docs/SCENE_FLOW.md): scene changes with carried entities, additive sub-scenes,
 // time-sliced preloading, loading scenes and transitions, all advanced at the end of a tick.
 //
 // A change goes:  requested -> (activation: `on scene_unloading` goes out) -> Out (fade to color) ->
 // Loading (optional loading scene; assets preloaded a few per tick; progress) -> swap -> In (fade back).
-// The swap keeps persistent entities (and their running behaviors), removes everything else, and clones
+// The swap keeps carried entities (and their running behaviors), removes everything else, and clones
 // the new scene in with fresh ids.
 
 #include "skywalker/game/SceneFlow.h"
@@ -95,18 +95,18 @@ Result<SceneFlowSettings> SceneFlowSettings::fromJson(const Json& scenes, const 
         }
     }
     if (!flow.isNull()) {
-        if (!flow.isObject()) return bad("sceneFlow must be an object: {persistent, loadingScene, transition, preloadPerTick}");
-        static const std::vector<std::string> keys{"persistent", "loadingScene", "transition", "preloadPerTick"};
+        if (!flow.isObject()) return bad("sceneFlow must be an object: {carry, loadingScene, transition, preloadPerTick}");
+        static const std::vector<std::string> keys{"carry", "loadingScene", "transition", "preloadPerTick"};
         for (const auto& [k, v] : flow.members()) {
             if (std::find(keys.begin(), keys.end(), k) == keys.end()) {
                 std::string guess = str::closest(k, keys, 3);
                 return bad("sceneFlow: unknown field '" + k + "'",
-                           (guess.empty() ? std::string() : "did you mean '" + guess + "'? ") + "valid fields: persistent, loadingScene, transition, preloadPerTick");
+                           (guess.empty() ? std::string() : "did you mean '" + guess + "'? ") + "valid fields: carry, loadingScene, transition, preloadPerTick");
             }
         }
-        for (const auto& n : flow.get("persistent").elements()) {
-            if (!n.isString()) return bad("sceneFlow.persistent must list entity names");
-            s.persistent.push_back(n.asString());
+        for (const auto& n : flow.get("carry").elements()) {
+            if (!n.isString()) return bad("sceneFlow.carry must list entity names");
+            s.carry.push_back(n.asString());
         }
         s.loadingScene = flow.get("loadingScene").asString();
         auto t = TransitionSpec::fromJson(flow.get("transition"));
@@ -300,21 +300,21 @@ struct SceneFlow::Impl {
 
     // --- persistence --------------------------------------------------------------------------
 
-    std::string persistentKey(EntityId e) const {
+    std::string carryKey(EntityId e) const {
         const Scene& s = engine.scene();
-        const Persistent* p = s.get<Persistent>(e);
+        const Carry* p = s.get<Carry>(e);
         return p && !p->id.empty() ? p->id : s.record(e)->name;
     }
 
-    /// Entities that survive a change: `persistent` components, game.json names, the change's `keep`; with descendants.
+    /// Entities that survive a change: `carry` components, game.json names, the change's `keep`; with descendants.
     std::unordered_set<EntityId> keptEntities(const std::vector<std::string>& keep) const {
         Scene& s = engine.scene();
         std::unordered_set<EntityId> roots;
-        std::set<std::string> names(settings().persistent.begin(), settings().persistent.end());
+        std::set<std::string> names(settings().carry.begin(), settings().carry.end());
         for (const auto& k : keep) names.insert(k);
         for (EntityId e : s.entities()) {
             const EntityRecord* r = s.record(e);
-            if (s.get<Persistent>(e) || names.count(r->name) || names.count("#" + std::to_string(e))) roots.insert(e);
+            if (s.get<Carry>(e) || names.count(r->name) || names.count("#" + std::to_string(e))) roots.insert(e);
         }
         std::unordered_set<EntityId> all;
         std::function<void(EntityId)> add = [&](EntityId e) {
@@ -325,7 +325,7 @@ struct SceneFlow::Impl {
         return all;
     }
 
-    std::vector<std::string> persistentNames() const {
+    std::vector<std::string> carriedNames() const {
         std::vector<std::string> out;
         Scene& s = engine.scene();
         std::unordered_set<EntityId> kept = keptEntities({});
@@ -393,14 +393,14 @@ struct SceneFlow::Impl {
         for (EntityId e : doomed) s.destroy(e);
         subs.clear();
         engine.runtime().forgetMissingEntities();
-        // The next scene's copies of persistent entities give way to the running ones.
+        // The next scene's copies of carried entities give way to the running ones.
         std::set<std::string> keys;
         for (EntityId e : kept) {
-            if (s.get<Persistent>(e) && !kept.count(s.record(e)->parent)) keys.insert(persistentKey(e));
+            if (s.get<Carry>(e) && !kept.count(s.record(e)->parent)) keys.insert(carryKey(e));
         }
         std::vector<EntityId> dupes;
         for (EntityId e : temp.entities()) {
-            const Persistent* p = temp.get<Persistent>(e);
+            const Carry* p = temp.get<Carry>(e);
             if (p && keys.count(p->id.empty() ? temp.record(e)->name : p->id)) dupes.push_back(e);
         }
         for (EntityId e : dupes) temp.destroy(e);
@@ -433,7 +433,7 @@ struct SceneFlow::Impl {
                 const Vec3 rot = s.get<Transform>(at)->rotation;
                 std::vector<EntityId> movers;
                 for (EntityId e : kept) {
-                    const Persistent* p = s.get<Persistent>(e);
+                    const Carry* p = s.get<Carry>(e);
                     if (p && p->spawn) movers.push_back(e);
                 }
                 if (movers.empty()) {
@@ -758,8 +758,8 @@ Json SceneFlow::info() const {
         for (EntityId e : sub.owned) alive += m.engine.scene().exists(e) ? 1 : 0;
         subs.push(Json::object({{"id", sub.id}, {"path", sub.path}, {"entities", alive}, {"unloading", sub.unloadIn >= 0}}));
     }
-    Json persistent = Json::array();
-    for (const auto& n : m.persistentNames()) persistent.push(n);
+    Json carried = Json::array();
+    for (const auto& n : m.carriedNames()) carried.push(n);
     static const char* kPhases[] = {"idle", "out", "loading", "in"};
     Json pending;
     if (m.pending) {
@@ -771,9 +771,9 @@ Json SceneFlow::info() const {
                                 {"loadingScene", m.pending->loadingPath}});
     }
     const FrameData::ScreenFade f = fade();
-    Json settingsJson = Json::object({{"persistent", Json::array()}, {"loadingScene", s.loadingScene}, {"transition", s.transition.toJson()},
+    Json settingsJson = Json::object({{"carry", Json::array()}, {"loadingScene", s.loadingScene}, {"transition", s.transition.toJson()},
                                       {"preloadPerTick", s.preloadPerTick}});
-    for (const auto& n : s.persistent) settingsJson["persistent"].push(n);
+    for (const auto& n : s.carry) settingsJson["carry"].push(n);
     return Json::object({{"playing", m.engine.playState() != PlayState::Editing},
                          {"current", m.current},
                          {"path", m.currentPath},
@@ -784,7 +784,7 @@ Json SceneFlow::info() const {
                                                       {"alpha", f.alpha},
                                                       {"crossfade", f.crossfade}})},
                          {"additive", subs},
-                         {"persistent", persistent},
+                         {"carried", carried},
                          {"aliases", aliases},
                          {"scenes", files},
                          {"settings", settingsJson}});

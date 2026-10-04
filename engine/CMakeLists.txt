@@ -212,8 +212,8 @@ set(SKY_ENGINE_SOURCES
     src/locale/LocaleAudit.cpp
     src/locale/LocaleBuiltins.cpp
     src/agent/LocaleTools.cpp
-    # Runtime scene flow: scene changes, persistent entities, sub-scenes, transitions (docs/SCENE_FLOW.md)
-    src/ecs/PersistentComponent.cpp
+    # Runtime scene flow: scene changes, carried entities, sub-scenes, transitions (docs/SCENE_FLOW.md)
+    src/ecs/CarryComponent.cpp
     src/wander/RuntimeScenes.cpp
     src/game/SceneFlow.cpp
     src/game/SceneFlowBuiltins.cpp

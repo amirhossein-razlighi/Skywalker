@@ -150,9 +150,10 @@ damaged files. When the shape of saved data changes, bump `game.json` `saves.ver
 ## Moving between scenes (menus, levels, rooms)
 
 Engine doc: `skywalker://docs/SCENE_FLOW`. `change_scene("level2", {transition: "fade", duration: 0.5, spawn_at: "Door_West"})` (a game.json `scenes` alias or a `.sky.json` path)
-replaces the world at the end of the tick; entities with a `persistent` component (`{id: "gm"}`, `spawn: true` for the player) carry over with their behaviors still running, and
+replaces the world at the end of the tick; entities with a `carry` component (`{id: "gm"}`, `spawn: true` for the player) are carried over with their behaviors still running, and
 the next scene's copy of the same manager gives way. Sub-scenes: `let room = load_additive("rooms/cellar", {offset: (40, 0, 0)})`, `unload_scene(room)` (removes exactly what it
 loaded). `current_scene()`, `loading_progress()` (for a loading scene's bar), `on scene_unloading` (data.to) / `on scene_loaded` (data.id). New scenes get fresh entity ids.
+`carry` (survives a scene change) is not `persist` (restored by a save): a player usually has both. Loading a save made in another scene changes to it at once, carried entities included.
 
 ```text
 sim_control {action:"play"}

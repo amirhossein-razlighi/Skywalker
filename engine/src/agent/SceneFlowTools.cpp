@@ -28,7 +28,7 @@ void addSceneFlowTools(Engine& engine, ToolRegistry& reg) {
     reg.add({"scene_flow_info", "Scene flow state",
              "The running game's scene flow: the current scene (alias or path), the pending change (target, preloaded assets, "
              "loading scene), loading progress, the transition (kind, phase out|loading|in|idle, alpha), loaded sub-scenes "
-             "with their entity counts, the entities that persist across changes, game.json scene aliases and every scene "
+             "with their entity counts, the carried entities (`carried`: `carry` components, game.json sceneFlow.carry), game.json scene aliases and every scene "
              "file. Use it before and after scene_change / scene_additive_load, and to explain why something did not carry over.",
              "scene", object({}), false, false, [&engine](const Json&, ToolContext&) {
                  Json out = engine.sceneFlow().info();
@@ -40,8 +40,8 @@ void addSceneFlowTools(Engine& engine, ToolRegistry& reg) {
 
     reg.add({"scene_change", "Change scene (play)",
              "Moves the running game to another scene, as Wander's change_scene does: the scene is a game.json \"scenes\" alias "
-             "or a .sky.json path (unknown names get a did-you-mean). Entities with a `persistent` component, game.json "
-             "sceneFlow.persistent names and `keep` carry over with their behaviors running; the rest is replaced. The change "
+             "or a .sky.json path (unknown names get a did-you-mean). Entities with a `carry` component, game.json "
+             "sceneFlow.carry names and `keep` carry over with their behaviors running; the rest is replaced. The change "
              "runs over the next ticks (transition out, preloading, swap, transition in); step the simulation to see it, or "
              "pass immediate: true to swap now. Stopping play returns the editor to the scene play started in. Example: "
              "{\"scene\": \"level2\", \"transition\": \"fade\", \"duration\": 0.4, \"spawn_at\": \"Door_West\"}.",
@@ -51,7 +51,7 @@ void addSceneFlowTools(Engine& engine, ToolRegistry& reg) {
                      {"duration", number("Transition seconds (0..10)")},
                      {"color", string("Fade color, e.g. \"#000000\"")},
                      {"keep", array(string("Entity name"), "More entities to carry over this time")},
-                     {"spawn_at", string("Entity of the new scene the player moves to (persistent.spawn, else tag \"player\")")},
+                     {"spawn_at", string("Entity of the new scene the player moves to (carry.spawn, else tag \"player\")")},
                      {"loading", string("Loading scene shown while the target preloads (\"\" = none; default game.json sceneFlow.loadingScene)")},
                      {"immediate", boolean("Swap now, without transition or preloading (default false)")}},
                     {"scene"}),

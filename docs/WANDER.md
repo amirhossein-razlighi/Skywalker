@@ -234,7 +234,7 @@ gradual typing: no annotation noise, and agents still get type errors before pla
 - **Save games.** `save_game` / `load_game` capture and restore persisted entities, `game_var`
   values and this runtime state exactly, between ticks ([SAVE_GAMES](SAVE_GAMES.md)).
 - **Scene changes.** `change_scene` / `load_additive` apply at the end of a tick; behaviors of
-  `persistent` entities keep running across them ([SCENE_FLOW](SCENE_FLOW.md)).
+  `carry` entities keep running across them ([SCENE_FLOW](SCENE_FLOW.md)).
 - Replacing a behavior while playing restarts its instance. `use`d modules reload when
   play starts or when their files change.
 

@@ -7,7 +7,7 @@
 // Every change happens at the end of a tick (Engine::step), never while scripts run, and always at
 // least one tick after it was asked for, so the leaving scene hears `on scene_unloading`. Scenes loaded
 // at run time get fresh entity ids (ids are never reused in a play session), so references held by
-// persistent entities can never land on an entity of the new scene. Stopping play discards all of it:
+// carried entities can never land on an entity of the new scene. Stopping play discards all of it:
 // the editor gets the scene that was open when play started.
 
 #include <cstdint>
@@ -37,10 +37,10 @@ struct TransitionSpec {
     Json toJson() const;
 };
 
-/// game.json: "scenes" (aliases) and "sceneFlow" (persistent entities, loading scene, default transition).
+/// game.json: "scenes" (aliases) and "sceneFlow" (carried entities, loading scene, default transition).
 struct SceneFlowSettings {
     std::vector<std::pair<std::string, std::string>> aliases;  // "menu" -> "scenes/menu.sky.json"
-    std::vector<std::string> persistent;  // entity names that survive scene changes (besides `persistent` components)
+    std::vector<std::string> carry;  // entity names carried across scene changes (besides `carry` components)
     std::string loadingScene;             // alias or path shown while the next scene preloads ("" = none)
     TransitionSpec transition;            // default for change_scene
     int preloadPerTick = 4;               // assets loaded per tick while preloading (time slicing)
@@ -52,7 +52,7 @@ struct ChangeOptions {
     bool hasTransition = false;
     TransitionSpec transition;
     std::vector<std::string> keep;  // more entities (names or "#id") to carry over this time
-    std::string spawnAt;            // entity of the new scene the player (persistent.spawn, else tag "player") moves to
+    std::string spawnAt;            // entity of the new scene the player (carry.spawn, else tag "player") moves to
     bool hasLoading = false;
     std::string loading;            // loading scene for this change ("" = none)
     bool immediate = false;         // tools: skip transition and preloading, change now (between ticks)
@@ -119,7 +119,7 @@ public:
     bool busy() const;
     /// The transition overlay for this frame (FrameData::fade).
     FrameData::ScreenFade fade() const;
-    /// Everything for scene_flow_info: scenes, sub-scenes, persistent entities, the pending change, the transition.
+    /// Everything for scene_flow_info: scenes, sub-scenes, carried entities, the pending change, the transition.
     Json info() const;
 
     struct Impl;

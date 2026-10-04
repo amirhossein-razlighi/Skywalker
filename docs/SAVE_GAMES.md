@@ -165,7 +165,7 @@ Between two ticks, while playing:
 
 1. If the save was made in another scene (or in the same scene entered with other entity ids), the scene flow
    changes to it at once, without a transition or loading scene, and its entities get the ids they had in the save.
-   Entities with a `persistent` component come along and keep running, as on any scene change; persisted ones
+   Entities with a `carry` component come along and keep running, as on any scene change; persisted ones
    among them are then restored like the others; sub-scenes loaded with `load_additive` go with the scene they were
    loaded into. A scene change or transition under way is dropped. The editor's play snapshot is untouched.
 2. Tombstoned entities are destroyed, and so are persisted entities spawned after the save.
@@ -179,8 +179,8 @@ The result is deterministic: saving at tick N, loading, and running M ticks give
 ticks directly (tests/test_save_games.cpp checks it, with random numbers, timers, waiting handlers, state machines
 and spawns, and for a save loaded from another scene). Stopping play still returns to the scene as it was edited.
 
-`persist` and the scene flow's `persistent` answer different questions: `persist` says what a save restores,
-`persistent` says what survives a scene change. A player usually has both. Entities carried across scene changes keep
+`persist` and the scene flow's `carry` answer different questions: `persist` says what a save restores, `carry`
+says what survives a scene change. A player usually has both. Entities carried across scene changes keep
 the ids they had, so carry entities from the scene play starts in (or spawn them in a fixed order) and give persisted
 ones a `persist.id`: a save then finds them in every play session.
 

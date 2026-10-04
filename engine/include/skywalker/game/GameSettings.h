@@ -56,7 +56,7 @@ struct GameSettings {
     // Localization: "localization": {"source": "en", "locale": "fr", "useSystemLocale": true} (locale/Localization.h)
     Json localization;
     // Runtime scene flow (game/SceneFlow.h): "scenes": {"menu": "scenes/menu.sky.json"} aliases and
-    // "sceneFlow": {"persistent": [...], "loadingScene": "loading", "transition": {"kind": "fade", "duration": 0.4}}
+    // "sceneFlow": {"carry": [...], "loadingScene": "loading", "transition": {"kind": "fade", "duration": 0.4}}
     Json scenes;
     Json sceneFlow;
 

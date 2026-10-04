@@ -585,7 +585,7 @@ Json persistedState(Engine& e) {
 void buildFlowGame(const Project& p) {
     p.write("prefabs/coin.prefab.json", kCoinPrefab);
     p.write("game.json", R"({"id": "flow-saves", "scenes": {"menu": "scenes/menu.sky.json", "level": "scenes/level.sky.json"}})");
-    const std::string gm = R"({"id": 1, "name": "GameManager", "components": {"persistent": {"id": "gm"}},
+    const std::string gm = R"({"id": 1, "name": "GameManager", "components": {"carry": {"id": "gm"}},
         "behaviors": [{"name": "Count", "source": "var ticks = 0\non tick\n  ticks += 1\nend"}]})";
     p.write("scenes/menu.sky.json", R"({"format": "skywalker.scene", "version": 1, "name": "Menu", "seed": 5, "entities": [)" + gm +
                                         R"(, {"id": 2, "name": "Title"}]})");

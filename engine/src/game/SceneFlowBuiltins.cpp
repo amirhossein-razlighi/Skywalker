@@ -40,7 +40,7 @@ void def(BuiltinRegistry& r, const char* name, std::vector<BuiltinParam> params,
 void registerSceneFlowBuiltins(BuiltinRegistry& reg) {
     def(reg, "change_scene", {{"scene", kTString}, {"options", kTMap, true}}, kTNone,
         "Moves the game to another scene (a game.json \"scenes\" alias or a .sky.json path) after this tick: the "
-        "current scene hears `on scene_unloading`, entities with a `persistent` component (and options.keep) carry "
+        "current scene hears `on scene_unloading`, entities with a `carry` component (and options.keep) carry "
         "over with their running behaviors, the rest is replaced. Options: transition (\"fade\" | \"crossfade\" | "
         "\"none\" or {kind, duration, color}), duration, keep: [names], spawn_at: \"EntityName\" (the player moves "
         "there), loading: a loading scene shown while assets preload. `on scene_loaded` follows. Stopping play returns "
