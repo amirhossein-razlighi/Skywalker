@@ -24,6 +24,11 @@ struct Animator {
     EntityLink lookAt;       // entity the head turns towards (look-at IK); empty = off
     float lookAtWeight = 1.f;
     float lookAtLimit = 70.f;  // max head/spine turn in degrees
+    // --- character tech (docs/CHARACTERS.md) ---
+    bool rootYaw = false;      // root motion also turns the entity by the clip's root rotation (turns, curved walks)
+    bool inPlace = false;      // play locomotion in place: the root's horizontal motion (and yaw) is removed, the entity stays
+    std::string retargetFrom;  // clip library to take clips from when they are not in `library` (pose-space retargeted)
+    std::string retarget = "auto";  // auto | pose | name: how clips from another rig map onto this skeleton
 
     static const TypeInfo& type();
 };

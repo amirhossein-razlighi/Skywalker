@@ -28,6 +28,8 @@
 
 namespace sky::anim {
 
+struct RetargetSetup;  // anim/Retarget.h
+
 class AnimationSystem {
 public:
     struct Hooks {
@@ -89,7 +91,15 @@ public:
     /// The library an animator uses (its own field, its controller's, or its mesh's).
     Result<std::shared_ptr<const Library>> libraryOf(EntityId animatorEntity);
     /// A clip reference ("Walk" in `lib`, or "anims/dance.anim#Dance") posed for `lib`'s skeleton.
-    std::shared_ptr<const Clip> resolveClip(const std::shared_ptr<const Library>& lib, const std::string& ref);
+    /// Clips of another rig are retargeted per `mode` ("auto", "pose" or "name"; see Animator::retarget);
+    /// `fallbackLibrary` (Animator::retargetFrom) supplies clips that are not in `lib`.
+    std::shared_ptr<const Clip> resolveClip(const std::shared_ptr<const Library>& lib, const std::string& ref,
+                                            const std::string& mode = "auto", const std::string& fallbackLibrary = "");
+    /// Pose-space retargeting setup between two libraries (cached); error when either is not a humanoid.
+    Result<std::shared_ptr<const RetargetSetup>> retargetSetup(const std::shared_ptr<const Library>& source,
+                                                                      const std::shared_ptr<const Library>& target);
+    /// How a clip of `source` reaches `target` under `mode`: "same" (identical rigs), "pose" or "name".
+    std::string retargetMethod(const Library& source, const Library& target, const std::string& mode);
 
     // --- Control (tools, Wander, sequencer) ------------------------------------------------
     Status setParam(EntityId e, std::string_view name, const Json& value);
@@ -125,6 +135,7 @@ private:
     void poseEditing(Instance& inst, EntityId e, const Animator& a);
     void finishPose(Instance& inst, EntityId e, const Animator& a);
     void applyLookAt(Instance& inst, EntityId e, const Animator& a);
+    void applyRootYaw(const Instance& inst, EntityId e, float yaw);
     void applyIk(Instance& inst, EntityId e);
     const std::vector<EntityId>* ikEffectors(EntityId animatorEntity);
     Mat4 modelToWorld(const Instance& inst, EntityId animatorEntity) const;
@@ -142,6 +153,7 @@ private:
     std::unordered_map<std::string, std::pair<std::shared_ptr<const ControllerDef>, std::string>> controllers_;
     std::unordered_map<std::string, std::pair<std::shared_ptr<const SequenceDef>, std::string>> sequences_;
     std::unordered_map<std::string, std::shared_ptr<const Clip>> retargeted_;
+    std::unordered_map<std::string, std::pair<std::shared_ptr<const RetargetSetup>, std::string>> retargetSetups_;
     std::unordered_map<EntityId, float> scrubs_;
     std::unordered_map<std::string, bool> warned_;
     std::unordered_map<EntityId, std::vector<EntityId>> ikIndex_;  // animator -> IK effectors (rebuilt per scene revision)

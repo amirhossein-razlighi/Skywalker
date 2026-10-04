@@ -57,6 +57,7 @@ set(SKY_TEST_SOURCES
     test_prefab.cpp
     test_legal.cpp
     test_agent_link.cpp
+    test_characters.cpp
 )
 
 add_executable(skywalker_tests ${SKY_TEST_SOURCES})

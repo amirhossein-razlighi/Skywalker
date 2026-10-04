@@ -165,6 +165,9 @@ set(SKY_ENGINE_SOURCES
     # Agent link: followable events and tools served by external processes (docs/PYTHON_AGENTS.md)
     src/agent/AgentLink.cpp
     src/agent/AgentLinkTools.cpp
+    # Character tech: humanoid maps, pose-space retargeting, foot / hand IK, skinned grooms (docs/CHARACTERS.md)
+    src/anim/HumanoidMap.cpp
+    src/anim/Retarget.cpp
 )
 
 # DCC bridge: the Python helper library and the Blender add-on are embedded so the engine can
