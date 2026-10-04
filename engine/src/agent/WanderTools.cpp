@@ -344,7 +344,7 @@ void addWanderTools(Engine& engine, ToolRegistry& reg) {
              }});
 
     reg.add({"behavior_graph", "Behavior as a node graph",
-             "Blueprint-style node graph of a behavior (or raw `source`): bodies (handlers, fns, tests, state handlers) "
+             "Visual node graph of a behavior (or raw `source`): bodies (handlers, fns, tests, state handlers) "
              "with an entry node, exec-flow statement nodes wired by exec pins (if: then/elif/else; loops: body), "
              "expression nodes wired into data pins, and literals/names inline on pins (`value`). Positions come from the "
              "saved layout or an automatic layout. Edit the JSON and send it back with behavior_from_graph. "

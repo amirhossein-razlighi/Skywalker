@@ -417,8 +417,8 @@ void addPhysicsTools(Engine& engine, ToolRegistry& reg) {
              }});
 
     reg.add({"physics_settle", "Settle with physics",
-             "Drop objects with a real simulation and keep where they come to rest — like Unreal's \"simulate, then "
-             "keep\". Only the listed entities move (as dynamic bodies, even without a body component); everything else "
+             "Drop objects with a real simulation and keep where they come to rest (simulate, then keep the poses). "
+             "Only the listed entities move (as dynamic bodies, even without a body component); everything else "
              "is frozen. The result is ONE undoable edit. Great after scatter/place: rocks, crates, books and debris "
              "end up naturally stacked and resting instead of floating or intersecting. Example: {\"entities\": "
              "[\"Crate 1\", \"Crate 2\", \"Barrel\"], \"seconds\": 4}.",
