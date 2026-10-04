@@ -15,7 +15,7 @@ const std::vector<DebugViewInfo>& debugViews() {
         {kReflections, "reflections", "gbuffer", "screen-space reflections only"},
         {kAo, "ao", "gbuffer", "ambient occlusion (white = open, black = occluded)"},
         {kDepth, "depth", "gbuffer", "scene depth (near bright, far dark)"},
-        {kLighting, "lighting", "gbuffer", "lit color before screen-space GI and reflections"},
+        {kLighting, "lighting", "gbuffer", "lit color before reflection probes, screen-space GI and reflections"},
         {kSketch, "sketch", "style", "pencil contours and cross-hatching"},
         {kImpostors, "impostors", "final", "final image with foliage meshes tinted green and distant impostors magenta"},
         {kWireframe, "wireframe", "final", "dark flat-shaded surfaces with every mesh triangle edge drawn in cyan (depth-tested)"},

@@ -296,6 +296,22 @@ TEST_CASE("probes: stills capture everything at once, with the bounce pass") {
     CHECK_FALSE(p.jobs[0].bounce);  // it already had a capture: one pass, lit by it
     planner.invalidate();
     CHECK(planner.plan(f, settings).jobs.size() == 2);
+    // GPU memory stays bounded: 512 px probes fit 16 slots in the 256 MB atlas cap, whatever the budget.
+    std::vector<ProbeItem> big;
+    for (int i = 0; i < 20; ++i) {
+        ProbeItem it = boxProbe(100 + i, {static_cast<float>(i) * 10.f, 1, 0}, {6, 3, 6});
+        it.resolution = 512;
+        big.push_back(it);
+    }
+    Planner capped;
+    Settings wide;
+    wide.budget = 32;
+    wide.unlimited = true;
+    p = capped.plan(frameWith(big, {95, 40, 60}, {95, 0, 0}), wide);
+    CHECK(p.atlasSlots == 16);
+    CHECK(p.atlasResolution == 512);
+    CHECK(slotBytes(p.atlasResolution) * p.atlasSlots <= kMaxAtlasMB * 1048576.0);
+    CHECK(p.overBudget == 4);
     // Budget 0 turns probes off.
     settings.budget = 0;
     p = planner.plan(f, settings);

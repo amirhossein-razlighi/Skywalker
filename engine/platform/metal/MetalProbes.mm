@@ -451,8 +451,7 @@ Json MetalProbes::info(const FrameData* frame) const {
 Json MetalProbes::stats() const {
     int ready = 0;
     for (const auto& s : plan_.probes) ready += s.ready ? 1 : 0;
-    const double mb = static_cast<double>(atlasResolution_) * atlasResolution_ * 8.0 * probes::kFaces * atlasSlots_ * (4.0 / 3.0) /
-                      (1024.0 * 1024.0);
+    const double mb = probes::slotBytes(atlasResolution_) * atlasSlots_ / (1024.0 * 1024.0);
     double last = 0.0;
     {
         std::lock_guard<std::mutex> lock(timing_->mutex);

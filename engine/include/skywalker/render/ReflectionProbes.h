@@ -41,6 +41,7 @@ constexpr int kFaces = 6;
 constexpr int kMinResolution = 64;
 constexpr int kMaxResolution = 512;
 constexpr int kMaxCaptureLights = 128; // point / spot lights a capture evaluates (nearest first)
+constexpr double kMaxAtlasMB = 256.0;     // the atlas never grows past this (fewer slots at high resolutions)
 constexpr float kInteriorMargin = 0.1f;    // m: surfaces this far outside an interior volume still belong to it
 constexpr float kInteriorMinWeight = 1e-3f; // interior volumes never fade to zero inside (renormalized: no sky)
 
@@ -51,6 +52,8 @@ const char* ambientName(int ambient);
 
 /// The nearest power of two in 64..512.
 int sanitizeResolution(int px);
+/// GPU memory of one atlas slot (a cube with its mips) at `resolution` px.
+double slotBytes(int resolution);
 /// Resolves a component on an entity with world matrix `world` (its scale multiplies the volume).
 ProbeItem makeItem(EntityId entity, const Mat4& world, const ReflectionProbe& p);
 

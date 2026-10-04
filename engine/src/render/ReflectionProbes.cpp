@@ -97,6 +97,10 @@ const char* ambientName(int ambient) {
     }
 }
 
+double slotBytes(int resolution) {
+    return static_cast<double>(resolution) * resolution * 8.0 /* RGBA16F */ * kFaces * (4.0 / 3.0) /* mips */;
+}
+
 int sanitizeResolution(int px) {
     int r = kMinResolution;
     while (r < kMaxResolution && r * 3 / 2 < px) r *= 2;  // nearest power of two (rounds 192 -> 256)
@@ -580,7 +584,18 @@ Plan Planner::plan(const FrameData& frame, const Settings& settings) {
     std::stable_sort(order.begin(), order.end(), [&](int a, int b) {
         return p.probes[static_cast<size_t>(a)].importance > p.probes[static_cast<size_t>(b)].importance;
     });
-    const size_t budget = static_cast<size_t>(settings.budget);
+    // GPU memory stays bounded: the atlas never exceeds kMaxAtlasMB (512 px probes fit 16 slots).
+    int topRes = kMinResolution;
+    for (size_t k = 0; k < order.size() && k < static_cast<size_t>(settings.budget); ++k) {
+        topRes = std::max(topRes, frame.probes[static_cast<size_t>(order[k])].resolution);
+    }
+    const size_t memoryCap = std::max<size_t>(1, static_cast<size_t>(kMaxAtlasMB * 1048576.0 / slotBytes(topRes)));
+    const size_t budget = std::min(static_cast<size_t>(settings.budget), memoryCap);
+    if (budget < static_cast<size_t>(settings.budget) && n > budget) {
+        p.warnings.push_back("the probe atlas is capped at " + std::to_string(static_cast<int>(kMaxAtlasMB)) + " MB: " +
+                             std::to_string(budget) + " probes of " + std::to_string(topRes) +
+                             " px fit; lower the largest probes' resolution to fit more");
+    }
     if (slots_.size() > budget) {  // the budget shrank: drop the slots beyond it
         for (size_t k = budget; k < slots_.size(); ++k) {
             if (auto r = records_.find(slots_[k]); r != records_.end()) r->second.slot = -1, r->second.ready = false;
@@ -836,8 +851,7 @@ Json Planner::info(const FrameData* frame) const {
             }
         }
     }
-    const double faceBytes = static_cast<double>(p.atlasResolution) * p.atlasResolution * 8.0;  // RGBA16F
-    const double mb = faceBytes * kFaces * p.atlasSlots * (4.0 / 3.0) / (1024.0 * 1024.0);
+    const double mb = slotBytes(p.atlasResolution) * p.atlasSlots / (1024.0 * 1024.0);
     return Json::object({{"atlas", Json::object({{"resolution", p.atlasResolution},
                                                  {"slots", p.atlasSlots},
                                                  {"used", slotsUsed},
