@@ -132,5 +132,8 @@ given), renders each through the sequence's live camera, audits it with `scene_a
 default materials above 0.1% of the image, primitive characters and missing files fail), benchmarks the first hero views with
 `perf_stats` (GPU ms, `gpuFaults` must be 0), and writes `shots/shot_NN.jpg` (<= 400 KB), `shots/contact_sheet.jpg`
 (<= 1.5 MB) and `shots/gate_report.json`. It prints PASS or FAIL and exits non-zero on FAIL. `--stylized` accepts flat-colored
-materials for a deliberate stylized look; `--no-strict` uses the 2% limit. Renders take the GPU lock, so run one gate at a time.
+materials for a deliberate stylized look; `--no-strict` uses the 2% limit. `--movie` renders each shot through
+`movie_render` instead of a scrubbed still: the sequence pre-rolls to the moment, so particles (smoke, spray) have their history,
+and the shutter (`--shutter`, default 0.5) adds motion blur; use it for driving and action sequences. Renders take the GPU lock,
+so run one gate at a time.
 The gate is a floor, not the bar: look at the sheet as an art director would (composition, light, scale, stretching).
