@@ -10,6 +10,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "skywalker/scene/Process.h"
 #include "skywalker/render/Renderer.h"
 #include "skywalker/render2d/Atlas.h"
 #include "skywalker/render2d/ImageIO.h"
@@ -108,7 +109,9 @@ struct Gather2DOptions {
 void gather2D(const Scene& scene, Assets2D& assets, FrameData& frame, const Gather2DOptions& opts);
 
 /// Advances sprite animations by dt; `emit(entity, event)` receives frame events and "finished" (delivered to Wander as anim:<name>).
-void tickAnimators(Scene& scene, Assets2D& assets, float dt, const std::function<void(EntityId, const std::string&)>& emit);
+/// With a process gate (game pause, time scale) sprites whose entity does not run hold their frame.
+void tickAnimators(Scene& scene, Assets2D& assets, float dt, const std::function<void(EntityId, const std::string&)>& emit,
+                   const ProcessGate* gate = nullptr);
 /// Starts `clip` on the entity's animator (restarts it when `restart` or when it differs).
 Status playAnimation(Scene& scene, Assets2D& assets, EntityId entity, const std::string& clip, bool restart);
 /// The sheet frame an animator shows now (false if it has no valid clip).
@@ -120,7 +123,7 @@ EntityId activeCamera(const Scene& scene, EntityId preferred = kNoEntity);
 /// bounds). Returns the world units per texel for sprite snapping (0 = none).
 float applyCamera2D(const Scene& scene, EntityId cameraEntity, ViewCamera& view, int width, int height);
 /// Moves cameras with camera2d.follow toward their targets (deterministic; call per fixed tick).
-void tickCameras(Scene& scene, float dt);
+void tickCameras(Scene& scene, float dt, const ProcessGate* gate = nullptr);
 
 /// sRGB (authoring) -> linear (rendering).
 Vec4 toLinear(Vec4 srgb);

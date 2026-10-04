@@ -32,6 +32,12 @@ Each frame renders one or more sub-samples:
 | 12 | Post | Bloom chain, then the composite: chromatic aberration, white balance, exposure, tonemap, saturation/contrast, look / 3D LUT, vignette, grain, contrast-adaptive sharpening, dithering. Debug views replace the image. |
 | 13 | Overlays | Gizmos, drawn in LDR on top. |
 
+**Frame pacing.** The simulation ticks at 60 Hz; real-time frames on faster displays show the world
+between the last two ticks (render interpolation: transforms, skins, CPU particles and the effects
+clock at the displayed time). `perf_stats.frameFlow` reports the interpolation alpha and frame pacing
+jitter; the previous frame's model matrix per entity (for motion vectors) is in
+`Engine::displayHistory()`. See docs/ARCHITECTURE.md "Render interpolation".
+
 ### Lighting
 
 - **Clustered forward lighting:** up to 1024 lights (see [Lights](#lights-light-component) for their fields). The view is split into 16×9×24 clusters

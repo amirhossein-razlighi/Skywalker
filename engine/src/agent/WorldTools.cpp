@@ -3,6 +3,8 @@
 // level building beyond single-entity edits.
 
 #include <algorithm>
+#include <optional>
+#include <map>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
@@ -121,6 +123,8 @@ ViewCamera orthoView(Vec3 center, float radius, Vec3 dir, Vec3 up) {
 }
 
 }  // namespace
+
+Json readPropertyPath(const Scene& s, EntityId id, const std::string& path) { return readProperty(s, id, path); }
 
 Status dropToSurface(Engine& engine, EntityId id, float offset) {
     Scene& s = engine.scene();
@@ -357,7 +361,11 @@ void addWorldTools(Engine& engine, ToolRegistry& reg) {
              "Run the game for N ticks and sample properties over time — e.g. transform.position of the player, "
              "vars.score, mesh.color — to verify behaviors numerically (did it jump? does the score increase?). "
              "Paths: <component>.<field>[.<sub>], vars.<name>, name, enabled. By default the scene is restored "
-             "afterwards if it was in edit mode.",
+             "afterwards if it was in edit mode. display_hz (e.g. 120) simulates a real display instead: real time "
+             "advances 1/display_hz per frame (fixed 60 Hz ticks accumulate), `every` counts display frames, and each "
+             "sample shows the interpolation alpha plus `shown` = what that frame displays (render interpolation) next to "
+             "the tick values; the result's `smoothness` compares how evenly vector properties move per frame with and "
+             "without interpolation (stepJitter: 0 = perfectly even, about 2 = every other frame repeats a tick) and `pacing` gives the frame-time jitter.",
              "sim",
              object({{"entities", array(entity(), "Entities to watch")},
                      {"properties", array(Json::object({{"type", "string"}}), "Property paths, e.g. [\"transform.position\", \"vars.score\"]")},
@@ -365,7 +373,10 @@ void addWorldTools(Engine& engine, ToolRegistry& reg) {
                      {"every", integer("Sample every N ticks (default 10)")},
                      {"press", array(Json::object({{"type", "string"}}), "Keys pressed at the start")},
                      {"hold", array(Json::object({{"type", "string"}}), "Keys held during the trace")},
-                     {"restore", boolean("Restore the edit-mode scene afterwards (default true)")}},
+                     {"restore", boolean("Restore the edit-mode scene afterwards (default true)")},
+                     {"display_hz", number("Simulate a display at this refresh rate (30..240, e.g. 120 for ProMotion): "
+                                           "samples per displayed frame with interpolation alpha and shown values")},
+                     {"interpolation", boolean("With display_hz: render interpolation on (default: the engine setting)")}},
                     {"entities", "properties"}),
              true, false, [&engine](const Json& a, ToolContext&) {
                  std::vector<EntityId> ids;
@@ -406,11 +417,95 @@ void addWorldTools(Engine& engine, ToolRegistry& reg) {
                      os << "\n";
                      samples.push(std::move(row));
                  };
-                 sample(0);
                  size_t before = engine.recentMessages(100000).size();
-                 for (int t = every; t <= ticks; t += every) {
-                     engine.step(every);
-                     sample(t);
+                 Json displayInfo;
+                 if (a.contains("display_hz")) {
+                     // A simulated display: real time advances per frame, ticks accumulate (Engine::advance), and each
+                     // sample reads what that frame shows (the in-between transforms) next to the tick state.
+                     const double hz = std::clamp(a.get("display_hz").asFloat(120.f), 30.f, 240.f);
+                     const bool wasInterp = engine.interpolation();
+                     if (a.contains("interpolation")) engine.setInterpolation(a.get("interpolation").asBool(true));
+                     if (engine.playState() != PlayState::Playing) engine.play();
+                     const int frames = static_cast<int>(std::ceil(ticks * hz / 60.0));
+                     const int everyFrame = static_cast<int>(std::clamp<int64_t>(a.get("every").asInt(1), 1, frames));
+                     // Per entity/property: per-frame displacement of vector values, shown and raw (tick state).
+                     struct Track {
+                         std::vector<double> shownSteps, rawSteps;
+                         std::optional<Vec3> lastShown, lastRaw;
+                     };
+                     std::map<std::string, Track> tracks;
+                     // How uneven per-frame motion is: RMS of each frame's step minus the mean of its two
+                     // neighbours, relative to the mean step. Real acceleration and turns barely count (they
+                     // change steps smoothly); a frame that repeats the last tick and one that jumps two do.
+                     auto stepJitter = [](const std::vector<double>& v) {
+                         if (v.size() < 3) return 0.0;
+                         double mean = 0, sq = 0;
+                         for (double x : v) mean += x;
+                         mean /= static_cast<double>(v.size());
+                         if (mean < 1e-9) return 0.0;
+                         for (size_t i = 1; i + 1 < v.size(); ++i) {
+                             const double d = v[i] - 0.5 * (v[i - 1] + v[i + 1]);
+                             sq += d * d;
+                         }
+                         return std::sqrt(sq / static_cast<double>(v.size() - 2)) / mean;
+                     };
+                     for (int f = 1; f <= frames; ++f) {
+                         const int ran = engine.advance(1.0 / hz);
+                         const float alpha = engine.interpolationAlpha();
+                         engine.notePresentedFrame(engine.interpolation() ? alpha : 1.f);
+                         const bool record = f % everyFrame == 0;
+                         const bool warm = engine.transformHistory().valid();
+                         Json row = Json::object({{"frame", f}, {"time", std::round(f / hz * 1000.) / 1000.},
+                                                  {"alpha", std::round(alpha * 1000.) / 1000.}, {"ticks", ran}});
+                         // Tick state first, then the displayed state (the scope restores the tick state).
+                         std::map<std::string, Json> raw;
+                         for (EntityId id : ids) {
+                             if (!engine.scene().exists(id)) continue;
+                             for (const auto& p : props) raw[std::to_string(id) + "." + p] = readProperty(engine.scene(), id, p);
+                         }
+                         {
+                             ScopedInterpolation shown(engine.scene(), engine.transformHistory(),
+                                                       engine.interpolation() ? alpha : 1.f, &engine.runtime().processGate());
+                             for (EntityId id : ids) {
+                                 if (!engine.scene().exists(id)) continue;
+                                 Json vals = Json::object();
+                                 for (const auto& p : props) {
+                                     const std::string key = std::to_string(id) + "." + p;
+                                     Json v = readProperty(engine.scene(), id, p);
+                                     Track& tr = tracks[key];
+                                     Vec3 sv, rv;
+                                     // Steps count once a tick history exists (the first frames have nothing to blend).
+                                     if (warm && reflect::jsonToVec3(v, sv) && reflect::jsonToVec3(raw[key], rv)) {
+                                         if (tr.lastShown) tr.shownSteps.push_back(length(sv - *tr.lastShown));
+                                         if (tr.lastRaw) tr.rawSteps.push_back(length(rv - *tr.lastRaw));
+                                         tr.lastShown = sv;
+                                         tr.lastRaw = rv;
+                                     }
+                                     if (record) vals[p] = Json::object({{"shown", v}, {"tick", raw[key]}});
+                                 }
+                                 if (record) row[std::to_string(id)] = vals;
+                             }
+                         }
+                         if (record && samples.size() < 2000) samples.push(std::move(row));
+                     }
+                     Json smooth = Json::object();
+                     for (const auto& [key, tr] : tracks) {
+                         if (tr.shownSteps.empty()) continue;
+                         smooth[key] = Json::object({{"stepJitter", std::round(stepJitter(tr.shownSteps) * 1000.) / 1000.},
+                                                     {"stepJitterWithoutInterpolation", std::round(stepJitter(tr.rawSteps) * 1000.) / 1000.}});
+                         os << key << ": step jitter " << stepJitter(tr.shownSteps) << " (without interpolation " << stepJitter(tr.rawSteps) << ")\n";
+                     }
+                     displayInfo = Json::object({{"hz", hz}, {"frames", frames}, {"interpolation", engine.interpolation()},
+                                                 {"pacing", engine.pacing().toJson()}, {"smoothness", smooth}});
+                     os << "display " << hz << " Hz, " << frames << " frames: jitter " << engine.pacing().jitterMs << " ms (without interpolation "
+                        << engine.pacing().jitterMsRaw << " ms)\n";
+                     engine.setInterpolation(wasInterp);
+                 } else {
+                     sample(0);
+                     for (int t = every; t <= ticks; t += every) {
+                         engine.step(every);
+                         sample(t);
+                     }
                  }
                  for (const auto& k : a.get("hold").elements()) in.held.erase(str::lower(k.asString()));
                  auto all = engine.recentMessages(100000);
@@ -425,6 +520,7 @@ void addWorldTools(Engine& engine, ToolRegistry& reg) {
                  }
                  ToolResult r = ToolResult::text(os.str());
                  r.structured = Json::object({{"samples", samples}, {"messages", logs}});
+                 if (!displayInfo.isNull()) r.structured["display"] = displayInfo;
                  return r;
              }});
 
@@ -585,6 +681,13 @@ void addWorldTools(Engine& engine, ToolRegistry& reg) {
                                                                  {"foliageChunks", static_cast<int64_t>(engine.world().stats().foliageChunks)},
                                                                  {"foliageInstances", static_cast<int64_t>(engine.world().stats().foliageInstances)}})}});
                  if (frames > 0) j["benchmark"] = bench;
+                 j["frameFlow"] = Json::object({{"interpolation", engine.interpolation()},
+                                                {"alpha", std::round(engine.interpolationAlpha() * 1000.f) / 1000.f},
+                                                {"interpolatedLastFrame", engine.frameFlowStats().interpolated},
+                                                {"frameHandlerRunsLastFrame", engine.frameFlowStats().frameHandlerRuns},
+                                                {"gamePaused", engine.gamePaused()},
+                                                {"timeScale", engine.timeScale()},
+                                                {"pacing", engine.pacing().toJson()}});
                  Json warnings = Json::array();
                  if (a.get("passes").asBool(false)) {
                      Json profile = engine.renderer().passProfile();

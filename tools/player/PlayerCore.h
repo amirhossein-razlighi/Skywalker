@@ -28,6 +28,7 @@ struct Options {
     int checkTicks = 120;
     std::string capture;         // write one rendered frame to this PNG, then quit
     int frames = 90;             // frames to run before the capture
+    double displayHz = 60;       // automated runs: simulated display rate (120 = ProMotion; render interpolation shows in-between ticks)
     double quitAfter = 0;        // seconds; 0 = never
     std::string agentSocket;     // serve MCP on this Unix socket (development)
     bool help = false;

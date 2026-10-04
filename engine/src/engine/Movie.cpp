@@ -18,6 +18,7 @@
 #include <cmath>
 #include <cstring>
 #include <filesystem>
+#include <optional>
 #include <unordered_map>
 
 #include "skywalker/anim/AnimMath.h"
@@ -25,6 +26,7 @@
 #include "skywalker/core/Log.h"
 #include "skywalker/core/Strings.h"
 #include "skywalker/engine/Engine.h"
+#include "skywalker/engine/Interpolation.h"
 
 namespace sky {
 namespace movie {
@@ -88,16 +90,8 @@ int shotIndex(const std::vector<double>& cuts, double t) {
 }
 
 Transform interpolateTransform(const Transform& a, const Transform& b, float alpha) {
-    alpha = std::clamp(alpha, 0.f, 1.f);
-    constexpr float kTeleport = 25.f;  // meters in one 1/60 s tick (1500 m/s): a jump, not motion
-    if (alpha >= 1.f || distance(a.position, b.position) > kTeleport) return b;
-    Transform out = b;
-    out.position = lerp(a.position, b.position, alpha);
-    out.scale = lerp(a.scale, b.scale, alpha);
-    if (a.rotation.x != b.rotation.x || a.rotation.y != b.rotation.y || a.rotation.z != b.rotation.z) {
-        out.rotation = anim::eulerDegFromQuat(anim::slerp(anim::Quat::fromEulerDeg(a.rotation), anim::Quat::fromEulerDeg(b.rotation), alpha));
-    }
-    return out;
+    // 25 m in one 1/60 s tick (1500 m/s) is a jump, not motion. Shared with real-time render interpolation.
+    return sky::interpolateTransform(a, b, alpha, 25.f);
 }
 
 // ---------------------------------------------------------------------------
@@ -292,8 +286,7 @@ struct Job::Impl {
 
     // Simulation state
     long tick = 0;
-    std::unordered_map<EntityId, Transform> prev;  // transforms at tick - 1
-    bool prevValid = false;
+    TransformHistory prev;  // transforms at tick - 1 (the same history real-time interpolation uses)
 
     // Progress
     int firstK = 0;  // first output frame of this run (> 0 when resuming)
@@ -481,14 +474,7 @@ struct Job::Impl {
     void advanceTo(double tau) {
         const long target = std::max(0L, static_cast<long>(std::ceil(tau / kTick - 1e-6)));
         while (tick < target) {
-            if (tick == target - 1) {
-                prev.clear();
-                Scene& s = engine.scene();
-                for (EntityId e : s.entities()) {
-                    if (const Transform* t = s.get<Transform>(e)) prev.emplace(e, *t);
-                }
-                prevValid = true;
-            }
+            if (tick == target - 1) prev.capture(engine.scene());
             tickOnce();
             ++tick;
         }
@@ -502,37 +488,24 @@ struct Job::Impl {
         advanceTo(tau);
         Scene& scene = engine.scene();
         const double tickTime = static_cast<double>(tick) * kTick;
-        const float alpha = tick == 0 || !prevValid ? 1.f : static_cast<float>(std::clamp((tau - (tickTime - kTick)) / kTick, 0.0, 1.0));
+        const float alpha = tick == 0 || !prev.valid() ? 1.f : static_cast<float>(std::clamp((tau - (tickTime - kTick)) / kTick, 0.0, 1.0));
 
-        // Everything below is restored when this scope ends (also on errors).
-        std::vector<std::pair<EntityId, Transform>> restore;
+        // Everything below is restored when this scope ends (also on errors), in reverse order: the
+        // sequence overrides first, then the in-between transforms (declared first, destroyed last).
+        std::optional<ScopedInterpolation> between;
         anim::AnimationSystem::FrameOverrides overrides;
         struct Restore {
             Impl& job;
-            std::vector<std::pair<EntityId, Transform>>& transforms;
             anim::AnimationSystem::FrameOverrides& ov;
             ~Restore() {
                 job.engine.particles().setRenderTimeOffset(0.f);
                 job.engine.setEffectsTimeOverride(std::nullopt);
                 job.engine.animation().endFrame(ov);
-                for (auto it = transforms.rbegin(); it != transforms.rend(); ++it) {
-                    if (Transform* t = job.engine.scene().get<Transform>(it->first)) *t = it->second;
-                }
             }
-        } guard{*this, restore, overrides};
+        } guard{*this, overrides};
 
         // 1. Transforms between the two ticks around tau.
-        if (alpha < 1.f) {
-            for (EntityId e : scene.entities()) {
-                Transform* t = scene.get<Transform>(e);
-                auto it = t ? prev.find(e) : prev.end();
-                if (it == prev.end()) continue;
-                const Transform& a = it->second;
-                if (a.position == t->position && a.rotation == t->rotation && a.scale == t->scale) continue;
-                restore.emplace_back(e, *t);
-                *t = interpolateTransform(a, *t, alpha);
-            }
-        }
+        between.emplace(scene, prev, alpha, &engine.runtime().processGate());
         // 2. The sequence exactly at tau (cameras, shots, keyed properties).
         if (seq) overrides = engine.animation().overrideSequenceAt(seq, static_cast<float>(seqTime(tau)));
         // 3. Clocks: effects at tau; CPU particles back along their velocity from the tick.
@@ -554,6 +527,8 @@ struct Job::Impl {
         co.offline.enabled = true;
         co.offline.sampleOffset = sampleOffset;
         co.offline.exposureDt = exposureDt;
+        co.frameHandlers = true;  // cosmetic `on frame` touches (camera shake...) show in the movie too
+        co.frameDt = exposureDt;
         View view;
         view.shot = shotIndex(cuts, tau);
         if (!o.camera.empty()) {

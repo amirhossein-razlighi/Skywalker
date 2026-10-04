@@ -293,8 +293,11 @@ audio_mix {"buses": {"music": 0.55, "ambience": 0.7, "sfx": 1}}
 audio_info {"path": "audio/theme.wav"}
 ```
 
-**Pause menu.** `set_volume("music", 0.25)` on pause and back on resume. The `ui` bus keeps
-playing, so menu clicks work while everything else is frozen.
+**Pause menu.** `pause_game()` (Wander) or `sim_control {"action": "pause_game"}` pauses every bus
+except `ui`, so menu clicks work while everything else is frozen; `resume_game()` resumes the
+held voices where they stopped. For a ducked rather than silent soundtrack, `set_volume("music", 0.25)`
+in `on pause` and back in `on resume` with the music on an `always` entity. (The editor's own pause holds
+every bus.)
 
 **Debug "why is it silent?"** `audio_mix` (are there voices? is the bus muted? is a device in
 use or only the null output?), then `audio_info` on the clip (silent file?), then check the

@@ -17,6 +17,7 @@
 #include <functional>
 #include <map>
 #include <memory>
+#include <optional>
 #include <set>
 #include <string>
 #include <typeindex>
@@ -25,6 +26,7 @@
 
 #include "skywalker/core/Json.h"
 #include "skywalker/core/Random.h"
+#include "skywalker/scene/Process.h"
 #include "skywalker/scene/Scene.h"
 #include "skywalker/wander/Builtins.h"
 #include "skywalker/wander/Bytecode.h"
@@ -93,8 +95,12 @@ public:
     void destroyEntity(EntityId entity);
     bool ticking() const { return ticking_; }
 
+    /// Game time in seconds: advances by dt * time_scale per tick and stops while the game is paused.
     double time() const { return time_; }
+    /// Ticks run since play started (also while paused).
     uint64_t frame() const { return frame_; }
+    /// Real (unscaled) seconds since play started: ticks * the fixed dt, paused or not.
+    double unscaledTime() const { return realTime_; }
     Random& rng() { return rng_; }
     Scene& scene() { return scene_; }
     const BuiltinRegistry& registry() const { return *registry_; }
@@ -186,6 +192,40 @@ public:
     bool stepTest(TestDriver& driver, float dt);
     bool testFinished(const TestDriver& driver) const;
 
+    // --- Game pause and time scale (scene/Process.h; docs/WANDER.md "Pause and slow motion") ---
+    /// Requests from scripts (pause_game, time_scale) and tools. They apply at the start of the next
+    /// tick, so a whole tick always runs under one pause state; `pause` / `resume` events go out then.
+    void requestPause(bool paused) { requestedPause_ = paused; }
+    void requestTimeScale(double scale);
+    /// The state of the current tick.
+    bool gamePaused() const { return paused_; }
+    double timeScale() const { return timeScale_; }
+    /// The latest request (what the next tick will use).
+    bool pauseRequested() const { return requestedPause_.value_or(paused_); }
+    double timeScaleRequested() const { return requestedScale_.value_or(timeScale_); }
+    static constexpr double kMaxTimeScale = 10.0;
+    /// Applies pending requests and refreshes the process gate. The engine calls it at the start of
+    /// every tick, before any system runs; tick() calls it itself when the embedding did not.
+    void prepareTick();
+    /// Which entities run this tick and how fast (valid after prepareTick).
+    const ProcessGate& processGate() const { return gate_; }
+
+    // --- Cosmetic `on frame` handlers (display rate; docs/WANDER.md "on frame") ---------------
+    struct FrameInfo {
+        float dt = 0;      // real seconds since the last displayed frame
+        float alpha = 1;   // where the frame sits between the last two ticks (render interpolation)
+        double time = 0;   // the displayed game time (interpolated)
+        const InputState* input = nullptr;  // devices and actions as of the last tick (null: none)
+    };
+    /// Runs every `on frame` handler of running instances. Their writes (transform, mesh, light, camera,
+    /// sprite, text, ui fields) are recorded and undone by revertFrame(), so they never reach the
+    /// simulation. Returns the number of handler runs.
+    size_t runFrameHandlers(const FrameInfo& info);
+    /// Restores every field written by the last runFrameHandlers().
+    void revertFrame();
+    /// Any compiled script has an `on frame` handler.
+    bool hasFrameHandlers() const;
+
     /// Execution budget per handler run, in instructions (loops charge their length per
     /// iteration, calls the callee's length).
     static constexpr int64_t kBudget = 1'000'000;
@@ -208,6 +248,14 @@ private:
     Random rng_;
     double time_ = 0;
     uint64_t frame_ = 0;
+    double realTime_ = 0;
+    // game clock (prepareTick)
+    bool paused_ = false;
+    double timeScale_ = 1.0;
+    std::optional<bool> requestedPause_;
+    std::optional<double> requestedScale_;
+    uint64_t preparedFrame_ = ~0ull;
+    ProcessGate gate_;
     bool ticking_ = false;
     std::unordered_map<std::type_index, void*> services_;
     std::string projectDir_;

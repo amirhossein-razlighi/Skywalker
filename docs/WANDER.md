@@ -135,6 +135,8 @@ declarations shared by its behaviors.
 | `on click` | When the entity is clicked |
 | `on collide ("name or tag")`, `on trigger_enter (…)`, `on trigger_exit (…)` | Physics contacts; `other`, `contact_point`, `contact_normal`, `impact` |
 | `on enter`, `on exit` | Inside a `state`: when the state is entered / left |
+| `on pause`, `on resume` | The game was paused / resumed (`pause_game()`, `resume_game()`); reaches every behavior, also those the pause stops |
+| `on frame` | Every *displayed* frame (display rate, e.g. 120 Hz), cosmetic only: see [on frame](#on-frame-cosmetic-display-rate-handlers) |
 
 Subsystems can register further trigger words (`wander_reference` lists them).
 
@@ -215,8 +217,54 @@ gradual typing: no annotation noise, and agents still get type errors before pla
   produce the same trace, in the VM and in native code.
 - **Limits.** 256 `spawn`s per tick, 20,000 entities; `destroy` takes effect at the end of
   the tick; spawned entities start their behaviors next tick.
+- **Pause and time scale.** `pause_game()` / `resume_game()` / `time_scale(x)` apply from the
+  next tick. While the game is paused, behaviors of `pausable` entities (the default) are
+  stopped: no `on tick`, no waits or timers advancing, no input; they still receive `on pause`
+  and `on resume`, and events they have handlers for wait and arrive on resume. Entities with
+  `process.mode` `always` or `when_paused` (and UI canvases, which run `always` by default)
+  keep running — that is where pause menu logic goes. `dt` is scaled by the time scale (and
+  is real for entities on `process.clock: real`); `time` is game time (it stops while paused);
+  `unscaled_dt()` / `unscaled_time()` are real time. `process.priority` reorders behaviors
+  (lower first). See docs/ARCHITECTURE.md "Game pause, process modes and time scale".
 - Replacing a behavior while playing restarts its instance. `use`d modules reload when
   play starts or when their files change.
+
+## on frame: cosmetic display-rate handlers
+
+`on tick` runs at the fixed 60 Hz. On a 120 Hz display the engine already shows motion between
+ticks (render interpolation), but some touches are best computed per displayed frame: camera
+shake, bobbing, flicker, UI tweens. `on frame` handlers run once per displayed frame while the
+game plays, after interpolation, with `dt` = real seconds since the last frame (scaled by the
+time scale) and `time` = the displayed game time.
+
+They are **cosmetic**: everything they write is undone after the frame, so the simulation (and
+every replay, test and trace) is identical however many frames are shown. They may:
+
+- set `position`, `rotation`, `scale`, `color` and fields of `transform`, `mesh`, `light`,
+  `camera`, `sprite`, `text`, `ui`, `light2d` (on entities that have them);
+- read anything (vars, components, other entities) and call pure functions and read-only
+  queries (`find`, `distance`, `key`, `axis`, `raycast`, `anim_state`, `noise`, `log`...).
+
+They may not change vars, `wait`, use `every`/`after`, `go to`, `move`/`rotate`/`look`,
+`emit`, `spawn`, `destroy` or call `random` (it advances the seeded generator; use `noise`).
+The compiler reports these as `frame_not_cosmetic` with a hint; functions they call are checked
+at run time (the first violation stops that script's frame handlers until the next play).
+
+```text
+behavior CameraShake
+  var trauma = 0                       -- raised by `on event "hit"` in on tick code
+  on event "hit"
+    trauma = min(1, trauma + 0.5)
+  end
+  on tick
+    trauma = max(0, trauma - dt * 1.5)
+  end
+  on frame
+    let k = trauma * trauma * 0.3
+    self.position = self.position + (noise(time * 40) - 0.5, noise(time * 40 + 9) - 0.5, 0) * k
+  end
+end
+```
 
 ## Builtins and the registry
 

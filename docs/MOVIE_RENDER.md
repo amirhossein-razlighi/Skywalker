@@ -134,6 +134,12 @@ the state between that tick and the previous one:
 Everything is restored right after the sub-frame renders, so the simulation never sees render-time
 state. Skeletal poses update at 60 Hz (limitation below).
 
+The transform part is the same code real-time frames use for render interpolation
+(`TransformHistory` + `ScopedInterpolation`, `engine/Interpolation.h`; docs/ARCHITECTURE.md
+"Render interpolation"), so entities with `process.interpolation: off` snap to ticks in movies too.
+Cosmetic `on frame` Wander handlers (camera shake, bobbing) run for every sub-frame with `time` = τ and
+are undone after it, like in real-time frames.
+
 ## Temporal state, cuts and exposure
 
 Offline frames are rendered with `FrameData::offline`: every render is an independent accumulation

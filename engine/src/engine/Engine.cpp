@@ -89,6 +89,7 @@ Engine::Engine(EngineConfig config)
         return rec ? rec->importSettings.get("animation").asString() : std::string();
     };
     animation_->hooks.emit = [this](const std::string& name, EntityId target) { runtime_->emit(name, target); };
+    animation_->process = &runtime_->processGate();  // game pause / time scale (scene/Process.h)
     // Root motion drives a physics character controller when the entity has one (it then
     // collides, steps and falls); otherwise the AnimationSystem moves the Transform.
     animation_->hooks.rootMotion = [this](EntityId e, Vec3 worldDelta) {
@@ -321,6 +322,7 @@ void Engine::play() {
         animation_->setPlaying(true);
         physics_->beginPlay();  // the world is built from the scene on the first tick
         nav_->beginPlay();
+        resetFrameFlow();  // render interpolation history, pacing stats
     }
     playState_ = PlayState::Playing;
     emitEvent(Json::object({{"type", "play_state"}, {"state", "playing"}}));
@@ -346,6 +348,7 @@ void Engine::stop() {
     animation_->setPlaying(false);
     physics_->endPlay();
     nav_->endPlay();
+    resetFrameFlow();
     input_ = {};
     cursorLocked_ = false;
     audio_->stopAll();
@@ -360,17 +363,24 @@ void Engine::step(int ticks) {
     }
     SKY_PROFILE_SCOPE("sim.step");
     for (int i = 0; i < ticks; ++i) {
+        // Game pause / time scale requests apply here; the gate says which entities run (process modes).
+        runtime_->prepareTick();
+        if (i == ticks - 1) transformHistory_.capture(*scene_);  // render interpolation: the tick before the last
+        const ProcessGate& gate = runtime_->processGate();
         actionMap_.evaluate(input_);  // device state + agent input -> actions for this tick
         world2d_->preTick(*scene_, input_, *runtime_, kFixedDt);  // UI input, dialogue
         runtime_->tick(kFixedDt, input_);
         world2d_->postTick(*scene_, *runtime_, kFixedDt);  // sprite animation, 2D cameras
         animation_->tick(kFixedDt);  // sequencers, animators, bone attachments
-        native_->tick(kFixedDt);     // per-tick systems of native modules
-        physics_->step(static_cast<float>(kFixedDt), *runtime_);  // nav steering, bodies, characters, contacts
-        particles_.update(*scene_, static_cast<float>(kFixedDt));
+        if (!gate.paused()) native_->tick(kFixedDt * gate.timeScale());  // per-tick systems of native modules
+        stepPhysics();  // nav steering, bodies, characters, contacts (holds while the game is paused)
+        particles_.update(*scene_, static_cast<float>(kFixedDt), &gate);
         input_.endTick();
     }
-    if (ticks > 0) audio_->update(*scene_, audio::Phase::Playing, ticks * static_cast<double>(kFixedDt), listenerPose());
+    if (ticks > 0) {
+        audio_->update(*scene_, runtime_->gamePaused() ? audio::Phase::GamePaused : audio::Phase::Playing,
+                       ticks * static_cast<double>(kFixedDt), listenerPose());
+    }
     for (auto& m : runtime_->drainMessages()) {
         Json j = m.toJson();
         messages_.push_back(j);
@@ -414,13 +424,7 @@ void Engine::update(double seconds) {
         audio_->update(*scene_, playState_ == PlayState::Paused ? audio::Phase::Paused : audio::Phase::Editing, seconds, std::nullopt);
         return;
     }
-    accumulator_ += std::min(seconds, 0.25);  // avoid spiral of death after stalls
-    int ticks = 0;
-    while (accumulator_ >= kFixedDt) {
-        accumulator_ -= kFixedDt;
-        ++ticks;
-    }
-    if (ticks) step(ticks);
+    advance(seconds);
 }
 
 double Engine::effectsTime() const {
@@ -588,7 +592,7 @@ void applyViewportQuality(FrameData& f, int quality) {
 }
 }  // namespace
 
-FrameData Engine::frame(const CaptureOptions& opts) {
+FrameData Engine::buildFrameData(const CaptureOptions& opts) {
     SKY_PROFILE_SCOPE("frame.build");
     // Animation previews while editing (sequencer scrub, bone attachments) hold for this frame only.
     struct PreviewGuard {
@@ -803,6 +807,12 @@ Status Engine::renderToSurface(void* surface, int width, int height) {
     opts.samples = 1;  // real time: temporal anti-aliasing across frames
     opts.quality = playState_ == PlayState::Editing ? static_cast<int>(editQuality_) : 0;
     opts.debugView = viewportDebugView_;  // [debug views]
+    const bool live = playState_ == PlayState::Playing;
+    if (live) {  // show the world between the last two ticks; cosmetic `on frame` handlers
+        opts.interpolationAlpha = interpolationAlpha();
+        opts.frameHandlers = true;
+        opts.frameDt = static_cast<float>(realSinceFrame_);
+    }
     world2d_->setViewport(width, height);  // the UI maps the normalized mouse into this view
     drainStreamedMeshes();
     streamMeshes_ = true;
@@ -813,6 +823,7 @@ Status Engine::renderToSurface(void* surface, int width, int height) {
         SKY_PROFILE_SCOPE("render.present");
         s = renderer_->present(surface);
     }
+    if (live) presented(f, opts.interpolationAlpha);  // pacing stats, display history
     double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
     stats_.cpuMs = stats_.cpuMs * 0.9 + ms * 0.1;  // smoothed
     stats_.draws = f.draws.size();

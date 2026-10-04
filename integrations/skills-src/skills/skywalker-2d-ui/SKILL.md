@@ -80,6 +80,8 @@ Anchors: `top_left top top_right left center right bottom_left bottom bottom_rig
 ```text
 ui_create {canvas:{name:"HUD", theme:"dark"}, elements:[{type:"panel", name:"Vitals", anchor:"top_left", position:[32,28], style:"hud", layout:"column", gap:6, padding:[10,14], children:[{type:"text", text:"HEALTH", style:"small muted"}, {type:"progress", name:"Health", value:1, size:[240,12]}]}, {type:"text", name:"Score", anchor:"top_right", position:[-32,28], text:"0", style:"large"}]}
 ui_create {template:"main_menu", canvas:{name:"Menu", theme:"glass"}}        # templates: main_menu hud pause_menu settings inventory document dialogue
+# pause menu: canvases keep running while the game is paused (process mode always); the script pauses the world
+behavior_set {entity:"PauseUI", name:"Pause", source:"on action \"pause\"\n  if is_paused() then resume_game() else pause_game() end\nend\non ui \"Resume\"\n  resume_game()\nend\n"}
 ui_inspect {canvas:"Menu"}                                                    # rects, visibility, text, values; add width/height to test another viewport
 ui_style {canvas:"Menu", theme:"parchment"}                                   # themes: dark light parchment glass pixel
 ui_style {canvas:"Menu", path:"ui/game.uistyle.json", vars:{accent:"#e8a33d"}, rules:{button:{radius:4, hover:{background:"$accent"}}, "#Title":{fontSize:72}}}

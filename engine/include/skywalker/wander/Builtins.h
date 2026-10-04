@@ -216,6 +216,14 @@ void registerCoreBuiltins(BuiltinRegistry& reg);
 /// Audio, input actions, physics, characters and navigation (through Runtime hooks).
 void registerSystemBuiltins(BuiltinRegistry& reg);
 
+/// `on frame` handlers are cosmetic: they run at display rate and everything they write is undone
+/// after the frame, so the simulation never sees it. They may assign fields of these components
+/// (and self.position / rotation / scale / color) ...
+const std::vector<std::string>& cosmeticComponents();
+bool cosmeticComponent(std::string_view component);
+/// ... and call pure builtins plus read-only queries (find, distance, key, axis, raycast, anim_state, log...).
+bool cosmeticBuiltin(const BuiltinDef& def);
+
 /// Interned names (vars, properties, events). Ids are process-wide and stable.
 uint32_t intern(std::string_view name);
 const std::string& symbolName(uint32_t id);

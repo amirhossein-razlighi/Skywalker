@@ -143,6 +143,9 @@ enum class Trigger {
     // physics: `on collide "filter"?`, `on trigger_enter "filter"?`, `on trigger_exit "filter"?`
     // (filter = the other entity's name or one of its tags; `other` names it in the handler)
     Collide, TriggerEnter, TriggerExit,
+    // `on frame`: every displayed frame (display rate), cosmetic only: its writes are undone after the
+    // frame and it cannot change vars, wait, change state, spawn or emit (docs/WANDER.md "on frame").
+    Frame,
 };
 const char* toString(Trigger t);
 

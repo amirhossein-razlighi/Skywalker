@@ -73,6 +73,14 @@ struct Coroutine {
     std::optional<Runtime::Contact> contact;  // collide/trigger handlers keep their contact across waits
 };
 
+struct PendingEvent {
+    uint32_t sym = 0;
+    std::string name;
+    EntityId target = kNoEntity;
+    EntityId other = kNoEntity;
+    Value payload;
+};
+
 struct Instance {
     std::shared_ptr<const Program> program;
     std::string scriptName;
@@ -85,20 +93,16 @@ struct Instance {
     int transitionsThisTick = 0;
     const NativeProgram* native = nullptr;  // AOT code for this program (refreshed every tick)
     bool dead = false;  // script disabled or replaced during this tick: stop running handlers
+    /// Events that arrived while the entity was paused (process mode): delivered when it runs again.
+    std::vector<PendingEvent> deferred;
+    std::vector<Runtime::Contact> deferredContacts;  // contacts of the tick the pause began, delivered on resume
+    bool frameFailed = false;  // an `on frame` handler failed: frame handlers are off for this play session
 };
 
 struct InstanceKeyHash {
     size_t operator()(const std::pair<EntityId, size_t>& k) const {
         return std::hash<uint64_t>()(k.first * 1000003ULL + k.second);
     }
-};
-
-struct PendingEvent {
-    uint32_t sym = 0;
-    std::string name;
-    EntityId target = kNoEntity;
-    EntityId other = kNoEntity;
-    Value payload;
 };
 
 /// Everything a running proto needs. One per handler run (and per test driver step).
@@ -120,6 +124,10 @@ struct ExecState {
     const Runtime::Contact* contact = nullptr;  // collide/trigger handlers
     std::optional<RayHitInfo> lastHit;          // the last raycast() in this run
     const std::string* scriptName = nullptr;  // for log messages
+    /// An `on frame` handler: display rate, writes are recorded and undone after the frame,
+    /// anything that would change the simulation (vars, waits, spawning, emitting...) is an error.
+    bool cosmetic = false;
+    double displayTime = 0;  // `time` inside a cosmetic run (the interpolated game time)
 
     ExecState(Runtime& r, Runtime::Impl& i, Scene& s) : rt(r), impl(i), scene(s) {}
 };
@@ -167,6 +175,18 @@ struct Runtime::Impl {
         const FieldInfo* field = nullptr;
     };
     std::unordered_map<std::string, ResolvedField> fieldCache;
+
+    // Undo log of the cosmetic (`on frame`) writes of the current frame (Runtime::revertFrame).
+    struct CosmeticUndo {
+        EntityId entity = kNoEntity;
+        const ComponentKind* kind = nullptr;  // null: the whole Transform
+        const FieldInfo* field = nullptr;
+        Transform transform;
+        unsigned char raw[16] = {};
+        Json json;
+        bool viaJson = false;
+    };
+    std::vector<CosmeticUndo> cosmeticUndo;
 };
 
 // --- shared helpers (Runtime.cpp) --------------------------------------------------
@@ -215,6 +235,10 @@ void forEachInstance(Runtime::Impl& impl, const Scene& scene, EntityId e, Fn&& f
         if (it != impl.instances.end()) fn(it->second);
     }
 }
+
+/// Records the current value of a component field (or the whole transform when `kind` is null) before
+/// an `on frame` handler changes it; Runtime::revertFrame puts it back.
+void recordCosmeticWrite(ExecState& st, EntityId e, const ComponentKind* kind, const FieldInfo* field);
 
 /// Text for UTF-8 code points of a string (iteration, indexing, length).
 std::vector<std::string> utf8Chars(const std::string& s);

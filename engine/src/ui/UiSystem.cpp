@@ -409,6 +409,14 @@ void UiSystem::tick(Scene& scene, const UiInput& in, float dt, const ViewCamera*
     lastWidth_ = w;
     lastHeight_ = h;
     Layout lay = computeLayout(scene, w, h);
+    if (gate_) {  // canvases that do not run this tick (process mode) take no input
+        for (auto& c : lay.canvases) {
+            if (!gate_->runs(c.entity)) c.canvas.interactable = false;
+        }
+        for (auto& n : lay.nodes) {
+            if (!lay.canvases[static_cast<size_t>(n.canvas)].canvas.interactable) n.interactable = false;
+        }
+    }
     const bool hasPointer = in.x >= 0.f && in.y >= 0.f;
     const EntityId target = hasPointer ? hitIn(lay, in.x, in.y, camera, true) : kNoEntity;
     hovered_ = target;

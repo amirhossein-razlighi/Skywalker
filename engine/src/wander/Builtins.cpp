@@ -227,4 +227,30 @@ uint64_t BuiltinRegistry::generation() const {
     return generation_ + (parent_ ? parent_->generation() * 1315423911ULL : 0);
 }
 
+// ---------------------------------------------------------------------------
+// Cosmetic (`on frame`) allowances
+// ---------------------------------------------------------------------------
+
+const std::vector<std::string>& cosmeticComponents() {
+    static const std::vector<std::string> names{"transform", "mesh", "light", "camera", "sprite", "text", "ui", "light2d"};
+    return names;
+}
+
+bool cosmeticComponent(std::string_view component) {
+    const auto& names = cosmeticComponents();
+    return std::find(names.begin(), names.end(), component) != names.end();
+}
+
+bool cosmeticBuiltin(const BuiltinDef& def) {
+    if (def.pure) return true;
+    // Read-only queries: they look at the world without changing it (random() advances the seeded
+    // generator, so it is not here: use noise()).
+    static const std::set<std::string, std::less<>> reads{
+        "distance", "direction", "forward",  "right",   "up",          "world_position", "find",     "find_all",
+        "nearest",  "count",     "tagged",   "exists",  "children",    "has",            "key",      "key_pressed",
+        "str",      "num",       "action",   "pressed", "released",    "axis",           "grounded", "arrived",
+        "raycast",  "overlap_sphere", "anim_state", "water_height", "is_paused", "tile_at", "dialogue_var", "__log"};
+    return reads.count(def.name) > 0;
+}
+
 }  // namespace sky::wander

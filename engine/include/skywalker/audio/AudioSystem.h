@@ -35,8 +35,9 @@ const char* toString(AudioMode m);
 /// Applies the SKYWALKER_AUDIO environment override to a configured mode.
 AudioMode resolveAudioMode(AudioMode configured);
 
-/// What the game is doing: audio plays only while Playing.
-enum class Phase { Editing, Playing, Paused };
+/// What the game is doing: audio plays only while Playing. Paused = the editor's pause (everything
+/// holds); GamePaused = the game's own pause (pause_game): every bus but `ui` holds, menu sounds play.
+enum class Phase { Editing, Playing, Paused, GamePaused };
 
 // --- Distance attenuation (mirrors miniaudio's spatializer) ------------------------------------------------
 

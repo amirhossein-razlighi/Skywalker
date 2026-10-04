@@ -225,6 +225,22 @@ behavior_set {"entity": "Menu", "name": "Menu", "source": "behavior Menu\n  on u
 ```
 Verify with `ui_inspect {"canvas": "Menu"}`, then `sim_control play` and `ui_interact {"element": "Play"}`.
 
+### A pause menu
+
+UI canvases run while the game is paused (their `process` mode defaults to `always`, on the real
+clock), so a pause menu is a canvas plus three handlers:
+
+```json
+ui_create {"template": "pause_menu", "canvas": {"name": "PauseUI", "theme": "glass"}}
+entity_update {"entity": "Pause Dim", "components": {"ui": {"visible": false}}}
+behavior_set {"entity": "PauseUI", "name": "Pause", "source": "on action \"pause\"\n  if is_paused() then resume_game() else pause_game() end\nend\non pause\n  find(\"Pause Dim\").ui.visible = true\nend\non resume\n  find(\"Pause Dim\").ui.visible = false\nend\non ui \"Resume\"\n  resume_game()\nend\n"}
+```
+`pause_game()` freezes every `pausable` entity (the default: behaviors, physics, animation,
+particles, non-UI sounds) from the next tick. A HUD that should freeze too gets
+`process: {mode: "pausable"}`. Verify with `sim_control {"action": "pause_game"}`,
+`process_info {"entity": "PauseUI"}` (runs: true) and `ui_interact {"element": "Resume"}` + `sim_control step`.
+See docs/ARCHITECTURE.md "Game pause, process modes and time scale".
+
 ### A dialogue scene
 
 1. Write `story/intro.dialogue`, run `dialogue_check {"path": "story/intro.dialogue"}`.

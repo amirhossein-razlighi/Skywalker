@@ -150,6 +150,14 @@ simulation is deterministic: Jolt is built with `CROSS_PLATFORM_DETERMINISTIC`, 
 processed in scene order, constraints have unique priorities and all callback-derived events are
 sorted. The same scene and inputs replay identically, which `sim_trace` and tests rely on.
 
+**Game pause and time scale.** While the game is paused (`pause_game()`), the physics world
+holds: no step, no contacts, bodies keep their velocities and continue on resume (the contacts of
+the step before the pause reach their handlers on resume). Give the entity with `physics_world` a
+`process` component with `mode: "always"` to keep physics running under a pause menu. `time_scale(x)`
+steps the world by `dt * x`; above 1 the step is split into substeps no longer than a tick, so fast
+forward stays stable. Real-time frames show bodies between ticks (render interpolation); call
+`teleport(e, position)` after moving a body far in one tick.
+
 While editing, queries run against an edit-time mirror of the scene that resyncs whenever the scene
 changes, so `physics_query`, `nav_path` and Wander-free tools work without pressing play.
 

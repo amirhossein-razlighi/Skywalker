@@ -22,6 +22,7 @@
 #include "skywalker/core/Random.h"
 #include "skywalker/render/MeshData.h"
 #include "skywalker/render/Renderer.h"
+#include "skywalker/scene/Process.h"
 #include "skywalker/scene/Scene.h"
 
 namespace sky::fx {
@@ -38,8 +39,10 @@ struct Particle {
 
 class ParticleSystem {
 public:
-    /// Advances every emitter in the scene by dt seconds (removes state of deleted ones).
-    void update(const Scene& scene, float dt);
+    /// Advances every emitter in the scene by dt seconds (removes state of deleted ones). With a
+    /// process gate (game pause, time scale), emitters that do not run hold and the others advance
+    /// by dt * their scale.
+    void update(const Scene& scene, float dt, const ProcessGate* gate = nullptr);
     /// Forgets all particles (play/stop boundaries keep simulations reproducible).
     void reset();
     /// Emits `count` particles from an emitter right away (Wander burst()).

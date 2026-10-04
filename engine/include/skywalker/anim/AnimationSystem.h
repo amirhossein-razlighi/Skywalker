@@ -23,6 +23,7 @@
 #include "skywalker/anim/Controller.h"
 #include "skywalker/anim/Sequence.h"
 #include "skywalker/render/Renderer.h"
+#include "skywalker/scene/Process.h"
 #include "skywalker/scene/Scene.h"
 
 namespace sky::anim {
@@ -39,6 +40,9 @@ public:
         std::function<bool(EntityId entity, Vec3 worldDelta)> rootMotion;
     };
     Hooks hooks;
+    /// Process modes (scene/Process.h): which sequencers and animators run this tick and how fast
+    /// (game pause, time scale). Null = all run at the tick's dt. Set by the engine.
+    const ProcessGate* process = nullptr;
 
     explicit AnimationSystem(Scene& scene);
     ~AnimationSystem();
@@ -65,6 +69,10 @@ public:
 
     // --- Rendering & queries ---------------------------------------------------------------
     const SkinPose* skin(EntityId drawEntity, const std::string& meshKey);
+    /// Render interpolation (engine/Interpolation.h): skin() blends each joint between the previous
+    /// tick's pose and the last one by `alpha` (1 = the tick pose). Set for one real-time frame.
+    void setDisplayAlpha(float alpha) { displayAlpha_ = alpha; }
+    float displayAlpha() const { return displayAlpha_; }
     std::shared_ptr<const MeshData> posedMesh(EntityId drawEntity, const std::string& meshKey);
     /// Nearest entity at or above `e` with an Animator (kNoEntity if none).
     EntityId animatorFor(EntityId e) const;
@@ -140,6 +148,7 @@ private:
     uint64_t ikRevision_ = ~0ull;
     uint64_t assetGeneration_ = 1;  // bumps on invalidate(): instances re-bind
     bool playing_ = false;
+    float displayAlpha_ = 1.f;
 };
 
 }  // namespace sky::anim

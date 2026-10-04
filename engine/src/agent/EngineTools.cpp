@@ -546,25 +546,70 @@ void addSimTools(Engine& engine, ToolRegistry& reg) {
     reg.add({"sim_control", "Simulation control",
              "play / pause / stop the game, or `step` N fixed ticks (1/60 s each) deterministically and get the "
              "resulting logs and errors. stop restores the scene to its pre-play state. Use step + "
-             "viewport_capture to test behaviors.",
+             "viewport_capture to test behaviors. Two different pauses: `pause` is the EDITOR pause (nothing ticks; "
+             "step still works), `pause_game` is the GAME's pause, like a pause menu (pause_game() in Wander): pausable "
+             "entities freeze while UI canvases and `process` mode always/when_paused entities keep running, and "
+             "`on pause` fires. `time_scale` with scale (0..10) is slow motion / fast forward for the game clock. Game "
+             "pause and time scale apply from the next tick. `interpolation` turns render smoothing between ticks on/off "
+             "(real-time frames only). Example: {\"action\":\"pause_game\"} then {\"action\":\"step\",\"ticks\":30}.",
              "sim",
-             object({{"action", enumeration({"play", "pause", "stop", "step", "status"}, "What to do")},
-                     {"ticks", integer("Ticks for step (default 60 = 1 second, max 36000)")}},
+             object({{"action", enumeration({"play", "pause", "stop", "step", "status", "pause_game", "resume_game", "time_scale"},
+                                            "What to do")},
+                     {"ticks", integer("Ticks for step (default 60 = 1 second, max 36000)")},
+                     {"scale", number("time_scale: game clock speed (0..10; 1 = normal, 0.25 = bullet time)")},
+                     {"interpolation", boolean("Render interpolation between ticks for real-time frames (default on)")}},
                     {"action"}),
              true, false, [&engine](const Json& a, ToolContext&) {
                  const std::string& action = a.get("action").asString();
                  size_t before = engine.recentMessages(100000).size();
+                 std::vector<std::string> notes;
+                 auto ensurePlaying = [&] {
+                     if (engine.playState() == PlayState::Editing) {
+                         engine.play();
+                         notes.push_back("started play (the game pause and time scale exist only while playing)");
+                     }
+                 };
+                 if (a.contains("interpolation")) engine.setInterpolation(a.get("interpolation").asBool(true));
                  if (action == "play") engine.play();
                  else if (action == "pause") engine.pause();
                  else if (action == "stop") engine.stop();
                  else if (action == "step") engine.step(static_cast<int>(std::clamp<int64_t>(a.get("ticks").asInt(60), 1, 36000)));
+                 else if (action == "pause_game" || action == "resume_game") {
+                     ensurePlaying();
+                     engine.setGamePaused(action == "pause_game");
+                     notes.push_back(std::string(action == "pause_game" ? "game paused" : "game resumed") + " from the next tick");
+                 } else if (action == "time_scale") {
+                     if (!a.get("scale").isNumber()) {
+                         return ToolResult::error(Error::make("invalid_argument", "time_scale needs `scale`",
+                                                              "e.g. {\"action\": \"time_scale\", \"scale\": 0.25}"));
+                     }
+                     ensurePlaying();
+                     double scale = a.get("scale").asFloat(1.f);
+                     if (scale < 0.0 || scale > wander::Runtime::kMaxTimeScale) {
+                         notes.push_back("scale clamped to 0..10");
+                     }
+                     engine.setTimeScale(scale);
+                     notes.push_back("time scale applies from the next tick");
+                 }
                  auto all = engine.recentMessages(100000);
                  Json fresh = Json::array();
                  for (size_t i = std::min(before, all.size()); i < all.size(); ++i) fresh.push(all[i]);
                  Json j = Json::object({{"state", toString(engine.playState())},
                                         {"time", engine.runtime().time()},
+                                        {"unscaledTime", engine.runtime().unscaledTime()},
                                         {"frame", engine.runtime().frame()},
+                                        {"game", Json::object({{"paused", engine.gamePaused()},
+                                                               {"timeScale", engine.timeScale()},
+                                                               {"pausedThisTick", engine.runtime().gamePaused()},
+                                                               {"timeScaleThisTick", engine.runtime().timeScale()}})},
+                                        {"interpolation", Json::object({{"enabled", engine.interpolation()},
+                                                                        {"alpha", engine.interpolationAlpha()}})},
                                         {"messages", fresh}});
+                 if (!notes.empty()) {
+                     Json n = Json::array();
+                     for (const auto& s : notes) n.push(s);
+                     j["notes"] = n;
+                 }
                  return ToolResult::json(j);
              }});
 
@@ -655,9 +700,16 @@ void addViewTools(Engine& engine, ToolRegistry& reg) {
                                                 "viewport_debug_view {\"list\": true}")},
                      {"quality", enumeration({"full", "balanced", "fast"}, "Viewport quality tier (default full; fast/balanced preview what the editor shows while editing)")},
                      {"include_image", boolean("Return the image (default true); false = only the entity list")},
-                     {"save_path", string("Also write the PNG to this project-relative path")}}),
+                     {"save_path", string("Also write the PNG to this project-relative path")},
+                     {"alpha", number("While playing: render the in-between frame a real-time display shows this far between "
+                                      "the last two ticks (0..1; render interpolation). Default 1 = the exact tick state")},
+                     {"frame_handlers", boolean("While playing: also run the cosmetic `on frame` Wander handlers for this "
+                                                "image (camera shake, UI tweens); their writes are undone afterwards")}}),
              false, false, [&engine](const Json& a, ToolContext&) {
                  CaptureOptions o;
+                 o.interpolationAlpha = std::clamp(a.get("alpha").asFloat(1.f), 0.f, 1.f);
+                 o.frameHandlers = a.get("frame_handlers").asBool(false);
+                 o.frameDt = Engine::kFixedDt;
                  o.width = static_cast<int>(std::clamp<int64_t>(a.get("width").asInt(768), 16, 2048));
                  o.height = static_cast<int>(std::clamp<int64_t>(a.get("height").asInt(432), 16, 2048));
                  o.useSceneCamera = a.get("view").asString() == "scene";
@@ -1099,6 +1151,7 @@ void registerEngineTools(Engine& engine) {
     tools::addGameTools(engine, reg);  // engine/src/agent/GameTools.cpp
     tools::addMovieTools(engine, reg);  // engine/src/agent/MovieTools.cpp (movie render queue)
     tools::addRenderLayerTools(engine, reg);  // engine/src/agent/RenderLayerTools.cpp (render layers, cull masks)
+    tools::addProcessTools(engine, reg);  // ProcessTools.cpp: process_info, sim_teleport, sim_display
 }
 
 }  // namespace sky

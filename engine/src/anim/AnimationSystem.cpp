@@ -104,6 +104,7 @@ struct AnimationSystem::Instance {
 
     Pose pose;
     std::vector<Mat4> globals;
+    std::vector<Mat4> prevGlobals;  // the pose of the tick before (render interpolation)
     uint64_t version = 0;
     bool posed = false;
     std::string editKey;
@@ -117,6 +118,9 @@ struct AnimationSystem::Instance {
         SkinPose pose;
         std::shared_ptr<MeshData> posed;
         uint64_t posedVersion = ~0ull;
+        SkinPose blended;  // between the previous tick's pose and the last one (render interpolation)
+        uint64_t blendedVersion = ~0ull;
+        float blendedAlpha = -1.f;
     };
     std::unordered_map<std::string, SkinEntry> skins;
 
@@ -593,7 +597,7 @@ void AnimationSystem::editorUpdate(float dt) {
 // Simulation tick
 // ---------------------------------------------------------------------------
 
-void AnimationSystem::tick(float dt) {
+void AnimationSystem::tick(float baseDt) {
     playing_ = true;
     ecs::Registry& reg = scene_.registry();
     // 1. Sequencers
@@ -601,6 +605,8 @@ void AnimationSystem::tick(float dt) {
         for (EntityId e : std::vector<EntityId>(scene_.entities())) {
             const SequencePlayer* sp = scene_.get<SequencePlayer>(e);
             if (!sp || !scene_.isActive(e)) continue;
+            if (process && !process->runs(e)) continue;  // paused (process mode): the cutscene holds
+            const float dt = baseDt * (process ? process->scale(e) : 1.f);
             SeqInstance* s = seqInstance(e);
             if (!s || !s->def) continue;
             if (!s->started) {
@@ -637,6 +643,12 @@ void AnimationSystem::tick(float dt) {
             if (!a || !scene_.isActive(e)) continue;
             Instance* inst = instance(e);
             if (!inst || !inst->lib) continue;
+            if (process && !process->runs(e)) {  // paused (process mode): the pose holds, nothing to blend
+                inst->prevGlobals = inst->globals;
+                continue;
+            }
+            const float dt = baseDt * (process ? process->scale(e) : 1.f);
+            if (inst->posed) inst->prevGlobals = inst->globals;
             std::vector<AnimatorRuntime::Event> events;
             Vec3 delta{0, 0, 0};
             inst->rt.update(dt * a->speed, &events, a->rootMotion ? &delta : nullptr);
@@ -756,7 +768,24 @@ const SkinPose* AnimationSystem::skin(EntityId drawEntity, const std::string& me
         se.pose.palette = std::move(palette);
         se.version = inst->version;
     }
-    return &se.pose;
+    // Render interpolation: real-time frames show the pose between the last two ticks.
+    const bool blend = playing_ && displayAlpha_ < 1.f && !inst->prevGlobals.empty() &&
+                       inst->prevGlobals.size() == inst->globals.size() && (!process || process->interpolates(ae));
+    if (!blend) return &se.pose;
+    if (se.blendedVersion != inst->version || se.blendedAlpha != displayAlpha_) {
+        const float t = std::clamp(displayAlpha_, 0.f, 1.f);
+        std::vector<Mat4> globals(inst->globals.size());
+        for (size_t i = 0; i < globals.size(); ++i) {
+            globals[i] = lerp(Trs::fromMatrix(inst->prevGlobals[i]), Trs::fromMatrix(inst->globals[i]), t).matrix();
+        }
+        auto palette = std::make_shared<std::vector<Mat4>>();
+        skinPalette(mesh->skin, se.map, globals, *palette);
+        se.blended.bounds = posedBounds(mesh->skin, *palette);
+        se.blended.palette = std::move(palette);
+        se.blendedVersion = inst->version;
+        se.blendedAlpha = displayAlpha_;
+    }
+    return &se.blended;
 }
 
 std::shared_ptr<const MeshData> AnimationSystem::posedMesh(EntityId drawEntity, const std::string& meshKey) {

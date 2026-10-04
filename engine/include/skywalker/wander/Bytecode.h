@@ -237,6 +237,7 @@ struct Program {
     std::vector<ModuleDep> modules;
     uint64_t hash = 0;  // source + modules + compiler version: AOT cache key
     uint64_t registryGeneration = 0;
+    bool hasFrameHandlers = false;  // any `on frame` handler (display-rate, cosmetic)
 
     size_t instructionCount() const;
     /// Human-readable listing (wander_check with disassemble=true; debugging). Without

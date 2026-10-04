@@ -545,11 +545,17 @@ void AudioSystem::update(Scene& scene, Phase phase, double dt, const std::option
         s.advance(dt);
         return;
     }
-    if (phase == Phase::Paused) {
+    if (phase == Phase::Paused || phase == Phase::GamePaused) {
         if (!s.paused) {
             s.pauseAll(true);
             s.paused = true;
         }
+        if (phase == Phase::Paused) return;
+        // The game's pause menu: `ui` sounds keep playing (and finish); everything else holds.
+        s.advance(dt);
+        s.stopMatching([](const Impl::Voice& v) {
+            return v.bus == "ui" && v.releaseAt < 0 && !v.loop && v.kind == Impl::Kind::OneShot && ma_sound_at_end(v.sound.get());
+        });
         return;
     }
 

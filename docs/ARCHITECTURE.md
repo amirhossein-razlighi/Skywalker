@@ -85,6 +85,125 @@ from a snapshot if they fail.
   into an sRGB target.
 - Editor overlays: selection outline (inverted hull) and gizmos.
 
+## Game pause, process modes and time scale
+
+The editor's pause (`sim_control pause`, the toolbar) stops everything. A *game* needs its own
+pause: the world freezes while the pause menu keeps working. That is `pause_game()` in Wander
+(`sim_control pause_game` for agents), and the `process` component decides what keeps running.
+
+| `process.mode` | Runs while the game plays | Runs while the game is paused |
+|---|---|---|
+| `pausable` (default) | yes | no |
+| `when_paused` | no | yes (pause menu logic) |
+| `always` | yes | yes (UI canvases by default, music controllers) |
+| `disabled` | no | no (frozen, still drawn) |
+| `inherit` (the field default) | from the nearest ancestor that sets it | |
+
+Other fields: `priority` (behaviors run in (priority, scene order): lower first; not inherited),
+`clock` (`game` follows `time_scale`, `real` ignores it; inherited) and `interpolation`
+(`on`/`off`, see below; inherited). A UI canvas without its own setting is `always` on the
+`real` clock, so menus work under a pause and in slow motion; give a HUD `mode: pausable` to
+freeze it with the game.
+
+**How a tick runs.** `Engine::step` calls `Runtime::prepareTick()` first: pause and time-scale
+requests made since the last tick (by scripts or tools) apply here, `on pause` / `on resume` go
+out, and the `ProcessGate` (`scene/Process.h`) is refreshed. Every system then asks the gate
+`runs(e)` and `scale(e)` (dt multiplier: the time scale, 1 on the real clock, 0 when stopped):
+
+| System | While the game is paused | Time scale |
+|---|---|---|
+| Wander | stopped instances keep their coroutines, timers and state; they still get `on pause` / `on resume`; events with a handler (and the last contacts) wait and arrive when they run again; input and clicks are dropped | per-instance `dt`, timers, waits |
+| Physics + navigation | the world holds, unless the `physics_world` entity runs (`always`) | step `dt * scale`, split into ≤ 1-tick substeps above 1 |
+| Animation, sequences | animators and cutscenes hold their pose | per entity |
+| Particles (CPU) | emitters hold | per emitter; GPU effects follow the game clock |
+| Sprites, 2D cameras, dialogue | hold | per entity |
+| UI | a canvas that does not run takes no input (default canvases run) | UI animations use real time |
+| Audio | every bus except `ui` pauses (menu clicks still play) | not pitched |
+| Native modules | not ticked | `dt * scale` |
+
+`time` in Wander is *game time* (stops while paused, slows with the scale);
+`unscaled_time()` / `unscaled_dt()` are real time. Determinism holds: requests apply at tick
+boundaries, the gate is a pure function of the scene and the clock, and a pause where nothing
+runs is invisible to the simulation (tests/test_process.cpp checks that pausing for N ticks
+yields the same world as not pausing, N ticks later, and that the same pause replays exactly).
+
+**Recipe: a pause menu.**
+
+```text
+-- on the PauseMenu ui_canvas (canvases run `always`); its child panel "PausePanel" starts hidden
+on action "pause"           -- Escape / Start in the default input map
+  if is_paused() then resume_game() else pause_game() end
+end
+on pause
+  find("PausePanel").ui.visible = true
+end
+on resume
+  find("PausePanel").ui.visible = false
+end
+on ui "Resume"
+  resume_game()
+end
+```
+
+(Keep the canvas entity itself enabled: a disabled entity runs nothing, not even `on pause`.)
+
+Agents check it with `process_info` (what runs, why, and a warning when a paused game has
+nothing that could resume it), `sim_control {action: "pause_game"}` + `step`, and
+`ui_interact` / `sim_input` clicks.
+
+**Recipe: bullet time.** `time_scale(0.25)` slows everything on the game clock; the HUD and
+menus (real clock) stay at full speed; `time_scale(1)` restores it.
+
+## Render interpolation
+
+The simulation ticks at a fixed 60 Hz. A 120 Hz (ProMotion) or 144 Hz display would show each
+tick for two or an uneven number of frames, which reads as stutter. Real-time frames therefore
+show the world between the last two ticks (`engine/Interpolation.h`):
+
+- `alpha = accumulator / fixed dt` — how far real time is into the next tick
+  (`Engine::interpolationAlpha()`).
+- `TransformHistory` keeps every entity's local transform from before the last tick (captured
+  in `Engine::step`, never serialized).
+- `ScopedInterpolation` writes `lerp/slerp(previous, current, alpha)` into the scene for the
+  time it takes to build one frame and restores the tick state afterwards. Everything that
+  reads world matrices is smoothed that way — meshes, cameras, lights, sprites, text, world UI,
+  particle emitters, hair, bone attachments. Skinned meshes blend joint matrices
+  (`AnimationSystem::setDisplayAlpha`), CPU particles move along their velocity, and the effects
+  clock (water, sky, GPU particles) uses the displayed time.
+- Opt out per subtree with `process.interpolation: off` (pixel-art snapping), and per jump
+  with `teleport(e, position)` in Wander or the `sim_teleport` tool. Moves longer than 25 m
+  in one tick are never smeared.
+- The picture lags the simulation by up to one tick, as in every fixed-step engine.
+
+Simulation, tools and captures never see the in-between values: `viewport_capture` and
+`capture()` show the exact tick state unless asked for an `alpha`. The editor viewport and the
+standalone player feed real frame time (`Engine::update`) and render with
+`renderToSurface`, which uses the current alpha. The movie render queue uses the same history
+and scope for its sub-frames (`Movie.cpp`).
+
+**`on frame` handlers** run once per displayed frame, after interpolation, for cosmetic
+touches: camera shake, bobbing, UI tweens. They may set `position`, `rotation`, `scale`,
+`color` and fields of `transform`, `mesh`, `light`, `camera`, `sprite`, `text`, `ui`,
+`light2d`, call pure functions and read-only queries; every write is undone after the frame.
+Writing vars, waiting, timers, `go to`, spawning, emitting or anything random is a compile
+error (`frame_not_cosmetic`), and a runtime check covers functions they call. So frames,
+however many, never change the simulation.
+
+**Verifying it (agents).** `sim_trace` with `display_hz: 120` simulates a display: per frame
+it records alpha and the shown vs tick values, and reports `smoothness.stepJitter` (0 = even
+motion; about 2 = every other frame repeats a tick) and frame `pacing` (`jitterMs` against
+`jitterMsWithoutInterpolation`). `perf_stats.frameFlow` and `process_info.interpolation` show
+the same for the live viewport; `viewport_capture` takes `alpha` and `frame_handlers`;
+`skywalker-player --capture-frame out.png --display-hz 120` renders through the real player
+pipeline at 120 Hz.
+
+**For renderer features (velocity buffer, per-object motion blur).** The previous frame's
+model matrix per entity is in `Engine::displayHistory()` once a feature turns tracking on
+(`setTrackDisplayHistory(true)`); it is filled after each real-time frame from the draws.
+Because transforms are interpolated before `buildFrame`, `DrawItem::model` already is the
+displayed matrix, so `prevModel = displayHistory().previous(entity)` (or `model` when absent)
+gives smooth per-frame motion vectors.
+
 ## Threading model
 
 The engine is single-threaded by design (the "main thread"). The MCP socket server

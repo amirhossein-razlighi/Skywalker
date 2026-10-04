@@ -25,6 +25,8 @@ const char* usageText() {
            "  --no-audio              silent\n"
            "  --check [TICKS]         headless validation: load, play TICKS ticks (default 120), render a test frame, print JSON\n"
            "  --capture-frame PNG     render one frame of the real player pipeline to PNG, then quit  (--frames N, default 90)\n"
+           "  --display-hz N          automated runs (capture, quit-after): frames per second, 30..240 (default 60;\n"
+           "                          120 shows render interpolation between the 60 Hz ticks)\n"
            "  --quit-after SECONDS    close after this long\n"
            "  --agent-socket PATH     serve MCP on a Unix socket so agents can inspect the running game (development)\n"
            "  --verbose               engine log\n"
@@ -86,6 +88,11 @@ Result<Options> parseOptions(int argc, char** argv) {
             if (a == "--width") o.width = static_cast<int>(*v);
             else if (a == "--height") o.height = static_cast<int>(*v);
             else o.frames = static_cast<int>(*v);
+        } else if (a == "--display-hz") {
+            auto v = number("--display-hz");
+            if (!v) return v.error();
+            if (*v < 30 || *v > 240) return bad("--display-hz must be between 30 and 240");
+            o.displayHz = *v;
         } else if (a == "--quit-after") {
             auto v = number("--quit-after");
             if (!v) return v.error();

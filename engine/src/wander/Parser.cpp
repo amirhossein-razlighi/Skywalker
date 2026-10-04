@@ -22,6 +22,7 @@ const char* toString(Trigger t) {
         case Trigger::Collide: return "collide";
         case Trigger::TriggerEnter: return "trigger_enter";
         case Trigger::TriggerExit: return "trigger_exit";
+        case Trigger::Frame: return "frame";
     }
     return "?";
 }
@@ -622,7 +623,7 @@ private:
         h.loc = next().loc;  // 'on'
         const Token& t = next();
         if (t.kind != Tok::Ident) {
-            error(t.loc, "unknown_trigger", "expected a trigger after 'on' (start, tick, event, key, click, enter, exit)");
+            error(t.loc, "unknown_trigger", "expected a trigger after 'on' (start, tick, frame, event, key, click, enter, exit)");
         } else if (t.text == "start") {
             h.trigger = Trigger::Start;
         } else if (t.text == "tick" || t.text == "update") {
@@ -640,6 +641,8 @@ private:
             } else {
                 h.argument = next().text;
             }
+        } else if (t.text == "frame") {
+            h.trigger = Trigger::Frame;  // display rate, cosmetic only (checked by the compiler)
         } else if (t.text == "click") {
             h.trigger = Trigger::Click;
         } else if (t.text == "anim") {
