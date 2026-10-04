@@ -1942,7 +1942,7 @@ class AsyncTools:
         return await self._c.call('behavior_from_graph', _args(BehaviorFromGraphArgs, {'graph': graph, 'entity': entity, 'name': name, 'allow_errors': allow_errors}), check=check, timeout=timeout)
 
     async def behavior_graph(self, *, entity: int | str | None = None, name: str | None = None, source: str | None = None, palette: bool | None = None, check: bool = False, timeout: float | None = None) -> ToolResult:
-        """Blueprint-style node graph of a behavior (or raw `source`): bodies (handlers, fns, tests, state handlers) with an entry node, exec-flow statement nodes wired by exec pins (if: then/elif/else; loops: body), expression nodes wired into data pins, and literals/names inline on pins (`value`). Positions come from the saved layout or an automatic layout. Edit the JSON and send it back with behavior_from_graph. palette=true adds every node type with its pins."""
+        """Visual node graph of a behavior (or raw `source`): bodies (handlers, fns, tests, state handlers) with an entry node, exec-flow statement nodes wired by exec pins (if: then/elif/else; loops: body), expression nodes wired into data pins, and literals/names inline on pins (`value`). Positions come from the saved layout or an automatic layout. Edit the JSON and send it back with behavior_from_graph. palette=true adds every node type with its pins."""
         return await self._c.call('behavior_graph', _args(BehaviorGraphArgs, {'entity': entity, 'name': name, 'source': source, 'palette': palette}), check=check, timeout=timeout)
 
     async def behavior_remove(self, *, entity: int | str, name: str, check: bool = False, timeout: float | None = None) -> ToolResult:
@@ -2226,7 +2226,7 @@ class AsyncTools:
         return await self._c.call('physics_settings', _args(PhysicsSettingsArgs, {'gravity': gravity, 'substeps': substeps, 'ignorePairs': ignorePairs, 'allowSleep': allowSleep, 'enabled': enabled}), check=check, timeout=timeout)
 
     async def physics_settle(self, *, entity: int | str | None = None, entities: list[int | str] | None = None, seconds: float | None = None, freeze_others: bool | None = None, check: bool = False, timeout: float | None = None) -> ToolResult:
-        """Drop objects with a real simulation and keep where they come to rest — like Unreal's "simulate, then keep". Only the listed entities move (as dynamic bodies, even without a body component); everything else is frozen. The result is ONE undoable edit. Great after scatter/place: rocks, crates, books and debris end up naturally stacked and resting instead of floating or intersecting. Example: {"entities": ["Crate 1", "Crate 2", "Barrel"], "seconds": 4}."""
+        """Drop objects with a real simulation and keep where they come to rest (simulate, then keep the poses). Only the listed entities move (as dynamic bodies, even without a body component); everything else is frozen. The result is ONE undoable edit. Great after scatter/place: rocks, crates, books and debris end up naturally stacked and resting instead of floating or intersecting. Example: {"entities": ["Crate 1", "Crate 2", "Barrel"], "seconds": 4}."""
         return await self._c.call('physics_settle', _args(PhysicsSettleArgs, {'entity': entity, 'entities': entities, 'seconds': seconds, 'freeze_others': freeze_others}), check=check, timeout=timeout)
 
     async def place_on_surface(self, *, entities: list[int | str], offset: float | None = None, check: bool = False, timeout: float | None = None) -> ToolResult:
@@ -2693,7 +2693,7 @@ class Tools:
         return self._c.call('behavior_from_graph', _args(BehaviorFromGraphArgs, {'graph': graph, 'entity': entity, 'name': name, 'allow_errors': allow_errors}), check=check, timeout=timeout)
 
     def behavior_graph(self, *, entity: int | str | None = None, name: str | None = None, source: str | None = None, palette: bool | None = None, check: bool = False, timeout: float | None = None) -> ToolResult:
-        """Blueprint-style node graph of a behavior (or raw `source`): bodies (handlers, fns, tests, state handlers) with an entry node, exec-flow statement nodes wired by exec pins (if: then/elif/else; loops: body), expression nodes wired into data pins, and literals/names inline on pins (`value`). Positions come from the saved layout or an automatic layout. Edit the JSON and send it back with behavior_from_graph. palette=true adds every node type with its pins."""
+        """Visual node graph of a behavior (or raw `source`): bodies (handlers, fns, tests, state handlers) with an entry node, exec-flow statement nodes wired by exec pins (if: then/elif/else; loops: body), expression nodes wired into data pins, and literals/names inline on pins (`value`). Positions come from the saved layout or an automatic layout. Edit the JSON and send it back with behavior_from_graph. palette=true adds every node type with its pins."""
         return self._c.call('behavior_graph', _args(BehaviorGraphArgs, {'entity': entity, 'name': name, 'source': source, 'palette': palette}), check=check, timeout=timeout)
 
     def behavior_remove(self, *, entity: int | str, name: str, check: bool = False, timeout: float | None = None) -> ToolResult:
@@ -2977,7 +2977,7 @@ class Tools:
         return self._c.call('physics_settings', _args(PhysicsSettingsArgs, {'gravity': gravity, 'substeps': substeps, 'ignorePairs': ignorePairs, 'allowSleep': allowSleep, 'enabled': enabled}), check=check, timeout=timeout)
 
     def physics_settle(self, *, entity: int | str | None = None, entities: list[int | str] | None = None, seconds: float | None = None, freeze_others: bool | None = None, check: bool = False, timeout: float | None = None) -> ToolResult:
-        """Drop objects with a real simulation and keep where they come to rest — like Unreal's "simulate, then keep". Only the listed entities move (as dynamic bodies, even without a body component); everything else is frozen. The result is ONE undoable edit. Great after scatter/place: rocks, crates, books and debris end up naturally stacked and resting instead of floating or intersecting. Example: {"entities": ["Crate 1", "Crate 2", "Barrel"], "seconds": 4}."""
+        """Drop objects with a real simulation and keep where they come to rest (simulate, then keep the poses). Only the listed entities move (as dynamic bodies, even without a body component); everything else is frozen. The result is ONE undoable edit. Great after scatter/place: rocks, crates, books and debris end up naturally stacked and resting instead of floating or intersecting. Example: {"entities": ["Crate 1", "Crate 2", "Barrel"], "seconds": 4}."""
         return self._c.call('physics_settle', _args(PhysicsSettleArgs, {'entity': entity, 'entities': entities, 'seconds': seconds, 'freeze_others': freeze_others}), check=check, timeout=timeout)
 
     def place_on_surface(self, *, entities: list[int | str], offset: float | None = None, check: bool = False, timeout: float | None = None) -> ToolResult:

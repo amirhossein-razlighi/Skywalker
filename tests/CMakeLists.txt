@@ -56,6 +56,7 @@ set(SKY_TEST_SOURCES
     test_prefab.cpp
     test_legal.cpp
     test_agent_link.cpp
+    test_website.cpp
 )
 
 add_executable(skywalker_tests ${SKY_TEST_SOURCES})
@@ -68,7 +69,7 @@ if(TARGET skywalker-player)
     target_compile_definitions(skywalker_tests PRIVATE SKY_PLAYER_PATH="$<TARGET_FILE:skywalker-player>")
 endif()
 
-# `skywalker legal` is also tested through the real CLI binary.
+# `skywalker legal` and the documentation site's reference (test_website.cpp) are also tested through the real CLI binary.
 if(TARGET skywalker)
     add_dependencies(skywalker_tests skywalker)
     target_compile_definitions(skywalker_tests PRIVATE SKY_CLI_PATH="$<TARGET_FILE:skywalker>")

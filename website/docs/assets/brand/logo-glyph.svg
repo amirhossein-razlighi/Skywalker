@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 440" width="744" height="512">
+  <title>Skywalker glyph</title>
+  <defs>
+    <g id="g_cs">
+    <rect x="30" y="190" width="540" height="210" rx="105"/>
+    <circle cx="118" cy="292" r="100"/>
+    <circle cx="238" cy="172" r="150"/>
+    <circle cx="398" cy="212" r="116"/>
+    <circle cx="488" cy="292" r="104"/>
+</g>
+    <mask id="g_m" maskUnits="userSpaceOnUse" x="-20" y="0" width="660" height="440">
+      <use href="#g_cs" fill="#fff"/>
+      <g fill="#000" stroke="#000" stroke-linejoin="round">
+        <g transform="translate(205 262)"><path d="M-72 -44 C-72 -52 -66 -54 -58 -54 L58 -54 C66 -54 72 -52 72 -44 L72 -8 C72 32 40 54 0 54 C-40 54 -72 32 -72 -8 Z" stroke-width="0"/></g>
+        <g transform="translate(405 262)"><path d="M-72 -44 C-72 -52 -66 -54 -58 -54 L58 -54 C66 -54 72 -52 72 -44 L72 -8 C72 32 40 54 0 54 C-40 54 -72 32 -72 -8 Z" stroke-width="0"/></g>
+        <path d="M271 232 Q305 210 339 232" fill="none" stroke-width="12" stroke-linecap="round"/>
+        <path d="M275 352 Q305 380 335 352" fill="none" stroke-width="12" stroke-linecap="round"/>
+      </g>
+      <g fill="none" stroke="#fff" stroke-width="0"></g>
+    </mask>
+  </defs>
+  <g transform="translate(10 10)"><rect x="-20" y="-10" width="660" height="440" fill="#fff" mask="url(#g_m)"/></g>
+</svg>

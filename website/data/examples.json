@@ -1,0 +1,181 @@
+{
+ "_comment": "Curated notes for the examples gallery (website/docs/examples/index.md is generated from this file, each project's game.json and its scenes). Order here is the gallery order. image/video are paths under website/docs/assets/. features are added to the ones detected from the scenes.",
+ "projects": {
+  "tidebreak_isle": {
+   "image": "images/shots/tidebreak_isle/brig.webp",
+   "video": "video/tidebreak_isle/establishing.mp4",
+   "features": [
+    "Eroded terrain",
+    "FFT surf",
+    "Sequences"
+   ],
+   "description": "An island cove at golden hour, built by an agent crew with the engine's own tools. An erosion-sculpted island with wet sand where the swash reaches, an FFT sea that shoals over the seabed, instanced palms and dune grass, a fort, a brig at anchor and a campfire with volumetric fire. Its hero camera moves ship as sequences, ready for the movie render queue."
+  },
+  "neon_requiem": {
+   "image": "images/shots/neon_requiem/avenue_dolly.webp",
+   "video": "video/neon_requiem/avenue_dolly.mp4",
+   "features": [
+    "Clustered lights",
+    "Rain and puddles",
+    "Skinned characters"
+   ],
+   "description": "A rain-soaked neon avenue at midnight with nearly six hundred lights evaluated by clustered lighting, reflective puddles, a monorail, holograms and animated pedestrians (a CC-BY glTF sample character). The city kit was generated in Blender through the DCC bridge."
+  },
+  "ashen_peaks": {
+   "image": "images/shots/ashen_peaks/crane_gate.webp",
+   "video": "video/ashen_peaks/establishing.mp4",
+   "features": [
+    "Eroded terrain",
+    "Impostor forests",
+    "Light shafts"
+   ],
+   "description": "A monastery valley at a misty sunrise: eroded alpine terrain, forests that turn into octahedral impostors in the distance, lantern-lit stairs, volumetric fires and a mirror lake. It is the scene the foliage impostor measurements in the manual come from."
+  },
+  "berrybrook": {
+   "image": "images/shots/berrybrook/berry_rows.webp",
+   "video": "video/berrybrook/berry_rows.mp4",
+   "features": [
+    "Farming gameplay",
+    "UI hotbar",
+    "Tilt-shift lens"
+   ],
+   "description": "A cozy berry farm: plant a row, harvest ripe berries, sell them at the stand and chat with the neighbours. Terrain with painted fields, foliage, a pond, a UI with a hotbar and a dialogue, and a miniature tilt-shift camera for its establishing shot."
+  },
+  "meridian_accord": {
+   "image": "images/shots/meridian_accord/front_line.webp",
+   "video": "video/meridian_accord/above_the_clouds.mp4",
+   "features": [
+    "Map overlay",
+    "Clouds below the camera",
+    "UI"
+   ],
+   "description": "A grand strategy map of a fictional continent: a terrain with a draped map overlay and map modes, clouds composited below the camera, nearly a hundred world-text labels, fronts and units, and a full UI with nation panels and news events."
+  },
+  "gloamwater": {
+   "image": "images/shots/gloamwater/grove.webp",
+   "features": [
+    "Painted parallax",
+    "2D camera"
+   ],
+   "description": "A 2D metroidvania in a drowned kingdom: painted parallax layers, sprites with flipbook animation, a tilemap, 2D lights with soft shadows and halos, particles, dialogue and a UI, all rendered by the same engine as the 3D worlds."
+  },
+  "chancellors_desk": {
+   "image": "images/shots/chancellors_desk/the_decree.webp",
+   "video": "video/chancellors_desk/the_decree.mp4",
+   "features": [
+    "Document UI",
+    "Branching dialogue"
+   ],
+   "description": "A narrative political drama played across one desk on one rainy night: documents and decrees built with the UI system, a branching dialogue script, lamplight, and rain on the window."
+  },
+  "smugglers_cove": {
+   "needs_download": true,
+   "features": [
+    "Photoscanned assets",
+    "FFT ocean",
+    "Volumetric fire"
+   ],
+   "description": "A pirate cove at golden hour built from CC0 photoscanned models and textures and an HDRI sky, with an FFT ocean and a volumetric campfire. The movie render queue's performance figures were measured on it."
+  },
+  "hidden_alley": {
+   "needs_download": true,
+   "features": [
+    "Photoscanned assets",
+    "Puddles"
+   ],
+   "description": "A rainy neo-noir alley assembled from CC0 photoscans under a night HDRI, with puddles of real reflective water, rain particles and fire."
+  },
+  "namaqua_canyon": {
+   "needs_download": true,
+   "features": [
+    "Photoscanned assets",
+    "Volumetric fire"
+   ],
+   "description": "A desert canyon at sunset with a covered jeep and a campfire: CC0 photoscanned rocks and props under an HDRI sky."
+  },
+  "abyss": {
+   "image": "images/examples/abyss.webp",
+   "features": [],
+   "description": "Underwater horror three hundred meters down: a lit submarine, drifting bioluminescent jellyfish, kelp and ruins, with a hundred behaviors animating the life around you."
+  },
+  "cyber_alley": {
+   "image": "images/examples/cyber_alley.webp",
+   "features": [
+    "Neon"
+   ],
+   "description": "A neon alley in the rain: glowing signs, wet reflective pavement and about two hundred behaviors bringing the street to life."
+  },
+  "frostlight": {
+   "image": "images/examples/frostlight.webp",
+   "features": [],
+   "description": "Cozy exploration under an aurora: snowy pines, an igloo and penguins heading home."
+  },
+  "harvest_fair": {
+   "image": "images/examples/harvest_fair.webp",
+   "features": [],
+   "description": "A family park at golden hour with a Ferris wheel, string lights, stalls and pumpkins under an atmospheric sky."
+  },
+  "hearthside": {
+   "image": "images/examples/hearthside.webp",
+   "features": [],
+   "description": "A log cabin on a snowy night: firelight, a decorated tree and snow outside the window."
+  },
+  "hollow_manor": {
+   "image": "images/examples/hollow_manor.webp",
+   "features": [
+    "Fog"
+   ],
+   "description": "Horror exploration: a lantern in the fog, a graveyard and a manor that should be empty."
+  },
+  "zen_garden": {
+   "image": "images/examples/zen_garden.webp",
+   "features": [],
+   "description": "A meditative art game: raked sand, a koi pond, bamboo and falling petals in soft morning haze."
+  },
+  "toy_kart_rally": {
+   "image": "images/examples/toy_kart_rally.webp",
+   "features": [],
+   "description": "Kart racing at dusk: four karts on an oval under floodlights, with a crowd waiting for fireworks."
+  },
+  "star_lancer": {
+   "image": "images/examples/star_lancer.webp",
+   "features": [],
+   "description": "A space shoot 'em up above a ringed giant, driven by more than three hundred behaviors."
+  },
+  "neon_drift": {
+   "image": "images/examples/neon_drift.webp",
+   "features": [
+    "Neon"
+   ],
+   "description": "A synthwave arena shooter: one ship, endless drones, a grid floor and a setting sun."
+  },
+  "cloudhopper": {
+   "image": "images/examples/cloudhopper.webp",
+   "features": [],
+   "description": "A 3D platformer across six floating islands with coins, mushrooms and a castle; the camera follows the hero."
+  },
+  "sky_dash": {
+   "image": "images/examples/sky_dash.webp",
+   "features": [
+    "Shipping"
+   ],
+   "description": "A side-scrolling platformer: run, hop and grab every coin. It is the project the shipping guide packages into a standalone macOS app."
+  },
+  "sky_village": {
+   "title": "Sky Village",
+   "genre": "Diorama",
+   "pitch": "A floating village above the clouds.",
+   "image": "images/examples/sky_village.webp",
+   "features": [],
+   "description": "A floating village diorama with a windmill, a lighthouse and an airship, small enough to read in one sitting."
+  },
+  "hello_sky": {
+   "title": "Hello Sky",
+   "genre": "Starter scene",
+   "pitch": "The smallest scene that shows the loop.",
+   "image": "images/examples/hello_sky.webp",
+   "features": [],
+   "description": "The starter scene used throughout the getting-started guide: a floating island, a tower, a cloud and a few behaviors. Small enough to read in full and the default target of the CLI examples."
+  }
+ }
+}

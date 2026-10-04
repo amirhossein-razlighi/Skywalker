@@ -242,7 +242,7 @@ const TypeInfo& ParticleEmitter::type() {
             SKY_FIELD(ParticleEmitter, fieldAxis, Vec3, "Vortex axis (local)"),
             SKY_FIELD_RANGE(ParticleEmitter, fieldPull, Float, "Vortex inward pull (m/s)", -100.f, 100.f),
             SKY_FIELD_RANGE(ParticleEmitter, fieldLift, Float, "Vortex lift along its axis (m/s)", -100.f, 100.f),
-            SKY_FIELD(ParticleEmitter, fieldTexture, String, "Vector field file (.fga: Houdini/Unreal/EmberGen export)"),
+            SKY_FIELD(ParticleEmitter, fieldTexture, String, "Vector field file (.fga from Houdini or EmberGen)"),
             SKY_FIELD(ParticleEmitter, fieldSize, Vec3, "Box covered by the vector field (m, centered on fieldCenter)"),
             SKY_FIELD(ParticleEmitter, depthCollision, Bool,
                       "gpu: collide with everything visible on screen (scene depth + normals): sparks bouncing off "

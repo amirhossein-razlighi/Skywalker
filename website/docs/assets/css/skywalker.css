@@ -1,0 +1,171 @@
+/* Skywalker documentation theme.
+   Colors follow docs/BRAND.md: night/void navy surfaces, sky-blue accent (#4f8dff), AI violet (#9a86ff)
+   for agent affordances, sunset (#ffb873) as the one warm accent. Dark first. */
+
+@import url("https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&display=swap");
+
+:root {
+  --sky-blue: #4f8dff;
+  --sky-violet: #9a86ff;
+  --sky-sunset: #ffb873;
+  --sky-rose: #ed6b7a;
+  --sky-night: #222a68;
+  --sky-navy: #131838;
+  --sky-void: #070919;
+  --sky-radius: 8px;
+  --md-heading-font: "Sora", "Avenir Next", system-ui, sans-serif;
+}
+
+/* ---------- light scheme ---------- */
+[data-md-color-scheme="default"] {
+  --md-primary-fg-color: #14172e;
+  --md-primary-fg-color--light: #222a68;
+  --md-primary-fg-color--dark: #0c0e1e;
+  --md-primary-bg-color: #ffffff;
+  --md-accent-fg-color: #2f6fe8;
+  --md-typeset-a-color: #2f6fe8;
+  --sky-card-bg: #f6f7fc;
+  --sky-card-border: #e1e4f0;
+  --sky-muted: #5d6275;
+}
+
+/* ---------- dark scheme ("slate", default) ---------- */
+[data-md-color-scheme="slate"] {
+  --md-hue: 232;
+  --md-default-bg-color: #0d0f1c;
+  --md-default-bg-color--light: #0d0f1cb3;
+  --md-default-fg-color: #e3e4e8;
+  --md-default-fg-color--light: #b4b7c4;
+  --md-default-fg-color--lighter: #7d8193;
+  --md-default-fg-color--lightest: #2c2f40;
+  --md-primary-fg-color: #0a0c18;
+  --md-primary-fg-color--light: #131838;
+  --md-primary-fg-color--dark: #070919;
+  --md-primary-bg-color: #e3e4e8;
+  --md-accent-fg-color: #7aa8ff;
+  --md-typeset-a-color: #7aa8ff;
+  --md-code-bg-color: #12152a;
+  --md-code-fg-color: #dfe2ee;
+  --md-footer-bg-color: #070919;
+  --md-footer-bg-color--dark: #05060f;
+  --md-typeset-table-color: #ffffff14;
+  --sky-card-bg: #12152a;
+  --sky-card-border: #23284a;
+  --sky-muted: #9b9da6;
+}
+
+/* Typography: dense and calm. */
+.md-typeset { font-size: 0.78rem; line-height: 1.65; }
+.md-typeset h1, .md-typeset h2, .md-typeset h3, .md-header__topic, .sky-hero h1 {
+  font-family: var(--md-heading-font);
+  letter-spacing: -0.01em;
+}
+.md-typeset h1 { font-weight: 700; font-size: 1.9em; margin-bottom: 0.6em; }
+.md-typeset h2 { font-weight: 600; border-top: 1px solid var(--md-default-fg-color--lightest); padding-top: 1.1em; }
+.md-typeset h3 { font-weight: 600; }
+.md-typeset .lead, .md-typeset > p:first-of-type.lead { font-size: 1.08em; color: var(--md-default-fg-color--light); }
+.md-typeset code { border-radius: 4px; }
+.md-typeset table:not([class]) { font-size: 0.72rem; border-radius: var(--sky-radius); }
+.md-typeset table:not([class]) th { background: var(--sky-card-bg); }
+.md-header { box-shadow: 0 1px 0 #ffffff10; }
+.md-tabs { background: var(--md-primary-fg-color--dark); }
+[data-md-color-scheme="slate"] .md-tabs { border-bottom: 1px solid #ffffff0d; }
+.md-nav__title { font-family: var(--md-heading-font); }
+
+/* Figures and media */
+.md-typeset figure img, .md-typeset figure video, .md-typeset img.shot {
+  border-radius: var(--sky-radius);
+  box-shadow: 0 6px 24px #0007;
+}
+.md-typeset figure { margin: 1.4em auto; }
+.md-typeset figcaption { color: var(--sky-muted); font-size: 0.72rem; max-width: 46rem; }
+.md-typeset video { width: 100%; height: auto; border-radius: var(--sky-radius); background: #000; }
+.sky-placeholder {
+  display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 0.3em;
+  aspect-ratio: 16 / 9; border: 1px dashed var(--sky-card-border); border-radius: var(--sky-radius);
+  background: repeating-linear-gradient(135deg, var(--sky-card-bg), var(--sky-card-bg) 12px, transparent 12px, transparent 24px);
+  color: var(--sky-muted); font-size: 0.75rem; text-align: center; padding: 1em;
+}
+.sky-placeholder strong { color: var(--md-default-fg-color); font-family: var(--md-heading-font); }
+
+/* Side-by-side comparisons */
+.sky-compare { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 0.8rem; margin: 1.2em 0; }
+.sky-compare figure { margin: 0; }
+.sky-compare img { width: 100%; }
+.sky-compare figcaption { text-align: center; }
+
+/* Gallery cards (examples, feature grid) */
+.sky-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: 1rem; margin: 1.4em 0; }
+.sky-card {
+  display: flex; flex-direction: column; overflow: hidden;
+  background: var(--sky-card-bg); border: 1px solid var(--sky-card-border); border-radius: calc(var(--sky-radius) + 2px);
+  transition: transform 0.15s ease, border-color 0.15s ease;
+  color: inherit !important;
+}
+a.sky-card:hover { transform: translateY(-2px); border-color: var(--sky-blue); }
+.sky-card img, .sky-card video { aspect-ratio: 16 / 9; object-fit: cover; width: 100%; display: block; border-radius: 0; box-shadow: none !important; }
+.sky-card .sky-card__body { padding: 0.7rem 0.85rem 0.85rem; }
+.sky-card .sky-card__title { font-family: var(--md-heading-font); font-weight: 600; font-size: 0.86rem; margin: 0; }
+.sky-card .sky-card__meta { color: var(--sky-muted); font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.06em; margin: 0.15rem 0 0.4rem; }
+.sky-card .sky-card__text { font-size: 0.72rem; color: var(--md-default-fg-color--light); margin: 0; }
+.sky-tags { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.5rem; }
+.sky-tag {
+  font-size: 0.6rem; padding: 0.05rem 0.45rem; border-radius: 999px;
+  border: 1px solid var(--sky-card-border); color: var(--sky-muted); white-space: nowrap;
+}
+
+/* Home hero */
+.sky-hero {
+  position: relative; overflow: hidden; border-radius: calc(var(--sky-radius) + 4px);
+  margin: 0 0 1.6rem; min-height: 22rem; display: flex; align-items: flex-end;
+  background: var(--sky-void);
+}
+.sky-hero video, .sky-hero > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border-radius: 0; box-shadow: none !important; }
+.sky-hero::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, #070919f0 0%, #070919b8 42%, #07091920 78%), linear-gradient(180deg, #07091900 55%, #070919cc 100%); }
+.sky-hero__content { position: relative; z-index: 1; padding: 2rem 2.2rem; max-width: 44rem; }
+.md-typeset .sky-hero h1 { color: #fff; font-size: 2rem; line-height: 1.12; margin: 0 0 0.5rem; }
+.md-typeset .sky-hero p { color: #d7dbef; font-size: 0.92rem; margin: 0 0 1rem; }
+.sky-hero .md-button { margin: 0.2rem 0.4rem 0.2rem 0; }
+.md-typeset .md-button--primary { background: var(--sky-blue); border-color: var(--sky-blue); color: #fff; }
+.md-typeset .md-button--primary:hover { background: #6a9fff; border-color: #6a9fff; }
+.sky-hero .md-button:not(.md-button--primary) { color: #fff; border-color: #ffffff60; }
+.sky-eyebrow { font-size: 0.68rem !important; letter-spacing: 0.14em; text-transform: uppercase; color: var(--sky-sunset) !important; margin-bottom: 0.4rem !important; }
+
+/* Feature grid on the home page */
+.sky-features { display: grid; grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr)); gap: 1rem; margin: 1.2rem 0 2rem; }
+.sky-feature { background: var(--sky-card-bg); border: 1px solid var(--sky-card-border); border-radius: calc(var(--sky-radius) + 2px); overflow: hidden; }
+.sky-feature img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; display: block; }
+.sky-feature div { padding: 0.65rem 0.85rem 0.85rem; }
+.sky-feature h3 { margin: 0 0 0.25rem !important; font-size: 0.86rem !important; }
+.sky-feature p { margin: 0; font-size: 0.72rem; color: var(--md-default-fg-color--light); }
+
+/* "For agents" admonition: violet, the editor's AI color */
+:root {
+  --md-admonition-icon--agent: url('data:image/svg+xml;charset=utf-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2M7.5 13A2.5 2.5 0 0 0 5 15.5 2.5 2.5 0 0 0 7.5 18a2.5 2.5 0 0 0 2.5-2.5A2.5 2.5 0 0 0 7.5 13m9 0a2.5 2.5 0 0 0-2.5 2.5 2.5 2.5 0 0 0 2.5 2.5 2.5 2.5 0 0 0 2.5-2.5 2.5 2.5 0 0 0-2.5-2.5"/></svg>');
+}
+.md-typeset .admonition.agent, .md-typeset details.agent { border-color: var(--sky-violet); }
+.md-typeset .agent > .admonition-title, .md-typeset .agent > summary { background-color: #9a86ff1f; }
+.md-typeset .agent > .admonition-title::before, .md-typeset .agent > summary::before {
+  background-color: var(--sky-violet);
+  -webkit-mask-image: var(--md-admonition-icon--agent);
+  mask-image: var(--md-admonition-icon--agent);
+}
+
+/* Reference pages */
+.md-typeset .sky-schema td:first-child code { white-space: nowrap; }
+.md-typeset .sky-badge {
+  display: inline-block; font-size: 0.62rem; line-height: 1.5; padding: 0 0.45rem; border-radius: 999px;
+  border: 1px solid var(--sky-card-border); color: var(--sky-muted); vertical-align: middle; margin-left: 0.3rem;
+}
+.md-typeset .sky-badge--mut { border-color: #ffb87380; color: var(--sky-sunset); }
+.md-typeset .sky-badge--ro { border-color: #4f8dff80; color: var(--md-accent-fg-color); }
+.md-typeset .sky-badge--open { border-color: #ed6b7a80; color: var(--sky-rose); }
+
+@media screen and (max-width: 44.9375em) {
+  .sky-hero { min-height: 18rem; }
+  .md-typeset .sky-hero h1 { font-size: 1.6rem; }
+  .sky-hero__content { padding: 1.2rem 1rem; }
+}
+
+/* The home page hero takes the full width: no edit/view buttons beside it. */
+.md-content__inner:has(.sky-hero) > .md-content__button { display: none; }

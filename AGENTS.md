@@ -34,6 +34,7 @@ Useful: `./build/headless/bin/skywalker tools --markdown` (tool catalogue), `sky
 | `docs/` | Documentation; `docs/TOOLS.md` is generated from the registry |
 | `integrations/` | Agent integrations. **Edit `integrations/skills-src/`, never the generated copies** |
 | `python/` | The Python agent layer (`cd python && uv sync && uv run pytest`); after changing engine tools run `uv run sky-agents gen-tools` |
+| `website/` | The documentation site (MkDocs Material, deployed to GitHub Pages). `website/docs/reference/` and the examples gallery are generated |
 
 ## Conventions
 
@@ -55,7 +56,12 @@ Useful: `./build/headless/bin/skywalker tools --markdown` (tool catalogue), `sky
 
 - **Add or rename a tool, argument or enum value** -> the skills must stay true. `python3 integrations/check_skills.py --tools <(skywalker tools --json)` lints every tool name and example call
   in `integrations/skills-src`; the test-suite runs it. Update the skill text, then `python3 integrations/generate.py` (also run by `--check` in the tests) and commit the generated files.
-- **Add docs** under `docs/`: they are embedded in the binary and served as MCP resources `skywalker://docs/<NAME>`.
+- **Add or change a tool, argument, enum value, component field, Wander builtin or CLI flag** -> regenerate the documentation site's
+  reference: `python3 website/scripts/dump_data.py --cli build/<preset>/bin/skywalker && python3 website/scripts/gen_reference.py`, then
+  `python3 website/scripts/check_snippets.py --cli build/<preset>/bin/skywalker`, and commit `website/data/` and `website/docs/reference/`.
+  The test-suite (`tests/test_website.cpp`) fails when they are stale or when a sample on the site no longer compiles. See `website/README.md`.
+- **Add docs** under `docs/`: they are embedded in the binary and served as MCP resources `skywalker://docs/<NAME>`. Site pages and images go
+  in `website/`, never in `docs/`.
 - Do not hand-edit `docs/TOOLS.md` unless you are the one regenerating it.
 
 ## Pitfalls specific to this repo
