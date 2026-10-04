@@ -2,13 +2,16 @@
 // (and, further down, foot / hand IK and skinned groom roots).
 
 #include <doctest/doctest.h>
+#include <unistd.h>
 
 #include <cmath>
+#include <filesystem>
 
 #include "skywalker/anim/CharacterIk.h"
 #include "skywalker/anim/Controller.h"
 #include "skywalker/anim/HumanoidMap.h"
 #include "skywalker/anim/Retarget.h"
+#include "skywalker/engine/Engine.h"
 #include "skywalker/fx/Groom.h"
 #include "skywalker/fx/GroomBinding.h"
 #include "skywalker/scene/Scene.h"
@@ -552,6 +555,12 @@ TEST_CASE("foot and hand IK on a skeleton: pelvis, ankles on target, hands reach
     REQUIRE(applyHand(sk, map, true, grip, Mat4{}, 1.f, false, pose, g));
     CHECK(distance(pos(g, map[HumanBone::LeftHand]), grip.translation()) < 1e-3f);
     CHECK_FALSE(applyHand(sk, HumanoidMap{}, true, grip, Mat4{}, 1.f, false, pose, g));
+    // Beyond the arm's reach the clavicle swings toward the grip: closer than the straight arm alone.
+    const Vec3 sh = pos(g, map[HumanBone::LeftUpperArm]);
+    const float armLen = distance(sh, pos(g, map[HumanBone::LeftLowerArm])) + distance(pos(g, map[HumanBone::LeftLowerArm]), pos(g, map[HumanBone::LeftHand]));
+    Mat4 far = Mat4::translate(sh + normalize(Vec3{0.6f, -0.5f, 0.6f}) * (armLen + 0.15f));
+    REQUIRE(applyHand(sk, map, true, far, Mat4{}, 1.f, false, pose, g));
+    CHECK(distance(pos(g, map[HumanBone::LeftHand]), far.translation()) < 0.15f - 0.02f);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -698,4 +707,119 @@ TEST_CASE("groom masks: bone and mirrored region masks only grow where asked") {
     std::string error;
     CHECK(sys.groomFor(scene, e, meshes, paths, &error) == nullptr);
     CHECK(error.find("Upper") != std::string::npos);
+}
+
+// ---------------------------------------------------------------------------------------------
+// Tools and Wander: character_inspect, character_ik, animation_retarget, retargetFrom, builtins
+// ---------------------------------------------------------------------------------------------
+
+namespace {
+
+struct CharacterProject {
+    std::string dir;
+    std::unique_ptr<Engine> engine;
+
+    CharacterProject() {
+        dir = (std::filesystem::temp_directory_path() / ("sky-characters-" + std::to_string(::getpid()))).string();
+        std::filesystem::create_directories(dir + "/anims");
+        std::filesystem::create_directories(dir + "/chars");
+        // Clips on a T-pose mixamo rig; the character is an A-pose UE rig.
+        Library src;
+        src.skeleton = mixamoTPose();
+        src.rootBone = 0;
+        Clip wave;
+        wave.name = "Wave";
+        wave.duration = 1.f;
+        int arm = src.skeleton.find("mixamorig:LeftArm");
+        wave.channels.push_back(rotationKeys(arm, {0, 1}, {Quat{}, Quat::axisAngle({0, 0, 1}, radians(80.f))}));
+        src.clips.push_back(wave);
+        REQUIRE(saveLibrary(dir + "/anims/pack.anim", src).ok());
+        Library dst;
+        dst.skeleton = ueAPose();
+        dst.rootBone = 0;
+        Clip idle;
+        idle.name = "Idle";
+        idle.duration = 1.f;
+        dst.clips.push_back(idle);
+        REQUIRE(saveLibrary(dir + "/chars/hero.anim", dst).ok());
+        EngineConfig cfg;
+        cfg.renderer = RendererBackend::Null;
+        cfg.projectDir = dir;
+        engine = std::make_unique<Engine>(cfg);
+        REQUIRE(engine->newScene("Characters", false).ok());
+        EntityId hero = engine->scene().create("Hero");
+        engine->scene().add<Transform>(hero);
+        engine->scene().add<Animator>(hero).library = "chars/hero.anim";
+        EntityId grip = engine->scene().create("Grip");
+        engine->scene().add<Transform>(grip).position = {0.3f, 1.1f, -0.3f};
+    }
+    ~CharacterProject() {
+        engine.reset();
+        std::error_code ec;
+        std::filesystem::remove_all(dir, ec);
+    }
+    ToolResult call(const char* tool, const char* args) { return engine->callTool(tool, Json::parse(args).value(), "agent:test"); }
+};
+
+}  // namespace
+
+TEST_CASE("character tools: retarget, inspect, IK setup, retargetFrom and Wander builtins") {
+    CharacterProject p;
+    Engine& e = *p.engine;
+
+    ToolResult prev = p.call("animation_retarget", R"({"source": "anims/pack.anim", "target": "Hero", "preview": true})");
+    INFO(prev.content.front().text);
+    REQUIRE_FALSE(prev.isError);
+    CHECK(prev.structured.get("source").get("convention").asString() == "mixamo");
+    CHECK(prev.structured.get("target").get("convention").asString() == "ue");
+    ToolResult out = p.call("animation_retarget", R"({"source": "anims/pack.anim", "target": "chars/hero.anim", "clips": ["Wave"],
+                                                     "output": "chars/hero_pack.anim"})");
+    INFO(out.content.front().text);
+    REQUIRE_FALSE(out.isError);
+    CHECK(std::filesystem::exists(p.dir + "/chars/hero_pack.anim"));
+    CHECK(out.structured.get("clips")[0].get("stretch").asFloat() < 1e-3f);
+    ToolResult typo = p.call("animation_retarget", R"({"source": "anims/pack.anim", "target": "Hero", "clips": ["Wvae"]})");
+    CHECK(typo.isError);
+    CHECK(typo.content.front().text.find("Wave") != std::string::npos);
+
+    ToolResult insp = p.call("character_inspect", R"({"entity": "Hero"})");
+    INFO(insp.content.front().text);
+    REQUIRE_FALSE(insp.isError);
+    CHECK(insp.structured.get("humanoid").get("complete").asBool());
+    CHECK(insp.structured.get("keyBones").contains("head"));
+    CHECK(insp.structured.get("clips").size() == 1);
+
+    ToolResult ik = p.call("character_ik", R"({"entity": "Hero", "feet": true, "step_height": 0.35, "left_hand": "Grip"})");
+    INFO(ik.content.front().text);
+    REQUIRE_FALSE(ik.isError);
+    const CharacterIk* c = e.scene().get<CharacterIk>(e.scene().find("Hero"));
+    REQUIRE(c);
+    CHECK(c->stepHeight == doctest::Approx(0.35f));
+    CHECK(e.scene().resolve(c->leftHand, e.scene().find("Hero")) == e.scene().find("Grip"));
+    CHECK(p.call("character_ik", R"({"entity": "Hero", "left_hand": "Gripp"})").isError);
+    CHECK(p.call("character_ik", R"({"entity": "Grip"})").isError);  // no animator
+
+    // retargetFrom: the pack's clip plays on the character (pose space: the bone names differ).
+    REQUIRE_FALSE(p.call("entity_update", R"({"entity": "Hero", "components": {"animator": {"retargetFrom": "anims/pack.anim",
+                                                    "clip": "Wave"}}})").isError);
+    auto d = e.animation().describe(e.scene().find("Hero"));
+    REQUIRE(d);
+    CHECK_FALSE(d->contains("warning"));
+    CHECK(e.animation().retargetMethod(**e.animation().library("anims/pack.anim"), **e.animation().library("chars/hero.anim"),
+                                       "auto") == "pose");
+
+    // Wander builtins drive the component while playing.
+    REQUIRE_FALSE(p.call("behavior_set", R"({"entity": "Hero", "name": "Ik", "source":
+        "on start\n foot_ik(self, false)\n hand_ik(self, \"right\", find(\"Grip\"), 0.5)\n turn_in_place(self, 90)\n look_at(self, find(\"Grip\"))\nend"})")
+                     .isError);
+    e.play();
+    e.step(30);
+    c = e.scene().get<CharacterIk>(e.scene().find("Hero"));
+    REQUIRE(c);
+    CHECK_FALSE(c->feet);
+    CHECK(c->rightHandWeight == doctest::Approx(0.5f));
+    CHECK(e.scene().get<Animator>(e.scene().find("Hero"))->lookAt.empty() == false);
+    // Turning in place reaches the target yaw at turnSpeed (220 deg/s: 90 degrees in under half a second).
+    CHECK(e.scene().get<Transform>(e.scene().find("Hero"))->rotation.y == doctest::Approx(90.f).epsilon(0.02));
+    e.stop();
 }

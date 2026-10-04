@@ -70,5 +70,8 @@ void addPrefabTools(Engine& engine, ToolRegistry& reg);  // PrefabTools.cpp: ent
 void addLegalTools(Engine& engine, ToolRegistry& reg);  // LegalTools.cpp: legal_info (docs/legal/)
 void addAgentLinkTools(Engine& engine, ToolRegistry& reg);  // AgentLinkTools.cpp: events_poll, tool_host_* (docs/PYTHON_AGENTS.md)
 void addCharacterTools(Engine& engine, ToolRegistry& reg);  // CharacterTools.cpp: character_inspect, character_ik, animation_retarget
+/// perf_stats "characters": skinning, groom simulation and groom rendering cost (CharacterTools.cpp).
+/// `groomRenderMs` < 0 = not measured (perf_stats measures it by benchmarking with grooms hidden).
+Json characterPerfStats(Engine& engine, double groomRenderMs = -1.0);
 
 }  // namespace sky::tools

@@ -173,6 +173,26 @@ bool applyHand(const Skeleton& sk, const HumanoidMap& map, bool left, const Mat4
     if (up < 0 || lo < 0 || hand < 0 || weight <= 0.f) return false;
     computeGlobals(sk, pose, globals);
     Mat4 target = toModel * targetWorld;
+    // Shoulder assist: a grip beyond the arm's reach swings the clavicle toward it (up to 30 degrees),
+    // as a person reaching across their body does.
+    const int shoulder = map[left ? HumanBone::LeftShoulder : HumanBone::RightShoulder];
+    if (shoulder >= 0 && sk.bones[static_cast<size_t>(up)].parent == shoulder) {
+        const Vec3 s = globals[static_cast<size_t>(shoulder)].translation();
+        const Vec3 a = globals[static_cast<size_t>(up)].translation();
+        const float reach = distance(a, globals[static_cast<size_t>(lo)].translation()) +
+                            distance(globals[static_cast<size_t>(lo)].translation(), globals[static_cast<size_t>(hand)].translation());
+        const float over = distance(a, target.translation()) - 0.97f * reach;
+        if (over > 0.f && length(a - s) > 1e-4f && length(target.translation() - s) > 1e-4f) {
+            Quat swing = Quat::fromTo(normalize(a - s), normalize(target.translation() - s));
+            const float angle = std::min(swing.angle(), radians(30.f) * std::clamp(over / (0.5f * reach), 0.f, 1.f));
+            if (swing.angle() > 1e-5f) swing = slerp(Quat{}, swing, std::clamp(weight, 0.f, 1.f) * angle / swing.angle());
+            const int parent = sk.bones[static_cast<size_t>(shoulder)].parent;
+            Quat parentQ = parent >= 0 ? rotationOf(globals[static_cast<size_t>(parent)]) : Quat{};
+            Quat now = rotationOf(globals[static_cast<size_t>(shoulder)]);
+            pose[static_cast<size_t>(shoulder)].r = (parentQ.conjugate() * swing * now).normalized();
+            computeGlobals(sk, pose, globals);
+        }
+    }
     if (!solveTwoBoneChain(sk, pose, globals, up, lo, hand, target.translation(), {0, 0, 0}, std::clamp(weight, 0.f, 1.f))) return false;
     if (matchRotation) {
         Quat want = rotationOf(target);

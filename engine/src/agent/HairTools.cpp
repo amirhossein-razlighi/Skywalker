@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <cstdio>
 #include <fstream>
 
@@ -55,6 +56,11 @@ Json groomInfo(Engine& engine, EntityId e) {
     j["boundsMin"] = reflect::vec3ToJson(data->bounds.min);
     j["boundsMax"] = reflect::vec3ToJson(data->bounds.max);
     j["simulated"] = g->simulate;
+    // Skinned characters: roots bound to the mesh's triangles follow the animated skin.
+    Json attach = Json::object({{"mode", g->attach}, {"bound", data->bound()}, {"boundRoots", data->childBind.size()}});
+    if (data->bindError > 0.f) attach["bindErrorM"] = std::round(data->bindError * 10000.f) / 10000.f;
+    if (!g->maskBone.empty()) attach["maskBone"] = g->maskBone;
+    j["attach"] = attach;
     Json stats = engine.renderer().stats();
     if (const Json* grooms = stats.find("grooms")) {
         for (const auto& item : grooms->elements()) {

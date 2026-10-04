@@ -103,6 +103,49 @@ Json groomAttachment(Engine& engine, EntityId groomEntity, const Json& rendererG
 
 }  // namespace
 
+Json characterPerfStats(Engine& engine, double groomRenderMs) {
+    Scene& s = engine.scene();
+    size_t animators = 0, ik = 0, skinned = 0, vertices = 0, grooms = 0;
+    for (EntityId e : s.entities()) {
+        if (!s.isActive(e)) continue;
+        animators += s.get<Animator>(e) ? 1 : 0;
+        ik += s.get<CharacterIk>(e) ? 1 : 0;
+        grooms += s.get<Groom>(e) && s.get<Groom>(e)->visible ? 1 : 0;
+        const MeshRenderer* m = s.get<MeshRenderer>(e);
+        if (!m || !m->visible || !engine.animation().animatorFor(e)) continue;
+        const MeshData* md = str::startsWith(m->mesh, "asset:") ? engine.cpuMesh(m->mesh) : nullptr;
+        if (md && md->skinned()) {
+            ++skinned;
+            vertices += md->vertexCount();
+        }
+    }
+    Json gpu = engine.renderer().stats();
+    Json profile = engine.renderer().passProfile();
+    const Json& groups = profile.get("groups");
+    Json j = Json::object({{"animators", animators},
+                           {"characterIk", ik},
+                           {"skinnedMeshes", skinned},
+                           {"skinnedVertices", vertices},
+                           {"grooms", grooms}});
+    if (groups.contains("skinning")) j["skinningGpuMs"] = groups.get("skinning");
+    j["groomSimGpuMs"] = gpu.get("hairGpuMs").asFloat(0.f);           // guide simulation + strand rebuild
+    j["groomShadowGpuMs"] = gpu.get("hairShadowGpuMs").asFloat(0.f);  // deep opacity maps
+    size_t drawn = 0, total = 0;
+    for (const auto& g : gpu.get("grooms").elements()) {
+        drawn += static_cast<size_t>(g.get("drawn").asInt(0));
+        total += static_cast<size_t>(g.get("strands").asInt(0));
+    }
+    j["strandsDrawn"] = drawn;
+    j["strandsTotal"] = total;
+    if (groomRenderMs >= 0.0) {
+        j["groomRenderGpuMs"] = std::round(std::max(groomRenderMs, 0.0) * 100.0) / 100.0;  // strands in the main pass + shadows
+    } else if (grooms > 0) {
+        j["groomRenderGpuMs"] = Json();
+        j["note"] = "groomRenderGpuMs: run perf_stats with frames and characters: true (benchmarks with grooms hidden)";
+    }
+    return j;
+}
+
 void addCharacterTools(Engine& engine, ToolRegistry& reg) {
     reg.add({"character_inspect", "Inspect character",
              "Everything about a character's animation and look in one call: the humanoid bone map of its skeleton "
