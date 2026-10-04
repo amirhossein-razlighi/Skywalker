@@ -120,6 +120,7 @@ Json tuneWarnings(const Vehicle& v) {
         w.push("frontTorqueSplit 0 or 1 makes the AWD car effectively RWD/FWD");
     }
     if (v.maxTorque <= 0.f) w.push("maxTorque is 0: the car cannot accelerate");
+    if (v.antiRollFront > 4000.f || v.antiRollRear > 4000.f) w.push("anti-roll bars above ~4000 can make the body shake at rest");
     return w;
 }
 

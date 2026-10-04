@@ -42,6 +42,7 @@ set(SKY_TEST_SOURCES
     test_dcc.cpp
     test_studio.cpp
     test_physics.cpp
+    test_vehicle.cpp
     test_nav.cpp
     test_anim.cpp
     test_animator.cpp

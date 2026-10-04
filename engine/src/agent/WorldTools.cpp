@@ -681,6 +681,13 @@ void addWorldTools(Engine& engine, ToolRegistry& reg) {
                                                                  {"foliageChunks", static_cast<int64_t>(engine.world().stats().foliageChunks)},
                                                                  {"foliageInstances", static_cast<int64_t>(engine.world().stats().foliageInstances)}})}});
                  if (frames > 0) j["benchmark"] = bench;
+                 j["vehicles"] = [&] {  // wheeled vehicles (physics/Vehicles.cpp): counts and per-tick CPU cost
+                     physics::PhysicsWorld* pw = engine.physics().playWorld();
+                     physics::VehicleStats vs = pw ? pw->vehicleStats() : physics::VehicleStats{};
+                     if (!pw) vs.vehicles = static_cast<int>(s.registry().count<Vehicle>());
+                     return Json::object({{"vehicles", vs.vehicles}, {"wheels", vs.wheels}, {"simulated", pw != nullptr},
+                                          {"stepMs", std::round(vs.lastStepMs * 1000.0) / 1000.0}});
+                 }();
                  j["frameFlow"] = Json::object({{"interpolation", engine.interpolation()},
                                                 {"alpha", std::round(engine.interpolationAlpha() * 1000.f) / 1000.f},
                                                 {"interpolatedLastFrame", engine.frameFlowStats().interpolated},

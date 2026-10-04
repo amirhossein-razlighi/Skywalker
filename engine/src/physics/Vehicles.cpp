@@ -315,7 +315,11 @@ struct VehicleSet::Entry {
     // Read by the Jolt step callbacks (job threads; written only between updates).
     std::vector<float> longitudinalScale, lateralScale;
     std::vector<float> surfaceGrip;
-    std::vector<uint8_t> absHit, tcHit;
+    std::vector<uint8_t> absHit;
+    std::vector<float> peakLongitudinal;  // per wheel: grip * the curve's peak (what an ideal ABS brakes with)
+    std::vector<float> visualAngle;       // per wheel: spin shown on the visual (ABS keeps it rolling)
+    bool braking = false;
+    std::vector<float> spin;  // per wheel: excess surface speed / ground speed (traction control)
     bool abs = false, tractionControl = false;
     // Driver and assists.
     std::optional<VehicleInput> override;
@@ -323,6 +327,7 @@ struct VehicleSet::Entry {
     float steer = 0.f;
     bool reversing = false;
     float tractionScale = 1.f;
+    float spinFiltered = 0.f;  // wheelspin smoothed over ~0.1 s (Jolt alternates spin and grip step to step)
     int requestedGear = 1;
     int lastGearWritten = 0;
     bool driftActive = false;
@@ -516,7 +521,7 @@ bool VehicleSet::create(const Scene& s, EntityId e, const Vehicle& v, JPH::BodyI
         ws->mSuspensionSpring.mDamping = w.damping;
         ws->mRadius = w.radius;
         ws->mWidth = w.width;
-        float wheelMass = std::clamp(en.mass * 0.012f, 2.f, 80.f);
+        float wheelMass = std::clamp(en.mass * 0.025f, 3.f, 120.f);  // tire, rim, brake and half shaft
         ws->mInertia = 0.5f * wheelMass * w.radius * w.radius;
         ws->mAngularDamping = 0.2f;
         ws->mMaxSteerAngle = w.steers ? radians(w.maxSteerDeg) : 0.f;
@@ -525,6 +530,9 @@ bool VehicleSet::create(const Scene& s, EntityId e, const Vehicle& v, JPH::BodyI
         ws->mLongitudinalFriction = linearCurve(longCurve, w.longitudinalGrip);
         ws->mLateralFriction = linearCurve(latCurve, w.lateralGrip);
         vs.mWheels.push_back(ws);
+        float peak = 0.f;
+        for (const auto& [x, y] : longCurve) peak = std::max(peak, y);
+        en.peakLongitudinal.push_back(peak * w.longitudinalGrip);
         if (w.steers) maxSteer = std::max(maxSteer, w.maxSteerDeg);
     }
     en.maxSteerDeg = maxSteer > 0 ? maxSteer : 30.f;
@@ -637,7 +645,8 @@ bool VehicleSet::create(const Scene& s, EntityId e, const Vehicle& v, JPH::BodyI
     en.lateralScale.assign(n, 1.f);
     en.surfaceGrip.assign(n, 1.f);
     en.absHit.assign(n, 0);
-    en.tcHit.assign(n, 0);
+    en.visualAngle.assign(n, 0.f);
+    en.spin.assign(n, 0.f);
     if (const AudioSource* audio = s.get<AudioSource>(e)) en.audioVolume = audio->volume;
 
     Entry* self = entry.get();  // entries live in unique_ptrs: the address is stable
@@ -654,35 +663,21 @@ bool VehicleSet::create(const Scene& s, EntityId e, const Vehicle& v, JPH::BodyI
         lateral *= grip;
     });
     en.controller->SetTireMaxImpulseCallback([self](JPH::uint wheel, float& outLongitudinal, float& outLateral, float suspensionImpulse,
-                                                    float longitudinalFriction, float lateralFriction, float, float, float) {
-        float ls = wheel < self->longitudinalScale.size() ? self->longitudinalScale[wheel] : 1.f;
-        float as = wheel < self->lateralScale.size() ? self->lateralScale[wheel] : 1.f;
-        outLongitudinal = longitudinalFriction * suspensionImpulse * ls;
-        outLateral = lateralFriction * suspensionImpulse * as;
-    });
-    // Anti-lock brakes and traction control act per wheel right after the controller computed the
-    // wheel speeds for this step (before the tire impulses are solved).
-    en.constraint->SetPostStepCallback([self](JPH::VehicleConstraint& c, const JPH::PhysicsStepListenerContext&) {
-        const JPH::Body* chassis = c.GetVehicleBody();
-        for (JPH::uint i = 0; i < c.GetWheels().size(); ++i) {
-            auto* w = static_cast<JPH::WheelWV*>(c.GetWheel(i));
-            if (!w->HasContact()) continue;
-            const float r = w->GetSettings()->mRadius;
-            JPH::Vec3 rel = chassis->GetPointVelocity(w->GetContactPosition()) - w->GetContactPointVelocity();
-            float ground = rel.Dot(w->GetContactLongitudinal());
-            if (self->abs && w->mBrakeImpulse > 0.f && w->GetAngularVelocity() == 0.f && std::fabs(ground) > 1.5f) {
-                w->SetAngularVelocity(0.88f * ground / r);  // release: keep the tire near its peak slip
-                self->absHit[i] = 1;
-            }
-            if (self->tractionControl && self->wheels[i].driven && self->applied.throttle > 0.05f) {
-                float limit = std::max(std::fabs(ground) * 1.12f, std::fabs(ground) + 1.2f);
-                float surface = w->GetAngularVelocity() * r;
-                if (std::fabs(surface) > limit && surface * ground >= -0.25f) {
-                    w->SetAngularVelocity((surface > 0 ? limit : -limit) / r);
-                    self->tcHit[i] = 1;
-                }
-            }
+                                                    float longitudinalFriction, float lateralFriction, float longitudinalSlip,
+                                                    float, float) {
+        if (wheel >= self->wheels.size()) {
+            outLongitudinal = longitudinalFriction * suspensionImpulse;
+            outLateral = lateralFriction * suspensionImpulse;
+            return;
         }
+        float longitudinal = longitudinalFriction, lateral = lateralFriction;
+        if (self->absHit[wheel]) {
+            longitudinal = std::max(longitudinal, self->peakLongitudinal[wheel] * self->surfaceGrip[wheel]);
+        } else if (self->braking && longitudinalSlip > 0.9f) {
+            lateral *= 0.35f;  // a locked tire slides: little steering
+        }
+        outLongitudinal = longitudinal * suspensionImpulse * self->longitudinalScale[wheel];
+        outLateral = lateral * suspensionImpulse * self->lateralScale[wheel];
     });
 
     if (previous && previous->wheels.size() == n && previous->stepped) {
@@ -787,19 +782,50 @@ void VehicleSet::preStep(const Scene& s, float dt) {
             en.steer = target;
         }
 
-        // Traction control: back off the throttle while the driven wheels spin (per-wheel limiting
-        // happens inside the step).
-        en.tractionControl = v->tractionControl;
-        en.abs = v->abs;
-        if (v->tractionControl) {
-            float maxSlip = 0.f;
-            for (size_t i = 0; i < en.wheels.size(); ++i) {
-                if (!en.wheels[i].driven) continue;
-                const auto* w = static_cast<const JPH::WheelWV*>(en.constraint->GetWheel(static_cast<JPH::uint>(i)));
-                if (w->HasContact() && flatSpeed > 2.f) maxSlip = std::max(maxSlip, w->mLongitudinalSlip);
+        // Wheel slip after the last step: tire surface speed minus ground speed, relative to at least
+        // 3 m/s (Jolt's slip ratio explodes near a standstill). + = spinning, - = skidding.
+        std::vector<float> groundSpeed(en.wheels.size(), 0.f);
+        {
+            JPH::BodyLockRead lock(host_.system->GetBodyLockInterfaceNoLock(), en.body);
+            for (size_t i = 0; i < en.wheels.size() && lock.Succeeded(); ++i) {
+                const JPH::Wheel* w = en.constraint->GetWheel(static_cast<JPH::uint>(i));
+                en.spin[i] = 0.f;
+                if (!w->HasContact()) continue;
+                JPH::Vec3 rel = lock.GetBody().GetPointVelocity(w->GetContactPosition()) - w->GetContactPointVelocity();
+                groundSpeed[i] = rel.Dot(w->GetContactLongitudinal());
+                float surface = w->GetAngularVelocity() * w->GetSettings()->mRadius;
+                en.spin[i] = (std::fabs(surface) - std::fabs(groundSpeed[i])) / std::max(std::fabs(groundSpeed[i]), 3.f);
             }
-            if (maxSlip > 0.3f && std::fabs(forward) > 0.2f) en.tractionScale = std::max(0.35f, en.tractionScale - 2.5f * dt);
-            else en.tractionScale = std::min(1.f, en.tractionScale + 1.5f * dt);
+        }
+
+        // Anti-lock brakes (an ideal ABS): while braking, each tire brakes with its peak friction even
+        // if Jolt locked the wheel, and keeps its cornering grip. Without ABS a locked tire slides at the
+        // lower locked friction and barely steers (see the tire callback).
+        en.abs = v->abs;
+        en.braking = brake > 0.f;
+        for (size_t i = 0; i < en.wheels.size(); ++i) {
+            bool on = v->abs && brake > 0.f && std::fabs(groundSpeed[i]) > 1.5f;
+            en.absHit[i] = on ? 1 : 0;
+        }
+
+        // Traction control: backs off the throttle while the driven wheels spin.
+        en.tractionControl = v->tractionControl;
+        if (v->tractionControl) {
+            float maxSpin = 0.f;
+            for (size_t i = 0; i < en.wheels.size(); ++i) {
+                if (en.wheels[i].driven) maxSpin = std::max(maxSpin, en.spin[i]);
+            }
+            en.spinFiltered += (maxSpin - en.spinFiltered) * std::min(1.f, dt / 0.08f);
+            // Wheelspin in a straight line still accelerates (the tire keeps most of its grip); it only
+            // hurts when it steps the car out sideways. So the throttle is trimmed while the driven
+            // wheels spin *and* the car slides (power oversteer, donuts), not on a straight launch.
+            const float allowed = 0.35f;
+            const bool sliding = std::fabs(en.bodySlip) > 5.f || (flatSpeed < 6.f && std::fabs(in.steer) > 0.3f);
+            if (en.spinFiltered > allowed && sliding && std::fabs(forward) > 0.2f) {
+                en.tractionScale = std::max(0.45f, en.tractionScale - (en.spinFiltered - allowed) * 3.f * dt);
+            } else {
+                en.tractionScale = std::min(1.f, en.tractionScale + 1.5f * dt);
+            }
             forward *= en.tractionScale;
         } else {
             en.tractionScale = 1.f;
@@ -814,8 +840,6 @@ void VehicleSet::preStep(const Scene& s, float dt) {
             }
             en.lateralScale[i] = std::max(lat, 0.2f);
             en.longitudinalScale[i] = 1.f;
-            en.absHit[i] = 0;
-            en.tcHit[i] = 0;
         }
 
         en.applied = {std::max(forward, 0.f), brake, en.steer, in.handbrake};
@@ -901,7 +925,10 @@ void VehicleSet::postStep(Scene* s, float dt, int collisionSteps) {
             const JPH::Wheel* w = en.constraint->GetWheel(static_cast<JPH::uint>(i));
             Vec3 centerBody = ws.position + Vec3{0.f, ws.restLength - w->GetSuspensionLength(), 0.f};
             Vec3 centerChassis = divide(centerBody, chassis.scale);
-            Mat4 spinSteer = Mat4::rotateEulerDeg({-degrees(w->GetRotationAngle()), degrees(w->GetSteerAngle()), 0.f});
+            float omega = en.absHit[i] && std::fabs(w->GetAngularVelocity()) < 1e-3f ? 0.92f * t->speedKmh / 3.6f / ws.radius
+                                                                                     : w->GetAngularVelocity();
+            en.visualAngle[i] = std::fmod(en.visualAngle[i] + omega * dt, 2.f * kPi);
+            Mat4 spinSteer = Mat4::rotateEulerDeg({-degrees(en.visualAngle[i]), degrees(w->GetSteerAngle()), 0.f});
             Mat4 m = Mat4::translate(centerChassis) * spinSteer * Mat4::translate(-ws.restCenterChassis) * ws.restInChassis;
             Mat4 local = ws.chassisFromParent.inverse() * m;
             Decomposed d = decompose(local);
@@ -1017,7 +1044,6 @@ std::optional<VehicleTelemetry> VehicleSet::telemetry(EntityId e) const {
             }
             t.skid = std::max(t.skid, wt.skid);
             t.absActive = t.absActive || en.absHit[i] != 0;
-            t.tractionControlActive = t.tractionControlActive || en.tcHit[i] != 0;
         }
         t.wheels.push_back(wt);
     }

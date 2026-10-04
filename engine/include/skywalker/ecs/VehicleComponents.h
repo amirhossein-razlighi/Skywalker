@@ -39,8 +39,8 @@ struct Vehicle {
     float maxSteerAngle = 32.f;       // degrees at full lock
     float brakeTorque = 2500.f;       // N m per wheel at full brake
     float handbrakeTorque = 5000.f;   // N m per rear wheel at full handbrake
-    float longitudinalGrip = 1.4f;    // peak tire friction accelerating/braking (scales longitudinalCurve)
-    float lateralGrip = 1.3f;         // peak tire friction cornering (scales lateralCurve)
+    float longitudinalGrip = 1.2f;    // peak tire friction accelerating/braking (scales longitudinalCurve)
+    float lateralGrip = 1.1f;         // peak tire friction cornering (scales lateralCurve)
     Json longitudinalCurve = Json::array();  // [[slip ratio, friction 0..1], ...]; empty = default curve
     Json lateralCurve = Json::array();       // [[slip angle in degrees, friction 0..1], ...]; empty = default curve
 
@@ -68,8 +68,8 @@ struct Vehicle {
     float clutchStrength = 10.f;        // how hard the clutch couples engine and wheels
 
     // --- Anti-roll and aero --------------------------------------------------------------------------
-    float antiRollFront = 8000.f;     // N/m (0 = none)
-    float antiRollRear = 5000.f;
+    float antiRollFront = 600.f;      // anti-roll bar stiffness (0 = none, 300 soft .. 2000 very stiff)
+    float antiRollRear = 400.f;
     float downforce = 0.4f;           // N per (m/s)^2 pressing the car down (grip at speed)
     float drag = 0.38f;               // N per (m/s)^2 against the motion (top speed)
 

@@ -104,7 +104,7 @@ struct Driver {
     Sandbox& sb;
     float time = 0.f;
     VehicleTelemetry t;
-    float maxLatG = 0.f, maxSpeed = 0.f, maxDrift = 0.f;
+    float maxLatG = 0.f, maxSpeed = 0.f, maxDrift = 0.f, maxRoll = 0.f;
     int maxGear = 0;
     float wheelBase = 2.5f, maxSteerDeg = 30.f, halfWidth = 0.9f, sss = 0.5f;
     Json trace = Json::array();
@@ -137,6 +137,8 @@ struct Driver {
         maxLatG = std::max(maxLatG, std::fabs(t.lateralG));
         maxSpeed = std::max(maxSpeed, t.speedKmh);
         maxDrift = std::max(maxDrift, std::fabs(t.bodySlipAngle));
+        Vec3 sideways = normalize(flatten(t.right));
+        maxRoll = std::max(maxRoll, std::fabs(degrees(std::atan2(dot(t.up, sideways), std::max(t.up.y, 1e-3f)))));
         maxGear = std::max(maxGear, t.gear);
         if (tracing && time >= nextSample) {
             nextSample += 0.25f;
@@ -168,7 +170,7 @@ struct Driver {
         return std::clamp(angle / std::max(lock, 1.f), -1.f, 1.f);
     }
 
-    float lookahead() const { return std::clamp(0.35f * length(t.velocity) + 4.f, 5.f, 30.f); }
+    float lookahead() const { return std::clamp(0.2f * length(t.velocity) + 3.f, 4.f, 25.f); }
 
     /// Throttle/brake to hold `kmh`.
     VehicleInput holdSpeed(float kmh) const {
@@ -201,7 +203,8 @@ Json finish(Driver& d, Json metrics, std::vector<std::string>& warnings, bool tr
     metrics["maxLateralG"] = r2(d.maxLatG);
     metrics["maxSpeedKmh"] = r2(d.maxSpeed);
     metrics["maxDriftAngle"] = r2(d.maxDrift);
-    metrics["seconds"] = r2(d.time);
+    metrics["maxRollDeg"] = r2(d.maxRoll);
+    metrics["totalSeconds"] = r2(d.time);
     Json w = Json::array();
     for (const auto& s : warnings) w.push(s);
     metrics["warnings"] = w;
@@ -210,7 +213,7 @@ Json finish(Driver& d, Json metrics, std::vector<std::string>& warnings, bool tr
 }
 
 Json runAccel(Driver& d, std::vector<std::string>& warnings) {
-    float t60 = -1, t100 = -1, t400m = -1, speed400m = 0, maxSlip = 0;
+    float t60 = -1, t100 = -1, t400m = -1, speed400m = 0, spinTime = 0;
     int shifts = 0, lastGear = d.t.gear;
     const float start = d.time;
     const Vec3 origin = d.t.position;
@@ -221,9 +224,10 @@ Json runAccel(Driver& d, std::vector<std::string>& warnings) {
         in.steer = d.steerToward(ahead);
         d.step(in);
         float elapsed = d.time - start;
-        for (const auto& w : d.t.wheels) {
-            if (w.driven && w.contact) maxSlip = std::max(maxSlip, std::min(w.slipRatio, 10.f));
-        }
+        bool spinning = false;
+        const float v = std::fabs(d.t.speedKmh) / 3.6f;
+        for (const auto& w : d.t.wheels) spinning = spinning || (w.driven && w.contact && (w.angularVelocity * w.radius - v) / std::max(v, 3.f) > 0.2f);
+        spinTime += spinning ? kDt : 0.f;
         if (d.t.gear != lastGear && d.t.gear > 0) ++shifts;
         lastGear = d.t.gear;
         if (t60 < 0 && d.t.speedKmh >= 60.f) t60 = elapsed;
@@ -244,7 +248,7 @@ Json runAccel(Driver& d, std::vector<std::string>& warnings) {
                          {"quarterMileS", t400m < 0 ? Json() : Json(r2(t400m))},
                          {"quarterMileKmh", t400m < 0 ? Json() : Json(r2(speed400m))},
                          {"upshifts", shifts},
-                         {"launchWheelspin", r2(maxSlip)}});
+                         {"wheelspinSeconds", r2(spinTime)}});
 }
 
 Json runBraking(Driver& d, float fromKmh, std::vector<std::string>& warnings) {
@@ -273,7 +277,7 @@ Json runBraking(Driver& d, float fromKmh, std::vector<std::string>& warnings) {
         maxDecel = std::max(maxDecel, -d.t.longitudinalG);
         absTime += d.t.absActive ? kDt : 0.f;
         maxDeviation = std::max(maxDeviation, std::fabs(d.t.position.x - origin.x));
-        for (const auto& w : d.t.wheels) locked = locked || (w.contact && w.angularVelocity == 0.f && d.t.speedKmh > 5.f);
+        for (const auto& w : d.t.wheels) locked = locked || (w.contact && w.angularVelocity == 0.f && d.t.speedKmh > 5.f && !d.t.absActive);
         if (d.spun()) {
             warnings.push_back("unstable under braking (spun)");
             break;
@@ -295,7 +299,7 @@ Json runBraking(Driver& d, float fromKmh, std::vector<std::string>& warnings) {
 
 Json runSlalom(Driver& d, float kmh, float spacing, std::vector<std::string>& warnings) {
     const int cones = 8;
-    const float amplitude = std::max(1.6f, d.halfWidth + 0.75f);
+    const float amplitude = d.halfWidth + 0.35f;  // the car clears each cone by 35 cm
     const Vec3 origin = d.t.position;
     // Distance along -Z where the first cone stands: enough run-up to reach the speed.
     const float runup = std::max(80.f, (kmh / 3.6f) * (kmh / 3.6f) / 4.f + 40.f);
@@ -335,7 +339,7 @@ Json runSlalom(Driver& d, float kmh, float spacing, std::vector<std::string>& wa
             float coneS = first + spacing * static_cast<float>(i);
             if (!passed[static_cast<size_t>(i)] && s >= coneS) {
                 passed[static_cast<size_t>(i)] = true;
-                if (std::fabs(d.t.position.x - origin.x) < d.halfWidth + 0.15f) ++hits;
+                if (std::fabs(d.t.position.x - origin.x) < d.halfWidth) ++hits;
             }
         }
         if (s > last + spacing * 0.5f) {
@@ -381,7 +385,7 @@ Json runSkidpad(Driver& d, float radius, float startKmh, std::vector<std::string
         float err = length(flatten(d.t.position - center)) - radius;
         if (d.time - t0 > 4.f && std::fabs(err) < 1.5f && std::fabs(target - d.t.speedKmh) < 4.f) {
             float v = d.t.speedKmh / 3.6f;
-            float g = v * v / radius / kG;
+            float g = v * v / std::max(length(flatten(d.t.position - center)), 1.f) / kG;
             if (g > bestG) {
                 bestG = g;
                 bestKmh = d.t.speedKmh;
@@ -498,6 +502,7 @@ Result<Json> runTestDrive(const PhysicsSystem& physics, const Scene& scene, Enti
         std::vector<std::string> warnings;
         Json rest = settle(d, warnings);
         Json r;
+        bool finished = false;  // metrics already filled from another driver (slalom search)
         if (m == "accel") {
             r = runAccel(d, warnings);
             summary["zeroTo100s"] = r.get("zeroTo100s");
@@ -506,7 +511,32 @@ Result<Json> runTestDrive(const PhysicsSystem& physics, const Scene& scene, Enti
             summary["brakingDistanceM"] = r.get("distanceM");
             summary["brakingFromKmh"] = r.get("fromKmh");
         } else if (m == "slalom") {
-            r = runSlalom(d, o.speedKmh > 0 ? o.speedKmh : 60.f, std::clamp(o.coneSpacing, 8.f, 60.f), warnings);
+            const float spacing = std::clamp(o.coneSpacing, 8.f, 60.f);
+            if (o.speedKmh > 0) {
+                r = runSlalom(d, o.speedKmh, spacing, warnings);
+            } else {
+                // No speed given: find the fastest clean run (5 km/h steps from 40), each in a fresh world.
+                for (float kmh = 40.f; kmh <= 160.f; kmh += 5.f) {
+                    auto attempt = makeSandbox(physics, scene, vehicle, o);
+                    if (!attempt) return attempt.error();
+                    Driver da(*attempt, false);
+                    std::vector<std::string> w;
+                    settle(da, w);
+                    Json run = runSlalom(da, kmh, spacing, w);
+                    if (!run.get("completed").asBool() || run.get("conesHit").asInt(1) > 0) break;
+                    run["maxCleanKmh"] = kmh;
+                    run["rest"] = rest;
+                    r = finish(da, run, w, false);
+                }
+                if (r.isNull()) {
+                    r = runSlalom(d, 40.f, spacing, warnings);
+                    r["maxCleanKmh"] = Json();
+                    warnings.push_back("no clean slalom run even at 40 km/h");
+                } else {
+                    finished = true;
+                }
+            }
+            summary["slalomMaxKmh"] = r.get("maxCleanKmh");
             summary["slalomAvgKmh"] = r.get("avgKmh");
             summary["slalomConesHit"] = r.get("conesHit");
         } else if (m == "skidpad") {
@@ -518,8 +548,10 @@ Result<Json> runTestDrive(const PhysicsSystem& physics, const Scene& scene, Enti
         } else {
             r = runCustom(d, o.inputs, o.duration, warnings);
         }
-        r["rest"] = rest;
-        r = finish(d, r, warnings, o.trace);
+        if (!finished) {
+            r["rest"] = rest;
+            r = finish(d, r, warnings, o.trace);
+        }
         float g = r.get("maxLateralG").asFloat(0.f);
         summary["maxLateralG"] = std::max(summary.get("maxLateralG").asFloat(0.f), g);
         out[m] = r;
