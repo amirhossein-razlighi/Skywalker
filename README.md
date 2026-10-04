@@ -66,6 +66,17 @@ interface the editor uses.
 - **Ship it:** `skywalker build` packages a project as a signed macOS app around the standalone
   player. → [docs/SHIPPING.md](docs/SHIPPING.md)
 
+## Made with Skywalker
+
+Sample worlds built by agent crews with the engine's own tools (original IP; every project is in `examples/`).
+
+| | |
+|---|---|
+| ![Tidebreak Isle](examples/tidebreak_isle/shots/brig.jpg) **Tidebreak Isle**: an island cove at golden hour, FFT surf, palms, a fort and a brig | ![Neon Requiem](examples/neon_requiem/shots/avenue_dolly.jpg) **Neon Requiem**: a rain-soaked neon city with hundreds of clustered lights |
+| ![Ashen Peaks](examples/ashen_peaks/shots/crane_gate.jpg) **Ashen Peaks**: a monastery valley with eroded terrain and impostor forests | ![Berrybrook](examples/berrybrook/shots/berry_rows.jpg) **Berrybrook**: a cozy berry farm with planting, harvest and a tilt-shift lens |
+| ![Gloamwater](examples/gloamwater/shots/grove.jpg) **Gloamwater**: a 2D metroidvania with painted parallax and 2D lights | ![Meridian Accord](examples/meridian_accord/shots/front_line.jpg) **Meridian Accord**: a grand strategy map with fronts, units and events |
+| ![The Chancellor's Desk](examples/chancellors_desk/shots/the_decree.jpg) **The Chancellor's Desk**: a political drama of documents, dialogue and decrees | ![Studio](examples/tidebreak_isle/shots/shallows.jpg) Every world ships its hero camera moves as sequences, ready for `movie_render` |
+
 ## Quick start
 
 Requirements: macOS 15+, Xcode 16+ command-line tools, CMake ≥ 3.29, Ninja.
