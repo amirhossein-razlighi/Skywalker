@@ -28,6 +28,7 @@ full descriptions; `component_schema` and each tool's input schema list every fi
 | Pixel to entity | `viewport_pick {x*, y*, width, height}` |
 | Editor viewport tier | `viewport_quality {quality: fast\|balanced\|full}` (omit to read; the human's live view, captures stay `full` unless `quality` is passed) |
 | Performance | `perf_stats {frames, width, height, view, quality}` (draw calls, lights, GPU/CPU ms) |
+| Light shadows | `shadow_atlas_info {view, entity}` (which lamps have shadows, cache, budgets, casters), `light_shadows {lights, enabled, resolution, mode, max_distance}`, `viewport_capture {debug_view: "shadow_atlas"}` |
 
 ## World
 
