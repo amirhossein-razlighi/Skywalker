@@ -60,7 +60,7 @@ TEST_CASE("legal: the documents are embedded with versions, a plain-language sum
     auto ph = legal::placeholders(terms->text);
     CHECK(std::find(ph.begin(), ph.end(), "{{LICENSOR_LEGAL_NAME}}") != ph.end());
     CHECK(std::find(ph.begin(), ph.end(), "{{GOVERNING_LAW_COUNTRY}}") != ph.end());
-    CHECK(std::find(ph.begin(), ph.end(), "{{DOUBLE_BRACES}}") != ph.end());  // the header note's example counts too
+    CHECK(std::find(ph.begin(), ph.end(), "{{EFFECTIVE_DATE}}") != ph.end());
 
     auto license = legal::document("license");
     REQUIRE(license);
@@ -176,6 +176,7 @@ TEST_CASE("skywalker legal: prints the documents, records acceptance, never bloc
     std::string out, err;
     CHECK(legal::runCommand({"--status"}, d.record(), out, err) == 0);
     CHECK(out.find("not recorded") != std::string::npos);
+    CHECK(out.find(legal::kDeveloperCredit) != std::string::npos);
 
     out.clear();
     CHECK(legal::runCommand({}, d.record(), out, err) == 0);

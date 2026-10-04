@@ -1,6 +1,6 @@
 # Skywalker Terms of Use
 
-> **Template prepared for legal review — not legal advice.** Text in `{{DOUBLE_BRACES}}` is a
+> **Template prepared for legal review — not legal advice.** Text in double braces, such as `{{EFFECTIVE_DATE}}`, is a
 > placeholder that must be filled in, and the whole document reviewed by a qualified lawyer for
 > the countries where Skywalker is offered, before it is published or relied on.
 
@@ -57,9 +57,8 @@ the Commercial License alone defines your rights to copy, modify, distribute and
 use of the Software, including the revenue and funding thresholds and the Change License.
 
 2.2 These Terms add the rules for using the Software and its AI features. They do not narrow the
-rights the License grants, and they do not apply to a version of the Software after it has
-converted to the Change License (Apache License 2.0), except where you keep using our AI-feature
-integrations with that version.
+rights the License grants, and they do not restrict any right you have under the Change License
+(Apache License 2.0) once a version of the Software has converted to it.
 
 2.3 If these Terms and the License or the Commercial License conflict, the License or the
 Commercial License prevails on use rights, and these Terms prevail on everything else.

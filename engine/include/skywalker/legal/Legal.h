@@ -57,6 +57,8 @@ struct AcceptanceRecord {
 };
 
 inline constexpr size_t kHistoryLimit = 100;
+/// Shown by `skywalker legal` and in the editor's legal screens.
+inline constexpr const char* kDeveloperCredit = "Developed by: AmirHossein (Amir) Razlighi";
 inline constexpr const char* kRecordFileName = "legal-acceptance.json";
 
 /// Where the acceptance record lives: $SKY_LEGAL_DIR if set, else ~/Library/Application Support/Skywalker on

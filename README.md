@@ -158,6 +158,7 @@ directly. Settings live in `game.json`. → [docs/SHIPPING.md](docs/SHIPPING.md)
 | [DEVELOPMENT](docs/DEVELOPMENT.md) | Building, testing, sanitizers, profiling, conventions |
 | [ROADMAP](docs/ROADMAP.md) | What's next |
 | [LICENSING](docs/LICENSING.md) | Licensing model (draft, please read) |
+| [TERMS](docs/legal/TERMS.md), [PRIVACY](docs/legal/PRIVACY.md) | Terms of Use and Privacy Notice (templates awaiting legal review) |
 
 ## License
 

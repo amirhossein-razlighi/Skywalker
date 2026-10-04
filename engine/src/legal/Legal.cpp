@@ -110,7 +110,7 @@ const char* kUsage =
 
 std::string statusText(const fs::path& recordPath) {
     std::ostringstream o;
-    o << "Skywalker legal documents (embedded copies; nothing is sent anywhere)\n";
+    o << "Skywalker legal documents (embedded copies; nothing is sent anywhere)\n" << kDeveloperCredit << "\n";
     for (const char* id : {"terms", "privacy", "licensing"}) {
         auto d = document(id);
         if (!d) continue;

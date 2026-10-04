@@ -1,6 +1,6 @@
 # Skywalker Privacy Notice
 
-> **Template prepared for legal review — not legal advice.** Text in `{{DOUBLE_BRACES}}` is a
+> **Template prepared for legal review — not legal advice.** Text in double braces, such as `{{EFFECTIVE_DATE}}`, is a
 > placeholder that must be filled in, and the whole document reviewed by a qualified lawyer, before
 > it is published or relied on.
 

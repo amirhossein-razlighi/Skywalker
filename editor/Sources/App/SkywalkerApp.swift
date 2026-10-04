@@ -7,6 +7,7 @@ struct SkywalkerApp: App {
     @State private var engine: EngineStore
     @State private var studio: StudioStore
     @State private var crew: CrewStore
+    @State private var legal = LegalStore()
 
     init() {
         let engine = EngineStore(projectDirectory: Self.projectDirectory())
@@ -22,8 +23,13 @@ struct SkywalkerApp: App {
                 .environment(engine)
                 .environment(studio)
                 .environment(crew)
+                .environment(legal)
                 .frame(minWidth: 1100, minHeight: 680)
                 .preferredColorScheme(.dark)
+                // Terms of Use on first launch and after a change; the editor stays behind the sheet until accepted.
+                .sheet(isPresented: Binding(get: { legal.needsAcceptance }, set: { _ in })) {
+                    LegalAcceptanceSheet().environment(legal).preferredColorScheme(.dark)
+                }
                 .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
                     crew.save()
                     engine.shutdown()
@@ -52,29 +58,41 @@ struct SkywalkerApp: App {
                 .keyboardShortcut("z", modifiers: [.command, .shift])
             }
             CommandGroup(replacing: .newItem) {
-                Button("Open Project…") { Self.chooseProject() }.keyboardShortcut("o")
+                Button("Open Project…") { Self.chooseProject() }.keyboardShortcut("o").disabled(legal.needsAcceptance)
             }
             CommandGroup(replacing: .saveItem) {
                 Button("Save Scene") { engine.call("scene_save", ["path": "scenes/main.sky.json"]) }.keyboardShortcut("s")
+                    .disabled(legal.needsAcceptance)
             }
             CommandMenu("Game") {
-                Button("Play") { engine.call("sim_control", ["action": "play"]) }.keyboardShortcut("p")
-                Button("Pause") { engine.call("sim_control", ["action": "pause"]) }.keyboardShortcut("p", modifiers: [.command, .shift])
-                Button("Stop") { engine.call("sim_control", ["action": "stop"]) }.keyboardShortcut(".")
-                Divider()
-                Button("Render Movie…") { engine.movieRequest = MovieRequest() }
-                    .keyboardShortcut("m", modifiers: [.command, .option])
-                    .disabled(engine.movie?.finished == false)
-                Divider()
-                Button("Frame All") { engine.call("camera_set", ["frame": "all"]) }.keyboardShortcut("0")
+                Group {
+                    Button("Play") { engine.call("sim_control", ["action": "play"]) }.keyboardShortcut("p")
+                    Button("Pause") { engine.call("sim_control", ["action": "pause"]) }.keyboardShortcut("p", modifiers: [.command, .shift])
+                    Button("Stop") { engine.call("sim_control", ["action": "stop"]) }.keyboardShortcut(".")
+                    Divider()
+                    Button("Render Movie…") { engine.movieRequest = MovieRequest() }
+                        .keyboardShortcut("m", modifiers: [.command, .option])
+                        .disabled(engine.movie?.finished == false)
+                    Divider()
+                    Button("Frame All") { engine.call("camera_set", ["frame": "all"]) }.keyboardShortcut("0")
+                }
+                .disabled(legal.needsAcceptance)  // usable once the Terms are accepted
             }
+            LegalCommands()
         }
+
+        // Help ▸ Terms of Use / Privacy Notice / Licenses and Settings ▸ Legal open the documents here.
+        WindowGroup("Legal", id: LegalWindow.id, for: LegalDocument.self) { $document in
+            LegalDocumentWindow(document: document ?? .terms).preferredColorScheme(.dark)
+        }
+        .defaultSize(width: 760, height: 720)
 
         Settings {
             SettingsView()
                 .environment(engine)
                 .environment(studio)
                 .environment(crew)
+                .environment(legal)
                 .preferredColorScheme(.dark)
         }
     }
