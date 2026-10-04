@@ -40,6 +40,9 @@ constexpr int kMinFrames = 4, kMaxFrames = 32;
 constexpr int kMipLevels = 5;
 /// Alpha threshold of the runtime alpha test; mips preserve the coverage at this cutoff.
 constexpr float kAlphaCutoff = 0.5f;
+/// Transition at this fraction of the texel-matching distance (impostors may be magnified up to
+/// ~1.5x: the bounding-sphere frame is looser than the silhouette).
+constexpr float kTexelMatch = 0.65f;
 
 // --- Directions ------------------------------------------------------------------------------
 

@@ -45,6 +45,7 @@ struct ImpostorBakeUniformsGpu {
 };
 
 constexpr NSUInteger kCullThreads = 128;
+constexpr float kFoliageLodScale = 0.8f / 3.f;  // ~3 px of LOD error instead of GpuMesh::lodFor's 0.8 px
 
 // Indirect argument layout per chunk and view (written by foliageCullKernel): for each part and
 // mesh band an MTLDrawIndexedPrimitivesIndirectArguments (5 uints), then one
@@ -134,6 +135,7 @@ struct MetalFoliage::Chunk {
     uint32_t viewMask = 0;  // bit v: view v may draw (chunk bounds vs frustum)
     float dmin = 0.f, dmax = 0.f;
     float D = 0.f, W = 0.f;
+    float cull = 0.f;  // effective cull distance this frame
     float bandFar[3] = {};
     float bandFrac[4] = {};  // share of the footprint in each mesh band (triangle budget estimate)
     int firstImpostorCascade = 4;
@@ -161,6 +163,12 @@ MetalFoliage::MetalFoliage(id<MTLDevice> device, id<MTLCommandQueue> queue, Mesh
       surfaceUniforms_(std::move(surfaceUniforms)),
       counters_(std::make_shared<Counters>()) {
     if (const char* env = std::getenv("SKY_GPU_CULL"); env && std::string(env) == "0") gpuCull_ = false;
+    // Developer switch for profiling: SKY_FOLIAGE_DEBUG=nomesh,noimpostors,noshadows.
+    if (const char* env = std::getenv("SKY_FOLIAGE_DEBUG")) {
+        const std::string d = env;
+        debugSkip_ = (d.find("nomesh") != std::string::npos ? 1u : 0u) | (d.find("noimpostors") != std::string::npos ? 2u : 0u) |
+                     (d.find("noshadows") != std::string::npos ? 4u : 0u);
+    }
     MTLTextureDescriptor* wd = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA8Unorm width:1 height:1 mipmapped:NO];
     white_ = [device_ newTextureWithDescriptor:wd];
     const uint8_t px[4] = {255, 255, 255, 255};
@@ -339,11 +347,12 @@ void MetalFoliage::prepare(id<MTLCommandBuffer> cmd, const FrameData& frame, con
 
     // Impostors: ready ones are used; missing ones are baked (or loaded from the project cache)
     // within the frame's budget. Until then their layers draw meshes out to the cull distance.
-    int budget = frame.samples > 1 ? INT_MAX : 1;
+    // Real time: ~100 ms of baking/loading per frame at most (cache loads are a few tens of ms;
+    // a bake can take longer and runs alone). Stills do everything now.
+    const double budgetMs = frame.samples > 1 ? 1e30 : 100.0;
+    const auto workStart = std::chrono::steady_clock::now();
     for (size_t i = 0; i < frame.impostors.size(); ++i) {
-        bool worked = false;
-        Impostor* imp = impostor(frame.impostors[i], budget > 0, false, &worked);
-        if (worked) --budget;
+        Impostor* imp = impostor(frame.impostors[i], msSince(workStart) < budgetMs, false);
         frameImpostors_[i] = imp && !imp->failed ? imp : nullptr;
     }
 
@@ -368,9 +377,12 @@ void MetalFoliage::prepare(id<MTLCommandBuffer> cmd, const FrameData& frame, con
         c.batch = &b;
         c.dmin = nearestDistance(eye, b.bounds);
         c.dmax = farthestDistance(eye, b.bounds);
-        if (c.dmin > b.cullDistance) continue;
         c.imp = b.impostor >= 0 && static_cast<size_t>(b.impostor) < frameImpostors_.size() ? frameImpostors_[static_cast<size_t>(b.impostor)] : nullptr;
         c.D = c.imp ? b.impostorDistance : 0.f;
+        // An impostor still loading: draw only the mesh range meanwhile (a few frames of pop-in),
+        // never every instance as a mesh out to the cull distance (that is what impostors avoid).
+        c.cull = b.impostor >= 0 && !c.imp && b.impostorDistance > 0.f ? std::min(b.cullDistance, b.impostorDistance) : b.cullDistance;
+        if (c.dmin > c.cull) continue;
         c.W = c.D > 0.f ? impostor::crossfadeWidth(c.D) : 0.f;
         const bool shadows = view.shadows && b.castShadows && !(frame.quality >= 2 && c.dmin > 60.f);
         if (!outside(planes, b.bounds)) c.viewMask |= 1u;
@@ -382,10 +394,11 @@ void MetalFoliage::prepare(id<MTLCommandBuffer> cmd, const FrameData& frame, con
         if (!c.viewMask) continue;
         // Far cascades take impostors only (lower tiers from the second cascade on).
         c.firstImpostorCascade = c.D > 0.f ? (frame.quality >= 1 ? 1 : 2) : 4;
-        const float meshRange = c.D > 0.f ? c.D : b.cullDistance;
-        c.bandFar[0] = meshRange * 0.25f, c.bandFar[1] = meshRange * 0.5f, c.bandFar[2] = meshRange * 0.75f;
+        const float meshRange = c.D > 0.f ? c.D : c.cull;
+        // Geometric bands: LOD error shrinks with 1/distance, so near bands are narrow.
+        c.bandFar[0] = meshRange * 0.125f, c.bandFar[1] = meshRange * 0.25f, c.bandFar[2] = meshRange * 0.5f;
         {  // share of the chunk's footprint in each mesh band (budget estimate)
-            const float midY = (b.bounds.min.y + b.bounds.max.y) * 0.5f, meshEnd = c.D > 0.f ? c.D : b.cullDistance;
+            const float midY = (b.bounds.min.y + b.bounds.max.y) * 0.5f, meshEnd = c.D > 0.f ? c.D : c.cull;
             for (int sy = 0; sy < 8; ++sy) {
                 for (int sx = 0; sx < 8; ++sx) {
                     Vec3 q{b.bounds.min.x + (b.bounds.max.x - b.bounds.min.x) * (static_cast<float>(sx) + 0.5f) / 8.f, midY,
@@ -411,7 +424,7 @@ void MetalFoliage::prepare(id<MTLCommandBuffer> cmd, const FrameData& frame, con
 
         FoliageUniformsGpu& u = c.uniforms;
         u.wind = simd_make_float4(std::sin(windAngle), std::cos(windAngle), env.windSpeed, b.wind);
-        u.params = simd_make_float4(b.cullDistance, b.meshHeight, debug ? 1.f : 0.f, frame.time);
+        u.params = simd_make_float4(c.cull, b.meshHeight, debug ? 1.f : 0.f, frame.time);
         u.fade = simd_make_float4(c.D, c.W, 0.f, 0.f);
         if (c.imp) {
             ImpostorUniformsGpu& iu = c.impUniforms;
@@ -435,7 +448,9 @@ void MetalFoliage::prepare(id<MTLCommandBuffer> cmd, const FrameData& frame, con
         if (!m) return 0;
         const float nearEdge = band == 0 ? 0.f : c.bandFar[band - 1];
         const int bias = table + (frame.quality >= 2 ? 1 : 0) + budgetBias_;
-        int lod = m->lodFor(pixelsPerUnit(nearEdge) * c.batch->maxScale) + bias;
+        // Foliage tolerates a few pixels of simplification error (leaves flutter, TAA resolves it):
+        // photoscanned trees of millions of triangles are unaffordable at the 1 px bar of props.
+        int lod = m->lodFor(pixelsPerUnit(nearEdge) * c.batch->maxScale * kFoliageLodScale) + bias;
         // Simplified leaf cards thin out: cap them (impostors take over the distance) unless the
         // triangle budget forbids it.
         if (ip.surface.alphaCutoff > 0.f && frame.quality < 2 && budgetBias_ == 0) lod = std::min(lod, (c.D > 0.f ? 2 : 1) + bias);
@@ -443,24 +458,36 @@ void MetalFoliage::prepare(id<MTLCommandBuffer> cmd, const FrameData& frame, con
     };
     // Triangle budget (camera view): a hard safety net against frames long enough to trip the GPU
     // watchdog. Estimated from each chunk's footprint split into the distance bands.
+    auto chunkTriangles = [&](const Chunk& c) {
+        double total = 0;
+        if (!(c.viewMask & 1u)) return total;
+        const double n = static_cast<double>(c.batch->instances->size());
+        for (int band = 0; band < kBands; ++band) {
+            if (c.bandFrac[band] <= 0.f) continue;
+            double tris = 0;
+            for (uint32_t part = 0; part < c.parts; ++part) {
+                if (const GpuMesh* m = meshes_((*c.batch->parts)[part].mesh)) tris += m->lodCount_[lodFor(c, part, band, 0)] / 3;
+            }
+            total += n * c.bandFrac[band] * tris;
+        }
+        return total;
+    };
     budgetBias_ = 0;
     for (; budgetBias_ <= 4; ++budgetBias_) {
         double total = 0;
-        for (const Chunk& c : chunks_) {
-            if (!(c.viewMask & 1u)) continue;
-            const double n = static_cast<double>(c.batch->instances->size());
-            for (int band = 0; band < kBands; ++band) {
-                if (c.bandFrac[band] <= 0.f) continue;
-                double tris = 0;
-                for (uint32_t part = 0; part < c.parts; ++part) {
-                    if (const GpuMesh* m = meshes_((*c.batch->parts)[part].mesh)) tris += m->lodCount_[lodFor(c, part, band, 0)] / 3;
-                }
-                total += n * c.bandFrac[band] * tris;
-            }
-        }
+        for (const Chunk& c : chunks_) total += chunkTriangles(c);
         lastEstimate_ = static_cast<uint64_t>(total);
         const uint64_t budget = safeMode_ ? kTriangleBudget / 4 : kTriangleBudget;
         if (total <= static_cast<double>(budget) || budgetBias_ == 4) break;
+    }
+    // Per-model breakdown (perf_stats "foliageModels"): where the mesh triangles go.
+    layerEstimate_.clear();
+    for (const Chunk& c : chunks_) {
+        const std::string& key = (*c.batch->parts)[0].mesh;
+        auto& e = layerEstimate_[key];
+        e.triangles += chunkTriangles(c);
+        e.transition = c.D;
+        e.cull = c.cull;
     }
 
     // Lists and arguments live in shared memory (unified on Apple silicon): the CPU fallback
@@ -498,7 +525,7 @@ void MetalFoliage::prepare(id<MTLCommandBuffer> cmd, const FrameData& frame, con
         const Vec3 center = b.modelBounds.center();
         p.eye = simd_make_float4(eye.x, eye.y, eye.z, c.D);
         // Shadow casters: everything in a cascade (fast editing tier: only near the camera).
-        p.params = simd_make_float4(c.W, b.cullDistance, std::max(length(b.modelBounds.extents()), 1e-3f),
+        p.params = simd_make_float4(c.W, c.cull, std::max(length(b.modelBounds.extents()), 1e-3f),
                                     c.views > 1 ? (frame.quality >= 2 ? 60.f : 1e9f) : 0.f);
         p.center = simd_make_float4(center.x, center.y, center.z, static_cast<float>(c.firstImpostorCascade));
         p.bands = simd_make_float4(c.bandFar[0], c.bandFar[1], c.bandFar[2], 0.f);
@@ -568,6 +595,7 @@ void MetalFoliage::bindPart(id<MTLRenderCommandEncoder> enc, const InstancePart&
 void MetalFoliage::encodeShadows(id<MTLRenderCommandEncoder> enc, const FrameData& frame, int cascade, simd_float4x4 lvp) {
     (void)frame;
     const uint32_t v = static_cast<uint32_t>(cascade + 1);
+    if (debugSkip_ & 4u) return;
     bool any = false;
     for (Chunk& c : chunks_) {
         if (!(c.viewMask & (1u << v))) continue;
@@ -622,6 +650,7 @@ void MetalFoliage::encodeMain(id<MTLRenderCommandEncoder> enc, const FrameData& 
     (void)frame;
     bool cutBound = false, first = true;
     for (Chunk& c : chunks_) {
+        if (debugSkip_ & 1u) break;
         if (!(c.viewMask & 1u) || (c.D > 0.f && c.dmin >= c.D)) continue;  // impostors only
         for (uint32_t pi = 0; pi < c.parts; ++pi) {
             const InstancePart& part = (*c.batch->parts)[pi];
@@ -652,6 +681,7 @@ void MetalFoliage::encodeMain(id<MTLRenderCommandEncoder> enc, const FrameData& 
         }
     }
     bool impBound = false;
+    if (debugSkip_ & 2u) return;
     for (Chunk& c : chunks_) {
         if (!(c.viewMask & 1u) || !c.imp || c.D <= 0.f || c.dmax <= c.D - c.W) continue;
         if (!impBound) {
@@ -752,7 +782,14 @@ Json MetalFoliage::stats() const {
         ++ready;
     }
     auto round2 = [](double v) { return std::round(v * 100.0) / 100.0; };
-    return Json::object({{"meshInstances", static_cast<int64_t>(counters_->meshInstances.load())},
+    Json models = Json::array();
+    for (const auto& [mesh, e] : layerEstimate_) {
+        models.push(Json::object({{"mesh", mesh},
+                                  {"meshTriangles", static_cast<int64_t>(e.triangles)},
+                                  {"impostorDistance", std::round(e.transition)},
+                                  {"cullDistance", e.cull}}));
+    }
+    return Json::object({{"foliageModels", models},{"meshInstances", static_cast<int64_t>(counters_->meshInstances.load())},
                          {"impostorInstances", static_cast<int64_t>(counters_->impostors.load())},
                          {"shadowImpostorInstances", static_cast<int64_t>(counters_->shadowImpostors.load())},
                          {"foliageTriangles", static_cast<int64_t>(counters_->kiloTris.load() * 1024)},

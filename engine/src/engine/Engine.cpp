@@ -551,7 +551,11 @@ void applyViewportQuality(FrameData& f, int quality) {
     env.ssr = 0.f;
     env.godRays = 0.f;
     env.shadowDistance = env.shadowDistance > 0.f ? std::min(env.shadowDistance, 150.f) : 150.f;
-    for (auto& b : f.instances) b.cullDistance *= 0.4f;
+    // Mesh-only layers draw nearer; layers with impostors keep their range (cards are cheap, and
+    // their transition distance already moved closer for this tier).
+    for (auto& b : f.instances) {
+        if (b.impostor < 0) b.cullDistance *= 0.4f;
+    }
 }
 }  // namespace
 

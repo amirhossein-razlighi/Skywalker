@@ -146,10 +146,11 @@ float transitionDistance(const TransitionParams& p) {
     const float diameter = std::max(p.modelRadius, 0.01f) * 2.f;
     float d = p.overrideDistance;
     if (d <= 0.f) {
-        // One atlas texel per screen pixel: the frame tile spans the bounding diameter.
+        // About one atlas texel per screen pixel (the frame tile spans the bounding diameter, which is
+        // looser than the silhouette, so a little magnification still reads sharp under TAA).
         const float pxPerMeterAt1m = static_cast<float>(std::max(p.screenHeight, 1)) /
                                      (2.f * std::tan(radians(std::clamp(p.fovDeg, 5.f, 150.f)) * 0.5f));
-        d = diameter * pxPerMeterAt1m / static_cast<float>(tileSize(p.atlasResolution, p.frames));
+        d = kTexelMatch * diameter * pxPerMeterAt1m / static_cast<float>(tileSize(p.atlasResolution, p.frames));
     }
     d *= qualityScale(p.quality);
     d = std::max(d, diameter * 1.5f + 2.f);  // never right in front of the camera

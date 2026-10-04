@@ -575,22 +575,41 @@ static ImpostorSample sampleImpostor(texture2d<float> atlasA, texture2d<float> a
     const bool hemi = ic.grid.z > 0.5;
     const float inset = 0.5 * ic.grid.w;
     float acc = 0.0;
+    // Pass 1: where the ray crosses each frame plane, and a cheap conservative coverage test (a
+    // coarse mip spreads coverage past the parallax shift): most of a card's pixels are empty and
+    // skip the parallax and material samples.
+    float2 uv0[3], gx[3], gy[3];
+    float3 q[3];
+    float denom[3];
+    ImpBasis basis[3];
+    float coarse = 0.0;
     for (int k = 0; k < 3; ++k) {
         uint fx = frames[k] % Fi, fy = frames[k] / Fi;
-        ImpBasis b = impFrameBasis(impFrameDirection(fx, fy, F, hemi));
-        float denom = min(dot(r, b.forward), -1e-3);
-        float3 q = p + r * (dot(c - p, b.forward) / denom) - c;  // on the frame plane through the center
+        basis[k] = impFrameBasis(impFrameDirection(fx, fy, F, hemi));
+        denom[k] = min(dot(r, basis[k].forward), -1e-3);
+        q[k] = p + r * (dot(c - p, basis[k].forward) / denom[k]) - c;  // on the frame plane through the center
         bool inside;
-        float2 uv0 = impAtlasUV(q, b, R, fx, fy, invF, inset, inside);
-        float2 gx = dfdx(uv0), gy = dfdy(uv0);  // un-displaced gradients: stable mip selection
+        uv0[k] = impAtlasUV(q[k], basis[k], R, fx, fy, invF, inset, inside);
+        gx[k] = dfdx(uv0[k]);  // un-displaced gradients: stable mip selection
+        gy[k] = dfdy(uv0[k]);
+        coarse += weights[k] * atlasA.sample(impostorSampler, uv0[k], gradient2d(gx[k] * 8.0, gy[k] * 8.0)).a;
+    }
+    if (coarse < 0.01) {
+        o.normal = float3(0.0, 1.0, 0.0);
+        o.position = p;
+        return o;
+    }
+    for (int k = 0; k < 3; ++k) {
         if (weights[k] <= 1e-3) continue;
-        float h = (atlasB.sample(impostorSampler, uv0, gradient2d(gx, gy)).z * 2.0 - 1.0) * R;
-        float2 uv1 = impAtlasUV(q + r * (h / denom), b, R, fx, fy, invF, inset, inside);
-        h = (atlasB.sample(impostorSampler, uv1, gradient2d(gx, gy)).z * 2.0 - 1.0) * R;
-        float3 q2 = q + r * (h / denom);  // the ray point at the baked depth
-        float2 uv2 = impAtlasUV(q2, b, R, fx, fy, invF, inset, inside);
-        float4 A = atlasA.sample(impostorSampler, uv2, gradient2d(gx, gy));
-        float4 B = atlasB.sample(impostorSampler, uv2, gradient2d(gx, gy));
+        uint fx = frames[k] % Fi, fy = frames[k] / Fi;
+        bool inside;
+        float h = (atlasB.sample(impostorSampler, uv0[k], gradient2d(gx[k], gy[k])).z * 2.0 - 1.0) * R;
+        float2 uv1 = impAtlasUV(q[k] + r * (h / denom[k]), basis[k], R, fx, fy, invF, inset, inside);
+        h = (atlasB.sample(impostorSampler, uv1, gradient2d(gx[k], gy[k])).z * 2.0 - 1.0) * R;
+        float3 q2 = q[k] + r * (h / denom[k]);  // the ray point at the baked depth
+        float2 uv2 = impAtlasUV(q2, basis[k], R, fx, fy, invF, inset, inside);
+        float4 A = atlasA.sample(impostorSampler, uv2, gradient2d(gx[k], gy[k]));
+        float4 B = atlasB.sample(impostorSampler, uv2, gradient2d(gx[k], gy[k]));
         float wa = weights[k] * A.a * (inside ? 1.0 : 0.0);
         o.alpha += wa;
         o.albedo += A.rgb * wa;

@@ -118,6 +118,7 @@ private:
     // GPU culling can be switched off (SKY_GPU_CULL=0); it also turns itself off when a frame's
     // indirect arguments fail validation (checked on the CPU when the frame completes).
     bool gpuCull_ = true;
+    uint32_t debugSkip_ = 0;  // SKY_FOLIAGE_DEBUG: 1 = no meshes, 2 = no impostors, 4 = no shadows
     struct ArgCheck {
         NSUInteger argsOffset, viewArgs;
         uint32_t views, parts, instances, listStride, maxIndices;
@@ -141,6 +142,11 @@ private:
     int budgetBias_ = 0;
     bool safeMode_ = false;
     uint64_t lastEstimate_ = 0;
+    struct ModelEstimate {
+        double triangles = 0;
+        float transition = 0, cull = 0;
+    };
+    std::unordered_map<std::string, ModelEstimate> layerEstimate_;  // camera mesh triangles per model (first part)
     size_t bakes_ = 0, cacheLoads_ = 0;
     double bakeMs_ = 0.0;
 };
