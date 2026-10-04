@@ -233,6 +233,29 @@ Status MetalFoliage::build(id<MTLLibrary> lib, const FoliageFormats& fmt) {
     cull_ = cull;
     mesh_ = mesh;
     meshCutout_ = cutout;
+    {  // [debug views] overdraw: every fragment adds 1 (additive, G-buffer untouched); optional
+        auto overdraw = [&](const char* vs) -> id<MTLRenderPipelineState> {
+            id<MTLFunction> f = fn("overdrawFragment");
+            if (!f) return nil;
+            MTLRenderPipelineDescriptor* d = [MTLRenderPipelineDescriptor new];
+            d.vertexFunction = fn(vs);
+            d.fragmentFunction = f;
+            d.depthAttachmentPixelFormat = fmt.depth;
+            d.rasterSampleCount = fmt.samples;
+            d.colorAttachments[0].pixelFormat = fmt.hdr;
+            d.colorAttachments[0].blendingEnabled = YES;
+            d.colorAttachments[0].sourceRGBBlendFactor = d.colorAttachments[0].destinationRGBBlendFactor = MTLBlendFactorOne;
+            d.colorAttachments[0].sourceAlphaBlendFactor = d.colorAttachments[0].destinationAlphaBlendFactor = MTLBlendFactorOne;
+            d.colorAttachments[1].pixelFormat = fmt.gbufA;
+            d.colorAttachments[1].writeMask = MTLColorWriteMaskNone;
+            d.colorAttachments[2].pixelFormat = fmt.gbufB;
+            d.colorAttachments[2].writeMask = MTLColorWriteMaskNone;
+            NSError* oe = nil;
+            return newRenderPipeline(device_, d, &oe);
+        };
+        overdrawMesh_ = overdraw("foliageVertex");
+        overdrawImpostor_ = overdrawMesh_ ? overdraw("impostorVertex") : nil;
+    }
     meshShadow_ = shadow;
     meshShadowAlpha_ = shadowAlpha;
     impostor_ = imp;
@@ -653,6 +676,7 @@ void MetalFoliage::encodeShadows(id<MTLRenderCommandEncoder> enc, const FrameDat
 
 void MetalFoliage::encodeMain(id<MTLRenderCommandEncoder> enc, const FrameData& frame) {
     const bool lodDebug = frame.debugView == debugview::kLod;
+    const bool overdraw = frame.debugView == debugview::kOverdraw && overdrawMesh_ && overdrawImpostor_;
     bool cutBound = false, first = true;
     for (Chunk& c : chunks_) {
         if (debugSkip_ & 1u) break;
@@ -664,7 +688,7 @@ void MetalFoliage::encodeMain(id<MTLRenderCommandEncoder> enc, const FrameData& 
             bool cut = false;
             bindPart(enc, part, false, cut);
             if (first || cut != cutBound) {
-                [enc setRenderPipelineState:cut ? meshCutout_ : mesh_];
+                [enc setRenderPipelineState:overdraw ? overdrawMesh_ : (cut ? meshCutout_ : mesh_)];
                 cutBound = cut;
                 first = false;
             }
@@ -701,7 +725,7 @@ void MetalFoliage::encodeMain(id<MTLRenderCommandEncoder> enc, const FrameData& 
     for (Chunk& c : chunks_) {
         if (!(c.viewMask & 1u) || !c.imp || c.D <= 0.f || c.dmax <= c.D - c.W) continue;
         if (!impBound) {
-            [enc setRenderPipelineState:impostor_];
+            [enc setRenderPipelineState:overdraw ? overdrawImpostor_ : impostor_];
             [enc setCullMode:MTLCullModeNone];
             impBound = true;
         }

@@ -22,13 +22,17 @@ static int debugMode(constant FrameUniforms& f) { return int(f.debug.x + 0.5); }
 // Surface views that replace the color entirely (lighting_only only changes the material).
 static bool debugReplacesColor(int mode) { return mode >= kDbgWireframe && mode != kDbgLightingOnly && mode != kDbgOverdraw; }
 
-// Discrete heat ramp shared by overdraw and light complexity: black, blue, green, yellow, red, white.
+// Discrete heat ramp shared by overdraw and light complexity (counts): 0 black, 1 dark blue,
+// 2 blue, 3 cyan, 4 green, 5-6 yellow, 7-9 orange, 10-15 red, 16+ white.
 static float3 debugHeat(float n) {
-    if (n < 0.5) return float3(0.03);
-    if (n < 2.5) return float3(0.10, 0.25, 0.95);
-    if (n < 4.5) return float3(0.10, 0.80, 0.25);
-    if (n < 8.5) return float3(0.95, 0.85, 0.10);
-    if (n < 16.5) return float3(0.95, 0.15, 0.08);
+    if (n < 0.5) return float3(0.02);
+    if (n < 1.5) return float3(0.03, 0.06, 0.40);
+    if (n < 2.5) return float3(0.08, 0.30, 0.95);
+    if (n < 3.5) return float3(0.10, 0.80, 0.85);
+    if (n < 4.5) return float3(0.12, 0.80, 0.20);
+    if (n < 6.5) return float3(0.95, 0.85, 0.10);
+    if (n < 9.5) return float3(0.98, 0.45, 0.05);
+    if (n < 15.5) return float3(0.90, 0.08, 0.06);
     return float3(1.0);
 }
 
@@ -66,7 +70,7 @@ static float debugShade(DebugSurface s, constant FrameUniforms& f) {
 
 static float3 debugSurfaceColor(int mode, DebugSurface s, constant FrameUniforms& f) {
     float shade = debugShade(s, f);
-    if (mode == kDbgWireframe) return float3(0.16, 0.17, 0.19) * shade;
+    if (mode == kDbgWireframe) return float3(0.045, 0.05, 0.06) * shade;
     if (mode == kDbgUnshaded) return s.albedo + s.emissive;
     if (mode == kDbgCascades) {
         float d = dot(s.worldPos - f.cameraPos.xyz, f.cameraForward.xyz);
@@ -85,10 +89,12 @@ static float3 debugSurfaceColor(int mode, DebugSurface s, constant FrameUniforms
     }
     if (mode == kDbgUvChecker) {
         float2 c = floor(s.uv * 8.0);
-        float check = fmod(abs(c.x + c.y), 2.0);
+        float check = fmod(abs(c.x + c.y), 2.0) > 0.5 ? 1.0 : 0.3;
+        float2 w = fwidth(s.uv * 8.0);
+        check = mix(0.65, check, saturate(1.5 - max(w.x, w.y) * 1.5));  // fade to gray where cells go sub-pixel
         float2 uvf = fract(s.uv);
         float3 tint = float3(0.35 + 0.65 * uvf.x, 0.35 + 0.65 * uvf.y, 0.6);
-        return tint * (check > 0.5 ? 1.0 : 0.3) * shade;
+        return tint * check * shade;
     }
     if (mode == kDbgTexelDensity) {
         if (s.texSize <= 1.5) return float3(0.4) * shade;

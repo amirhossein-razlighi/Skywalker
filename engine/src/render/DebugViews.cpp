@@ -20,16 +20,16 @@ const std::vector<DebugViewInfo>& debugViews() {
         {kImpostors, "impostors", "final", "final image with foliage meshes tinted green and distant impostors magenta"},
         {kWireframe, "wireframe", "final", "dark flat-shaded surfaces with every mesh triangle edge drawn in cyan (depth-tested)"},
         {kOverdraw, "overdraw", "surface",
-         "how many mesh fragments land on each pixel, no depth test: black 0, blue 1-2, green 3-4, yellow 5-7, "
-         "red 8+ (meshes and transparent meshes; terrain and GPU foliage are not counted)"},
+         "fragments shaded per pixel with no depth test (meshes, terrain, foliage, impostors): black 0, dark blue 1, "
+         "blue 2, cyan 3, green 4, yellow 5-6, orange 7-9, red 10-15, white 16+"},
         {kUnshaded, "unshaded", "surface", "albedo + emission with no lighting, shadows or fog"},
         {kLightingOnly, "lighting_only", "surface",
          "the lighting on a white material (albedo 1): judge light placement, shadows and GI without textures"},
         {kShadowCascades, "shadow_cascades", "surface",
          "sun shadow cascade per pixel: red 0 (nearest), green 1, blue 2, yellow 3, gray = beyond the shadow distance"},
         {kLightComplexity, "light_complexity", "surface",
-         "point/spot lights evaluated per pixel (light clusters): black 0, blue 1-2, green 3-4, yellow 5-8, red 9-16, "
-         "white 17+"},
+         "point/spot lights evaluated per pixel (its light cluster): black 0, dark blue 1, blue 2, cyan 3, green 4, "
+         "yellow 5-6, orange 7-9, red 10-15, white 16+"},
         {kLod, "lod", "surface",
          "mesh level of detail: green LOD0, yellow 1, orange 2, red 3, magenta 4+; foliage meshes by distance band, "
          "impostors purple, terrain by CDLOD node level"},
@@ -37,7 +37,8 @@ const std::vector<DebugViewInfo>& debugViews() {
         {kSpecular, "specular", "surface",
          "specular reflectance F0 scaled by glossiness: dielectrics dark gray, metals their tint, rough surfaces darker"},
         {kUvChecker, "uv_checker", "surface",
-         "a checker on UV0 (8x8 per UV tile, hue = U/V position): stretching, seams and flipped UVs"},
+         "a checker on UV0 (8x8 cells per 0..1 UV tile, red/green tint = U/V position): stretching, seams and flipped "
+         "UVs; terrain shows one cell per texture repeat"},
         {kTexelDensity, "texel_density", "surface",
          "base-color texels per meter: blue < 128, cyan 256, green 512 (target), yellow 1024, red > 2048; gray = "
          "untextured"},

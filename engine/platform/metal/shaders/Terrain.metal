@@ -267,8 +267,8 @@ fragment MainOut terrainFragment(TerrainOut in [[stage_in]],
         DebugSurface ds;
         ds.worldPos = wp;
         ds.N = N;
-        ds.uv = wp.xz * tu.layerParams[0].x;  // layer 0 texture coordinates
-        ds.texUV = ds.uv;
+        ds.texUV = wp.xz * tu.layerParams[0].x;  // layer 0 texture coordinates
+        ds.uv = ds.texUV * 0.125;                // uv_checker: one check per texture repeat
         ds.texSize = l0a.get_width() > 1 ? float(l0a.get_width()) : 0.0;
         ds.albedo = s.albedo;
         ds.emissive = overlayGlow;

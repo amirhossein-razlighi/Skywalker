@@ -108,6 +108,7 @@ private:
     id<MTLComputePipelineState> cull_;
     id<MTLRenderPipelineState> mesh_, meshCutout_, meshShadow_, meshShadowAlpha_;
     id<MTLRenderPipelineState> impostor_, impostorShadow_, bake_;
+    id<MTLRenderPipelineState> overdrawMesh_, overdrawImpostor_;  // [debug views] overdraw counting
     id<MTLDepthStencilState> bakeDepth_;
 
     // Per frame: the chunks to draw and their GPU-written lists / indirect arguments.

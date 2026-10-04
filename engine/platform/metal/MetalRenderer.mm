@@ -914,7 +914,8 @@ private:
         id<MTLRenderPipelineState> wire = motionVec ? make("meshVertex", "wireframeFragment", kHDRFormat, kSamples, Blend::Alpha, true, &e, true) : nil;
         id<MTLRenderPipelineState> overdraw = wire ? make("meshVertex", "overdrawFragment", kHDRFormat, kSamples, Blend::Additive, true, &e, true) : nil;
         id<MTLRenderPipelineState> terrainWire = overdraw ? make("terrainVertex", "wireframeFragment", kHDRFormat, kSamples, Blend::Alpha, true, &e, true) : nil;
-        if (!terrainWire) volume = nil;
+        id<MTLRenderPipelineState> terrainOverdraw = terrainWire ? make("terrainVertex", "overdrawFragment", kHDRFormat, kSamples, Blend::Additive, true, &e, true) : nil;
+        if (!terrainOverdraw) volume = nil;
         if (volume) {
             for (const char* k : {"fluidAdvect", "fluidCorrect", "fluidCombust", "fluidCurl", "fluidForces", "fluidDivergence",
                                   "fluidJacobi", "fluidProject"}) {
@@ -978,6 +979,7 @@ private:
         wireframePipeline_ = wire;
         overdrawPipeline_ = overdraw;
         terrainWirePipeline_ = terrainWire;
+        terrainOverdrawPipeline_ = terrainOverdraw;
         if (fx_) fx_->build(lib, FxFormats{kHDRFormat, kGbufAFormat, kGbufBFormat, kDepthFormat, kSamples, kShadowAtlas / 2});  // [hair+vfx]
         if (pipelineCache_) pipelineCache_->setBypass(false);
         libraryMs_ = libMs;  // [shader cache] engine_info.shaders
@@ -2046,8 +2048,8 @@ private:
         [enc endEncoding];
     }
 
-    /// [debug views] overdraw: every mesh fragment adds 1 (no depth test, no sky); the debug
-    /// pass turns the counts into a heat map.
+    /// [debug views] overdraw: every mesh, terrain and foliage fragment adds 1 (no depth test, no
+    /// sky); the debug pass turns the counts into a heat map.
     void encodeOverdraw(id<MTLRenderCommandEncoder> enc, const FrameData& frame, const FrameUniforms& fu) {
         [enc setVertexBytes:&fu length:sizeof(fu) atIndex:2];
         [enc setFragmentBytes:&fu length:sizeof(fu) atIndex:1];
@@ -2059,6 +2061,10 @@ private:
             if (frustum.intersects(d.worldBounds)) drawMesh(enc, d);
             else ++culled_;
         }
+        terrainNodesDrawn_ = 0;
+        drawTerrains(enc, frame, frustum, terrainOverdrawPipeline_);
+        [enc setDepthStencilState:depthNone_];
+        foliage_->encodeMain(enc, frame);  // uses its overdraw pipelines in this view
     }
 
     // --- Effects: FFT water and particles (single-sample, over the resolved scene) -----------
@@ -2950,7 +2956,7 @@ private:
     std::string shaderLibraryOrigin_ = "source", shaderNote_, builtinSource_;
     double libraryMs_ = 0, pipelinesMs_ = 0, startupMs_ = 0;
     // [debug views]
-    id<MTLRenderPipelineState> wireframePipeline_, overdrawPipeline_, terrainWirePipeline_;
+    id<MTLRenderPipelineState> wireframePipeline_, overdrawPipeline_, terrainWirePipeline_, terrainOverdrawPipeline_;
 };
 
 }  // namespace
