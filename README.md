@@ -14,88 +14,83 @@ Skywalker is a C++20 game engine with a native macOS editor, designed so that AI
 precisely, **test** what they built, and **collaborate** with you — through the very same
 interface the editor uses.
 
-> **Status: v0.0.1** — an early, working foundation. macOS / Apple Silicon (Metal) first;
-> the architecture is backend- and OS-agnostic. See [ROADMAP](docs/ROADMAP.md).
+> **Status: v0.1 (pre-release).** macOS / Apple silicon (Metal) first; the core is
+> platform-agnostic and has a CPU renderer for headless use. See [ROADMAP](docs/ROADMAP.md).
 
 ## Highlights
 
-- **One tool surface for everyone.** 57 typed, schema-validated tools (scene, entities,
-  world/spatial, behaviors, simulation, viewport, lighting, effects, history, assets,
-  materials, prefabs, shaders). The editor UI, the
-  in-editor agents and external agents over **MCP** all use them. Errors come with
+### Built for agents
+- **Everything is a tool.** 160+ typed, schema-validated tools cover scenes, entities, worlds,
+  terrain, foliage, materials, lighting, effects, physics, navigation, animation, sequences,
+  2D, UI, dialogue, audio, assets, Blender, the studio, movies and shipping. The editor, its
+  in-app agents and external agents over **MCP** all use the same surface; errors come with
   `did you mean …?` hints. → [docs/TOOLS.md](docs/TOOLS.md)
-- **Agents can see.** `viewport_capture` returns a PNG plus every visible entity's screen
-  box; `annotate` draws `#id` labels on the image ("set-of-mark" prompting), so a vision
-  model can name exactly what it is looking at.
-- **ECPS — Entity · Component · Prompt System.** Every behavior is a natural-language
-  **intent** paired with deterministic **Wander** code. People and agents edit either side;
-  "Weave" turns intent into code and verifies it in simulation. → [docs/WANDER.md](docs/WANDER.md)
-- **Wander** is safe by construction: no unbounded loops (every handler terminates),
-  seeded randomness (replayable), execution budgets, precise diagnostics.
-- **Everything is undoable and attributed.** Transactional history records *who* did each
-  change (you, `agent:Nimbus`, `mcp:claude-code`); `batch` makes many edits atomic.
-- **Deterministic simulation** with fixed 60 Hz ticks: agents test gameplay with
-  `sim_control step` + `sim_input`, then `stop` restores the scene.
-- **A studio of agents.** A roster of specialists (directors, producers, designers,
-  programmers, artists, audio, writers, playtesters, critics — each with a role and a focus),
-  a task board, feedback with the director's verdicts and their measured effect, playtest
-  bots that actually play, and user-defined loops (playtest → triage → fix → verify) that run
-  in the editor, headless (`skywalker studio run`) or driven by Claude Code / Codex. Agents
-  are designed in the **Agent Designer** (model, mission, instructions, per-category
-  permissions, memory, usage) and shared as `agents/*.agent.json`. Bring Anthropic, any
-  OpenAI-compatible API, or local models (Ollama, LM Studio, vLLM). → [docs/STUDIO.md](docs/STUDIO.md)
-- **An asset system agents can use.** Stable GUIDs, tags, descriptions and generator
-  provenance in `.meta` sidecars; glTF/GLB, OBJ+MTL, PLY (vertex colors) and STL import;
-  `asset_download` fetches openly licensed models from the web (with your approval, license
-  tracking and an auto-maintained `CREDITS.md`); materials and prefabs as files;
-  rendered previews; "who uses this?" queries; safe renames. → [docs/ASSETS.md](docs/ASSETS.md)
-- **Spatial tools.** Triangle-accurate `raycast`, `place_on_surface`, seeded `scatter`
-  (forests in one undo step), four-view `viewport_multi`, and `sim_trace` to verify
-  gameplay numerically.
-- **Realistic or stylized, your call.** Metal/roughness PBR with normal, ORM and emissive
-  maps, triplanar projection, clearcoat and subsurface; image-based lighting from the sky,
-  4-cascade soft shadows, SSAO, an atmospheric sky with clouds and stars, height fog, bloom
-  and AgX/ACES/neutral tonemapping. Or flip a material to `toon` with outlines. Agents can
-  generate seamless PBR textures (`texture_generate`) and start from material presets.
-  Photographed HDRI skies light the scene. → [docs/RENDERING.md](docs/RENDERING.md)
-- **Simulated effects.** Fire, smoke, steam and explosions as a real GPU fluid simulation
-  (3D Eulerian solver: combustion, buoyancy, vorticity, pressure projection), ray-marched with
-  blackbody flames and lit, self-shadowed smoke. An FFT ocean (JONSWAP wind waves, choppy
-  crests, persistent whitecaps, shore surf, caustics, refraction, depth color, screen-space
-  reflections) that gameplay can query, so boats ride the waves you see. Volumetric light
-  shafts. Deterministic particles for embers, rain with splashes, snow, mist and sparks.
-  One `fx_create` call from a preset; `burst()` / `water_height()` in Wander.
-- **Generative assets ready.** `asset_request` / `asset_complete` route 3D, texture,
-  sprite, audio, music and video requests to generators and record what prompt made each file.
-- **Pro editor.** Outliner, details with reflected properties and scrubbable fields,
-  move/rotate/scale gizmos with snapping, Metal viewport with PBR, sun shadows, MSAA,
-  selection outlines, stats, console, activity feed.
+- **Agents can see.** `viewport_capture` returns an image plus every visible entity's screen box,
+  with optional `#id` labels (set-of-mark prompting), buffer views (albedo, normals, GI, AO,
+  depth…), clay and pencil-sketch looks, and supersampled stills.
+- **Native in your agent.** `skywalker setup claude|codex|gemini|cursor` installs the MCP server,
+  13 skills, studio-role subagents and commands. → [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md)
+- **A studio of agents.** Directors, designers, programmers, artists and playtesters with roles
+  and focus areas; a shared board; playtest bots that really play; feedback the director accepts,
+  defers or drops with measured effect; user-defined loops (playtest → triage → fix → verify).
+  Anthropic, OpenAI-compatible and local models. → [docs/STUDIO.md](docs/STUDIO.md)
+- **Undoable and attributed.** Every edit records who made it (you, `agent:Nimbus`,
+  `mcp:claude-code`); deterministic 60 Hz simulation lets agents test gameplay and replay it.
+
+### From words to native code
+- **Wander** turns a natural-language intent into deterministic behavior code: functions,
+  collections, coroutines, state machines, types, modules and tests on a register VM, a
+  Blueprint-style graph view of the same code, and ahead-of-time compilation to C++ native
+  modules (up to 33× faster on hot loops). → [docs/WANDER.md](docs/WANDER.md)
+
+### Rendering tuned for Apple silicon
+- Deferred-style G-buffer with **clustered lighting** (1,000+ lights), screen-space **GI and
+  reflections**, temporal anti-aliasing, **MetalFX** upscaling, PBR with clearcoat and subsurface,
+  cascaded soft shadows and AO.
+- Physical **atmosphere** with ray-marched **volumetric clouds** and cloud shadows, light shafts,
+  height fog, an **FFT ocean**, GPU **fluid fire and smoke**, **GPU particles** (sub-emitters,
+  ribbons, flipbooks, collisions) and **strand hair** with Marschner shading.
+- Eroded **terrain** with splat layers and wet shorelines, instanced **foliage** with wind and
+  automatic LODs, auto exposure, depth of field, motion blur, looks and .cube LUTs.
+- An editor viewport that stays responsive (fast / balanced / full quality while editing), a
+  GPU-safe offline path, and a **Movie Render Queue** that renders sequences to HEVC / ProRes with
+  real motion blur. → [docs/RENDERING.md](docs/RENDERING.md), [docs/MOVIE_RENDER.md](docs/MOVIE_RENDER.md)
+
+### A complete engine
+- **Physics** (Jolt) with characters, joints and queries; **navigation** (Recast/Detour);
+  **animation** with state machines, IK, retargeted glTF characters and a sequencer;
+  **audio** with spatial sound and procedural SFX/music; **2D** sprites, tilemaps and 2D lights;
+  **UI** layout with themes and SDF text; a **dialogue** language.
+- **Assets:** GUIDs, tags and provenance; glTF/OBJ/PLY/STL import; licensed web downloads with
+  automatic credits; procedural PBR textures; a **Blender bridge** that models and imports.
+- **Ship it:** `skywalker build` packages a project as a signed macOS app around the standalone
+  player. → [docs/SHIPPING.md](docs/SHIPPING.md)
 
 ## Quick start
 
 Requirements: macOS 15+, Xcode 16+ command-line tools, CMake ≥ 3.29, Ninja.
 
 ```bash
-cmake --preset debug
+cmake --preset release
 ```
 
 ```bash
-cmake --build --preset debug
+cmake --build --preset release
 ```
 
 ```bash
-ctest --preset debug
+ctest --preset release
 ```
 
-Run the editor with the example project:
+Run the editor with an example project (File › Open Project… switches later):
 
 ```bash
-open build/debug/bin/Skywalker.app --env SKY_PROJECT="$PWD/examples/hello_sky"
+open build/release/bin/Skywalker.app --args --project "$PWD/examples/hello_sky"
 ```
 
 ### Use with Claude Code / Codex / Gemini / Cursor
 
-One command wires a tool to Skywalker: the MCP server (attaches to the running editor, otherwise runs headless), twelve `skywalker-*` skills (the agent loop, world
+One command wires a tool to Skywalker: the MCP server (attaches to the running editor, otherwise runs headless), thirteen `skywalker-*` skills (the agent loop, world
 building, look development, assets, Blender, audio, the multi-agent studio, ...), eight studio-role subagents and five workflow commands.
 
 ```bash
@@ -105,12 +100,12 @@ skywalker setup claude          # or codex | gemini | cursor | all   (add --glob
 Claude Code also ships as a plugin (`claude plugin marketplace add <this repo>` then `claude plugin install skywalker@skywalker`), Gemini CLI as an extension
 (`gemini extensions install integrations/gemini`). The same server exposes the docs, skills, the tool catalogue and the live studio as MCP resources and prompts.
 Setup merges into existing configs and backs up what it changes. Details, role mapping across tools, and SDK examples (OpenAI Agents SDK, Anthropic tool runner):
-[docs/INTEGRATIONS.md](docs/INTEGRATIONS.md). By hand: `claude mcp add skywalker -- "$PWD/build/debug/bin/skywalker" mcp --auto`.
+[docs/INTEGRATIONS.md](docs/INTEGRATIONS.md). By hand: `claude mcp add skywalker -- "$PWD/build/release/bin/skywalker" mcp --auto`.
 
 ### Headless CLI
 
 ```bash
-build/debug/bin/skywalker render examples/hello_sky/scenes/main.sky.json -o shot.png --annotate
+build/release/bin/skywalker render examples/hello_sky/scenes/main.sky.json -o shot.png --annotate
 ```
 
 `skywalker run SCENE --ticks 600` simulates deterministically and prints logs;
@@ -131,18 +126,27 @@ directly. Settings live in `game.json`. → [docs/SHIPPING.md](docs/SHIPPING.md)
 | Doc | What's inside |
 |---|---|
 | [ARCHITECTURE](docs/ARCHITECTURE.md) | Layers, threading, data flow, design decisions |
-| [WANDER](docs/WANDER.md) | The behavior language and the ECPS model |
+| [PLAN](docs/PLAN.md) | Intent, gap analysis against Unity/Unreal, workstreams |
 | [AGENTS](docs/AGENTS.md) | MCP, the crew, Agent Designer, providers, generative assets |
-| [SHIPPING](docs/SHIPPING.md) | Build a game into a macOS app: the standalone player, `game.json` settings, packaging, signing |
-| [INTEGRATIONS](docs/INTEGRATIONS.md) | Skills, subagents and setup for Claude Code, Codex, Gemini CLI and Cursor; MCP resources and prompts |
+| [STUDIO](docs/STUDIO.md) | Multi-agent studio: roles, board, feedback, playtests, loops |
+| [INTEGRATIONS](docs/INTEGRATIONS.md) | Skills, subagents and setup for Claude Code, Codex, Gemini CLI and Cursor |
+| [WANDER](docs/WANDER.md) | The behavior language, graphs, AOT and native modules |
+| [RENDERING](docs/RENDERING.md) | The frame, lighting, sky and clouds, terrain and foliage, camera, debug views, performance |
+| [MOVIE_RENDER](docs/MOVIE_RENDER.md) | Offline cinematic renders to H.264 / HEVC / ProRes / PNG with motion blur |
+| [HAIR_AND_VFX](docs/HAIR_AND_VFX.md) | GPU particles and strand hair |
+| [PHYSICS](docs/PHYSICS.md) | Rigid bodies, characters, joints, queries, navigation |
+| [ANIMATION](docs/ANIMATION.md) | Skeletal animation, state machines, IK, sequencer |
+| [AUDIO](docs/AUDIO.md) | Spatial audio, mixer, procedural sound |
+| [2D_AND_UI](docs/2D_AND_UI.md) | Sprites, tilemaps, 2D lights, text, UI, dialogue |
+| [INPUT](docs/INPUT.md) | Actions, keyboard, mouse, gamepads |
 | [ASSETS](docs/ASSETS.md) | Asset database, glTF, materials, prefabs, spatial tools |
-| [RENDERING](docs/RENDERING.md) | PBR + toon surfaces, IBL, cascaded shadows, SSAO, sky, post, recipes |
-| [MOVIE_RENDER](docs/MOVIE_RENDER.md) | Movie Render Queue: offline cinematic renders to H.264 / HEVC / ProRes / PNG with motion blur, progress, resume |
+| [DCC](docs/DCC.md) | Blender and other DCC bridges |
+| [SHIPPING](docs/SHIPPING.md) | Standalone player, `game.json`, packaging, signing |
 | [BRAND](docs/BRAND.md) | Logo, app icon, colors, typography |
 | [TOOLS](docs/TOOLS.md) | Generated reference of every tool |
 | [DEVELOPMENT](docs/DEVELOPMENT.md) | Building, testing, sanitizers, profiling, conventions |
 | [ROADMAP](docs/ROADMAP.md) | What's next |
-| [LICENSING](docs/LICENSING.md) | Licensing model (draft — please read) |
+| [LICENSING](docs/LICENSING.md) | Licensing model (draft, please read) |
 
 ## License
 

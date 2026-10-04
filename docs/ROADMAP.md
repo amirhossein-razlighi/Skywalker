@@ -1,53 +1,39 @@
 # Roadmap
 
-## v0.0.1 (this release)
+## v0.1 (pre-release, this branch)
 
-- C++20 engine core:
-  - reflected components and an ECS with stable ids;
-  - transactional, attributed undo and redo;
-  - deterministic simulation.
-- Wander language and the ECPS model (intent + code): compiler diagnostics, safe runtime.
-- Metal renderer:
-  - PBR shading, sun shadows, MSAA;
-  - selection outline and transform gizmos;
-  - runtime-compiled, hot-reloadable shaders;
-  - a CPU fallback.
-- 35 agent tools; an MCP server (stdio plus attach-to-editor socket); C API; headless CLI.
-- SwiftUI editor:
-  - panels: outliner, details, assets, console, activity, agents, pipelines;
-  - gizmos, stats, and a status bar.
-- Crew agents: Anthropic and OpenAI-compatible providers, with autonomy levels, approvals,
-  delegation, pipelines, and Weave.
+The ground-up expansion described in [PLAN](PLAN.md):
 
-## v0.0.2 (in progress)
-
-- **Asset system:**
-  - GUID `.meta` sidecars, tags, descriptions and generator provenance;
-  - search, usage queries, safe moves, rendered previews.
-- **Formats:** glTF 2.0 / GLB import; material assets; prefabs, including Wander `spawn("prefab:…")`.
-- **World tools:** `raycast`, `place_on_surface`, `scatter`, `viewport_multi`, `sim_trace`, `perf_stats`. 57 tools in total.
-- **Rendering:** PBR maps, triplanar, clearcoat/subsurface, toon + outlines, IBL, 4 shadow cascades, SSAO, atmospheric sky with clouds and stars, height fog, AgX/neutral/filmic tonemapping; procedural PBR textures (`texture_generate`, 21 kinds) and material presets.
-- **Import:** PLY (ascii/binary, vertex colors), STL, OBJ + MTL, glTF maps; `asset_download` for licensed web assets (zip packs, multi-file glTF), credits and provenance.
-- **Brand:** app icon, glyph, favicon, lockups, `docs/BRAND.md`.
+- **Agents first:**
+  - 160+ tools over MCP, the editor socket and the C API;
+  - 13 skills, subagents and setup for Claude Code, Codex, Gemini CLI and Cursor;
+  - a multi-agent studio with roles, board, feedback triage, playtest bots and user-defined loops.
+- **Wander 2:**
+  - register VM; functions, collections, coroutines, state machines, types, modules and tests;
+  - builtin registry, graph view, ahead-of-time C++ and native modules.
 - **Rendering:**
-  - HDR pipeline with bloom, ACES, saturation/contrast grading and vignette;
-  - texture tiling, unlit materials, frustum culling.
-- **Editor:**
-  - asset browser with thumbnails and drag-and-drop placement;
-  - asset pickers in Details; Save as Prefab.
-- **Agents:**
-  - Agent Designer: mission, instructions, per-category permissions, memory, usage;
-  - project agent files; parallel pipeline stages.
+  - G-buffer, clustered lighting, screen-space GI and reflections, TAA, MetalFX upscaling;
+  - atmosphere with volumetric clouds, terrain with erosion, instanced foliage with LODs and a triangle budget;
+  - camera post: exposure, DOF, motion blur, LUTs;
+  - debug, clay and sketch views;
+  - GPU particles, strand hair, FFT ocean, GPU fluids;
+  - editor quality tiers; GPU-fault detection and a cross-process GPU job lock.
+- **Engine:**
+  - Jolt physics, Recast navigation, skeletal animation and a sequencer, spatial audio, input actions;
+  - 2D sprites, tilemaps and lights; UI layout and SDF text; dialogue.
+- **Production:**
+  - Blender bridge;
+  - Movie Render Queue (HEVC/ProRes, motion blur);
+  - standalone player and `skywalker build` into signed macOS apps.
 
 ## Next
 
 | Area | Planned work |
 |---|---|
-| Rendering | GPU instancing; cascaded shadows; IBL environment maps; glTF skinning/animation and multi-material meshes; sprite atlases and a proper 2D renderer; GPU picking ID buffer |
-| Platforms | Vulkan backend (Windows/Linux), then D3D12; an editor shell for non-Mac platforms |
-| Physics | Collision shapes, rigid bodies and triggers (`on touch "Name"` in Wander), character controller |
-| Audio | Audio engine and playback of `audio`/`music` assets; Wander `play "sound"` |
-| Wander | Coroutine-style `wait`, modules, debugger (breakpoints, watch), bytecode VM |
-| Agents | Built-in generator adapters (image, 3D, audio, music); MCP resources (scene, docs) and prompts; spending limits on top of usage tracking; screenshot diffing for visual review; agent-designed pipelines |
-| Editor | Multi-select editing, prefab overrides and nested prefab sync, play-in-editor game window, undo history panel, layouts, keyboard shortcut editor |
-| Production | Packaging and export of standalone games; asset pipeline with import settings; plugin API |
+| Rendering | Foliage impostors / HLOD; virtual shadow maps; hardware ray-traced reflections and GI on M3+; skin subsurface profiles; decals; virtualized geometry for scanned assets |
+| Platforms | Vulkan backend (Windows/Linux), then D3D12; iOS player; an editor shell for non-Mac platforms |
+| World | World partition / streaming for very large maps; road and spline tools; procedural city kit |
+| Wander | Debugger (breakpoints, watch, step) in the editor; hot-reload of native modules |
+| Agents | Built-in generator adapters (image, 3D, audio); screenshot diffing for visual review; spending limits per loop |
+| Editor | Multi-select editing, prefab overrides, docking layouts, a timeline editor for sequences, profiler panel |
+| Shipping | Developer ID signing and notarization automation, App Store packaging, save games, localization |
