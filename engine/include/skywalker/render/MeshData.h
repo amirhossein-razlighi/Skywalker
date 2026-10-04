@@ -123,7 +123,8 @@ struct LoadOptions {
     bool turnAround = false;  // rotate 180 degrees around Y (rigged glTF characters: +Z -> -Z forward)
     int part = -2;  // glTF: one material's triangles (see Gltf.h); -2 = the whole model
 };
-/// "model.gltf#3" -> {"model.gltf", 3}; no fragment -> part -2.
+/// "model.gltf#3" -> {"model.gltf", 3}; no fragment -> part -2. A per-instance skinned-copy suffix
+/// ("model.glb@skin12", "model.glb#3@skin12") is ignored, so posed copies resolve to their source model.
 std::pair<std::string, int> splitPart(const std::string& ref);
 /// Loads .obj / .ply / .stl / .glb / .gltf by extension (geometry only; see Gltf.h and
 /// loadObjWithMaterial for materials).

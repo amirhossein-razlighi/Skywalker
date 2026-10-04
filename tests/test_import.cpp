@@ -286,3 +286,13 @@ TEST_CASE("import: asset_download fetches, credits, imports (multi-file glTF fro
     REQUIRE(def);
     CHECK(def->openWorld);
 }
+
+TEST_CASE("import: mesh part references, including posed skinned copies") {
+    using sky::mesh::splitPart;
+    using Ref = std::pair<std::string, int>;
+    CHECK(splitPart("models/a.glb#3") == Ref{"models/a.glb", 3});
+    CHECK(splitPart("models/a.glb") == Ref{"models/a.glb", -2});
+    // the renderer keys a posed copy per entity; it must still resolve to the source model and part
+    CHECK(splitPart("models/bird.glb@skin414") == Ref{"models/bird.glb", -2});
+    CHECK(splitPart("models/a.glb#2@skin7") == Ref{"models/a.glb", 2});
+}
