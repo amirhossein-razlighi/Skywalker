@@ -5,6 +5,7 @@
 #include <cmath>
 #include <filesystem>
 
+#include "skywalker/core/FileTime.h"
 #include "skywalker/core/Log.h"
 #include "skywalker/ecs/Reflection.h"
 #include "skywalker/render/Impostor.h"
@@ -15,12 +16,7 @@ namespace fs = std::filesystem;
 
 namespace {
 
-int64_t mtimeOf(const std::string& path) {
-    std::error_code ec;
-    auto t = fs::last_write_time(path, ec);
-    if (ec) return -1;
-    return std::chrono::duration_cast<std::chrono::nanoseconds>(t.time_since_epoch()).count();
-}
+int64_t mtimeOf(const std::string& path) { return fileModifiedNs(path); }
 
 uint64_t fnv(const std::string& s, uint64_t h = 1469598103934665603ull) {
     for (unsigned char c : s) h = (h ^ c) * 1099511628211ull;

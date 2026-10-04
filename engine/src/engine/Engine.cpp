@@ -22,6 +22,7 @@
 
 #include "skywalker/agent/CustomTools.h"
 #include "skywalker/agent/SocketServer.h"
+#include "skywalker/core/FileTime.h"
 #include "skywalker/core/Log.h"
 #include "skywalker/core/Profiler.h"
 #include "skywalker/core/Strings.h"
@@ -966,12 +967,7 @@ std::optional<audio::ListenerPose> Engine::listenerPose() {
 
 namespace {
 
-int64_t fileTime(const std::string& path) {
-    std::error_code ec;
-    auto t = fs::last_write_time(path, ec);
-    if (ec) return -1;
-    return std::chrono::duration_cast<std::chrono::nanoseconds>(t.time_since_epoch()).count();
-}
+int64_t fileTime(const std::string& path) { return fileModifiedNs(path); }
 
 Result<Json> readJson(const std::string& path) {
     std::ifstream f(path);
@@ -1499,9 +1495,8 @@ const ResolvedMaterial* Engine::resolveMaterial(const std::string& path) {
     double now = monotonicSeconds();
     if (now - c.checkedAt < 1.0) return c.ok ? &c.material : nullptr;  // hot path: many lookups per frame
     c.checkedAt = now;
-    std::error_code ec;
-    auto t = fs::last_write_time(resolvePath(rel), ec);
-    int64_t mtime = ec ? -2 : std::chrono::duration_cast<std::chrono::nanoseconds>(t.time_since_epoch()).count();
+    int64_t mtime = fileModifiedNs(resolvePath(rel));
+    if (mtime < 0) mtime = -2;  // missing: differs from the "never checked" -1
     if (c.mtime != mtime) {
         c.mtime = mtime;
         auto m = loadMaterial(resolvePath(rel));
@@ -1522,10 +1517,8 @@ Result<Json> Engine::loadPrefabAsset(const std::string& path) {
     if (auto it = prefabs_.find(rel); it != prefabs_.end() && it->second.mtime >= 0 && now - it->second.checkedAt < 1.0) {
         return it->second.prefab;
     }
-    std::error_code ec;
-    auto t = fs::last_write_time(resolvePath(rel), ec);
-    if (ec) return Error::make("not_found", "no prefab " + rel, "use asset_list type=prefab to see prefabs");
-    int64_t mtime = std::chrono::duration_cast<std::chrono::nanoseconds>(t.time_since_epoch()).count();
+    const int64_t mtime = fileModifiedNs(resolvePath(rel));
+    if (mtime < 0) return Error::make("not_found", "no prefab " + rel, "use asset_list type=prefab to see prefabs");
     CachedPrefab& c = prefabs_[rel];
     c.checkedAt = now;
     if (c.mtime != mtime) {

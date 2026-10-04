@@ -6,18 +6,14 @@
 #include <fstream>
 #include <vector>
 
+#include "skywalker/core/FileTime.h"
 #include "stb_image.h"
 
 namespace sky::render2d {
 
 namespace fs = std::filesystem;
 
-int64_t fileMTime(const std::string& path) {
-    std::error_code ec;
-    auto t = fs::last_write_time(path, ec);
-    if (ec) return -1;
-    return static_cast<int64_t>(t.time_since_epoch().count());
-}
+int64_t fileMTime(const std::string& path) { return fileModifiedNs(path); }
 
 Result<Image> decodeImage(const uint8_t* data, size_t size) {
     if (!data || size == 0 || size > static_cast<size_t>(INT32_MAX)) return Error::make("invalid_image", "empty image data");
