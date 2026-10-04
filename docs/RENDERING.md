@@ -301,6 +301,8 @@ precompiled `.metallib` removes.
 | `tiling` | Texture repeats. With `triplanar`, it is repeats per 2 m of world space. |
 | `triplanar` | World-space projection with whiteout normal blending. Textures never stretch on scaled cubes, walls or terrain. |
 | `clearcoat` | A second glossy lobe on top (car paint, varnish, ceramics). |
+| `clearcoatRoughness` | Material assets: the coat's own roughness (default 0.06; 0.02-0.04 for a polished lacquer, 0.2-0.3 for satin). |
+| `flakes`, `flakeSize` | Material assets: metallic flakes in the base layer (see [Car paint](#car-paint)). |
 | `subsurface` | Wrap diffuse plus back-light transmission (skin, leaves, wax, snow, ice). |
 | `rim` | Stylized silhouette light. |
 | `shading` | `pbr`, `toon` (banded light, crisp highlight, hemispheric fill) or `unlit`. |
@@ -310,6 +312,34 @@ precompiled `.metallib` removes.
 
 Color alpha below 1 makes a surface transparent: glass, water, ghosts, god rays. Such
 surfaces are sorted back to front and don't cast shadows.
+
+### Car paint
+
+Automotive paint is two layers: a colored base with metallic flakes, under a clear lacquer.
+The `car_paint` preset sets all of it; tune these material fields:
+
+```json
+{"tool": "material_create", "args": {"path": "materials/body.mat.json", "preset": "car_paint",
+  "color": "#0b2a4a", "metallic": 0.6, "roughness": 0.35, "clearcoat": 1, "clearcoatRoughness": 0.03,
+  "flakes": 0.35, "flakeSize": 0.0015}}
+```
+
+- **The coat** (`clearcoat`, `clearcoatRoughness`) is a separate GGX lobe on the smooth geometric
+  normal, so normal maps and flakes stay under it. In the G-buffer a coated pixel stores the coat
+  (its normal, roughness and strength), so reflection probes and screen-space reflections land on
+  the lacquer: the road, the bodywork and the scenery roll over the paint. The base layer under a
+  coat keeps the sky's image-based light.
+- **Flakes** (`flakes` 0..1 is their share of the base reflection; 0.3-0.5 for metallic paint,
+  0 for solid colors) are small mirrors tilted ~13 degrees around the base normal, one per cell
+  of a grid in the mesh's own space (so they stay put on a moving car). Each glints where it lines
+  up with the sun or a light and reflects its own patch of the environment, tinted by the base
+  color. `flakeSize` is in meters: real flakes are tens of microns, 1-2 mm reads as paint on
+  screen, larger looks like glitter.
+- **Level of detail:** where flakes get smaller than about a pixel, the grid coarsens by powers of
+  two (blended), each coarse cell standing for the average of four finer flakes: its tilt halves
+  and the spread it loses widens the flake lobe instead. Close-ups sparkle, distant cars get a
+  smooth metallic sheen, and nothing shimmers in between.
+- Debug view `material` shows the coat's roughness on coated pixels.
 
 ## Materials and textures for agents
 
@@ -762,8 +792,8 @@ lightmaps yet) and caster masks.
 - Toon outlines and distant hair cards write no object motion (they reproject with the camera
   only).
 - GI is screen-space: there is no world-space GI yet. Reflection probes fill what screen-space
-  reflections miss, but their captures leave out foliage, hair, particles and water. Opaque clearcoat layers
-  still reflect the sky. Probe captures are kept in GPU memory only (re-captured after a restart).
+  reflections miss, but their captures leave out foliage, hair, particles and water. The base layer under a
+  clearcoat reflects the sky (the coat gets probes and screen-space reflections). Probe captures are kept in GPU memory only (re-captured after a restart).
 - Transparent meshes don't refract (water does). Particles and fluid volumes render after
   transparent meshes.
 - Fluid volumes don't cast shadows on the scene yet.

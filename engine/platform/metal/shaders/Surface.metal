@@ -104,10 +104,10 @@ static float3 directSurfaceLight(SurfaceData s, float3 Ngeo, float3 worldPos, fl
     return max(color, 0.0);  // negative lights darken, never below black
 }
 
-// Image-based light of a surface from its environment light (EnvLight: sky cube or reflection probes)
-// and the clearcoat's sharp reflection `ccEnv`, plus the stylized rim light.
+// Image-based light of a surface from its environment light (EnvLight: sky cube or reflection probes),
+// the clearcoat's reflection `ccEnv` and the metallic flakes' `flakeEnv`, plus the stylized rim light.
 static float3 indirectSurfaceLight(SurfaceData s, float3 V, bool toon, float rim, constant FrameUniforms& f, EnvLight env,
-                                   float3 ccEnv, texture2d<float> brdfLut) {
+                                   float3 ccEnv, float3 flakeEnv, texture2d<float> brdfLut) {
     float ambientK = f.ground.w * 2.0;
     float NdotV = max(dot(s.N, V), 1e-4);
     float3 indirect;
@@ -123,8 +123,12 @@ static float3 indirectSurfaceLight(SurfaceData s, float3 V, bool toon, float rim
         float3 diffuse = env.irr * s.albedo * kd;
         float specOcclusion = saturate(pow(NdotV + s.ao, exp2(-16.0 * s.roughness - 1.0)) - 1.0 + s.ao);
         float3 specular = env.spec * Fr * specOcclusion;
+        if (s.flakes > 0.0) {
+            float2 abf = brdfLut.sample(linearClamp, float2(NdotV, 1.0 - s.flakeRoughness)).rg;
+            specular = mix(specular, flakeEnv * (mix(s.albedo, float3(1.0), 0.15) * abf.x + abf.y) * specOcclusion, s.flakes);
+        }
         if (s.clearcoat > 0.0) {
-            float Fc = 0.04 + 0.96 * pow(1.0 - NdotV, 5.0);
+            float Fc = 0.04 + 0.96 * pow(1.0 - max(dot(s.Nc, V), 1e-4), 5.0);
             specular = specular * (1.0 - Fc * s.clearcoat) + ccEnv * Fc * s.clearcoat;
             diffuse *= 1.0 - Fc * s.clearcoat;
         }
@@ -150,10 +154,13 @@ static float3 shadeSurface(SurfaceData s, float3 Ngeo, float3 worldPos, float2 f
     uint cluster;
     float3 color = directSurfaceLight(s, Ngeo, worldPos, fragXY, V, toon, f, lights, clusterCells, clusterIndices, shadowAtlas,
                                       cloudShape, localShadows, layers, cluster);
-    float3 ccEnv = 0.0;
-    if (s.clearcoat > 0.0) ccEnv = envTex.sample(cubeSampler, reflect(-V, Ngeo), level(0.06 * f.extra.z)).rgb * f.sky.w * f.ground.w;
+    float3 ccEnv = 0.0, flakeEnv = 0.0;
+    if (s.clearcoat > 0.0)
+        ccEnv = envTex.sample(cubeSampler, reflect(-V, s.Nc), level(s.coatRoughness * f.extra.z)).rgb * f.sky.w * f.ground.w;
+    if (s.flakes > 0.0)
+        flakeEnv = envTex.sample(cubeSampler, reflect(-V, s.Nf), level(s.flakeRoughness * f.extra.z)).rgb * f.sky.w * f.ground.w;
     EnvLight env = skyEnvLight(f, envTex, s.N, reflect(-V, s.N), s.roughness);
-    return color + indirectSurfaceLight(s, V, toon, rim, f, env, ccEnv, brdfLut);
+    return color + indirectSurfaceLight(s, V, toon, rim, f, env, ccEnv, flakeEnv, brdfLut);
 }
 
 // The same with reflection probes in the main pass: transparent meshes (no G-buffer for the resolve)
@@ -167,14 +174,20 @@ static float3 shadeSurfaceProbes(SurfaceData s, float3 Ngeo, float3 worldPos, fl
     uint cluster;
     float3 color = directSurfaceLight(s, Ngeo, worldPos, fragXY, V, toon, f, lights, clusterCells, clusterIndices, shadowAtlas,
                                       cloudShape, localShadows, layers, cluster);
-    float3 ccEnv = 0.0;
+    float3 ccEnv = 0.0, flakeEnv = 0.0;
     if (s.clearcoat > 0.0) {
-        float3 Rc = reflect(-V, Ngeo);
-        ccEnv = probeRadiance(probes, probeClusters, probeAtlas, cluster, worldPos, Rc, 0.06,
-                              envTex.sample(cubeSampler, Rc, level(0.06 * f.extra.z)).rgb * f.sky.w * f.ground.w, f.sky.w);
+        float3 Rc = reflect(-V, s.Nc);
+        ccEnv = probeRadiance(probes, probeClusters, probeAtlas, cluster, worldPos, Rc, s.coatRoughness,
+                              envTex.sample(cubeSampler, Rc, level(s.coatRoughness * f.extra.z)).rgb * f.sky.w * f.ground.w, f.sky.w);
+    }
+    if (s.flakes > 0.0) {
+        float3 Rf = reflect(-V, s.Nf);
+        flakeEnv = probeRadiance(probes, probeClusters, probeAtlas, cluster, worldPos, Rf, s.flakeRoughness,
+                                 envTex.sample(cubeSampler, Rf, level(s.flakeRoughness * f.extra.z)).rgb * f.sky.w * f.ground.w,
+                                 f.sky.w);
     }
     EnvLight env = environmentLight(f, probes, probeClusters, probeAtlas, envTex, cluster, worldPos, s.N, reflect(-V, s.N), s.roughness);
-    return color + indirectSurfaceLight(s, V, toon, rim, f, env, ccEnv, brdfLut);
+    return color + indirectSurfaceLight(s, V, toon, rim, f, env, ccEnv, flakeEnv, brdfLut);
 }
 
 // Height fog with a warm in-scatter toward the sun.
@@ -248,8 +261,46 @@ static MaterialSample evaluateMaterial(float3 worldPos, float3 normal, float2 uv
     }
     s.clearcoat = d.material3.x;
     s.subsurface = d.material3.y;
+    s.coatRoughness = clamp(d.material5.x, 0.02, 1.0);
+    s.Nc = m.Ngeo;
+    s.flakes = 0.0;  // meshShade applies them (applyFlakes)
+    s.flakeRoughness = 1.0;
+    s.Nf = s.N;
     m.s = s;
     return m;
+}
+
+static float3 hash33(float3 p) {
+    p = fract(p * float3(0.1031, 0.1030, 0.0973));
+    p += dot(p, p.yxz + 33.33);
+    return fract((p.xxy + p.yxx) * p.zyx);
+}
+
+// One random tangential tilt per object-space cell of size `cell` (a flake).
+static float3 flakeTilt(float3 objPos, float cell, float3 N) {
+    float3 r = hash33(floor(objPos / cell) + 0.5) * 2.0 - 1.0;
+    return r - N * dot(r, N);
+}
+
+// Metallic flakes (material `flakes`, `flakeSize`): object-space cells, so they stick to a moving car,
+// each a small mirror tilted around the base normal. Where cells get smaller than ~a pixel the grid
+// coarsens by powers of two (blended); a coarser cell stands for the average of four finer flakes, so
+// its tilt halves and the lost spread widens the flake lobe instead: glints at close range, a smooth
+// metallic sheen at a distance, and no shimmer in between.
+static void applyFlakes(thread SurfaceData& s, float3 objPos, float amount, float size) {
+    const float sigma0 = 0.22;  // tilt spread of single flakes (~13 degrees)
+    const float alpha0 = 0.12 * 0.12;  // a single flake's own lobe
+    size = max(size, 1e-5);
+    float footprint = max(length(fwidth(objPos)), 1e-7);
+    float lod = clamp(log2(footprint * 1.5 / size), 0.0, 14.0);
+    float l0 = floor(lod), t = lod - l0;
+    float c0 = size * exp2(l0);
+    float3 tilt = mix(flakeTilt(objPos, c0, s.N) * exp2(-l0), flakeTilt(objPos, c0 * 2.0, s.N) * exp2(-l0 - 1.0), t);
+    s.Nf = normalize(s.N + tilt * sigma0);
+    float sigma = sigma0 * exp2(-lod);
+    float lost = sigma0 * sigma0 - sigma * sigma;
+    s.flakeRoughness = clamp(sqrt(sqrt(alpha0 * alpha0 + lost)), 0.045, 1.0);
+    s.flakes = saturate(amount);
 }
 
 // Lit meshes. kProbes: reflection probes in the main pass (meshFragmentProbes: transparent meshes and
@@ -332,6 +383,18 @@ static MainOut meshShade(MeshOut in, bool frontFacing, constant DrawUniforms& d,
     alpha = sqrt(alpha * alpha + min(2.0 * variance, 0.18));
     s.roughness = clamp(sqrt(alpha), 0.045, 1.0);
     bool toon = shading == 1;
+    // Car paint: the lacquer's roughness widens with the geometric normal's variance only (normal maps
+    // and flakes lie under it), then the flakes.
+    if (s.clearcoat > 0.0) {
+        float3 dg = fwidth(Ngeo);
+        float ac = s.coatRoughness * s.coatRoughness;
+        ac = sqrt(ac * ac + min(0.5 * dot(dg, dg), 0.18));
+        s.coatRoughness = clamp(sqrt(ac), 0.02, 1.0);
+    }
+    if (d.material5.y > 0.0 && shading == 0) {
+        float3 objPos = (transpose(d.normalMatrix) * float4(in.worldPos, 1.0)).xyz;  // inverse(model) = normalMatrix^T
+        applyFlakes(s, objPos, d.material5.y, d.material5.z);
+    }
 
     // Render layers of this draw (DrawUniforms.motion.y; 0 = unset, e.g. mesh particles: layer 1).
     const uint layers = d.motion.y > 0.5 ? uint(d.motion.y) : 1u;
@@ -346,7 +409,11 @@ static MainOut meshShade(MeshOut in, bool frontFacing, constant DrawUniforms& d,
 
     // Toon and legacy water keep their stylized ambient: no screen-space GI/reflections.
     bool screenSpace = !toon && shading != 3;
-    MainOut o = mainOut(float4(color, s.alpha), s.albedo, s.ao, s.N, s.roughness, screenSpace ? s.metallic : kGbufNoLighting);
+    // Clearcoated surfaces hand the resolve their coat (normal, roughness, strength): its reflections
+    // get the probes and screen-space reflections; the base layer keeps the sky's.
+    bool coat = screenSpace && s.clearcoat > 0.02;
+    MainOut o = mainOut(float4(color, s.alpha), s.albedo, s.ao, coat ? s.Nc : s.N, coat ? s.coatRoughness : s.roughness,
+                        coat ? gbufCoatEncode(s.metallic, s.clearcoat) : (screenSpace ? s.metallic : kGbufNoLighting));
     o.velocity = objectMotion(f, in.worldPos, in.prevWorldPos);
     return o;
 }

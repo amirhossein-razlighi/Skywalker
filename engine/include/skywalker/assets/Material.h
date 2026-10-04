@@ -36,6 +36,10 @@ struct MaterialAsset {
     bool doubleSided = false;
     float occlusionStrength = 1.f;  // how much the ORM map's red channel darkens indirect light
     float alphaCutoff = 0.f;        // > 0: alpha-tested cutout (foliage, sails, fences)
+    // Car paint: the clearcoat's own roughness, and metallic flakes in the base layer (docs/RENDERING.md "Car paint").
+    float clearcoatRoughness = 0.06f;
+    float flakes = 0.f;           // 0..1: share of the base reflection coming from flakes (sparkle)
+    float flakeSize = 0.0015f;    // flake size in meters (object space); smaller than a pixel fades into a sheen
 
     static const TypeInfo& type();
 };

@@ -547,7 +547,7 @@ fragment float4 debugViewFragment(FullscreenOut in [[stage_in]], constant PostUn
     float3 c = 0.0;
     if (mode == 1) c = gbufA.sample(pointClamp, uv).rgb;
     else if (mode == 2) c = b.w >= 1.5 ? float3(0.0) : octDecode(b.xy) * 0.5 + 0.5;
-    else if (mode == 3) c = b.w >= 1.5 ? float3(0.0) : float3(b.z, saturate(b.w), 0.0);
+    else if (mode == 3) c = b.w >= 1.5 ? float3(0.0) : float3(b.z, gbufMetallic(b.w), 0.0);
     else if (mode == 4) c = tonemapACES(gi.sample(linearClamp, uv).rgb);
     else if (mode == 5) { float4 r = ssr.sample(linearClamp, uv); c = tonemapACES(r.rgb) * r.a; }
     else if (mode == 6) c = float3(ao.sample(linearClamp, uv).r);

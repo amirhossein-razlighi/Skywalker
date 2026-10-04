@@ -133,6 +133,8 @@ Use presets (`material_create {path, preset}`: gold, silver, copper, chrome, bru
 water, ice, skin, wax, leaves, snow, velvet, neon, toon, toon_metal, clay) and `texture_generate` (albedo + normal + ORM) with
 `triplanar` so nothing stretches on scaled shapes. Real surfaces vary: add `normalMap`/`ormMap`, keep `roughness` between 0.3 and 0.9 for
 most dielectrics, `metallic` 0 or 1 (rarely in between), `subsurface` for leaves/skin/wax/snow, `clearcoat` for paint and varnish.
+Car paint: the `car_paint` preset, then `clearcoatRoughness` (0.03 polished lacquer) and `flakes` (0.3-0.5 metallic, 0 solid)
+with `flakeSize` (meters, ~0.0015) on a material asset; the coat picks up probes and screen-space reflections.
 
 ## Quality gate: `scene_audit` (no placeholder shapes on camera)
 

@@ -41,6 +41,16 @@ const TypeInfo& MaterialAsset::type() {
             SKY_FIELD_RANGE(MaterialAsset, occlusionStrength, Float, "Ambient occlusion from the ORM map's red channel", 0.f, 1.f),
             SKY_FIELD_RANGE(MaterialAsset, alphaCutoff, Float, "Alpha-tested cutout threshold (foliage, sails, fences); 0 = off",
                             0.f, 1.f),
+            SKY_FIELD_RANGE(MaterialAsset, clearcoatRoughness, Float,
+                            "Roughness of the clearcoat layer (0.02 mirror lacquer .. 0.3 satin; default 0.06)", 0.f, 1.f),
+            SKY_FIELD_RANGE(MaterialAsset, flakes, Float,
+                            "Metallic flakes in the base layer (car paint sparkle): share of the base reflection, 0 = none, "
+                            "0.3-0.6 = metallic paint",
+                            0.f, 1.f),
+            SKY_FIELD_RANGE(MaterialAsset, flakeSize, Float,
+                            "Flake size in meters in the mesh's own space (default 0.0015; real flakes are smaller, a little "
+                            "larger reads better on screen)",
+                            0.00005f, 0.05f),
         }};
     return info;
 }
@@ -67,6 +77,9 @@ Surface toSurface(const MaterialAsset& m) {
     s.doubleSided = m.doubleSided;
     s.occlusionStrength = m.occlusionStrength;
     s.alphaCutoff = m.alphaCutoff;
+    s.clearcoatRoughness = m.clearcoatRoughness;
+    s.flakes = m.flakes;
+    s.flakeSize = m.flakeSize;
     return s;
 }
 
@@ -89,7 +102,7 @@ Result<MaterialAsset> materialPreset(const std::string& name) {
         {"plastic", R"({"color":"#e04a3a","metallic":0,"roughness":0.32})"},
         {"rubber", R"({"color":"#202022","metallic":0,"roughness":0.92})"},
         {"ceramic", R"({"color":"#f4f1ea","metallic":0,"roughness":0.12,"clearcoat":0.6})"},
-        {"car_paint", R"({"color":"#b01622","metallic":0.6,"roughness":0.38,"clearcoat":1})"},
+        {"car_paint", R"({"color":"#b01622","metallic":0.6,"roughness":0.38,"clearcoat":1,"clearcoatRoughness":0.04,"flakes":0.45})"},
         {"glass", R"({"color":"#d8ecff38","metallic":0,"roughness":0.03,"doubleSided":true})"},
         {"water", R"({"color":"#0d3a4a","metallic":0,"roughness":0.04,"shading":"water"})"},
         {"ice", R"({"color":"#cdeaffcc","metallic":0,"roughness":0.08,"subsurface":0.6})"},

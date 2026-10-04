@@ -95,6 +95,10 @@ struct Surface {
     bool doubleSided = false;
     float occlusionStrength = 1.f;
     float alphaCutoff = 0.f;  // > 0: alpha-tested cutout
+    // Car paint (material assets): the lacquer's roughness and metallic flakes under it.
+    float clearcoatRoughness = 0.06f;
+    float flakes = 0.f;          // 0..1 share of the base reflection from flakes
+    float flakeSize = 0.0015f;   // meters (object space)
     bool textureAlphaOnly = false;  // use the base-color texture for its alpha (cut-out) only (clay renders)
 };
 

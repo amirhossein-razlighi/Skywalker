@@ -129,8 +129,10 @@ struct DrawUniforms {
     // --- appended (velocity buffer) ---
     simd_float4x4 prevModel;  // previous frame's model matrix (= model when static)
     simd_float4 motion;       // x = moves (prevModel differs or a previous skinned pose is bound)
+    // --- appended (car paint) ---
+    simd_float4 material5;    // x = clearcoat roughness, y = flakes, z = flake size (m)
 };
-static_assert(sizeof(DrawUniforms) == 336, "must match DrawUniforms in Common.metal");
+static_assert(sizeof(DrawUniforms) == 352, "must match DrawUniforms in Common.metal");
 
 struct PostUniforms {
     simd_float4 params;
@@ -1592,6 +1594,7 @@ private:
         du.material4 = simd_make_float4(s.alphaCutoff, s.textureAlphaOnly ? 1.f : 0.f, 0, 0);
         du.prevModel = du.model;  // static unless drawMesh knows better (velocity buffer)
         du.motion = simd_make_float4(0, static_cast<float>(d.layers & 0xFFFFFu), 0, 0);  // y = render layers (light masks)
+        du.material5 = simd_make_float4(s.clearcoatRoughness, s.flakes, s.flakeSize, 0);
         return du;
     }
 

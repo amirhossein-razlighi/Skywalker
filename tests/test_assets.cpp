@@ -344,6 +344,53 @@ TEST_CASE("rendering: advanced surface fields reach the frame (inline and from m
     }
 }
 
+TEST_CASE("rendering: car paint materials carry a coat roughness and metallic flakes to the frame and the GPU") {
+    TempProject p("carpaint");
+    auto e = makeEngine(p);
+    // The preset is a flaked metallic paint under a glossy coat.
+    Result<MaterialAsset> preset = materialPreset("car_paint");
+    REQUIRE(preset);
+    CHECK(preset.value().clearcoat == doctest::Approx(1));
+    CHECK(preset.value().clearcoatRoughness < 0.06f);
+    CHECK(preset.value().flakes > 0.f);
+    // Defaults keep the previous look: a 0.06 coat and no flakes.
+    MaterialAsset plain;
+    CHECK(plain.clearcoatRoughness == doctest::Approx(0.06));
+    CHECK(plain.flakes == doctest::Approx(0));
+
+    call(*e, "material_create",
+         R"({"path":"materials/gt.mat.json","preset":"car_paint","color":"#0b2a4a","clearcoatRoughness":0.03,"flakes":0.6,"flakeSize":0.002})");
+    call(*e, "material_create", R"({"path":"materials/loud.mat.json","flakes":3})");  // clamped to 0..1
+    REQUIRE(e->resolveMaterial("materials/loud.mat.json"));
+    CHECK(e->resolveMaterial("materials/loud.mat.json")->flakes == doctest::Approx(1));
+    // The fields round-trip through the file.
+    auto loaded = loadMaterial((p.dir / "materials/gt.mat.json").string());
+    REQUIRE(loaded);
+    CHECK(loaded.value().clearcoatRoughness == doctest::Approx(0.03));
+    CHECK(loaded.value().flakes == doctest::Approx(0.6));
+    CHECK(loaded.value().flakeSize == doctest::Approx(0.002));
+
+    call(*e, "material_assign", R"({"entities":["Cube"],"material":"materials/gt.mat.json"})");
+    CaptureOptions o;
+    FrameData f = e->frame(o);
+    bool found = false;
+    for (const auto& d : f.draws) {
+        if (d.entity != e->scene().find("Cube")) continue;
+        found = true;
+        CHECK(d.surface.clearcoat == doctest::Approx(1));
+        CHECK(d.surface.clearcoatRoughness == doctest::Approx(0.03));
+        CHECK(d.surface.flakes == doctest::Approx(0.6));
+        CHECK(d.surface.flakeSize == doctest::Approx(0.002));
+    }
+    CHECK(found);
+    // The GPU path (flakes, coat in the G-buffer, the lighting resolve) renders; with screen-space
+    // reflections and the material debug view too (which decodes the coat's G-buffer packing).
+    call(*e, "environment_update", R"({"ssr":1})");
+    Json r = call(*e, "viewport_capture", R"({"width":64,"height":36,"samples":2,"annotate":false,"include_image":false})");
+    CHECK(r.get("width").asInt() == 64);
+    call(*e, "viewport_capture", R"({"width":64,"height":36,"samples":1,"debug_view":"material","include_image":false})");
+}
+
 TEST_CASE("rendering: texture_generate writes a PBR set and a ready material") {
     TempProject p("texgen-tool");
     auto e = makeEngine(p);
