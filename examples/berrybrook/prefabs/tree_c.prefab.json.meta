@@ -1,0 +1,13 @@
+{
+  "guid": "3e44c6c383367bb7110f4b72356cd9b6",
+  "type": "prefab",
+  "tags": [
+    "berrybrook"
+  ],
+  "description": "Berrybrook tree c (procedural, Blender)",
+  "source": {
+    "by": "mcp:director",
+    "fromEntity": "Prefab tree_c"
+  },
+  "import": {}
+}

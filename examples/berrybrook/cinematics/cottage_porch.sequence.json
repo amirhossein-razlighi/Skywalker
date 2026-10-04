@@ -1,0 +1,325 @@
+{
+  "format": "skywalker.sequence",
+  "version": 1,
+  "name": "Berrybrook — cottage porch",
+  "duration": 7,
+  "tracks": [
+    {
+      "type": "property",
+      "property": "environment.sunElevation",
+      "keys": [
+        {
+          "t": 0,
+          "value": 8.5,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.sunAzimuth",
+      "keys": [
+        {
+          "t": 0,
+          "value": 292,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.sunIntensity",
+      "keys": [
+        {
+          "t": 0,
+          "value": 3.4,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.sunColor",
+      "keys": [
+        {
+          "t": 0,
+          "value": "#ffcf96",
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.ambient",
+      "keys": [
+        {
+          "t": 0,
+          "value": 0.72,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.clouds",
+      "keys": [
+        {
+          "t": 0,
+          "value": 0.55,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.cloudHeight",
+      "keys": [
+        {
+          "t": 0,
+          "value": 1300,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.cloudThickness",
+      "keys": [
+        {
+          "t": 0,
+          "value": 1100,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.cloudDensity",
+      "keys": [
+        {
+          "t": 0,
+          "value": 0.8,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.fogColor",
+      "keys": [
+        {
+          "t": 0,
+          "value": "#f2d0ac",
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.fogDensity",
+      "keys": [
+        {
+          "t": 0,
+          "value": 0.0011,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.fogHeight",
+      "keys": [
+        {
+          "t": 0,
+          "value": 0.05,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.godRays",
+      "keys": [
+        {
+          "t": 0,
+          "value": 0.9,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.haze",
+      "keys": [
+        {
+          "t": 0,
+          "value": 5e-04,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.exposureCompensation",
+      "keys": [
+        {
+          "t": 0,
+          "value": 0.25,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.look",
+      "keys": [
+        {
+          "t": 0,
+          "value": "golden_hour",
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.lookStrength",
+      "keys": [
+        {
+          "t": 0,
+          "value": 0.35,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.saturation",
+      "keys": [
+        {
+          "t": 0,
+          "value": 1.16,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.contrast",
+      "keys": [
+        {
+          "t": 0,
+          "value": 1.04,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.bloomIntensity",
+      "keys": [
+        {
+          "t": 0,
+          "value": 0.45,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.vignette",
+      "keys": [
+        {
+          "t": 0,
+          "value": 0.18,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.shadowSoftness",
+      "keys": [
+        {
+          "t": 0,
+          "value": 1.6,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.windSpeed",
+      "keys": [
+        {
+          "t": 0,
+          "value": 2.5,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.temperature",
+      "keys": [
+        {
+          "t": 0,
+          "value": 0.08,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "shot",
+      "camera": "Cam cottage_porch",
+      "keys": [
+        {
+          "t": 0,
+          "shot": "path",
+          "duration": 7,
+          "target": [
+            -13.4,
+            1.9,
+            -13.6
+          ],
+          "points": [
+            [
+              -9.8,
+              2.024,
+              -2
+            ],
+            [
+              -10.4,
+              2.117,
+              -3.4
+            ],
+            [
+              -11,
+              2.25,
+              -4.8
+            ]
+          ],
+          "fov": 44
+        }
+      ]
+    },
+    {
+      "type": "camera",
+      "keys": [
+        {
+          "t": 0,
+          "camera": "Cam cottage_porch"
+        }
+      ]
+    },
+    {
+      "type": "event",
+      "keys": [
+        {
+          "t": 0,
+          "event": "hud_hide",
+          "target": "HUD"
+        }
+      ]
+    }
+  ]
+}

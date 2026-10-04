@@ -1,0 +1,13 @@
+{
+  "guid": "e083d81fa9a6874000fb871843db2a7d",
+  "type": "prefab",
+  "tags": [
+    "berrybrook"
+  ],
+  "description": "Berrybrook tree poplar (procedural, Blender)",
+  "source": {
+    "by": "mcp:director",
+    "fromEntity": "Prefab tree_poplar"
+  },
+  "import": {}
+}

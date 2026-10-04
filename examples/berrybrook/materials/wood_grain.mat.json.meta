@@ -1,0 +1,13 @@
+{
+  "guid": "e505214fc320c89978132ab8aed5fa64",
+  "type": "material",
+  "tags": [],
+  "description": "wood (procedural PBR)",
+  "source": {
+    "generator": "texgen",
+    "kind": "wood",
+    "seed": 1,
+    "by": "mcp:director"
+  },
+  "import": {}
+}

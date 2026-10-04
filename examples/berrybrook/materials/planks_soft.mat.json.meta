@@ -1,0 +1,13 @@
+{
+  "guid": "17e94861b2a5add4d3a765dcbce098b1",
+  "type": "material",
+  "tags": [],
+  "description": "planks (procedural PBR)",
+  "source": {
+    "generator": "texgen",
+    "kind": "planks",
+    "seed": 1,
+    "by": "mcp:director"
+  },
+  "import": {}
+}

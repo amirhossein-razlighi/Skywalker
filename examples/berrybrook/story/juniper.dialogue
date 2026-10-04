@@ -1,0 +1,13 @@
+title: Start
+---
+<<declare $traded = false>>
+Juniper: Evening, neighbour! Your berries are blushing redder than my cheeks. #portrait:juniper
+Juniper: Grandma Wren always said the last light of the day makes the sweetest picking. #portrait:juniper
+-> Want a basket? They're still warm from the sun.
+    <<set $traded = true>>
+    Juniper: Oh, you darling. Here, a jar of my rhubarb-and-honey jam for your shelf. #portrait:juniper
+    <<give_jam>>
+-> How's the bakery?
+    Juniper: Busy as a hive! Tomorrow's shortcake needs twelve baskets... and a little luck. #portrait:juniper
+Juniper: Mind the hens on your way home. They've been plotting something by the pond. #portrait:juniper
+===

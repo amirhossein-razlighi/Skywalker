@@ -1,0 +1,13 @@
+{
+  "guid": "6be40876bd4792d2ad94266ab0e71d5b",
+  "type": "prefab",
+  "tags": [
+    "berrybrook"
+  ],
+  "description": "Berrybrook flowers butter (procedural, Blender)",
+  "source": {
+    "by": "mcp:director",
+    "fromEntity": "Prefab flowers_butter"
+  },
+  "import": {}
+}

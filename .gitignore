@@ -104,3 +104,7 @@ examples/gloamwater/portraits/
 examples/ashen_peaks/agents/
 examples/ashen_peaks/studio/
 examples/*/.skywalker/cache/
+# Berrybrook: Blender farm kit and generated textures (rebuilt by media/demo/games/berrybrook.py); look-dev renders
+examples/berrybrook/dcc/
+examples/berrybrook/textures/
+examples/berrybrook/lookdev/

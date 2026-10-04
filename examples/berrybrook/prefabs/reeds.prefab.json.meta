@@ -1,0 +1,13 @@
+{
+  "guid": "62ab93239765565693a991d68ba70a1b",
+  "type": "prefab",
+  "tags": [
+    "berrybrook"
+  ],
+  "description": "Berrybrook reeds (procedural, Blender)",
+  "source": {
+    "by": "mcp:director",
+    "fromEntity": "Prefab reeds"
+  },
+  "import": {}
+}

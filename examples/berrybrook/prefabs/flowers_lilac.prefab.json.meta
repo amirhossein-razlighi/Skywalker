@@ -1,0 +1,13 @@
+{
+  "guid": "046ccb700989020df07860be463bafec",
+  "type": "prefab",
+  "tags": [
+    "berrybrook"
+  ],
+  "description": "Berrybrook flowers lilac (procedural, Blender)",
+  "source": {
+    "by": "mcp:director",
+    "fromEntity": "Prefab flowers_lilac"
+  },
+  "import": {}
+}
