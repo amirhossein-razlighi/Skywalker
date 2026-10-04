@@ -642,7 +642,7 @@ void addViewTools(Engine& engine, ToolRegistry& reg) {
                                                 "Buffer visualization for diagnosing looks: material = roughness (red) / metallic (green), "
                                                 "gi = bounce light, lighting = before screen-space GI/reflections, impostors = the final image "
                                                 "with foliage meshes tinted green and distant impostors magenta, motion = the velocity buffer "
-                                                "(hue = direction, brightness = speed, full at 16 px/frame) that TAA, MetalFX and motion blur use; "
+                                                "(hue = direction, strength = speed on a log scale: faint at 0.25 px, full at 15 px per frame) that TAA, MetalFX and motion blur use; "
                                                 "capture twice (samples 1) while something moves to see it")},
                      {"quality", enumeration({"full", "balanced", "fast"}, "Viewport quality tier (default full; fast/balanced preview what the editor shows while editing)")},
                      {"include_image", boolean("Return the image (default true); false = only the entity list")},

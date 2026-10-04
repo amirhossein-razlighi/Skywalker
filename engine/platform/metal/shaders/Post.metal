@@ -579,14 +579,14 @@ fragment float4 debugViewFragment(FullscreenOut in [[stage_in]], constant PostUn
         c = mix(paper, ink, saturate(edge * 0.95 + (d0 < 1.0 ? hatch : 0.0)));
     }
     else if (mode == 11) {
-        // Motion: hue = direction, brightness = speed (full at 16 px per frame), over a dimmed
-        // grayscale of the scene so agents can tell what moves.
+        // Motion: hue = direction, saturation = speed on a log scale (0.25 px faint, full at 15 px
+        // per frame), over a dimmed grayscale of the scene so agents can tell what moves.
         float2 v = velocity.sample(pointClamp, uv).xy * p.texel.zw;  // pixels per frame
         float len = length(v);
         float h = atan2(v.y, v.x) / 6.2831853 + 0.5;
         float3 hue = saturate(abs(fract(h + float3(0.0, 2.0 / 3.0, 1.0 / 3.0)) * 6.0 - 3.0) - 1.0);
         float lum = dot(tonemapACES(hdr.sample(linearClamp, uv).rgb), float3(0.2126, 0.7152, 0.0722));
-        c = mix(float3(lum * 0.25), hue, saturate(len / 16.0));
+        c = mix(float3(lum * 0.25), hue, saturate(log2(1.0 + len) / 4.0));
     }
     else c = tonemapACES(hdr.sample(linearClamp, uv).rgb);
     return float4(c, 1.0);
