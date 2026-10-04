@@ -80,6 +80,7 @@ typo never silently ships the wrong thing.
 | `copyright` | none | Shown in the About panel. |
 | `include` | none | Extra files or folders to ship (globs `*` and `?`; a folder name includes everything below it). For assets that scripts load by computed names. |
 | `exclude` | none | Files to leave out even when referenced. The build warns about each referenced file you excluded. |
+| `render` | none | `{"layers": {"1": "world", "2": "hero"}}` names the 20 render layers ([RENDERING](RENDERING.md#render-layers)); tools and Wander `layer_mask()` accept the names. |
 
 Command-line flags of the player and `skywalker build` override the file.
 

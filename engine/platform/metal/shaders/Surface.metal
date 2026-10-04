@@ -75,7 +75,7 @@ static float3 triplanarNormal(texture2d<float> tex, Triplanar t, float3 N, float
 static float3 shadeSurface(SurfaceData s, float3 Ngeo, float3 worldPos, float2 fragXY, float3 V, bool toon, float rim,
                            constant FrameUniforms& f, const device GPULight* lights, const device uint2* clusterCells,
                            const device uint* clusterIndices, depth2d<float> shadowAtlas, texturecube<float> envTex,
-                           texture2d<float> brdfLut, texture3d<float> cloudShape) {
+                           texture2d<float> brdfLut, texture3d<float> cloudShape, uint layers = 1u) {
     // Sun
     float3 L = -f.sunDir.xyz;
     float sunVisible = L.y > -0.08 ? shadowFactor(worldPos, Ngeo, fragXY, f, shadowAtlas) : 0.0;
@@ -90,25 +90,12 @@ static float3 shadeSurface(SurfaceData s, float3 Ngeo, float3 worldPos, float2 f
     for (int k = 0; k < total; ++k) {
         int i = k < dirCount ? k : int(clusterIndices[cell.x + uint(k - dirCount)]);
         GPULight l = lights[i];
+        if (!lightAffects(l, layers)) continue;  // render layers: the light's cullMask excludes this surface
         float3 Ll;
-        float atten = 1.0;
-        if (l.kind.x < 0.5) {
-            Ll = -l.directionCone.xyz;
-        } else {
-            float3 toL = l.positionRange.xyz - worldPos;
-            float dist = length(toL);
-            Ll = toL / max(dist, 1e-4);
-            float r = l.positionRange.w;
-            float falloff = saturate(1.0 - pow(dist / r, 4.0));
-            atten = falloff * falloff / (dist * dist + 1.0);
-            if (l.kind.x > 1.5) {
-                float cd = dot(-Ll, l.directionCone.xyz);
-                atten *= smoothstep(l.directionCone.w, mix(l.directionCone.w, 1.0, 0.2), cd);
-            }
-        }
-        float3 rad = l.colorIntensity.rgb * l.colorIntensity.w * atten;
-        color += toon ? toonLight(s, V, Ll, rad) : directLight(s, V, Ll, rad);
+        float3 rad = lightRadiance(l, worldPos, Ll);
+        color += toon ? toonLight(s, V, Ll, rad, l.params.x) : directLight(s, V, Ll, rad, l.params.x);
     }
+    color = max(color, 0.0);  // negative lights darken, never below black
 
     // Image-based lighting (sky cubemap). `ambient` scales how much sky light reaches the
     // scene (interiors, caves, night); `reflections` scales the specular part.
@@ -289,8 +276,10 @@ fragment MainOut meshFragment(MeshOut in [[stage_in]],
     s.roughness = clamp(sqrt(alpha), 0.045, 1.0);
     bool toon = shading == 1;
 
+    // Render layers of this draw (DrawUniforms.motion.y; 0 = unset, e.g. mesh particles: layer 1).
+    const uint layers = d.motion.y > 0.5 ? uint(d.motion.y) : 1u;
     float3 color = shadeSurface(s, Ngeo, in.worldPos, in.position.xy, V, toon, d.material3.z, f, lights, clusterCells,
-                                clusterIndices, shadowAtlas, envTex, brdfLut, cloudShape) + emissive;
+                                clusterIndices, shadowAtlas, envTex, brdfLut, cloudShape, layers) + emissive;
     color = applyFog(color, in.worldPos, V, f);
 
 

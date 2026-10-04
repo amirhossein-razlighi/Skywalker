@@ -13,8 +13,9 @@ the rubric below, change again. Do not set 30 fields at once: you cannot tell wh
 | Layer | Tool | Fields |
 |---|---|---|
 | Scene lighting and post | `environment_update` (merge; `environment_get` reads back) | see the table below |
-| Lights | `entity_create`/`entity_update` with `components.light` | `kind: directional\|point\|spot, color, intensity (0..1000), range (m), spotAngle` |
-| Camera lens | `components.camera` | `fov, aperture (f-stop, 0 = DOF off), focusDistance (m, 0 = autofocus), motionBlur (0..1, 0.5 film-like), primary` |
+| Lights | `entity_create`/`entity_update` with `components.light` | `kind: directional\|point\|spot, color, intensity (0..1000), range (m), spotAngle`; v2: `temperature` (Kelvin, 0 = off), `innerAngle` (spot hard core), `specular` (0 = no glints), `volumetric` (god-ray strength), `negative` (subtracts light), `attenuation: smooth\|inverse_square` + `size`, `distanceFade` + `fadeBegin`/`fadeLength`, `cullMask` (layers it lights) |
+| Render layers | `render_layers` | name layers (`action:"name"`), put meshes on layers (`layers`) and give cameras / lights a `cull_mask`, by name |
+| Camera lens | `components.camera` | `fov, aperture (f-stop, 0 = DOF off), focusDistance (m, 0 = autofocus), motionBlur (0..1, 0.5 film-like: camera and moving objects), primary, cullMask` |
 | Surfaces | `material_create` / `material_update` / `texture_generate`, or `components.mesh` | `color, metallic, roughness, emissive (alpha = strength, HDR), normalMap, ormMap, clearcoat, subsurface, triplanar, shading: pbr\|toon\|unlit\|water` |
 | Judging | `viewport_capture` | `samples, debug_view, overlays:false, annotate:false, view:"scene", quality` |
 | Live viewport tier | `viewport_quality` | `fast`, `balanced`, `full` (see below) |
@@ -63,6 +64,7 @@ Details and per-look numbers are in [references/recipes.md](references/recipes.m
 | Materials look plastic or wrong | `"albedo"`, `"material"` (roughness red, metallic green) | Albedo too bright/saturated; roughness uniform |
 | Reflections absent or noisy | `"reflections"` | `ssr` too low, floor too rough, `samples` too low |
 | Wrong shape / scale | `"depth"` | Near/far planes, scale errors |
+| Smearing / ghosting of moving things | `"motion"` (capture `samples:1` right after a sim `step`) | The velocity buffer: moving meshes, skinned characters, swaying foliage, hair and mesh particles show hue = direction; gray = static. Something that moves but stays gray will ghost under TAA / MetalFX |
 
 4. **Change one group, recapture, compare.** Keep what improved. Stop when the rubric passes, not when you run out of ideas.
 
@@ -95,7 +97,14 @@ The live editor viewport renders at a **tier** so heavy worlds stay responsive w
 - **Grid and id labels in the "final" shot**: pass `overlays:false, annotate:false`.
 - **Over-bloom**: bloom should hint at emissives and the sun, not blur the scene. Keep `bloomIntensity` under 0.8.
 - **Fixing light with materials**: if everything is dull, check lighting first (`sunIntensity`, `exposure`, `ambient`), then albedo.
-- **TAA ghosting on fast motion**: stills are fine; for motion tests compare with `taa:false`.
+- **TAA ghosting on fast motion**: moving objects carry motion vectors (velocity buffer), so TAA, MetalFX and motion blur follow
+  them. If something still smears, check `debug_view:"motion"` and `perf_stats` `gpu.velocity` (`movingDraws`,
+  `skinnedWithPreviousPose`). Toon outlines and distant hair cards have no object motion yet.
+- **A light that should only touch the hero**: don't fight it with intensity; name a layer and mask the light:
+  `render_layers {action:"name", layer:2, name:"hero"}`, `render_layers {action:"set", entities:["Hero"], layers:["world","hero"]}`,
+  `render_layers {action:"set", entities:["RimLight"], cull_mask:"hero"}`. Terrain, foliage, water, particles and hair are on layer 1.
+- **Warm practicals**: use `temperature` (2700 tungsten, 1900 candle) instead of guessing orange hex colors; it keeps the light's
+  brightness and stays physically plausible.
 - **LUT path wrong**: `lut` must be a project-relative `.cube` file; apply with `lookStrength`.
 
 ## Materials for realism
@@ -109,5 +118,6 @@ most dielectrics, `metallic` 0 or 1 (rarely in between), `subsurface` for leaves
 
 - Beauty shot at 16+ samples, `quality:"full"` (the default), overlays off, from the camera the game will use (`view:"scene"`).
 - At least one `debug_view` (`lighting` or `gi`) if you changed light terms.
-- `perf_stats` if you added many lights (16 punctual lights are used per frame; directional first) or volumetrics.
+- `perf_stats` if you added many lights (all lights shade surfaces through clusters; the 16 most important also light water, particles
+  and fog) or volumetrics. `gpu.lights` counts layer-masked, negative and inverse-square lights.
 - Report the final `environment_get` values so the look is reproducible.

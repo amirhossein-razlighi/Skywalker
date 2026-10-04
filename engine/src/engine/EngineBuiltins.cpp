@@ -12,6 +12,8 @@
 
 namespace sky {
 
+void registerRenderLayerBuiltins(wander::BuiltinRegistry& reg);  // RenderBuiltins.cpp: layer_mask
+
 namespace {
 
 using namespace wander;
@@ -154,6 +156,7 @@ void registerEngineBuiltins() {
         registerUiBuiltins(reg);  // 2D, UI, dialogue (World2D)
         registerPlatformBuiltins(reg);
         // Subsystem builtins: one line each.
+        registerRenderLayerBuiltins(reg);  // render layers (RenderBuiltins.cpp)
     });
 }
 

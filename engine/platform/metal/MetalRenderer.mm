@@ -28,6 +28,7 @@
 #include <simd/simd.h>
 
 #include <algorithm>
+#include <array>
 #include <atomic>
 #include <cmath>
 #include <cstdio>
@@ -204,7 +205,11 @@ struct GPULight {
     simd_float4 colorIntensity;
     simd_float4 directionCone;
     simd_float4 kind;
+    // --- appended (light v2) ---
+    simd_float4 params;   // x = specular, y = layer mask (as float), z = cos(inner cone) (0 = auto), w = inverse square
+    simd_float4 params2;  // x = emitter radius, y = indirect, z = volumetric, w = unused
 };
+static_assert(sizeof(GPULight) == 96, "must match GPULight in Common.metal");
 
 constexpr MTLPixelFormat kColorFormat = MTLPixelFormatBGRA8Unorm_sRGB;  // final LDR image
 constexpr MTLPixelFormat kHDRFormat = MTLPixelFormatRGBA16Float;     // scene, ambient, bloom, env
@@ -451,6 +456,10 @@ public:
             int64_t skinnedWithHistory = 0;
             for (const auto& [key, h] : skinHistory_) skinnedWithHistory += h.motion && h.lastFrame + 1 == frameIndex_ ? 1 : 0;
             const MotionHistory::Stats& ms = motionHistory_.stats();
+            j["lights"] = Json::object({{"total", static_cast<int64_t>(lightStats_[0])},
+                                        {"layerMasked", static_cast<int64_t>(lightStats_[1])},
+                                        {"negative", static_cast<int64_t>(lightStats_[2])},
+                                        {"inverseSquare", static_cast<int64_t>(lightStats_[3])}});
             j["velocity"] = Json::object({{"movingDraws", static_cast<int64_t>(movingDraws_)},
                                           {"trackedDraws", static_cast<int64_t>(ms.tracked)},
                                           {"teleported", static_cast<int64_t>(ms.teleported)},
@@ -527,6 +536,13 @@ public:
             // All lights shade surfaces through clusters; the most important few also light
             // water, particles, fluids and the volumetric fog.
             std::vector<GPULight> allLights = gpuLights(frame);
+            lightStats_ = {};
+            for (const LightItem& l : frame.lights) {  // light v2 usage (perf_stats "lights")
+                lightStats_[0]++;
+                lightStats_[1] += (l.mask & 0xFFFFFu) != 0xFFFFFu ? 1 : 0;
+                lightStats_[2] += l.negative ? 1 : 0;
+                lightStats_[3] += l.inverseSquare ? 1 : 0;
+            }
             std::vector<GPULight> lights(allLights.begin(),
                                          allLights.begin() + static_cast<std::ptrdiff_t>(std::min(allLights.size(), FrameData::kMaxEffectLights)));
             const LightGrid grid = buildLightGrid(frame);
@@ -1371,6 +1387,9 @@ private:
             g.colorIntensity = lin(l.color, l.intensity);
             g.directionCone = v4(l.direction, l.cosCone);
             g.kind = simd_make_float4(static_cast<float>(l.kind), 0, 0, 0);
+            if (l.negative) g.colorIntensity.w = -g.colorIntensity.w;  // subtracts light
+            g.params = simd_make_float4(l.specular, static_cast<float>(l.mask & 0xFFFFFu), l.cosInner, l.inverseSquare ? 1.f : 0.f);
+            g.params2 = simd_make_float4(l.size, l.indirect, l.volumetric, 0);
             out.push_back(g);
         }
         if (out.empty()) out.push_back(GPULight{});  // Metal requires a bound buffer
@@ -1393,7 +1412,7 @@ private:
         du.outlineColor = lin(s.outlineColor);
         du.material4 = simd_make_float4(s.alphaCutoff, s.textureAlphaOnly ? 1.f : 0.f, 0, 0);
         du.prevModel = du.model;  // static unless drawMesh knows better (velocity buffer)
-        du.motion = simd_make_float4(0, 0, 0, 0);
+        du.motion = simd_make_float4(0, static_cast<float>(d.layers & 0xFFFFFu), 0, 0);  // y = render layers (light masks)
         return du;
     }
 
@@ -1872,7 +1891,7 @@ private:
             }
         }
         du.prevModel = toSimd(prev);
-        du.motion = simd_make_float4(moving ? 1.f : 0.f, 0, 0, 0);
+        du.motion.x = moving ? 1.f : 0.f;
         bool twoSided = s.doubleSided || d.mesh == "plane" || d.mesh == "quad";
         [enc setCullMode:twoSided ? MTLCullModeNone : MTLCullModeBack];
         [enc setVertexBuffer:m->vertices offset:0 atIndex:0];
@@ -2884,6 +2903,7 @@ private:
     MotionHistory motionHistory_;          // previous transforms of drawn objects
     std::vector<Mat4> prevModels_;         // per FrameData::draws entry, this frame
     size_t movingDraws_ = 0;
+    std::array<size_t, 4> lightStats_{};    // lights this frame: total, layer-masked, negative, inverse square
     float mipBias_ = 0.f;                  // texture LOD bias while MetalFX upscales (log2 renderScale)
     float prevTime_ = 0.f;
     bool prevTimeValid_ = false;

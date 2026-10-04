@@ -25,15 +25,16 @@ Each frame renders one or more sub-samples:
 | 5 | Lighting resolve | Swaps the sky-probe indirect light of PBR surfaces for GI and reflections (bilateral upsample), and applies SSAO to indirect diffuse. |
 | 6 | Effects | Fluid simulation (compute), FFT water, fluid volumes, GPU particles (compute, sorted) and CPU particles over the lit scene. |
 | 7 | Volumetric light | Half resolution: shadow-mapped sun shafts and lamp cones through height-falling haze. |
-| 8 | Temporal | Applies the volumetric light, then one of: TAA (Catmull-Rom history, YCoCg variance clipping, reactive mask for particles); accumulation of sub-samples; or a pass-through when MetalFX upscales. |
-| 9 | Upscale | Used when `renderScale` < 1: camera motion vectors, then the MetalFX temporal scaler, from internal to output resolution. |
-| 10 | Camera | Motion blur (camera motion), bokeh depth of field (thin-lens CoC, half-res gather) and auto exposure (center-weighted metering + adaptation). |
-| 11 | Post | Bloom chain, then the composite: chromatic aberration, white balance, exposure, tonemap, saturation/contrast, look / 3D LUT, vignette, grain, contrast-adaptive sharpening, dithering. Debug views replace the image. |
-| 12 | Overlays | Gizmos, drawn in LDR on top. |
+| 8 | Velocity | The [velocity buffer](#velocity-buffer-motion-vectors): camera reprojection of the depth buffer plus the object motion the scene pass wrote. |
+| 9 | Temporal | Applies the volumetric light, then one of: TAA (dilated velocity, Catmull-Rom history, YCoCg variance clipping, reactive mask for particles); accumulation of sub-samples; or a pass-through when MetalFX upscales. |
+| 10 | Upscale | Used when `renderScale` < 1: the MetalFX temporal scaler, from internal to output resolution, fed the velocity buffer, the engine's exposure and the GPU-particle reactive mask. Textures get a mip bias of log2(`renderScale`) so they stay sharp. |
+| 11 | Camera | Motion blur (camera and object motion, tile-max reconstruction), bokeh depth of field (thin-lens CoC, half-res gather) and auto exposure (center-weighted metering + adaptation). |
+| 12 | Post | Bloom chain, then the composite: chromatic aberration, white balance, exposure, tonemap, saturation/contrast, look / 3D LUT, vignette, grain, contrast-adaptive sharpening, dithering. Debug views replace the image. |
+| 13 | Overlays | Gizmos, drawn in LDR on top. |
 
 ### Lighting
 
-- **Clustered forward lighting:** up to 1024 lights. The view is split into 16×9×24 clusters
+- **Clustered forward lighting:** up to 1024 lights (see [Lights](#lights-light-component) for their fields). The view is split into 16×9×24 clusters
   (built on the CPU, tested), and each pixel evaluates only nearby lights. Directional
   lights apply everywhere. The 16 most important lights also light water, particles, fluids
   and volumetric fog.
@@ -93,7 +94,7 @@ See the `terrain_*` and `foliage_add` tools.
 
 - **Lens** (camera component, or `viewport_capture` `aperture` / `focus_distance` / `tilt_shift`):
   `aperture` (f-stop; 0 = everything sharp), `focusDistance` (0 = autofocus on the center)
-  and `motionBlur` (shutter fraction; a post-process blur in real time, a real accumulated shutter in
+  and `motionBlur` (shutter fraction; a post-process blur of camera and object motion in real time, a real accumulated shutter in
   movie renders, see [MOVIE_RENDER](MOVIE_RENDER.md)). `tiltShift` (0..1) fakes a tilt-shift lens: a
   sharp band across the middle of the frame with blur growing above and below it, the "toy town"
   miniature look for aerial shots (a real aperture cannot blur a scene 50 m away that much). It
@@ -111,7 +112,9 @@ See the `terrain_*` and `foliage_add` tools.
 - `albedo`, `normals`, `material` (roughness/metallic), `gi`, `reflections`, `ao`,
   `depth`, `lighting` (before GI);
 - `sketch`: pencil contours and hatching;
-- `impostors`: the final image with foliage meshes tinted green and impostors magenta.
+- `impostors`: the final image with foliage meshes tinted green and impostors magenta;
+- `motion`: the velocity buffer over a dimmed gray image. Hue is the direction, strength the speed on a log scale (faint at
+  0.25 px, full at 15 px per frame). Capture with `samples: 1` right after something moved (a `sim_control` step).
 
 `clay: true` renders every surface as matte white clay. Sketch, clay and final make
 "sketch to fill" sequences.
@@ -324,9 +327,94 @@ remains at ground level is mostly the jacaranda's 3.5M-triangle mesh near the ca
 dense alpha-tested grass. Assets with game-ready triangle counts (20–100k) fall well
 within budget.
 
+## Velocity buffer (motion vectors)
+
+Every frame knows how each pixel moved since the previous one. TAA, MetalFX temporal upscaling and motion blur use this, so moving
+and animated things stay sharp instead of ghosting or smearing.
+
+- **Object motion** is written by the scene pass into a fourth MSAA attachment: the screen offset between where a surface point is
+  now and where it was a frame ago, measured in the previous frame's projection. Static geometry writes 0.
+  - Meshes: the previous transform of every draw (`render/MotionHistory.h`, keyed by entity and mesh; a jump over 25 m counts as
+    a teleport, not motion).
+  - Skinned meshes: the posed vertices are double-buffered, so the vertex shader reads the previous pose too.
+  - Foliage: wind sway is evaluated at the previous frame's time as well.
+  - Strand hair: the interpolated strands are double-buffered. Mesh particles use their velocity.
+- **Camera motion** is added afterwards from the depth buffer (sky pixels reproject by rotation only). Anything that doesn't write
+  object motion is therefore treated as static, never as garbage.
+- **TAA** reads the velocity of the nearest surface in a 3x3 neighborhood (dilation), so object edges reproject with the object.
+- **MetalFX** gets the velocity buffer as its motion texture, the composite's exposure (`autoExposure` included) as its exposure
+  texture, and the GPU-particle reactive mask.
+- **Motion blur** (`Camera.motionBlur`, the shutter fraction) follows McGuire et al. 2012: the largest motion per ~40 px tile and per
+  3x3 tile neighborhood, then a depth-aware gather along it. Moving objects blur over a sharp background; the blur length is capped
+  at two tiles. Movie renders keep their real accumulated shutter ([MOVIE_RENDER](MOVIE_RENDER.md)).
+- **Observe it:** `viewport_capture {debug_view: "motion"}` and `perf_stats` `gpu.velocity`: `movingDraws`, `trackedDraws`,
+  `teleported`, `maxObjectMotionM`, `skinnedWithPreviousPose`, `mipBias`, `motionBlurTilePx`.
+- **Check it:** `python3 tools/render_checks/velocity_and_layers.py` (macOS, opt-in) renders a fast textured cube and a swinging
+  skinned strip under TAA and compares them to a 16-sample still. On an M1 Pro the mean error around the cube went from 7.7 to 5.2,
+  and around the skinned strip from 13.3 to 7.7 (camera-only motion vectors before).
+- **Cost** (M1 Pro, 1920x1080, `perf_stats {frames}`): about +0.2 to +0.4 ms per frame (the extra attachment and one full-screen
+  pass): hello_sky 5.95 -> 6.35 ms, ashen_peaks 25.9 -> 26.1 ms.
+
+## Render layers
+
+Twenty render layers. A mesh is **on** layers; cameras and lights **see** layers through a cull mask. Bit `i` of a mask
+is layer `i + 1`.
+
+| Field | On | Default | Meaning |
+|---|---|---|---|
+| `layers` | `mesh` | 1 | Layers the mesh is on |
+| `cullMask` | `camera` | all (1048575) | Layers the camera draws; meshes outside it are not drawn (and cast no shadow) |
+| `cullMask` | `light` | all | Layers the light illuminates |
+
+Terrain, foliage, water, particles and hair have no `layers` field yet and count as layer 1. Decals, reflection probes and render
+targets will use the same two field names (`layers` for what something is on, `cullMask` for what it sees or affects).
+
+Name layers in `game.json` and use the names everywhere:
+
+```json
+{"render": {"layers": {"1": "world", "2": "hero", "3": "fx", "20": "editor_only"}}}
+```
+
+- `render_layers {action: "name", layer: 2, name: "hero"}` writes the name.
+- `render_layers {action: "set", entities: ["Hero"], layers: ["world", "hero"]}` puts meshes on layers.
+- `render_layers {action: "set", entities: ["RimLight"], cull_mask: "hero"}` gives cameras and lights a mask.
+- Masks accept a number (raw bits), a name, `"3"`, `"all"`, `"none"` or a list; misspelled names get a did-you-mean error.
+  `mode: "add"` / `"remove"` edits the current mask.
+- `render_layers {}` lists the named layers, meshes per layer, cameras and restricted lights, and warns about meshes no camera draws
+  and lights that light nothing.
+- Wander: `layer_mask("world", "fx")` returns the bits, e.g. `find("Mirror").camera.cullMask = layer_mask("world")`.
+
+### Recipes
+
+| Goal | Setup |
+|---|---|
+| Rim light only on the hero | Hero on `["world", "hero"]`; the rim light's `cull_mask: "hero"` |
+| First-person arms not in the mirror | Arms on layer `"arms"`; the mirror camera's `cull_mask` excludes it |
+| Editor helpers hidden in the game | Helpers on `"editor_only"` (20); the game camera's `cull_mask: ["world", "fx"]` |
+| A UI-only 3D preview | Preview model on `"preview"`, lit by a light with `cull_mask: "preview"` only |
+
+## Lights (`light` component)
+
+| Field | Meaning |
+|---|---|
+| `kind`, `color`, `intensity`, `range`, `spotAngle` | Directional, point or spot; color and brightness; falloff distance; cone half-angle |
+| `cullMask` | Render layers it lights ([Render layers](#render-layers)) |
+| `temperature` | Kelvin (1900 candle, 2700 tungsten, 4000 fluorescent, 5500 noon, 6500 white, 9000 overcast sky) multiplied with `color`; 0 = off |
+| `innerAngle` | Spot: half-angle of the full-intensity core in degrees (0 = automatic soft edge); close to `spotAngle` = hard edge |
+| `specular` | Highlight strength; 0 = diffuse only (fill lights that shouldn't sparkle) |
+| `volumetric` | Strength in volumetric light / god rays |
+| `indirect` | Contribution to world-space GI (reserved until GI probes or lightmaps exist) |
+| `negative` | Subtracts light: stylized darkening, fake occlusion |
+| `attenuation`, `size` | `smooth` (default, soft, reaches 0 at `range`) or `inverse_square` (physical 1/d², peak capped by the emitter radius `size`, still windowed to `range`) |
+| `distanceFade`, `fadeBegin`, `fadeLength` | Fade out with distance from the camera; faded-out lights are not sent to the GPU at all |
+
+`perf_stats` reports `gpu.lights`: `total`, `layerMasked`, `negative`, `inverseSquare`. Not yet: per-light shadows (point and spot
+lights don't cast them), bake modes (no lightmaps yet) and caster masks.
+
 ## Limits and next steps
 
-- Point and spot lights don't cast shadows yet. The sun casts four cascades; clouds and
+- Point and spot lights don't cast shadows yet. Toon outlines and distant hair cards write no object motion (they reproject with
+  the camera only). The sun casts four cascades; clouds and
   hair cast their own.
 - GI and reflections are screen-space: what is off screen comes from the sky probe. There
   are no reflection probes or world-space GI yet.

@@ -142,7 +142,7 @@ Result<GameSettings> GameSettings::fromJson(const Json& j) {
     GameSettings g;
     static const std::vector<std::string> keys{"id", "title", "genre", "mood", "pitch", "assets", "startScene", "window", "quality",
                                                "renderScale", "quitOnEscape", "pauseOnFocusLoss", "icon", "bundleId",
-                                               "version", "copyright", "include", "exclude"};
+                                               "version", "copyright", "include", "exclude", "render"};
     if (Status s = checkKeys(j, "game.json", keys); !s) return s.error();
     for (auto [key, out] : std::initializer_list<std::pair<const char*, std::string*>>{
              {"id", &g.id}, {"title", &g.title}, {"genre", &g.genre}, {"mood", &g.mood}, {"pitch", &g.pitch}, {"assets", &g.assets},
@@ -181,6 +181,14 @@ Result<GameSettings> GameSettings::fromJson(const Json& j) {
     }
     if (Status s = readBool(j, "", "quitOnEscape", g.quitOnEscape); !s) return s.error();
     if (Status s = readBool(j, "", "pauseOnFocusLoss", g.pauseOnFocusLoss); !s) return s.error();
+    if (const Json* r = j.find("render"); r && !r->isNull()) {
+        if (!r->isObject()) return typeError("render", "an object like {\"layers\": {\"1\": \"world\"}}", *r);
+        static const std::vector<std::string> rk{"layers"};
+        if (Status s = checkKeys(*r, "game.json render", rk); !s) return s.error();
+        auto names = render::LayerNames::fromJson(r->get("layers"));
+        if (!names) return names.error();
+        g.renderLayers = *names;
+    }
     if (Status s = readStrings(j, "include", g.include); !s) return s.error();
     if (Status s = readStrings(j, "exclude", g.exclude); !s) return s.error();
 
@@ -242,6 +250,7 @@ Json GameSettings::toJson() const {
     };
     list("include", include);
     list("exclude", exclude);
+    if (Json layers = renderLayers.toJson(); !layers.members().empty()) j["render"] = Json::object({{"layers", layers}});
     return j;
 }
 

@@ -71,7 +71,7 @@ struct DrawUniforms {
     float4 material4;     // x = alpha cutoff (0 = off)
     // --- appended (velocity buffer) ---
     float4x4 prevModel;   // the object's model matrix in the previous frame (= model when static)
-    float4 motion;        // x = moves (prevModel differs or a previous skinned pose is bound), yzw = unused
+    float4 motion;        // x = moves (prevModel differs or a previous skinned pose is bound), y = render layers (bits as a float), zw = unused
 };
 static_assert(sizeof(DrawUniforms) == 336, "DrawUniforms must match MetalRenderer.mm");
 
@@ -97,7 +97,40 @@ struct GPULight {
     float4 colorIntensity;  // rgb, w = intensity
     float4 directionCone;   // xyz, w = cos(cone)
     float4 kind;            // x: 0 directional, 1 point, 2 spot
+    // --- appended (light v2) ---
+    float4 params;          // x = specular, y = layer mask (20 bits as a float), z = cos(inner cone) (0 = auto), w = 1 inverse square
+    float4 params2;         // x = emitter radius (m), y = indirect, z = volumetric, w = unused
 };
+static_assert(sizeof(GPULight) == 96, "GPULight must match MetalRenderer.mm");
+
+// Render layers: does light `l` light a surface on `layers`? Surfaces without a layers field
+// (terrain, foliage, water, particles, hair) are on layer 1.
+static bool lightAffects(GPULight l, uint layers) { return (uint(l.params.y) & layers) != 0u; }
+
+// Radiance arriving at `pos` from light `l` (direction to the light in `dirOut`): smooth or
+// inverse-square falloff windowed to the range, spot cone with an optional inner angle.
+// Negative lights carry a negative intensity.
+static float3 lightRadiance(GPULight l, float3 pos, thread float3& dirOut) {
+    float atten = 1.0;
+    if (l.kind.x < 0.5) {
+        dirOut = -l.directionCone.xyz;
+    } else {
+        float3 toL = l.positionRange.xyz - pos;
+        float dist = length(toL);
+        dirOut = toL / max(dist, 1e-4);
+        float r = l.positionRange.w;
+        float window = saturate(1.0 - pow(dist / r, 4.0));
+        window *= window;
+        float size = max(l.params2.x, 1e-3);
+        atten = l.params.w > 0.5 ? window / max(dist * dist, size * size) : window / (dist * dist + 1.0);
+        if (l.kind.x > 1.5) {
+            float cd = dot(-dirOut, l.directionCone.xyz);
+            float inner = l.params.z > 0.0 ? max(l.params.z, l.directionCone.w + 1e-4) : mix(l.directionCone.w, 1.0, 0.2);
+            atten *= smoothstep(l.directionCone.w, inner, cd);
+        }
+    }
+    return l.colorIntensity.rgb * l.colorIntensity.w * atten;
+}
 
 struct Vertex {
     packed_float3 position;
@@ -247,7 +280,7 @@ struct SurfaceData {
     float3 N;
 };
 
-static float3 directLight(SurfaceData s, float3 V, float3 L, float3 radiance) {
+static float3 directLight(SurfaceData s, float3 V, float3 L, float3 radiance, float specScale = 1.0) {
     float3 N = s.N;
     float NdotL = dot(N, L);
     float NdotV = max(dot(N, V), 1e-4);
@@ -261,7 +294,7 @@ static float3 directLight(SurfaceData s, float3 V, float3 L, float3 radiance) {
     float a = s.roughness * s.roughness;
     float3 F0 = mix(float3(0.04), s.albedo, s.metallic);
     float3 F = F_Schlick(F0, VdotH);
-    float3 spec = D_GGX(NdotH, a) * V_SmithGGX(NdotV, max(nl, 1e-4), a) * F;
+    float3 spec = D_GGX(NdotH, a) * V_SmithGGX(NdotV, max(nl, 1e-4), a) * F * specScale;
     float3 kd = (1.0 - F) * (1.0 - s.metallic);
     float3 color = (kd * s.albedo / M_PI_F * diffNdotL + spec * nl) * radiance * M_PI_F;
     // Transmission (thin parts glow when backlit)
@@ -273,20 +306,20 @@ static float3 directLight(SurfaceData s, float3 V, float3 L, float3 radiance) {
     if (s.clearcoat > 0.0) {
         float ac = 0.06 * 0.06;
         float Fc = 0.04 + 0.96 * pow(1.0 - VdotH, 5.0);
-        float cc = D_GGX(NdotH, ac) * V_SmithGGX(NdotV, max(nl, 1e-4), ac) * Fc * s.clearcoat;
+        float cc = D_GGX(NdotH, ac) * V_SmithGGX(NdotV, max(nl, 1e-4), ac) * Fc * s.clearcoat * specScale;
         color = color * (1.0 - Fc * s.clearcoat) + cc * radiance * nl * M_PI_F;
     }
     return color;
 }
 
-static float3 toonLight(SurfaceData s, float3 V, float3 L, float3 radiance) {
+static float3 toonLight(SurfaceData s, float3 V, float3 L, float3 radiance, float specScale = 1.0) {
     float NdotL = dot(s.N, L);
     float w = fwidth(NdotL) * 1.5 + 0.01;
     float band = smoothstep(0.0, w, NdotL) * 0.55 + smoothstep(0.45, 0.45 + w, NdotL) * 0.45;
     float3 H = normalize(V + L);
     float shin = mix(180.0, 12.0, s.roughness);
     float sp = pow(saturate(dot(s.N, H)), shin);
-    float hl = smoothstep(0.5 - w, 0.5 + w, sp) * (1.0 - s.roughness * 0.7);
+    float hl = smoothstep(0.5 - w, 0.5 + w, sp) * (1.0 - s.roughness * 0.7) * specScale;
     float3 base = s.albedo * (1.0 - s.metallic * 0.5);
     return (base * band + mix(float3(1.0), s.albedo, s.metallic) * hl * 0.6) * radiance;
 }
@@ -398,22 +431,10 @@ static float3 reconstructWorld(constant FrameUniforms& f, float2 uv, float depth
 }
 
 static float3 pointLightAt(GPULight l, float3 pos, float3 n, thread float3& dirOut) {
-    float3 Ll;
-    float atten = 1.0;
-    if (l.kind.x < 0.5) {
-        Ll = -l.directionCone.xyz;
-    } else {
-        float3 toL = l.positionRange.xyz - pos;
-        float dist = length(toL);
-        Ll = toL / max(dist, 1e-4);
-        float r = l.positionRange.w;
-        float falloff = saturate(1.0 - pow(dist / r, 4.0));
-        atten = falloff * falloff / (dist * dist + 1.0);
-        if (l.kind.x > 1.5) {
-            float cd = dot(-Ll, l.directionCone.xyz);
-            atten *= smoothstep(l.directionCone.w, mix(l.directionCone.w, 1.0, 0.2), cd);
-        }
+    (void)n;
+    if (!lightAffects(l, 1u)) {  // water, particles, fluids and hair are on layer 1
+        dirOut = float3(0.0, 1.0, 0.0);
+        return float3(0.0);
     }
-    dirOut = Ll;
-    return l.colorIntensity.rgb * l.colorIntensity.w * atten;
+    return lightRadiance(l, pos, dirOut);
 }

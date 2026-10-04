@@ -10,6 +10,7 @@
 
 #include "skywalker/core/Json.h"
 #include "skywalker/core/Result.h"
+#include "skywalker/render/RenderLayers.h"
 
 namespace sky {
 struct Environment;
@@ -44,6 +45,8 @@ struct GameSettings {
     // Packaging
     std::vector<std::string> include;  // extra project files/folders to ship (globs: "audio/**", "data/*.json")
     std::vector<std::string> exclude;  // files to leave out even when referenced (globs)
+    // Rendering: "render": {"layers": {"1": "world", "2": "player"}} names the 20 render layers
+    render::LayerNames renderLayers;
 
     bool fromFile = false;  // a game.json was found
 
