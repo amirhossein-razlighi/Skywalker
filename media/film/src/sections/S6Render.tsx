@@ -1,6 +1,6 @@
 import React from "react";
 import { AbsoluteFill, interpolate, Sequence, useCurrentFrame } from "remotion";
-import { Footage, pickSlot, resolveSlot } from "../components/Footage";
+import { clipOffset, Footage, pickSlot, resolveSlot } from "../components/Footage";
 import { Backdrop, LightLeak } from "../components/Overlays";
 import { Kicker, MaskLine, Words } from "../components/Type";
 import { BAR, BEAT } from "../timeline";
@@ -14,27 +14,24 @@ import { C, EASE, FONT, prog } from "../theme";
 
 type Shot = { slot: string; beats: number; title: string; sub: string; fallback?: string[]; tr?: "whip" | "zoom" | "flash" };
 
+/** Four worlds, four moods: the island at golden hour, the monastery valley, the neon city, the farm. 48 beats. */
 const SHOTS: Shot[] = [
-  { slot: "rs_ocean", beats: 4, title: "FFT ocean", sub: "JONSWAP waves, whitecaps, refraction", tr: "flash" },
-  { slot: "rs_galleon", beats: 2, title: "Volumetric light", sub: "Sun shafts through the rigging", tr: "whip" },
-  { slot: "rs_beach", beats: 2, title: "Coastlines", sub: "Shore surf, wet sand, foam lines", tr: "zoom" },
-  { slot: "rs_clouds", beats: 4, title: "Volumetric clouds", sub: "Ray-marched, multiple scattering", tr: "whip" },
-  { slot: "rs_terrain", beats: 2, title: "Eroded terrain", sub: "Heightfields up to 4097², eight blended layers", tr: "zoom" },
-  { slot: "rs_valley", beats: 2, title: "Instanced foliage", sub: "Wind-animated forests, automatic LODs", tr: "whip" },
-  { slot: "rs_canyon", beats: 2, title: "Atmosphere", sub: "Aerial perspective and god rays", tr: "flash" },
-  { slot: "rs_campfire", beats: 2, title: "Fluid fire", sub: "3D GPU simulation, blackbody flames", tr: "zoom" },
-  { slot: "rs_rain", beats: 4, title: "Clustered lighting", sub: "Up to 1,024 lights, rain and mist", tr: "whip" },
-  { slot: "rs_puddle", beats: 2, title: "Screen-space reflections", sub: "GGX importance-sampled", tr: "zoom" },
-  { slot: "rs_neon_city", beats: 2, title: "Neon in the rain", sub: "Every light reflected, every drop lit", tr: "whip" },
-  { slot: "rs_fire", beats: 2, title: "Fire and steam", sub: "Combustion, buoyancy, vorticity", tr: "flash" },
-  { slot: "rs_gi", beats: 4, title: "Global illumination", sub: "Firelight bouncing through the room", tr: "zoom" },
-  { slot: "rs_fog", beats: 2, title: "Height fog", sub: "Lanterns in the mist", tr: "whip" },
-  { slot: "rs_aurora", beats: 2, title: "HDR and bloom", sub: "AgX, ACES and filmic tonemapping", tr: "zoom" },
-  { slot: "rs_abyss", beats: 2, title: "Emissive light", sub: "Three hundred meters down", tr: "whip" },
-  { slot: "rs_hair", beats: 4, title: "Strand hair", sub: "100k strands, Marschner shading", tr: "flash" },
-  { slot: "rs_fur", beats: 2, title: "Fur", sub: "GPU-simulated, self-shadowed", tr: "zoom" },
-  { slot: "rs_particles", beats: 2, title: "GPU particles", sub: "Millions per emitter", tr: "whip" },
-  { slot: "rs_vortex", beats: 4, title: "Curl noise and ribbons", sub: "Particles that emit light", tr: "zoom" },
+  { slot: "rs_isle_aerial", beats: 4, title: "Coastlines", sub: "A sculpted island, surf on the reef, a brig at anchor", tr: "flash" },
+  { slot: "rs_isle_swash", beats: 4, title: "FFT ocean", sub: "Waves that run up the sand, foam lines, wet sand", tr: "whip" },
+  { slot: "rs_isle_palms", beats: 2, title: "Volumetric light", sub: "Sun shafts through the palms", tr: "zoom" },
+  { slot: "rs_isle_campfire", beats: 2, title: "Volumetric fire", sub: "Flames, embers and flickering light", tr: "whip" },
+  { slot: "rs_peaks_forest", beats: 4, title: "Instanced forests", sub: "Wind-animated, with LODs and impostors", tr: "flash" },
+  { slot: "rs_peaks_lake", beats: 2, title: "Atmosphere", sub: "Valley mist and aerial perspective", tr: "zoom" },
+  { slot: "rs_peaks_gate", beats: 2, title: "Physical sky", sub: "Sun, sky and haze from one model", tr: "whip" },
+  { slot: "rs_peaks_hall", beats: 2, title: "HDR and bloom", sub: "AgX, ACES and filmic tone mapping", tr: "zoom" },
+  { slot: "rs_neon_avenue", beats: 4, title: "Clustered lighting", sub: "Hundreds of lights, rain and mist", tr: "flash" },
+  { slot: "rs_neon_puddle", beats: 4, title: "Screen-space reflections", sub: "GGX importance-sampled", tr: "zoom" },
+  { slot: "rs_neon_holo", beats: 4, title: "Neon in the rain", sub: "Every light reflected, every drop lit", tr: "whip" },
+  { slot: "rs_neon_noodle", beats: 2, title: "Global illumination", sub: "Lantern light that bounces", tr: "zoom" },
+  { slot: "rs_neon_skyline", beats: 2, title: "Scale", sub: "A whole city, thousands of lit windows", tr: "whip" },
+  { slot: "rs_farm_rows", beats: 4, title: "Depth of field", sub: "Physical aperture and focus distance", tr: "flash" },
+  { slot: "rs_farm_pond", beats: 2, title: "Water", sub: "Reflections, lily pads, the low sun", tr: "zoom" },
+  { slot: "rs_farm_mini", beats: 4, title: "Tilt-shift lens", sub: "One camera setting, and the farm is a miniature", tr: "whip" },
 ];
 
 const MONTAGE_FRAMES = 12 * BAR;
@@ -124,7 +121,7 @@ const ShotView: React.FC<{ shot: ReturnType<typeof layout>[number]; index: numbe
           opacity,
         }}
       >
-        <Footage slot={shot.slot} fallback={shot.fallback} duration={shot.dur + TR} kb={{ from: kbFrom, to: kbTo }} />
+        <Footage slot={shot.slot} fallback={shot.fallback} duration={shot.dur + TR} offset={clipOffset(shot.slot, shot.dur + TR)} kb={{ from: kbFrom, to: kbTo }} />
         {/* lower-left callout */}
         <AbsoluteFill style={{ background: "linear-gradient(0deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0) 32%)" }} />
         <div style={{ position: "absolute", left: 96, bottom: 92 }}>

@@ -12,6 +12,8 @@ import { C, EASE, FONT, prog } from "../theme";
  * final render. On the downbeat of bar 8 we cut to black and the logo draws itself.
  */
 export const LOGO_AT = bars(8);
+/** The three matched clips (sketch, clay, final) start their slow drift past the brig here, together. */
+const PLAY_AT = 150;
 
 const Caption: React.FC<{ text: string; at: number; out: number }> = ({ text, at, out }) => (
   <div style={{ position: "absolute", left: 0, right: 0, bottom: 118, display: "flex", justifyContent: "center" }}>
@@ -34,7 +36,7 @@ const Caption: React.FC<{ text: string; at: number; out: number }> = ({ text, at
 
 export const S1Open: React.FC = () => {
   const frame = useCurrentFrame();
-  const t = { draw: [6, 200] as [number, number], sketch: [110, 230] as [number, number], clay: [236, 316] as [number, number], final: [356, 440] as [number, number] };
+  const t = { draw: [6, 168] as [number, number], sketch: [104, 176] as [number, number], clay: [236, 316] as [number, number], final: [356, 440] as [number, number] };
   // dip to black right before the logo hit
   const dip = prog(frame, LOGO_AT - 14, LOGO_AT, EASE.in);
   const fadeIn = prog(frame, 0, 20);
@@ -48,9 +50,10 @@ export const S1Open: React.FC = () => {
           <SketchReveal
             slot="open_hero"
             t={t}
-            origin={[66, 22]}
+            origin={[74, 42]}
             wipeAngle={96}
-            move={{ from: [0.6, 0.4, 1.02], to: [-0.8, -0.2, 1.13], duration: LOGO_AT }}
+            playAt={PLAY_AT}
+            move={{ from: [0, 0, 1.0], to: [0, -0.4, 1.06], duration: LOGO_AT }}
           />
           <LightLeak t={interpolate(frame, [400, 560], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" })} x0={80} x1={10} strength={0.5} />
           <AbsoluteFill style={{ background: "linear-gradient(0deg, rgba(0,0,0,0.45) 0%, rgba(0,0,0,0) 28%)" }} />

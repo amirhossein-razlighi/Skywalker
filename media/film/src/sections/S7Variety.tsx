@@ -1,37 +1,44 @@
 import React from "react";
-import { AbsoluteFill, interpolate, Sequence, useCurrentFrame, useVideoConfig } from "remotion";
+import { AbsoluteFill, Sequence, useCurrentFrame, useVideoConfig } from "remotion";
 import { Footage, pickSlot, resolveSlot } from "../components/Footage";
 import { Kicker, Words } from "../components/Type";
 import { C, EASE, FONT, SPRING, hash, lerp, prog, sp } from "../theme";
-import { typed } from "../ui/kit";
 
 /**
- * Variety (7 bars, 504 frames): a mosaic of every sample game; then UI + dialogue on the noir street;
- * then the 2D platformer. Vocabulary: the grid (tiles springing in, one tile scaling up to fill the frame).
+ * Variety (9 bars, 648 frames): a mosaic of every sample game (the flagships move, the older samples are
+ * stills); the strategy map tile grows to full frame and keeps zooming down to the front line; then the
+ * political drama's decree is signed; then Gloamwater, the same engine in 2D, with its own dialogue box.
+ * Every HUD, map label, tooltip, document and dialogue box on screen here is the engine's UI, not an overlay.
  */
 
 const TILES: { slot: string; label: string; fallback?: string[] }[] = [
-  { slot: "var_platformer2d", label: "2D platformer" },
-  { slot: "var_park", label: "Park builder" },
-  { slot: "var_noir", label: "Neo-noir adventure" },
+  { slot: "rs_neon_avenue", label: "Neo-noir RPG" },
+  { slot: "var_gloam_run", label: "Metroidvania" },
+  { slot: "rs_isle_aerial", label: "Island adventure" },
+  { slot: "var_drama", label: "Political drama" },
   { slot: "var_kart", label: "Kart racing" },
+  { slot: "var_strategy", label: "Grand strategy" },
+  { slot: "rs_peaks_forest", label: "Mythic action" },
+  { slot: "var_farm", label: "Farming life sim" },
   { slot: "var_shmup", label: "Space shooter" },
-  { slot: "var_zen", label: "Meditative" },
   { slot: "var_horror", label: "Horror" },
-  { slot: "var_cozy", label: "Cozy life sim" },
-  { slot: "var_strategy", label: "Strategy" },
+  { slot: "var_zen", label: "Meditative" },
   { slot: "var_arena", label: "Arena shooter" },
-  { slot: "var_platformer3d", label: "3D platformer" },
   { slot: "var_frost", label: "Cozy exploration" },
-  { slot: "var_farm", label: "Farm sim" },
-  { slot: "var_village", label: "Sky village" },
+  { slot: "var_park", label: "Park builder" },
   { slot: "rs_abyss", label: "Underwater horror" },
-  { slot: "rs_canyon", label: "Open-world survival" },
-  { slot: "rs_ocean", label: "Pirate adventure" },
-  { slot: "rs_rain", label: "Stealth" },
-  { slot: "rs_clouds", label: "Open world" },
+  { slot: "rs_canyon", label: "Survival" },
+  { slot: "var_village", label: "Sky village" },
+  { slot: "var_cozy", label: "Cozy life sim" },
 ];
 
+const FOCUS = "var_strategy";
+/** The map tile holds on the whole continent, then starts its zoom while the grid is still on screen. */
+const FOCUS_PLAY = 100;
+/** The map fills the frame on beat 11; from here the full-frame Strategy shot carries the same clip on. */
+const MAP_CUT = 198;
+/** Beat 16: cut to the Chancellor's office as Decree No. 14 arrives (the zoom has landed by then). */
+const DECREE_CUT = 288;
 const COLS = 4;
 const GAP = 14;
 const TW = (1920 - 2 * 96 - (COLS - 1) * GAP) / COLS; // 421
@@ -44,11 +51,20 @@ const Mosaic: React.FC = () => {
   const tiles = avail.slice(0, Math.min(16, avail.length - (avail.length % COLS)));
   const rows = Math.ceil(tiles.length / COLS);
   const gridH = rows * TH + (rows - 1) * GAP;
-  // the camera pulls back from a close-up of the grid, then the noir tile flies to full frame
+  // the camera pulls back from a close-up of the grid, then the farm tile grows to fill the frame
   const pull = prog(frame, 0, 110, EASE.out);
   const s0 = lerp(1.45, 0.86, pull);
-  const focusIdx = tiles.findIndex((t) => t.slot === "var_noir");
-  const fly = prog(frame, 168, 200, EASE.inOut);
+  const focusIdx = tiles.findIndex((t) => t.slot === FOCUS);
+  const fly = prog(frame, 162, 196, EASE.inOut);
+  // where the focus tile sits on screen (grid space -> screen space), so it can grow from there
+  const fcol = focusIdx % COLS;
+  const frow = Math.floor(focusIdx / COLS);
+  const gx = 960 + (fcol * (TW + GAP) - (1920 - 192) / 2) * s0;
+  const gy = 540 + lerp(0, 60, pull) * s0 + (frow * (TH + GAP) - gridH / 2) * s0;
+  const fl = lerp(gx, 0, fly);
+  const ft = lerp(gy, 0, fly);
+  const fw = lerp(TW * s0, 1920, fly);
+  const fh = lerp(TH * s0, 1080, fly);
   return (
     <AbsoluteFill style={{ background: C.void }}>
       <AbsoluteFill style={{ alignItems: "center", justifyContent: "center", transform: `scale(${s0}) translateY(${lerp(0, 60, pull)}px)` }}>
@@ -58,26 +74,24 @@ const Mosaic: React.FC = () => {
             const row = Math.floor(i / COLS);
             const s = sp(frame, fps, 4 + (col + row) * 3 + hash(i) * 6, SPRING.snappy);
             const isFocus = i === focusIdx;
-            const x = col * (TW + GAP);
-            const y = row * (TH + GAP);
             const lbl = prog(frame, 50 + i * 2, 64 + i * 2);
             return (
               <div
                 key={t.slot}
                 style={{
                   position: "absolute",
-                  left: x,
-                  top: y,
+                  left: col * (TW + GAP),
+                  top: row * (TH + GAP),
                   width: TW,
                   height: TH,
                   borderRadius: 14,
                   overflow: "hidden",
-                  opacity: s * (isFocus ? 1 : 1 - fly),
+                  opacity: s * (1 - fly) * (isFocus && fly > 0 ? 0 : 1),
                   transform: `scale(${0.8 + 0.2 * s})`,
                   boxShadow: "0 18px 50px rgba(0,0,0,0.5)",
                 }}
               >
-                <Footage slot={t.slot} fallback={t.fallback} duration={220} kb={{ from: [0, 0, 1.08], to: [hash(i) * 4 - 2, 0, 1.0] }} placeholderLabel={false} />
+                <Footage slot={t.slot} fallback={t.fallback} duration={220} offset={isFocus ? 0 : 8} playAt={isFocus ? FOCUS_PLAY : 0} kb={{ from: [0, 0, 1.08], to: [hash(i) * 4 - 2, 0, 1.0] }} placeholderLabel={false} />
                 <div
                   style={{
                     position: "absolute",
@@ -91,7 +105,7 @@ const Mosaic: React.FC = () => {
                     fontWeight: 600,
                     fontSize: 17,
                     color: "#fff",
-                    opacity: lbl * (1 - fly),
+                    opacity: lbl,
                   }}
                 >
                   {t.label}
@@ -101,120 +115,80 @@ const Mosaic: React.FC = () => {
           })}
         </div>
       </AbsoluteFill>
-      <AbsoluteFill style={{ background: "radial-gradient(55% 45% at 50% 50%, rgba(4,5,13,0.82), rgba(4,5,13,0.2) 80%, transparent)", opacity: prog(frame, 70, 90) * (1 - prog(frame, 150, 168)) }} />
-      <AbsoluteFill style={{ alignItems: "center", justifyContent: "center", opacity: 1 - prog(frame, 150, 166) }}>
+      <AbsoluteFill style={{ background: "radial-gradient(55% 45% at 50% 50%, rgba(4,5,13,0.82), rgba(4,5,13,0.2) 80%, transparent)", opacity: prog(frame, 70, 90) * (1 - prog(frame, 146, 162)) }} />
+      <AbsoluteFill style={{ alignItems: "center", justifyContent: "center", opacity: 1 - prog(frame, 146, 160) }}>
         <Words text={"One engine.\nEvery kind of game."} at={74} size={120} weight={700} />
       </AbsoluteFill>
-      {/* the focus tile grows to full frame */}
+      {/* the map tile grows out of the grid to full frame (the same clip keeps playing) */}
       {fly > 0 && (
-        <AbsoluteFill style={{ opacity: fly }}>
-          <Footage slot="var_noir" duration={300} kb={{ from: [0, 0, 1.0], to: [0, -1, 1.06] }} />
-        </AbsoluteFill>
+        <div style={{ position: "absolute", left: fl, top: ft, width: fw, height: fh, borderRadius: lerp(14 * s0, 0, fly), overflow: "hidden" }}>
+          <Footage slot={FOCUS} playAt={FOCUS_PLAY} placeholderLabel={false} />
+        </div>
       )}
     </AbsoluteFill>
   );
 };
 
-const LINES = [
-  "Mara, the rain keeps no secrets. Neither should you.",
-];
-
-/** UI + dialogue recreated over the noir street (original characters and lines). */
-const Dialogue: React.FC = () => {
+/** Lower-left caption on a soft scrim, clear of the games' own HUDs. */
+const Caption: React.FC<{ kicker: string; title: string; color: string; at: number; out: number; top?: number }> = ({ kicker, title, color, at, out, top }) => {
   const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
-  const box = sp(frame, fps, 6, SPRING.snappy);
-  const line = typed(frame, 20, LINES[0], 34);
-  const choices = ["Tell him about the ledger.", "Say nothing.", "Ask who sent him."];
-  const pick = frame > 118 ? 0 : -1;
-  const exit = prog(frame, 176, 190, EASE.in);
+  const o = 1 - prog(frame, out, out + 12, EASE.in);
   return (
-    <AbsoluteFill>
-      <Footage slot="var_noir" duration={200} kb={{ from: [0, -1, 1.06], to: [0, -1.6, 1.1] }} />
-      <AbsoluteFill style={{ background: "linear-gradient(0deg, rgba(0,0,0,0.75), rgba(0,0,0,0) 55%)" }} />
-      <div style={{ position: "absolute", left: 96, top: 92, opacity: 1 - exit }}>
-        <Kicker text="2D · UI · dialogue" at={4} color={C.sunset} />
-        <Words text="UI and dialogue, built in." at={8} size={62} weight={700} align="left" />
+    <>
+      <AbsoluteFill style={{ background: top === undefined ? "linear-gradient(0deg, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0) 36%)" : "linear-gradient(90deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0) 42%)", opacity: o }} />
+      <div style={{ position: "absolute", left: 96, ...(top === undefined ? { bottom: 92 } : { top }), opacity: o }}>
+        <Kicker text={kicker} at={at} color={color} />
+        <div style={{ height: 12 }} />
+        <Words text={title} at={at + 4} size={64} weight={700} align="left" style={{ textShadow: "0 3px 30px rgba(0,0,0,0.6)" }} />
       </div>
-      {/* HUD */}
-      <div style={{ position: "absolute", right: 96, top: 96, display: "flex", gap: 14, opacity: prog(frame, 10, 24) * (1 - exit) }}>
-        {["Case 3 · The Ledger", "23:41"].map((t) => (
-          <div key={t} style={{ padding: "10px 18px", borderRadius: 10, background: "rgba(10,12,26,0.6)", border: "1px solid rgba(255,90,170,0.4)", fontFamily: FONT.mono, fontSize: 20, color: "#ffd6ef" }}>{t}</div>
-        ))}
-      </div>
-      <div
-        style={{
-          position: "absolute",
-          left: 260,
-          right: 260,
-          bottom: 90,
-          opacity: interpolate(box, [0, 0.5], [0, 1], { extrapolateRight: "clamp" }) * (1 - exit),
-          transform: `translateY(${(1 - box) * 40}px)`,
-        }}
-      >
-        <div style={{ display: "flex", gap: 26, padding: "26px 30px", borderRadius: 20, background: "rgba(12,14,28,0.82)", backdropFilter: "blur(14px)", border: "1px solid rgba(120,200,255,0.25)" }}>
-          <div style={{ width: 120, height: 120, borderRadius: 16, background: "linear-gradient(160deg, #2b3a6b, #6b2b5a)", flexShrink: 0, display: "flex", alignItems: "flex-end", justifyContent: "center", overflow: "hidden" }}>
-            <svg width={100} height={100} viewBox="0 0 100 100">
-              <circle cx={50} cy={40} r={20} fill="#151826" />
-              <path d="M14 100 Q50 55 86 100 Z" fill="#151826" />
-              <path d="M26 30 L74 30 L66 22 L34 22 Z" fill="#0b0d18" />
-              <rect x={20} y={28} width={60} height={5} rx={2} fill="#0b0d18" />
-            </svg>
-          </div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontFamily: FONT.display, fontWeight: 600, fontSize: 24, color: "#7fd4ff", letterSpacing: 0.5 }}>DETECTIVE ROOK</div>
-            <div style={{ fontFamily: FONT.body, fontSize: 32, color: "#fff", marginTop: 8, lineHeight: 1.35, minHeight: 44 }}>{line}</div>
-            <div style={{ marginTop: 16, display: "flex", gap: 12 }}>
-              {choices.map((c, i) => {
-                const p = prog(frame, 84 + i * 6, 96 + i * 6);
-                const sel = pick === i;
-                return (
-                  <div
-                    key={c}
-                    style={{
-                      padding: "10px 16px",
-                      borderRadius: 10,
-                      fontFamily: FONT.body,
-                      fontWeight: 500,
-                      fontSize: 21,
-                      color: sel ? "#0b0d18" : "#e8ecff",
-                      background: sel ? "#7fd4ff" : "rgba(255,255,255,0.07)",
-                      border: "1px solid rgba(255,255,255,0.12)",
-                      opacity: p,
-                      transform: `translateY(${(1 - p) * 10}px) scale(${sel ? 1.04 : 1})`,
-                    }}
-                  >
-                    {i + 1}. {c}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      </div>
+    </>
+  );
+};
+
+/** Meridian Accord full frame: the zoom continues from the tile down to the river crossing (labels, tooltip, HUD). */
+const Strategy: React.FC = () => (
+  <AbsoluteFill>
+    <Footage slot={FOCUS} offset={MAP_CUT - FOCUS_PLAY} placeholderLabel={false} />
+    <Caption kicker="Meridian Accord" title={"From the continent\nto the front line."} color={C.sunset} at={6} out={78} />
+  </AbsoluteFill>
+);
+
+/** The Chancellor's Desk: Decree No. 14 slides in and the cursor signs it. */
+const Decree: React.FC = () => {
+  const frame = useCurrentFrame();
+  const p = prog(frame, 0, 16, EASE.out);
+  return (
+    <AbsoluteFill style={{ background: C.void }}>
+      <AbsoluteFill style={{ transform: `scale(${lerp(1.06, 1, p)})` }}>
+        <Footage slot="var_decree" offset={0} placeholderLabel={false} />
+      </AbsoluteFill>
+      <Caption kicker="The Chancellor's Desk" title={"Documents, choices,\nconsequences."} color={C.gold} at={10} out={164} top={430} />
     </AbsoluteFill>
   );
 };
 
-/** The 2D platformer with a HUD; the frame splits to show it is the same engine. */
-const Platformer: React.FC = () => {
+/** Gloamwater: the same engine in 2D. Wick runs the grove, then meets Bellwether; the dialogue box is the engine's UI. */
+const Gloam: React.FC = () => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const inn = sp(frame, fps, 0, SPRING.gentle);
-  const coins = Math.min(12, Math.floor(Math.max(0, frame - 20) / 9));
-  const exit = prog(frame, 100, 114, EASE.in);
+  const RUN = 62;
+  const capOut = prog(frame, RUN + 40, RUN + 54, EASE.in);
   return (
     <AbsoluteFill style={{ background: C.void }}>
       <AbsoluteFill style={{ clipPath: `inset(0 0 0 ${(1 - inn) * 100}%)` }}>
-        <Footage slot="var_platformer2d" duration={120} kb={{ from: [2, 0, 1.06], to: [-2, 0, 1.06] }} />
-        <div style={{ position: "absolute", left: 60, top: 50, display: "flex", gap: 22, alignItems: "center", fontFamily: FONT.display, fontWeight: 700, fontSize: 40, color: "#fff", textShadow: "0 3px 0 rgba(0,0,0,0.25)" }}>
-          <span style={{ color: "#ffd75e" }}>● {String(coins).padStart(2, "0")}</span>
-          <span style={{ color: "#ff6b8a" }}>♥♥♥</span>
-        </div>
+        <Sequence durationInFrames={RUN}>
+          <Footage slot="var_gloam_run" offset={20} placeholderLabel={false} />
+        </Sequence>
+        <Sequence from={RUN}>
+          <Footage slot="var_gloam_talk" offset={4} placeholderLabel={false} />
+        </Sequence>
       </AbsoluteFill>
-      <AbsoluteFill style={{ alignItems: "center", justifyContent: "flex-end", paddingBottom: 110, opacity: 1 - exit }}>
-        <div style={{ padding: "18px 34px", borderRadius: 20, background: "rgba(8,10,24,0.55)", backdropFilter: "blur(10px)" }}>
-          <Words text="Same engine. Two dimensions." at={16} size={64} weight={700} />
+      <AbsoluteFill style={{ alignItems: "center", justifyContent: "center", opacity: 1 - capOut }}>
+        <div style={{ marginTop: -40, textAlign: "center" }}>
+          <Kicker text="Gloamwater" at={14} color="#7ff4e4" />
+          <div style={{ height: 14 }} />
+          <Words text="Same engine. Two dimensions." at={18} size={78} weight={700} style={{ textShadow: "0 3px 40px rgba(0,0,0,0.7)" }} />
         </div>
       </AbsoluteFill>
     </AbsoluteFill>
@@ -223,14 +197,17 @@ const Platformer: React.FC = () => {
 
 export const S7Variety: React.FC = () => (
   <AbsoluteFill style={{ background: C.void }}>
-    <Sequence durationInFrames={204}>
+    <Sequence durationInFrames={MAP_CUT}>
       <Mosaic />
     </Sequence>
-    <Sequence from={200} durationInFrames={190}>
-      <Dialogue />
+    <Sequence from={MAP_CUT} durationInFrames={DECREE_CUT - MAP_CUT}>
+      <Strategy />
     </Sequence>
-    <Sequence from={388} durationInFrames={116}>
-      <Platformer />
+    <Sequence from={DECREE_CUT} durationInFrames={468 - DECREE_CUT}>
+      <Decree />
+    </Sequence>
+    <Sequence from={468} durationInFrames={180}>
+      <Gloam />
     </Sequence>
   </AbsoluteFill>
 );

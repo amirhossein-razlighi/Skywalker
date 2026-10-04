@@ -17,7 +17,7 @@ import sys
 import numpy as np
 from PIL import Image
 
-INK = 150  # contour lines are ~115 grey, hatching ~170+, paper ~245
+INK = int(os.environ.get("SKY_INK", 150))  # contour lines are ~115 grey, hatching ~170+, paper ~245 (video frames: ~160)
 SCALE = 1  # trace at full resolution
 
 

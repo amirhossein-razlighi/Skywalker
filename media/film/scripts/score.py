@@ -27,6 +27,9 @@ BPM = TL["bpm"]
 BEAT = 60.0 / BPM
 BAR = BEAT * TL["beatsPerBar"]
 N_BARS = max(s["startBar"] + s["bars"] for s in TL["sections"])
+SEC_START = {s["id"]: s["startBar"] for s in TL["sections"]}
+FIN = SEC_START["finale"]  # finale: triptych +0, accelerating cuts +2, hero impact +4, end card +6
+TOOLS = SEC_START["tools"]
 LENGTH = N_BARS * BAR + 0.5
 N = int(LENGTH * SR)
 rng = np.random.default_rng(20261004)
@@ -146,7 +149,7 @@ def chord_for(bar):
     if s == "variety":
         return ["G", "D", "A", "Bm"][k % 4]
     if s == "finale":
-        if bar >= 82:
+        if bar >= FIN + 4:
             return "D"
         return ["G", "A", "Bm", "A"][k % 4]
     return "D"
@@ -170,18 +173,18 @@ kick_times = []
 # ---------------------------------------------------------------- pads
 for bar in range(N_BARS):
     s = sec_id(bar)
-    if s == "finale" and bar >= 84:
+    if s == "finale" and bar >= FIN + 6:
         hold = (N_BARS - bar) * BAR + 0.4
     else:
         hold = BAR
-    if s == "finale" and bar > 84:
+    if s == "finale" and bar > FIN + 6:
         continue
     chord = CH[chord_for(bar)]
     e = energy(bar)
     bright = 14 if e < 0.4 else 30 if e < 0.8 else 60
     if s == "problem":
         bright = 6
-    if s == "finale" and bar >= 82:
+    if s == "finale" and bar >= FIN + 4:
         bright = 60
     n = int((hold + 1.6) * SR)
     sig = np.zeros((n, 2))
@@ -224,12 +227,12 @@ for bar in range(0, 8, 2):
         if bar == 0 and beat < 2:
             continue
         add(bell, bell_note(m), t_of_bar(bar, beat), 0.16)
-for bar in (70, 72, 74, 76):
+for bar in (TOOLS, TOOLS + 2, TOOLS + 4, TOOLS + 6):
     for beat, m in MOTIF[::2]:
         add(bell, bell_note(m + 12, 2.0, 0.6), t_of_bar(bar, beat), 0.07)
 for beat, m in [(0, 74), (0.02, 78), (0.04, 81), (0.06, 86)]:
-    add(bell, bell_note(m, 5.0), t_of_bar(82, beat), 0.13)
-    add(bell, bell_note(m, 5.0), t_of_bar(84, beat), 0.09)
+    add(bell, bell_note(m, 5.0), t_of_bar(FIN + 4, beat), 0.13)
+    add(bell, bell_note(m, 5.0), t_of_bar(FIN + 6, beat), 0.09)
 
 # ---------------------------------------------------------------- arpeggio
 ARP_PATTERN = [0, 2, 3, 4, 3, 2, 1, 2]
@@ -244,14 +247,14 @@ def pluck(f, dur=0.32, bright=30):
 
 for bar in range(N_BARS):
     s = sec_id(bar)
-    if s in ("open", "problem") or (s == "finale" and bar >= 82):
+    if s in ("open", "problem") or (s == "finale" and bar >= FIN + 4):
         continue
     if s == "wander" and bar < 42:
         continue
     chord = CH[chord_for(bar)]
     tones = [m + 12 for m in chord[1:]]
     e = energy(bar)
-    sixteenth = s in ("render", "variety") or (s == "finale" and bar >= 80)
+    sixteenth = s in ("render", "variety") or (s == "finale" and bar >= FIN + 2)
     steps = 16 if sixteenth else 8
     for k in range(steps):
         m = tones[ARP_PATTERN[k % 8] % len(tones)]
@@ -314,7 +317,7 @@ KICK, CLAP, HATC, HATO = kick(), clap(), hat(), hat(True)
 for bar in range(N_BARS):
     s = sec_id(bar)
     e = energy(bar)
-    full = s in ("render", "variety") or (s == "finale" and 78 <= bar < 82)
+    full = s in ("render", "variety") or (s == "finale" and FIN <= bar < FIN + 4)
     half = s in ("idea", "studio", "tools") or (s == "wander" and bar >= 44)
     if s == "idea" and bar < 22:
         half = False
@@ -324,8 +327,8 @@ for bar in range(N_BARS):
         kb = [0, 2.5] if s != "tools" else [0, 2]
     else:
         kb = []
-    if s == "finale" and bar >= 80:  # build: eighth-note kicks into the hit
-        kb = [i * 0.5 for i in range(8)] if bar == 81 else [0, 1, 2, 3]
+    if s == "finale" and bar >= FIN + 2:  # build: eighth-note kicks into the hit
+        kb = [i * 0.5 for i in range(8)] if bar == FIN + 3 else [0, 1, 2, 3]
     for b in kb:
         t0 = t_of_bar(bar, b)
         kick_times.append(t0)
@@ -348,14 +351,14 @@ for bar in range(N_BARS):
     s = sec_id(bar)
     if s in ("open",) and bar < 8:
         continue
-    if s == "finale" and bar >= 84:
+    if s == "finale" and bar >= FIN + 6:
         continue
     root = CH[chord_for(bar)][0]
     while root > 45:
         root -= 12
     f = mtof(root + 12) if root < 36 else mtof(root)
     e = energy(bar)
-    if s in ("render", "variety") or (s == "finale" and bar < 82):
+    if s in ("render", "variety") or (s == "finale" and bar < FIN + 4):
         pattern = [(i * 0.5, 0.42) for i in range(8)]
     elif s == "problem":
         pattern = [(0, 2.3)]
