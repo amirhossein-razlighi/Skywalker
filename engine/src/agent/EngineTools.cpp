@@ -722,7 +722,8 @@ void addViewTools(Engine& engine, ToolRegistry& reg) {
     reg.add({"viewport_capture", "Look at the scene",
              "Render the scene and return a PNG plus every visible entity with its on-screen box [x, y, w, h]. "
              "annotate=true (default) draws each entity's #id on the image so you can match what you see to ids. "
-             "Choose the view: the editor camera (default), the game camera (view=\"scene\"), or any eye/target.",
+             "Choose the view: the editor camera (default), the game camera (view=\"scene\"), or any eye/target. "
+             "probe=<entity> returns that reflection probe's captured cubemap instead (6 faces as a cross).",
              "view",
              object({{"width", integer("Image width (default 768, max 2048)")},
                      {"height", integer("Image height (default 432, max 2048)")},
@@ -746,7 +747,8 @@ void addViewTools(Engine& engine, ToolRegistry& reg) {
                                                 "material), emission, specular. Geometry: wireframe, overdraw (heat map), lod (green 0 .. red 3), "
                                                 "uv_checker, texel_density (green = 512 texels/m). Lights: shadow_cascades (red/green/blue/yellow), "
                                                 "light_complexity (lights per pixel heat map), shadow_atlas (point/spot shadow maps, outlined per light: green "
-                                                "re-rendered, blue cached, orange waiting; see shadow_atlas_info). Motion: the velocity buffer (hue = "
+                                                "re-rendered, blue cached, orange waiting; see shadow_atlas_info), reflection_probes (which probe lights each pixel, "
+                                                "their volumes; see probe_info). Motion: the velocity buffer (hue = "
                                                 "direction, strength = speed). Also sketch, impostors. Full legend: "
                                                 "viewport_debug_view {\"list\": true}")},
                      {"quality", enumeration({"full", "balanced", "fast"}, "Viewport quality tier (default full; fast/balanced preview what the editor shows while editing)")},

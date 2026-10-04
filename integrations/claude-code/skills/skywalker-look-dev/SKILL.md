@@ -16,6 +16,7 @@ the rubric below, change again. Do not set 30 fields at once: you cannot tell wh
 | Lights | `entity_create`/`entity_update` with `components.light` | `kind: directional\|point\|spot, color, intensity (0..1000), range (m), spotAngle`; v2: `temperature` (Kelvin, 0 = off), `innerAngle` (spot hard core), `specular` (0 = no glints), `volumetric` (god-ray strength), `negative` (subtracts light), `attenuation: smooth\|inverse_square` + `size`, `distanceFade` + `fadeBegin`/`fadeLength`, `cullMask` (layers it lights); shadows: `castShadows` (default true), `shadowResolution`, `shadowBias`, `shadowNormalBias`, `shadowMaxDistance`, `shadowMode: cube\|dual_paraboloid` |
 | Light shadows | `light_shadows` (one light, a list or `"all"`), `shadow_atlas_info` | budgets in the environment: `localShadowLights` (16), `localShadowUpdates` (24 views/frame), `localShadowAtlas` (4096 px) |
 | Render layers | `render_layers` | name layers (`action:"name"`), put meshes on layers (`layers`) and give cameras / lights a `cull_mask`, by name |
+| Reflection probes | `probe_add` (sizes the box to the room), `probe_bake`, `probe_info`, or `components.reflection_probe` | `size, blendDistance, boxProjection, projectionSize/projectionOffset, interior, ambient: probe\|sky\|color, ambientColor, update: once\|on_change\|realtime, interval, resolution (64..512), priority, cullMask`; budgets: `probeBudget` (16 probes), `probeUpdates` (6 faces/frame) |
 | Camera lens | `components.camera` | `fov, aperture (f-stop, 0 = DOF off), focusDistance (m, 0 = autofocus), motionBlur (0..1, 0.5 film-like: camera and moving objects), primary, cullMask` |
 | Surfaces | `material_create` / `material_update` / `texture_generate`, or `components.mesh` | `color, metallic, roughness, emissive (alpha = strength, HDR), normalMap, ormMap, clearcoat, subsurface, triplanar, shading: pbr\|toon\|unlit\|water` |
 | Judging | `viewport_capture` | `samples, debug_view, overlays:false, annotate:false, view:"scene", quality` |
@@ -43,7 +44,7 @@ Details and per-look numbers are in [references/recipes.md](references/recipes.m
 | **Golden hour** | `preset:"noon"`, `skyMode:"atmosphere"`, `sunElevation:12-16`, `sunColor:"#ffd9a8"`, `sunIntensity:3`, volumetric `clouds:0.35`, `gi:0.5`, `godRays:0.8`, `haze:0.012`, **cool** `fogColor:"#a9bbd6"` with low `fogDensity:0.0015`, `look:"golden_hour"` at `lookStrength:0.25`, `tonemap:"agx"`, `autoExposure`, `exposureCompensation:-0.3`. Camera low (eye height), sun behind/beside the subject for rim light. |
 | **Overcast / moody** | `preset:"overcast"`, `clouds:0.8`, `cloudDensity:1.2`, soft `shadowSoftness:4`, `sunIntensity` low, `ao:1.2`, desaturate (`saturation:0.85`), `look:"bleach"` at 0.2-0.3, `fogDensity:0.006`, `fogHeight:0.5`. |
 | **Night neon** | gradient sky near black, `stars`, low `ambient:0.15`, `gi:0.8`, `ssr:0.9` on wet glossy floor (`roughness:0.1-0.2`), emissive strips (`emissive` strength 2-5) plus matching point lights, `bloomIntensity:0.5-0.7` with `bloomThreshold:1.2+`, `look:"teal_orange"` 0.3, `chromaticAberration:0.1`, `grain:0.08`. |
-| **Interior** | `ambient:0.1-0.3` (the sky must not light the room), `reflections:0.3`, sun through windows (`godRays` + `haze:0.02`), warm point/spot lights (intensity 8-25 for `range` 8-14), `ao:1.2`, `gi:0.7`, `autoExposure` with `adaptationSpeed` 1-2. |
+| **Interior** | one `probe_add {position: [room center, ~1.5 m up], interior: true}` per room (floors, metal and glass then reflect the room, not the sky), sun through windows (`godRays` + `haze:0.02`), warm point/spot lights (intensity 8-25 for `range` 8-14), `ao:1.2`, `gi:0.7`, `autoExposure` with `adaptationSpeed` 1-2. Without a probe: `ambient:0.1-0.3`, `reflections:0.3`. |
 | **Cinematic close-up** | `fov:28-40`, `aperture:1.8-2.8`, `focusDistance` = distance to the subject (`raycast` it), `motionBlur:0.5` only for moving shots, `vignette:0.25`, `grain:0.06`. |
 | **Stylized / toon** | `shading:"toon"` + `outline:2-3` + `rim:0.5`, `tonemap:"neutral"`, `saturation:1.2`, `gi:0`, `ssr:0`. |
 
@@ -64,6 +65,7 @@ Details and per-look numbers are in [references/recipes.md](references/recipes.m
 | Everything glows or is washed out | `"lighting"` (before SS-GI/reflections), `"gi"` | Which term adds the light: fog/haze, GI, ambient, bloom |
 | Materials look plastic or wrong | `"albedo"`, `"material"` (roughness red, metallic green) | Albedo too bright/saturated; roughness uniform |
 | Reflections absent or noisy | `"reflections"` | `ssr` too low, floor too rough, `samples` too low |
+| Indoor metal / floors reflect blue sky | `"reflection_probes"` (each probe's color per pixel, its box outlined; gray = sky) | No probe covers the spot: `probe_add`, or the floor lies on the box's bottom face (`probe_info` warns); `viewport_capture {probe:"Hall Probe"}` shows what the probe captured |
 | Wrong shape / scale | `"depth"` | Near/far planes, scale errors |
 | Is it the light or the material? | `"lighting_only"` (white material), `"unshaded"` (albedo + emission) | Light placement and shadows vs. texture/albedo problems |
 | Glossy/metal looks wrong | `"specular"` (F0 x glossiness) | Dielectrics should be dark gray; metals tinted; a green/colored dielectric means a wrong `metallic` or ORM blue channel |
@@ -102,6 +104,12 @@ The live editor viewport renders at a **tier** so heavy worlds stay responsive w
   `ignoredFixtures` the small meshes within 0.3 m that are skipped, and `reason` says why a light has no shadow
   (`over_light_budget`: raise `localShadowLights` or turn off minor lights with `light_shadows`). Move the light out of
   the shade, or set `castShadows:false` on the blocking mesh. Look at the maps with `debug_view:"shadow_atlas"`.
+- **Indoor reflections show the sky** (blue floors, sky in a chrome ball in a closed room): screen-space reflections only see
+  what is on screen; everything else falls back to the sky. Add a reflection probe per room (`probe_add {position, interior:true}`)
+  and check `debug_view:"reflection_probes"`. Probes are captured once and cached: after moving furniture or changing the lights
+  run `probe_bake` (`probe_info` flags `stale` probes). Long streets: several probes along it, each with `projectionSize` = the
+  whole street so reflections stay aligned; extend the volumes below the road (`probe_info` warns when the floor sits on the
+  bottom face).
 - **Many lamps, slow frames**: shadows are cached while nothing in range moves; `shadowMaxDistance` (e.g. 40) frees
   distant lamps in big levels, and `particles.lightShadows` / `fluid.lightShadows` stay off unless a fire needs them.
 - **Camera inside terrain** gives a flat orange/brown frame: check the camera height against the ground.
@@ -129,7 +137,8 @@ most dielectrics, `metallic` 0 or 1 (rarely in between), `subsurface` for leaves
 ## Verification checklist before reporting done
 
 - Beauty shot at 16+ samples, `quality:"full"` (the default), overlays off, from the camera the game will use (`view:"scene"`).
-- At least one `debug_view` (`lighting` or `gi`) if you changed light terms.
+- At least one `debug_view` (`lighting` or `gi`) if you changed light terms; `reflection_probes` and `probe_info` (no warnings) if the
+  scene has glossy surfaces indoors or in streets.
 - `perf_stats {frames:30, passes:true}` if you added many lights (all lights shade surfaces through clusters; the 16 most important also light
   water, particles and fog) or volumetrics: `profile.groups` shows which area got expensive (`main`, `shadows`, `ssgi`, `clouds`, `volumetrics`,
   `post` ...), `gpu.lights` counts layer-masked, negative and inverse-square lights, and `debug_view:"light_complexity"` shows where lights stack up

@@ -29,10 +29,10 @@ struct ProbeBlock {
     GPUProbe probes[kProbeMax];
 };
 
-static bool probeFlag(GPUProbe p, int bit) { return (int(p.params.z + 0.5) & bit) != 0; }
+static bool probeFlag(constant GPUProbe& p, int bit) { return (int(p.params.z + 0.5) & bit) != 0; }
 
 // Distance (m) to the nearest face of the volume: > 0 inside. `local` = the point in the volume frame.
-static float probeEdgeDistance(GPUProbe p, float3 local) {
+static float probeEdgeDistance(constant GPUProbe& p, float3 local) {
     if (probeFlag(p, 4)) return p.extents.x - length(local);
     float3 q = p.extents.xyz - abs(local);
     return min(q.x, min(q.y, q.z));
@@ -41,7 +41,7 @@ static float probeEdgeDistance(GPUProbe p, float3 local) {
 constant float kProbeInteriorMargin = 0.1;     // probes::kInteriorMargin
 constant float kProbeInteriorMinWeight = 1e-3;  // probes::kInteriorMinWeight
 
-static float probeInfluence(GPUProbe p, float3 local) {
+static float probeInfluence(constant GPUProbe& p, float3 local) {
     float d = probeEdgeDistance(p, local);
     if (probeFlag(p, 2)) {  // interior: the room's walls (on or just outside the faces) still belong to it
         return d <= -kProbeInteriorMargin ? 0.0 : clamp(d / max(p.extents.w, 1e-3), kProbeInteriorMinWeight, 1.0);
@@ -50,7 +50,7 @@ static float probeInfluence(GPUProbe p, float3 local) {
 }
 
 // Cubemap lookup direction for reflection vector R at `world` (probes::lookupDir).
-static float3 probeLookup(GPUProbe p, float3 world, float3 local, float3 R) {
+static float3 probeLookup(constant GPUProbe& p, float3 world, float3 local, float3 R) {
     if (!probeFlag(p, 1)) return R;
     float3 rl = (p.worldToLocal * float4(R, 0.0)).xyz;
     const bool proxy = p.projection.w > 0.5;  // a projection box other than the volume
@@ -94,7 +94,7 @@ static ProbeSample sampleProbes(constant ProbeBlock& pb, const device uint* clus
         const uint i = ctz(mask);
         mask &= mask - 1u;
         if (int(i) >= count) break;
-        GPUProbe p = pb.probes[i];
+        constant GPUProbe& p = pb.probes[i];
         float3 local = (p.worldToLocal * float4(world, 1.0)).xyz;
         float w = probeInfluence(p, local);
         if (w <= 0.0) continue;
@@ -126,25 +126,30 @@ static float3 probeOverSky(float3 probeLight, float weight, bool interior, float
 }
 
 // Image-based light of a surface point: diffuse ambient (`irr`) and the prefiltered reflection
-// (`spec`), both already scaled (Environment.ambient / reflections for the sky part). Used by lit
-// surfaces in the main pass and by the lighting resolve, so screen-space reflections replace exactly
-// what the surface added.
+// (`spec`), both already scaled (Environment.ambient / reflections for the sky part): probes over the
+// sky. Used by the lighting resolve (opaque surfaces), transparent meshes, hair and probe captures.
 struct EnvLight {
     float3 irr;
     float3 spec;
 };
 
+// The sky cube's image-based light alone (no probes).
+static EnvLight skyEnvLight(constant FrameUniforms& f, texturecube<float> envTex, float3 N, float3 R, float rough) {
+    EnvLight e;
+    e.irr = envTex.sample(cubeSampler, N, level(f.extra.z)).rgb * f.ground.w;
+    e.spec = envTex.sample(cubeSampler, R, level(rough * f.extra.z)).rgb * f.sky.w * f.ground.w;
+    return e;
+}
+
 static EnvLight environmentLight(constant FrameUniforms& f, constant ProbeBlock& pb, const device uint* probeClusters,
                                  texturecube_array<float> probeAtlas, texturecube<float> envTex, uint cluster, float3 world,
                                  float3 N, float3 R, float rough) {
-    const float maxMip = f.extra.z;
     EnvLight e;
     if ((int(pb.info.z + 0.5) & 2) != 0) {  // interior capture: a constant ambient instead of the sky
         e.irr = pb.ambient.rgb;
         e.spec = pb.ambient.rgb;
     } else {
-        e.irr = envTex.sample(cubeSampler, N, level(maxMip)).rgb * f.ground.w;
-        e.spec = envTex.sample(cubeSampler, R, level(rough * maxMip)).rgb * f.sky.w * f.ground.w;
+        e = skyEnvLight(f, envTex, N, R, rough);
     }
     if (pb.info.x > 0.5) {
         ProbeSample ps = sampleProbes(pb, probeClusters, probeAtlas, cluster, world, R, N, rough, true);
@@ -253,7 +258,7 @@ fragment float4 probeDebugFragment(FullscreenOut in [[stage_in]], constant Frame
     bool interior = false;
     if (surface) {
         for (int i = 0; i < count && acc < 0.999; ++i) {
-            GPUProbe p = volumes.probes[i];
+            constant GPUProbe& p = volumes.probes[i];
             if (p.params.x < -0.5) continue;  // no capture yet
             float w = probeInfluence(p, (p.worldToLocal * float4(world, 1.0)).xyz);
             if (w <= 0.0) continue;
@@ -270,7 +275,7 @@ fragment float4 probeDebugFragment(FullscreenOut in [[stage_in]], constant Frame
     // Volume outlines and capture points (constant pixel width).
     const float px = max(dp.params.x, 1e-5);
     for (int i = 0; i < count; ++i) {
-        GPUProbe p = volumes.probes[i];
+        constant GPUProbe& p = volumes.probes[i];
         float3 col = probeDebugColor(p.ambient.w);
         float3 lo = (p.worldToLocal * float4(ro, 1.0)).xyz;
         float3 ld = (p.worldToLocal * float4(rd, 0.0)).xyz;

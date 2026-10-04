@@ -917,7 +917,8 @@ private:
             "exposureFragment", "motionBlurFragment", "dofCocFragment", "dofBlurFragment",
             "dofCombineFragment", "motionVectorFragment", "wireframeFragment", "overdrawFragment",
             "motionTileMaxFragment", "motionNeighborMaxFragment", "fxExposureFragment",
-            "shadowClearVertex", "shadowAtlasDebugFragment", "probeSkyFragment", "probeFilterKernel", "probeDebugFragment"};
+            "shadowClearVertex", "shadowAtlasDebugFragment", "probeSkyFragment", "probeFilterKernel", "probeDebugFragment",
+            "meshFragmentProbes", "ssgiProbesFragment", "lightingResolveProbesFragment"};
         return kRequired;
     }
 
@@ -1008,7 +1009,8 @@ private:
         NSError* e = nil;
         id<MTLRenderPipelineState> sky = make("fullscreenVertex", "skyFragment", kHDRFormat, kSamples, Blend::None, true, &e, true);
         id<MTLRenderPipelineState> mesh = sky ? make("meshVertex", "meshFragment", kHDRFormat, kSamples, Blend::None, true, &e, true) : nil;
-        id<MTLRenderPipelineState> meshBlend = mesh ? make("meshVertex", "meshFragment", kHDRFormat, kSamples, Blend::Alpha, true, &e, true) : nil;
+        // Transparent meshes have no G-buffer for the lighting resolve: they shade reflection probes themselves.
+        id<MTLRenderPipelineState> meshBlend = mesh ? make("meshVertex", "meshFragmentProbes", kHDRFormat, kSamples, Blend::Alpha, true, &e, true) : nil;
         id<MTLRenderPipelineState> grid = meshBlend ? make("gridVertex", "gridFragment", kHDRFormat, kSamples, Blend::Alpha, true, &e, true) : nil;
         id<MTLRenderPipelineState> shadow = grid ? make("shadowVertex", nullptr, MTLPixelFormatInvalid, 1, Blend::None, true, &e) : nil;
         id<MTLRenderPipelineState> present = shadow ? make("fullscreenVertex", "presentFragment", kColorFormat, 1, Blend::None, false, &e) : nil;
@@ -1059,7 +1061,12 @@ private:
         id<MTLRenderPipelineState> overdraw = wire ? make("meshVertex", "overdrawFragment", kHDRFormat, kSamples, Blend::Additive, true, &e, true) : nil;
         id<MTLRenderPipelineState> terrainWire = overdraw ? make("terrainVertex", "wireframeFragment", kHDRFormat, kSamples, Blend::Alpha, true, &e, true) : nil;
         id<MTLRenderPipelineState> terrainOverdraw = terrainWire ? make("terrainVertex", "overdrawFragment", kHDRFormat, kSamples, Blend::Additive, true, &e, true) : nil;
-        if (!terrainOverdraw) volume = nil;
+        // [reflection probes] variants with probe code: opaque meshes in probe captures (bounce light), and the
+        // SSGI / resolve passes while probes shade the frame (the plain ones stay lean without probes).
+        id<MTLRenderPipelineState> meshProbes = terrainOverdraw ? make("meshVertex", "meshFragmentProbes", kHDRFormat, kSamples, Blend::None, true, &e, true) : nil;
+        id<MTLRenderPipelineState> ssgiProbes = meshProbes ? make("fullscreenVertex", "ssgiProbesFragment", kHDRFormat, 1, Blend::None, false, &e) : nil;
+        id<MTLRenderPipelineState> resolveProbes = ssgiProbes ? make("fullscreenVertex", "lightingResolveProbesFragment", kHDRFormat, 1, Blend::None, false, &e) : nil;
+        if (!resolveProbes) volume = nil;
         if (volume) {
             for (const char* k : {"fluidAdvect", "fluidCorrect", "fluidCombust", "fluidCurl", "fluidForces", "fluidDivergence",
                                   "fluidJacobi", "fluidProject"}) {
@@ -1133,6 +1140,9 @@ private:
         overdrawPipeline_ = overdraw;
         terrainWirePipeline_ = terrainWire;
         terrainOverdrawPipeline_ = terrainOverdraw;
+        meshProbesPipeline_ = meshProbes;  // [reflection probes]
+        ssgiProbesPipeline_ = ssgiProbes;
+        resolveProbesPipeline_ = resolveProbes;
         if (fx_) fx_->build(lib, FxFormats{kHDRFormat, kGbufAFormat, kGbufBFormat, kDepthFormat, kSamples, kShadowAtlas / 2, kVelocityFormat});  // [hair+vfx]
         libraryMs_ = libMs;  // [shader cache] engine_info.shaders
         pipelinesMs_ = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
@@ -1868,7 +1878,7 @@ private:
         [enc setFragmentBuffer:blockBuf.buffer offset:blockBuf.offset atIndex:10];  // bounce light: probes reaching the capture
         [enc setFragmentBytes:&face.mask length:sizeof(face.mask) atIndex:11];
         [enc setFragmentTexture:probes_->atlas() atIndex:33];
-        [enc setRenderPipelineState:meshPipeline_];
+        [enc setRenderPipelineState:meshProbesPipeline_];  // bounce light: the probes' previous captures
         [enc setDepthStencilState:depthWrite_];
         const Frustum frustum(face.viewProj);
         std::vector<const DrawItem*> blended;
@@ -1882,7 +1892,7 @@ private:
             }
             const bool cut = d.surface.alphaCutoff > 0.f;
             if (cut != cutoutBound) {
-                [enc setRenderPipelineState:cut ? meshCutoutPipeline_ : meshPipeline_];
+                [enc setRenderPipelineState:cut ? meshCutoutPipeline_ : meshProbesPipeline_];
                 cutoutBound = cut;
             }
             drawMesh(enc, d, di);
@@ -3000,7 +3010,8 @@ private:
         u.params2 = simd_make_float4(reproject ? 1.f : 0.f, temporal ? 0.9f : 0.f, 0.65f, static_cast<float>(seed % 1024));
         u.texel = simd_make_float4(1.f / hdr_.width, 1.f / hdr_.height, 1.f / giRaw_.width, 1.f / giRaw_.height);
         if (giActive_) {
-            fullscreenFU(cmd, ssgiPipeline_, giRaw_, {depthResolved_, gbufB_, radiance, envCube_}, fu, &u, sizeof(u), @"SSGI");
+            fullscreenFU(cmd, probes_->active() ? ssgiProbesPipeline_ : ssgiPipeline_, giRaw_, {depthResolved_, gbufB_, radiance, envCube_}, fu,
+                         &u, sizeof(u), @"SSGI");
             if (temporal) {
                 id<MTLTexture> dst = giHist_[giCurrent_ ^ 1];
                 fullscreenFU(cmd, ssTemporalPipeline_, dst, {giRaw_, giHist_[giCurrent_], depthResolved_, depthPrev_}, fu, &u,
@@ -3029,7 +3040,7 @@ private:
         r.params = simd_make_float4(std::min(env.gi, 1.f), env.ssr, env.ao, giActive_ ? 1.f : 0.f);
         r.params2 = simd_make_float4(ssrActive_ ? 1.f : 0.f, aoActive_ ? 1.f : 0.f, 0, 0);
         r.texel = simd_make_float4(1.f / hdr_.width, 1.f / hdr_.height, 1.f / giRaw_.width, 1.f / giRaw_.height);
-        fullscreenFU(cmd, resolvePipeline_, lit_,
+        fullscreenFU(cmd, probes_->active() ? resolveProbesPipeline_ : resolvePipeline_, lit_,
                      {hdr_, gbufA_, gbufB_, depthResolved_, aoBlurred_, giOut_, ssrOut_, envCube_, brdfLut_}, fu, &r,
                      sizeof(r), @"Lighting resolve");
     }
@@ -3415,6 +3426,7 @@ private:
     id<MTLRenderPipelineState> wireframePipeline_, overdrawPipeline_, terrainWirePipeline_, terrainOverdrawPipeline_;
     std::unique_ptr<MetalShadows> shadows_;  // [local shadows]
     std::unique_ptr<MetalProbes> probes_;    // [reflection probes]
+    id<MTLRenderPipelineState> meshProbesPipeline_, ssgiProbesPipeline_, resolveProbesPipeline_;  // [reflection probes]
     Alloc probeBlockBuf_{}, probeMaskBuf_{};  // [reflection probes] this frame's shaded probes and cluster masks
 };
 
