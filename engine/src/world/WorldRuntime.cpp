@@ -153,6 +153,7 @@ void WorldRuntime::gather(const Scene& scene, const ViewCamera& view, FrameData&
         item.data = data;
         item.waterLevel = t->waterLevel;
         item.wetBand = t->wetBand;
+        item.macroVariation = t->macroVariation;
         item.detail = t->detail;
         item.castShadows = t->castShadows;
         if (!t->overlay.empty() && t->overlayOpacity > 0.f) {

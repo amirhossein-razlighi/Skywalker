@@ -53,6 +53,13 @@ void OrbitCamera::lookAt(Vec3 eye, Vec3 newTarget) {
     yaw = degrees(std::atan2(d.x, d.z));
 }
 
+void ViewCamera::lookFrom(Vec3 e, Vec3 t) {
+    eye = e;
+    target = t;
+    nearPlane = std::clamp(distance(e, t) * 0.005f, 0.02f, 0.25f);
+    farPlane = std::max(farPlane, 40000.f);
+}
+
 ViewCamera OrbitCamera::toView() const {
     float cp = std::cos(radians(pitch)), sp = std::sin(radians(pitch));
     float cy = std::cos(radians(yaw)), sy = std::sin(radians(yaw));

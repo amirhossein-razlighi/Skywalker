@@ -23,6 +23,7 @@ struct Terrain {
     float waterLevel = -100000.f;     // world height of nearby water: sand and soil look wet below it + wetBand
     float wetBand = 1.2f;             // meters above the water line that stay damp (shorelines, wave run-up)
     float detail = 1.f;               // LOD quality multiplier (0.5 faster .. 2 sharper)
+    float macroVariation = 0.f;       // 0..1 large-scale tone/hue variation (breaks up layer tiling across a landscape)
     bool castShadows = true;
     // Map overlay: one image draped over the whole terrain (row 0 = -Z edge, column 0 = -X edge),
     // e.g. a political map, region tints, borders, a paper/parchment map. Its alpha masks it.

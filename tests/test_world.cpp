@@ -140,6 +140,10 @@ TEST_CASE("world: terrain and foliage tools, frame items and raycasts") {
     REQUIRE(hit);
     CHECK(hit->entity == terrain);
 
+    r = e.callTool("entity_update", Json::parse(R"({"entity":"Terrain","components":{"terrain":{"macroVariation":0.6}}})").value(), "agent:test");
+    REQUIRE(!r.isError);
+    CHECK(e.scene().get<Terrain>(terrain)->macroVariation == doctest::Approx(0.6f));
+
     CaptureOptions o;
     o.width = 64;
     o.height = 36;
@@ -150,6 +154,7 @@ TEST_CASE("world: terrain and foliage tools, frame items and raycasts") {
     REQUIRE(cap);
     REQUIRE(cap->frame.terrains.size() == 1);
     CHECK(cap->frame.terrains[0].layers.size() >= 4);
+    CHECK(cap->frame.terrains[0].macroVariation == doctest::Approx(0.6f));
     CHECK(!cap->frame.instances.empty());
 }
 

@@ -10,7 +10,7 @@
 struct TerrainUniforms {
     float4 origin;           // xyz = world position of the terrain center, w = size (m)
     float4 grid;             // x = resolution, y = 1/resolution, z = cell size (m), w = layer count
-    float4 water;            // x = water level (world y), y = wet band (m), z = selected, w = unused
+    float4 water;            // x = water level (world y), y = wet band (m), z = selected, w = macro variation
     float4 layerParams[8];   // x = tiling (repeats per m), y = normal strength, z = roughness, w = flags
     float4 layerColor[8];    // rgb = tint (linear), a = metallic
     float4 overlay;          // x = opacity (0 = no overlay), y = blend (0 mix, 1 multiply, 2 glow)
@@ -211,6 +211,15 @@ fragment MainOut terrainFragment(TerrainOut in [[stage_in]],
 
     SurfaceData s;
     s.albedo = acc.albedo;
+    // Macro variation: kilometer-scale patches of lusher/darker and drier/warmer ground plus a
+    // mid-scale brightness break-up, so a landscape never reads as one repeated texture.
+    if (tu.water.w > 0.0) {
+        float m1 = valueNoise(wp.xz * 0.0065) * 0.6 + valueNoise(wp.xz * 0.021) * 0.4;
+        float m2 = valueNoise(wp.xz * 0.085 + 17.0);
+        float3 lush = float3(0.80, 0.92, 0.74), dry = float3(1.12, 1.04, 0.86);
+        float3 tintC = mix(lush, dry, smoothstep(0.25, 0.75, m1)) * (0.86 + 0.28 * m2);
+        s.albedo *= mix(float3(1.0), tintC, saturate(tu.water.w));
+    }
     s.alpha = 1.0;
     s.ao = acc.orm.x;
     s.roughness = clamp(acc.orm.y, 0.04, 1.0);

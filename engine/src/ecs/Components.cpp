@@ -303,6 +303,8 @@ const TypeInfo& Terrain::type() {
             SKY_FIELD(Terrain, waterLevel, Float, "World height of the water line (wet sand/soil just above it)"),
             SKY_FIELD_RANGE(Terrain, wetBand, Float, "Meters above the water line that stay damp", 0.f, 20.f),
             SKY_FIELD_RANGE(Terrain, detail, Float, "Level-of-detail quality multiplier", 0.25f, 4.f),
+            SKY_FIELD_RANGE(Terrain, macroVariation, Float,
+                            "Large-scale tone and hue variation over the whole landscape (0 = off, 0.5 natural)", 0.f, 1.f),
             SKY_FIELD(Terrain, castShadows, Bool, "Cast sun shadows"),
             SKY_FIELD(Terrain, overlay, String,
                       "Image draped over the whole terrain (row 0 = -Z edge): political/region maps, borders, paper maps. "

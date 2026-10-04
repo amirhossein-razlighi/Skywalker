@@ -89,8 +89,8 @@ CaptureOptions characterView(Engine& engine, EntityId e, const Json& a) {
     if (reflect::jsonToVec3(a.get("eye"), eye)) {
         o.hasCustomView = true;
         o.customView = engine.camera().toView();
-        o.customView.eye = eye;
-        if (reflect::jsonToVec3(a.get("target"), target)) o.customView.target = target;
+        if (!reflect::jsonToVec3(a.get("target"), target)) target = o.customView.target;
+        o.customView.lookFrom(eye, target);
         return o;
     }
     Scene& s = engine.scene();

@@ -41,6 +41,9 @@ struct ViewCamera {
     float motionBlur = 0.f;     // shutter fraction
 
     Mat4 view() const { return Mat4::lookAt(eye, target, up); }
+    /// Points the camera from `eye` at `target` with clip planes suited to any view distance
+    /// (custom captures and cinematics: close-ups and kilometer-scale vistas alike).
+    void lookFrom(Vec3 e, Vec3 t);
     Mat4 projection(float aspect) const;
     /// Ray through pixel (x,y) of a width x height viewport (y down).
     Ray rayAt(float x, float y, int width, int height) const;
@@ -197,6 +200,7 @@ struct TerrainItem {
     std::vector<Layer> layers;
     float waterLevel = -100000.f;
     float wetBand = 1.2f;
+    float macroVariation = 0.f;
     float detail = 1.f;
     bool castShadows = true;
     bool selected = false;
