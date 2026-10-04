@@ -5,7 +5,7 @@ title: "Wander builtins"
 
 # Wander builtins
 
-Every function a Wander script can call lives in one registry: name, typed parameters, return type, category, documentation and an example. The compiler checks calls against it (arity, types, did-you-mean), and this page is generated from it. **135 builtins** in 19 categories.
+Every function a Wander script can call lives in one registry: name, typed parameters, return type, category, documentation and an example. The compiler checks calls against it (arity, types, did-you-mean), and this page is generated from it. **136 builtins** in 19 categories.
 
 Agents get the same information from `wander_reference` (the guide) and `wander_reference {topic}` (structured entries for a category or a function). For the language itself, read the [Wander manual](../manual/wander/index.md).
 
@@ -26,7 +26,7 @@ Agents get the same information from `wander_reference` (the guide) and `wander_
 | [physics](#physics) | [`impulse`](#physics-impulse), [`overlap_sphere`](#physics-overlap_sphere), [`push`](#physics-push), [`raycast`](#physics-raycast), [`torque`](#physics-torque), [`velocity`](#physics-velocity) |
 | [random](#random) | [`chance`](#random-chance), [`pick`](#random-pick), [`random`](#random-random), [`random_int`](#random-random_int), [`shuffle`](#random-shuffle) |
 | [render](#render) | [`layer_mask`](#render-layer_mask) |
-| [scene](#scene) | [`add_tag`](#scene-add_tag), [`children`](#scene-children), [`count`](#scene-count), [`exists`](#scene-exists), [`find`](#scene-find), [`find_all`](#scene-find_all), [`has`](#scene-has), [`nearest`](#scene-nearest), [`remove_tag`](#scene-remove_tag), [`spawn`](#scene-spawn), [`tagged`](#scene-tagged) |
+| [scene](#scene) | [`add_tag`](#scene-add_tag), [`children`](#scene-children), [`count`](#scene-count), [`exists`](#scene-exists), [`find`](#scene-find), [`find_all`](#scene-find_all), [`has`](#scene-has), [`nearest`](#scene-nearest), [`remove_tag`](#scene-remove_tag), [`set_parent`](#scene-set_parent), [`spawn`](#scene-spawn), [`tagged`](#scene-tagged) |
 | [text](#text) | [`num`](#text-num), [`str`](#text-str), [`type_of`](#text-type_of), [`ends_with`](#text-ends_with), [`lower`](#text-lower), [`replace`](#text-replace), [`split`](#text-split), [`starts_with`](#text-starts_with), [`trim`](#text-trim), [`upper`](#text-upper) |
 | [time](#time) | [`is_paused`](#time-is_paused), [`pause_game`](#time-pause_game), [`resume_game`](#time-resume_game), [`teleport`](#time-teleport), [`time_scale`](#time-time_scale), [`unscaled_dt`](#time-unscaled_dt), [`unscaled_time`](#time-unscaled_time) |
 | [vector](#vector) | [`cross`](#vector-cross), [`direction`](#vector-direction), [`distance`](#vector-distance), [`dot`](#vector-dot), [`forward`](#vector-forward), [`length`](#vector-length), [`normalize`](#vector-normalize), [`right`](#vector-right), [`up`](#vector-up), [`vec`](#vector-vec), [`world_position`](#vector-world_position) |
@@ -1979,6 +1979,26 @@ Returns: `none`
 remove_tag(self, "carried")
 ```
 
+### `set_parent` { #scene-set_parent }
+
+```text
+set_parent(e: entity, parent: none|entity, keep_world: bool?)
+```
+
+Moves an entity under a new parent, or to the scene root with none. By default it keeps its world position, rotation and scale (keep_world = false keeps its local transform instead, so it jumps to the same offset from the new parent). Parenting under itself or a descendant fails. Like every play-time change, it is undone when play stops.
+
+| Parameter | Type | |
+|---|---|---|
+| `e` | entity |  |
+| `parent` | none\|entity |  |
+| `keep_world` | bool | optional |
+
+Returns: `none`
+
+```text
+set_parent(item, self)  -- pick it up; set_parent(item, none) drops it
+```
+
 ### `spawn` { #scene-spawn }
 
 ```text
@@ -2733,6 +2753,7 @@ world_position(self)
         has(e: entity, component: string) -> bool — Whether the entity has a component ("light", "particles", ...).
         nearest(tag: string, max_distance: number?) -> none|entity — Closest other active entity with a tag (within max_distance); none if there is none.
         remove_tag(e: entity, tag: string) — Removes a tag from an entity.
+        set_parent(e: entity, parent: none|entity, keep_world: bool?) — Moves an entity under a new parent, or to the scene root with none. By default it keeps its world position, rotation and scale (keep_world = false keeps its local transform instead, so it jumps to the same offset from the new parent). Parenting under itself or a descendant fails. Like every play-time change, it is undone when play stops.
         spawn(mesh: string, position: vector|entity?, name?) -> entity — Creates an entity: a primitive mesh ("cube", "sphere"...), "asset:models/x.glb", or a whole prefab "prefab:prefabs/coin.prefab.json" (with its children and behaviors). Its behaviors start next tick. Limits: 256 spawns per tick, 20000 entities.
         tagged(e, tag: string) -> bool — Whether an entity has a tag (false for none).
       [text]

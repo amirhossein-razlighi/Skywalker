@@ -8,6 +8,7 @@
 #include <numeric>
 
 #include "RuntimeInternal.h"
+#include "skywalker/anim/AnimMath.h"
 #include "skywalker/core/Strings.h"
 #include "skywalker/wander/Builtins.h"
 
@@ -404,6 +405,35 @@ void registerCoreBuiltins(BuiltinRegistry& r) {
            std::vector<Value> out;
            for (EntityId id : c.scene().children(c.entity(0))) out.push_back(Value::entity(id));
            return Value::list(std::move(out));
+       });
+    fn(r, "set_parent", {{"e", E}, {"parent", E | kTNone}, {"keep_world", B, true}}, kTNone, "scene",
+       "Moves an entity under a new parent, or to the scene root with none. By default it keeps its world position, "
+       "rotation and scale (keep_world = false keeps its local transform instead, so it jumps to the same offset "
+       "from the new parent). Parenting under itself or a descendant fails. Like every play-time change, it is "
+       "undone when play stops.",
+       "set_parent(item, self)  -- pick it up; set_parent(item, none) drops it", [](CallContext& c) {
+           EntityRef id = c.entity(0);
+           EntityId parent = kNoEntity;
+           if (c.arg(1).isEntity()) {
+               parent = c.entity(1);
+           } else if (!c.arg(1).isNone()) {
+               c.fail("set_parent(): the parent must be an entity or none");
+           }
+           Scene& scene = c.scene();
+           if (scene.record(id)->parent == parent) return Value();
+           const bool keepWorld = c.argc() > 2 ? c.boolean(2) : true;
+           const Mat4 world = scene.worldMatrix(id);
+           if (Status st = scene.setParent(id, parent); !st) c.fail("set_parent(): " + st.error().message);
+           if (keepWorld) {
+               const Mat4 local = parent != kNoEntity ? scene.worldMatrix(parent).inverse() * world : world;
+               const anim::Trs d = anim::Trs::fromMatrix(local);
+               Transform& t = transformArg(c, 0);
+               t.position = d.t;
+               t.rotation = anim::eulerDegFromQuat(d.r);
+               t.scale = d.s;
+           }
+           scene.markDirty();
+           return Value();
        });
     fn(r, "has", {{"e", E}, {"component", S}}, B, "scene", "Whether the entity has a component (\"light\", \"particles\", ...).",
        "if has(self, \"light\") then self.light.intensity = 2 end", [](CallContext& c) {

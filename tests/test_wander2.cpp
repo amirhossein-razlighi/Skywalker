@@ -677,3 +677,82 @@ TEST_CASE("wander2: builtins registered at runtime are checked, documented and c
     // Without the registration, the same script does not compile.
     CHECK(hasCode(compile("on start\n  triple(1)\nend", std::vector<std::string>{}), "unknown_function"));
 }
+
+TEST_CASE("wander2: set_parent re-parents, keeps the world transform and is undone on stop") {
+    // The compiler points read-only `parent` at the builtin, which really exists.
+    auto ro = check("on start\n  self.parent = none\nend");
+    CHECK(hasCode(ro, "readonly"));
+    CHECK(!hasCode(check("on start\n  set_parent(self, none)\n  set_parent(self, find(\"Hand\"), false)\nend"), "unknown_function"));
+    CHECK(check("on start\n  set_parent(self, none)\nend").ok());
+    CHECK(!check("on start\n  set_parent(self, 3)\nend").ok());  // a number is not an entity
+
+    Scene s;
+    EntityId hand = s.create("Hand");
+    s.add<Transform>(hand).position = {2, 1, 0};
+    s.get<Transform>(hand)->rotation = {0, 90, 0};
+    s.get<Transform>(hand)->scale = {2, 2, 2};
+    EntityId item = withScript(s, "Item", R"(
+behavior Pickup
+  on start
+    set_parent(self, find("Hand"))
+  end
+  on event "drop"
+    set_parent(self, none)
+  end
+  on event "snap"
+    set_parent(self, find("Hand"), false)
+  end
+  on event "loop"
+    set_parent(find("Hand"), self)
+  end
+end)");
+    s.add<Transform>(item).position = {5, 0, -1};
+    const Vec3 before = s.worldMatrix(item).translation();
+    Runtime rt(s);
+    run(rt, 1);
+    CHECK(errorsOf(rt).empty());
+    REQUIRE(s.record(item)->parent == hand);
+    Vec3 w = s.worldMatrix(item).translation();
+    CHECK(w.x == doctest::Approx(before.x).epsilon(1e-4));
+    CHECK(w.y == doctest::Approx(before.y).epsilon(1e-4));
+    CHECK(w.z == doctest::Approx(before.z).epsilon(1e-4));
+    CHECK(s.get<Transform>(item)->scale.x == doctest::Approx(0.5f).epsilon(1e-4));  // undoes the parent's scale
+
+    rt.emit("drop");
+    run(rt, 1);
+    CHECK(s.record(item)->parent == kNoEntity);
+    w = s.worldMatrix(item).translation();
+    CHECK(w.x == doctest::Approx(before.x).epsilon(1e-4));
+    CHECK(w.z == doctest::Approx(before.z).epsilon(1e-4));
+
+    rt.emit("snap");
+    run(rt, 1);
+    REQUIRE(s.record(item)->parent == hand);
+    const Vec3 local = s.get<Transform>(item)->position;  // keep_world = false: the local transform is unchanged
+    CHECK(local.x == doctest::Approx(before.x).epsilon(1e-4));
+    CHECK(local.z == doctest::Approx(before.z).epsilon(1e-4));
+
+    rt.emit("loop");  // Hand under its own child: a runtime error, nothing changes
+    run(rt, 1);
+    CHECK(errorsOf(rt).find("descendant") != std::string::npos);
+    CHECK(s.record(hand)->parent == kNoEntity);
+
+    // Through the engine: a play-time re-parent is undone when play stops.
+    EngineConfig cfg;
+    cfg.renderer = RendererBackend::Null;
+    Engine e(cfg);
+    (void)e.newScene("Parenting", false);
+    auto call = [&](const char* tool, const char* args) {
+        ToolResult r = e.callTool(tool, Json::parse(args).value(), "agent:test");
+        INFO(tool << ": " << (r.content.empty() ? "" : r.content.front().text));
+        REQUIRE(!r.isError);
+    };
+    call("entity_create", R"({"name":"Hand","position":[0,1,0]})");
+    call("entity_create", R"({"name":"Item","position":[3,0,0]})");
+    call("behavior_set", R"({"entity":"Item","name":"Grab","source":"on start\n  set_parent(self, find(\"Hand\"))\nend"})");
+    call("sim_control", R"({"action":"play"})");
+    call("sim_control", R"({"action":"step","ticks":2})");
+    CHECK(e.scene().record(e.scene().find("Item"))->parent == e.scene().find("Hand"));
+    call("sim_control", R"({"action":"stop"})");
+    CHECK(e.scene().record(e.scene().find("Item"))->parent == kNoEntity);
+}

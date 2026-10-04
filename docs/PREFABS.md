@@ -73,7 +73,7 @@ their owner. `entity_refs` reports duplicates.
 ```
 on start
   let muzzle = find("%Muzzle")      -- this instance's muzzle, not another copy's
-  self.camera2d.follow = find("Hero")  -- assign an entity (or a name) to a link field
+  self.camera2d.follow = find("Hero")  -- assign an entity (or none) to a link field
 end
 ```
 
