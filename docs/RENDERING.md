@@ -94,6 +94,16 @@ See the `terrain_*` and `foliage_add` tools.
   (trunk + alpha-cut leaves) share instances. A compute pass culls every instance and picks
   its level of detail; heavy models become octahedral impostors in the distance (see
   [Foliage impostors](#foliage-impostors)).
+- **Hand-placed instances:** a foliage layer with `points` draws exactly those instances instead
+  of scattering: the buildings of a distant city, a row of cypresses, lamp posts along a quay.
+  They get the same GPU culling, per-instance LODs, impostors, shadows and wind as scattered
+  foliage, at the cost of one instance each. Points are `[x, y, z, yaw?, scale?]` or
+  `{position, rotation: [pitch, yaw, roll], scale: s or [sx, sy, sz], tint}`; with
+  `snapToSurface: true`, y is an offset above the ground under (x, z). Density, slope, height
+  and terrain-layer rules do not apply. Non-uniform scales stretch the model (triplanar
+  materials keep their texel size, since they project in world space). Example:
+  `foliage_add {"entity": "Terrain", "name": "Far City", "layers": [{"prefab": "models/house_a.prefab.json",
+  "wind": 0, "cullDistance": 3000, "snapToSurface": true, "points": [[40, 0, -120, 90], [52, 0, -118, 0, 1.2]]}]}`.
 - **Levels of detail:** meshes of 3,000+ triangles (photoscans) get an automatic LOD chain
   from meshoptimizer: attribute-aware, with a sloppy fallback for card geometry. The level
   is chosen by on-screen error under one pixel (foliage allows ~3 px, per instance). Leaf

@@ -111,6 +111,27 @@ std::vector<FoliageLayer> foliageLayersFromJson(const Json& layers, const std::v
         l.density = std::clamp(l.density, 0.f, 64.f);
         l.cullDistance = std::clamp(l.cullDistance, 4.f, 4000.f);
         if (l.scaleMax < l.scaleMin) std::swap(l.scaleMin, l.scaleMax);
+        if (src.contains("points")) {
+            // Invalid points leave the layer empty here; foliage_add rejects them up front.
+            auto pts = foliagePointsFromJson(src.get("points"));
+            l.points = std::make_shared<const std::vector<FoliagePoint>>(pts ? std::move(*pts) : std::vector<FoliagePoint>{});
+            l.snapToSurface = src.get("snapToSurface").asBool(false);
+            // The scale range covers every point (chunk bounds and impostor sizes use it), and the
+            // density is the points' own, so chunks hold a few hundred instances as usual.
+            if (!l.points->empty()) {
+                float lo = 1e30f, hi = 0.f;
+                Vec2 bmin{1e30f, 1e30f}, bmax{-1e30f, -1e30f};
+                for (const auto& p : *l.points) {
+                    lo = std::min({lo, p.scale.x, p.scale.y, p.scale.z});
+                    hi = std::max({hi, p.scale.x, p.scale.y, p.scale.z});
+                    bmin = {std::min(bmin.x, p.position.x), std::min(bmin.y, p.position.z)};
+                    bmax = {std::max(bmax.x, p.position.x), std::max(bmax.y, p.position.z)};
+                }
+                l.scaleMin = lo, l.scaleMax = hi;
+                float area = std::max((bmax.x - bmin.x) * (bmax.y - bmin.y), 1.f);
+                l.density = std::clamp(static_cast<float>(l.points->size()) / area, 1e-4f, 64.f);
+            }
+        }
         out.push_back(l);
     }
     return out;
@@ -163,8 +184,92 @@ Json foliagePreset(const std::string& name) {
     return Json::object({{"mesh", "grass"}});
 }
 
+Result<std::vector<FoliagePoint>> foliagePointsFromJson(const Json& points) {
+    if (!points.isArray()) {
+        return Error::make("invalid_points", "points must be a list of instances",
+                           R"(e.g. [[12, 0, -4, 90, 1.2], {"position": [3, 0, 8], "rotation": [0, 45, 0], "scale": [1, 1.3, 1]}])");
+    }
+    std::vector<FoliagePoint> out;
+    out.reserve(points.size());
+    auto vec3 = [](const Json& v, Vec3& out3) {
+        if (v.isNumber()) {
+            out3 = Vec3(v.asFloat());
+            return true;
+        }
+        if (!v.isArray() || v.size() != 3) return false;
+        for (size_t k = 0; k < 3; ++k) {
+            if (!v[k].isNumber()) return false;
+        }
+        out3 = {v[size_t{0}].asFloat(), v[size_t{1}].asFloat(), v[size_t{2}].asFloat()};
+        return true;
+    };
+    for (size_t i = 0; i < points.size(); ++i) {
+        const Json& p = points[i];
+        FoliagePoint fp;
+        bool ok = true;
+        if (p.isArray()) {
+            // [x, y, z, yaw?, scale?]
+            ok = p.size() >= 3 && p.size() <= 5;
+            for (size_t k = 0; ok && k < p.size(); ++k) ok = p[k].isNumber();
+            if (ok) {
+                fp.position = {p[size_t{0}].asFloat(), p[size_t{1}].asFloat(), p[size_t{2}].asFloat()};
+                if (p.size() > 3) fp.rotation.y = p[size_t{3}].asFloat();
+                if (p.size() > 4) fp.scale = Vec3(p[size_t{4}].asFloat());
+            }
+        } else if (p.isObject()) {
+            ok = p.contains("position") && vec3(p.get("position"), fp.position);
+            if (ok && p.contains("rotation")) ok = vec3(p.get("rotation"), fp.rotation);
+            if (ok && p.contains("yaw")) fp.rotation.y = p.get("yaw").asFloat(fp.rotation.y);
+            if (ok && p.contains("scale")) ok = vec3(p.get("scale"), fp.scale);
+            fp.tint = std::clamp(p.get("tint").asFloat(0.f), -1.f, 1.f);
+        } else {
+            ok = false;
+        }
+        if (ok) ok = fp.scale.x > 0.f && fp.scale.y > 0.f && fp.scale.z > 0.f;
+        if (!ok) {
+            return Error::make("invalid_points", "points[" + std::to_string(i) + "] is not a valid instance",
+                               R"(use [x, y, z, yaw?, scale?] or {"position": [x, y, z], "rotation": [pitch, yaw, roll], )"
+                               R"("scale": s or [sx, sy, sz], "tint": -1..1} with positive scales)");
+        }
+        out.push_back(fp);
+    }
+    return out;
+}
+
+namespace {
+
+// The hand-placed instances of a points layer that fall in one chunk, in their given order.
+std::vector<FoliageInstance> placeChunkPoints(const FoliageLayer& l, int cx, int cz, float chunkSize, const SurfaceFn& surface,
+                                              float meshHeight) {
+    std::vector<FoliageInstance> out;
+    const float x0 = static_cast<float>(cx) * chunkSize, z0 = static_cast<float>(cz) * chunkSize;
+    for (size_t i = 0; i < l.points->size(); ++i) {
+        const FoliagePoint& p = (*l.points)[i];
+        if (p.position.x < x0 || p.position.x >= x0 + chunkSize || p.position.z < z0 || p.position.z >= z0 + chunkSize) continue;
+        Vec3 pos = p.position;
+        if (l.snapToSurface) {
+            SurfaceSample s;
+            if (!surface(pos.x, pos.z, s)) continue;
+            pos.y += s.y;
+        }
+        Mat4 m = Mat4::trs(pos, p.rotation, p.scale);
+        FoliageInstance inst{};
+        for (int c = 0; c < 4; ++c) inst.row0[c] = m.at(c, 0), inst.row1[c] = m.at(c, 1), inst.row2[c] = m.at(c, 2);
+        uint32_t h = mix3(static_cast<uint32_t>(i), 0x9017u, l.seed);
+        inst.tint = p.tint;
+        inst.phase = u01(mix3(h, 17, 18));
+        inst.height = std::max(meshHeight * p.scale.y, 0.05f);
+        inst.fade = u01(mix3(h, 19, 20));
+        out.push_back(inst);
+    }
+    return out;
+}
+
+}  // namespace
+
 std::vector<FoliageInstance> scatterChunk(const FoliageLayer& l, int layerIndex, uint32_t seed, int cx, int cz,
                                           float chunkSize, const SurfaceFn& surface, float meshHeight) {
+    if (l.points) return placeChunkPoints(l, cx, cz, chunkSize, surface, meshHeight);
     std::vector<FoliageInstance> out;
     if (l.density <= 0.f) return out;
     const float cell = 1.f / std::sqrt(l.density);
@@ -266,7 +371,7 @@ std::vector<FoliageChunk> FoliageCache::visibleChunks(const FoliageLayer& layer,
                 b.min = {std::min(b.min.x, p.x), std::min(b.min.y, p.y), std::min(b.min.z, p.z)};
                 b.max = {std::max(b.max.x, p.x), std::max(b.max.y, p.y + i.height), std::max(b.max.z, p.z)};
             }
-            float pad = meshHeight * layer.scaleMax;
+            float pad = std::max(meshHeight, layer.boundsRadius) * layer.scaleMax;
             b.min = b.min - Vec3{pad, pad * 0.2f, pad};
             b.max = b.max + Vec3{pad, pad * 0.2f, pad};
             e.chunk.instances = std::move(inst);
