@@ -88,3 +88,6 @@ samples/
 examples/*/terrain/*.terrain
 examples/*/terrain/*.r16
 examples/*/studio/usage.json
+
+# Gloamwater art is painted by media/demo/games/gloamwater_art.py (regenerated on build)
+examples/gloamwater/art/
