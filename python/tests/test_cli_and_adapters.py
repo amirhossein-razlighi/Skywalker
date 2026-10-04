@@ -51,6 +51,24 @@ def test_cli_memory_round_trip(project: Path, capsys: pytest.CaptureFixture[str]
     assert '"total": 1' in capsys.readouterr().out
 
 
+def test_cli_eval_spec(project: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    (tmp_path / "wf.yaml").write_text(
+        "name: build\nsteps:\n  - {id: make, tool: entity_create, args: {name: '{{ inputs.name }}'}}\n"
+    )
+    (tmp_path / "eval.yaml").write_text(
+        "name: pillars\nworkflow: wf.yaml\nscenarios:\n"
+        "  - name: tall\n    inputs: {name: Tall Pillar}\n    checks:\n"
+        "      - {type: tool, name: exists, tool: scene_overview, expect: \"'Tall Pillar' in text\"}\n"
+        "      - {type: text, name: completed, expect: \"output.status == 'completed'\"}\n"
+        "      - {type: metric, metric: deaths, max: 5}\n"
+    )
+    code = main(["eval", str(tmp_path / "eval.yaml"), "--fake", "--project", str(project), "--out",
+                 str(tmp_path / "report.json")])
+    out = capsys.readouterr().out
+    assert code == 0, out
+    assert "1/1 scenarios passed" in out and (tmp_path / "report.json").exists()
+
+
 def test_cli_run_trace_and_cards(project: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     wf = tmp_path / "hello.yaml"
     wf.write_text(
