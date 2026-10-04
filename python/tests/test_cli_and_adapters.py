@@ -62,8 +62,17 @@ def test_cli_eval_spec(project: Path, tmp_path: Path, capsys: pytest.CaptureFixt
         "      - {type: text, name: completed, expect: \"output.status == 'completed'\"}\n"
         "      - {type: metric, metric: deaths, max: 5}\n"
     )
-    code = main(["eval", str(tmp_path / "eval.yaml"), "--fake", "--project", str(project), "--out",
-                 str(tmp_path / "report.json")])
+    code = main(
+        [
+            "eval",
+            str(tmp_path / "eval.yaml"),
+            "--fake",
+            "--project",
+            str(project),
+            "--out",
+            str(tmp_path / "report.json"),
+        ]
+    )
     out = capsys.readouterr().out
     assert code == 0, out
     assert "1/1 scenarios passed" in out and (tmp_path / "report.json").exists()
