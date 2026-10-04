@@ -1,0 +1,51 @@
+{
+  "format": "skywalker.sequence",
+  "version": 1,
+  "name": "avenue_dolly",
+  "duration": 7,
+  "tracks": [
+    {
+      "type": "shot",
+      "camera": "Cam avenue_dolly",
+      "keys": [
+        {
+          "t": 0,
+          "shot": "path",
+          "duration": 7,
+          "target": [
+            -0.5,
+            13,
+            -90
+          ],
+          "points": [
+            [
+              2.4,
+              1.7,
+              31
+            ],
+            [
+              1.7,
+              1.75,
+              21
+            ],
+            [
+              1,
+              1.8,
+              11
+            ]
+          ],
+          "fov": 52
+        }
+      ]
+    },
+    {
+      "type": "camera",
+      "keys": [
+        {
+          "t": 0,
+          "camera": "Cam avenue_dolly"
+        }
+      ]
+    }
+  ]
+}

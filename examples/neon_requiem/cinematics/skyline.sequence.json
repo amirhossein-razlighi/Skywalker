@@ -1,0 +1,51 @@
+{
+  "format": "skywalker.sequence",
+  "version": 1,
+  "name": "skyline",
+  "duration": 8,
+  "tracks": [
+    {
+      "type": "shot",
+      "camera": "Cam skyline",
+      "keys": [
+        {
+          "t": 0,
+          "shot": "path",
+          "duration": 8,
+          "target": [
+            0,
+            30,
+            -250
+          ],
+          "points": [
+            [
+              -4,
+              92,
+              80
+            ],
+            [
+              0,
+              95,
+              70
+            ],
+            [
+              4,
+              98,
+              60
+            ]
+          ],
+          "fov": 50
+        }
+      ]
+    },
+    {
+      "type": "camera",
+      "keys": [
+        {
+          "t": 0,
+          "camera": "Cam skyline"
+        }
+      ]
+    }
+  ]
+}

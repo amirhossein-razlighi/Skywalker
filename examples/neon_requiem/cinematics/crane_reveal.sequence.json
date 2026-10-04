@@ -1,0 +1,51 @@
+{
+  "format": "skywalker.sequence",
+  "version": 1,
+  "name": "crane_reveal",
+  "duration": 8,
+  "tracks": [
+    {
+      "type": "shot",
+      "camera": "Cam crane_reveal",
+      "keys": [
+        {
+          "t": 0,
+          "shot": "path",
+          "duration": 8,
+          "target": [
+            0,
+            22,
+            -190
+          ],
+          "points": [
+            [
+              1.5,
+              2,
+              -50
+            ],
+            [
+              1,
+              18,
+              -47
+            ],
+            [
+              0.5,
+              42,
+              -44
+            ]
+          ],
+          "fov": 55
+        }
+      ]
+    },
+    {
+      "type": "camera",
+      "keys": [
+        {
+          "t": 0,
+          "camera": "Cam crane_reveal"
+        }
+      ]
+    }
+  ]
+}
