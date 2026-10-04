@@ -5,7 +5,7 @@
 The ground-up expansion described in [PLAN](PLAN.md):
 
 - **Agents first:**
-  - 160+ tools over MCP, the editor socket and the C API;
+  - 164 tools over MCP, the editor socket and the C API;
   - 13 skills, subagents and setup for Claude Code, Codex, Gemini CLI and Cursor;
   - a multi-agent studio with roles, board, feedback triage, playtest bots and user-defined loops.
 - **Wander 2:**

@@ -9,7 +9,7 @@ endif()
 set(CMAKE_OSX_DEPLOYMENT_TARGET "15.0" CACHE STRING "Minimum macOS version")
 
 project(Skywalker
-    VERSION 0.0.1
+    VERSION 0.1.0
     DESCRIPTION "A game engine built from the ground up for AI agents"
     LANGUAGES C CXX)
 

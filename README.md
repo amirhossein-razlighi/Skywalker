@@ -20,7 +20,7 @@ interface the editor uses.
 ## Highlights
 
 ### Built for agents
-- **Everything is a tool.** 160+ typed, schema-validated tools cover scenes, entities, worlds,
+- **Everything is a tool.** 164 typed, schema-validated tools cover scenes, entities, worlds,
   terrain, foliage, materials, lighting, effects, physics, navigation, animation, sequences,
   2D, UI, dialogue, audio, assets, Blender, the studio, movies and shipping. The editor, its
   in-app agents and external agents over **MCP** all use the same surface; errors come with
