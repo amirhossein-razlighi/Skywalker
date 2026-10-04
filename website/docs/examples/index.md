@@ -40,7 +40,7 @@ title: "Examples"
 
 *Open-world Island Adventure* · The storm left you one ship, one map and a cove nobody charts. Make landfall before dark.
 
-An island cove at golden hour, built by an agent crew with the engine's own tools. An erosion-sculpted island with wet sand where the swash reaches, an FFT sea that shoals over the seabed, instanced palms and dune grass, a fort, a brig at anchor and a campfire with volumetric fire. Its hero camera moves ship as sequences, ready for the movie render queue.
+An island cove at golden hour, built by an agent crew with the engine's own tools. An erosion-sculpted island with wet sand where the swash reaches, an FFT sea that shoals over the seabed, instanced palms and dune grass, a fort, a brig at anchor and a campfire with volumetric fire. Its hero camera moves ship as sequences, ready for the movie renderer.
 
 | | |
 |---|---|
@@ -317,7 +317,7 @@ A narrative political drama played across one desk on one rainy night: documents
 
 *Pirate Adventure* · The galleon is in. The tide won't wait. Neither will the Navy.
 
-A pirate cove at golden hour built from CC0 photoscanned models and textures and an HDRI sky, with an FFT ocean and a volumetric campfire. The movie render queue's performance figures were measured on it.
+A pirate cove at golden hour built from CC0 photoscanned models and textures and an HDRI sky, with an FFT ocean and a volumetric campfire. The movie renderer's performance figures were measured on it.
 
 | | |
 |---|---|

@@ -178,7 +178,7 @@ nav:
       - Production:
           - Studio and crews: manual/studio.md
           - DCC bridge: manual/dcc.md
-          - Movie render queue: manual/movie-render.md
+          - Movie renderer: manual/movie-render.md
           - Shipping: manual/shipping.md
           - Performance: manual/performance.md
   - Agent Guide:

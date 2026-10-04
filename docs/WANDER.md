@@ -52,7 +52,7 @@ Wander 2 is a redesign that keeps what worked and replaces what did not:
 | Untyped → **optional types with inference** (gradual) | Mistakes are caught before play, without annotation noise |
 | Events without data → **payloads** and `other` | `emit "damage" with {amount: 5} to target` |
 | Manual playtesting → **`test` blocks** run in a sandbox | Agents verify behavior against the intent |
-| Text only → a **node-graph view** with a lossless round trip | Blueprint-style editing for people who prefer it |
+| Text only → a **node-graph view** with a lossless round trip | Visual editing for people who prefer nodes and wires |
 | Interpreted only → **AOT to C++** and **native C++ modules** | Hot loops at native speed; any C++ library |
 
 ## A tour
@@ -348,7 +348,7 @@ end
 
 ## The graph view
 
-`behavior_graph` turns a behavior into a Blueprint-style node graph and
+`behavior_graph` turns a behavior into a visual node graph and
 `behavior_from_graph` turns a graph back into code; the round trip is lossless (every
 example script in the repository is tested: code → graph → code compiles to the same
 bytecode).
@@ -358,7 +358,7 @@ bytecode).
   outputs, loops a `body` output, every statement a `next` output.
 - **Expressions** are data nodes (operators, calls, methods, member access, lists, maps,
   vectors, text) wired into statement inputs; literals and plain names sit inline on input
-  pins (`value`), like pin defaults in Unreal. Any pin accepts any Wander expression.
+  pins (`value`) as pin defaults. Any pin accepts any Wander expression.
 - Comments on statements are kept. Node positions are saved with the behavior.
 
 In the editor, each behavior card has a **Code | Graph** switch. The graph canvas pans and

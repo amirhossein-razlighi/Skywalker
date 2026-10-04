@@ -18,7 +18,7 @@
 // CPU particles move along their velocity. Simulation, tools and captures never see these
 // values: captures stay tick-exact unless they ask for an alpha.
 //
-// The movie render queue (Movie.cpp) uses the same history and scope for its sub-frames.
+// The movie renderer (Movie.cpp) uses the same history and scope for its sub-frames.
 //
 // For renderer features that need the previous frame (velocity buffers, motion blur): what
 // was displayed last frame per entity is in DisplayHistory (Engine::displayHistory()); it is

@@ -4,7 +4,7 @@
 // (`self.body.velocity`, `self.collider.isTrigger`, ...) all come from the tables in
 // PhysicsComponents.cpp. The simulation lives in skywalker/physics and skywalker/nav.
 //
-// The model follows Unity/Unreal so agents can transfer what they know:
+// The component model:
 //   * `collider` alone            -> static geometry (walls, floors, level meshes),
 //   * `body` (+ optional collider) -> a simulated rigid body; colliders on child entities
 //                                     without their own body become parts of its compound shape,
@@ -127,7 +127,7 @@ struct NavAgent {
     static const TypeInfo& type();
 };
 
-/// Navigation-mesh bake settings and the saved bake (like Unity's NavMeshSurface). One per scene.
+/// Navigation-mesh bake settings and the saved bake. One per scene.
 struct NavMeshSurface {
     float agentRadius = 0.4f;   // m: walls are eroded by this
     float agentHeight = 1.8f;   // m: minimum ceiling height

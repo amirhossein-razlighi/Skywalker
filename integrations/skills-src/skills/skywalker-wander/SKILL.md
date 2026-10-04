@@ -125,7 +125,7 @@ Emit events and tags that `playtest_run` understands (`death`, `fail`, `damage`,
 
 ## Graph view and specs
 
-`behavior_graph {entity, name, palette:true}` returns a Blueprint-style node graph (`format: wander-graph`): bodies for each handler/fn/test/state, exec-flow nodes wired by exec pins, data nodes for expressions, inline literal pins, saved layout.
+`behavior_graph {entity, name, palette:true}` returns a visual node graph (`format: wander-graph`): bodies for each handler/fn/test/state, exec-flow nodes wired by exec pins, data nodes for expressions, inline literal pins, saved layout.
 Edit the JSON (add a node, rewire a pin) and send it back as `graph` to `behavior_from_graph {entity, name, graph}`: it generates Wander code, compiles it (rejected on errors unless `allow_errors`), saves it and stores the node positions.
 The round trip is lossless; use the graph when a human wants to see or edit flow visually, text for everything else. Pass `source` instead of `entity`+`name` to graph unsaved code.
 

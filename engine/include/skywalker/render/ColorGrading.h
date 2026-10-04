@@ -1,6 +1,6 @@
 #pragma once
-// Color grading: built-in "looks" baked into 3D LUTs, and .cube LUT files (the format used
-// by DaVinci Resolve, Premiere, Unreal and Unity). LUTs apply in display space, after tonemapping.
+// Color grading: built-in "looks" baked into 3D LUTs, and .cube LUT files (the format DaVinci
+// Resolve and Premiere export). LUTs apply in display space, after tonemapping.
 
 #include <string>
 #include <vector>

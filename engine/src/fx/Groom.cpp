@@ -1134,7 +1134,7 @@ Result<StrandSet> loadStrands(const std::string& path, float scale, bool zUp) {
 
 Vec3 hairAbsorption(float melanin, float redness) {
     // Concentration from a perceptual 0..1 control, then the eumelanin / pheomelanin absorption
-    // spectra (as in Blender's Principled Hair and Unreal's hair shading).
+    // spectra (as in Blender's Principled Hair BSDF).
     float m = std::clamp(melanin, 0.f, 0.9995f);
     float qty = -std::log(std::max(1.f - m, 1e-4f));
     float eu = qty * (1.f - std::clamp(redness, 0.f, 1.f)), pheo = qty * std::clamp(redness, 0.f, 1.f);

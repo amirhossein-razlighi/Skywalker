@@ -42,7 +42,7 @@ interface the editor uses.
 ### From words to native code
 - **Wander** turns a natural-language intent into deterministic behavior code: functions,
   collections, coroutines, state machines, types, modules and tests on a register VM, a
-  Blueprint-style graph view of the same code, and ahead-of-time compilation to C++ native
+  visual node-graph view of the same code, and ahead-of-time compilation to C++ native
   modules (up to 33× faster on hot loops). → [docs/WANDER.md](docs/WANDER.md)
 
 ### Rendering tuned for Apple silicon
@@ -55,7 +55,7 @@ interface the editor uses.
 - Eroded **terrain** with splat layers and wet shorelines, instanced **foliage** with wind and
   automatic LODs and octahedral impostors for distant forests, auto exposure, depth of field, motion blur, looks and .cube LUTs.
 - An editor viewport that stays responsive (fast / balanced / full quality while editing), a
-  GPU-safe offline path, and a **Movie Render Queue** that renders sequences to HEVC / ProRes with
+  GPU-safe offline path, and an offline **movie renderer** that renders sequences to HEVC / ProRes with
   real motion blur. → [docs/RENDERING.md](docs/RENDERING.md), [docs/MOVIE_RENDER.md](docs/MOVIE_RENDER.md)
 
 ### A complete engine
@@ -139,7 +139,7 @@ directly. Settings live in `game.json`. → [docs/SHIPPING.md](docs/SHIPPING.md)
 | Doc | What's inside |
 |---|---|
 | [ARCHITECTURE](docs/ARCHITECTURE.md) | Layers, threading, data flow, design decisions |
-| [PLAN](docs/PLAN.md) | Intent, gap analysis against Unity/Unreal, workstreams |
+| [PLAN](docs/PLAN.md) | Intent, gap analysis against an industry baseline, workstreams |
 | [AGENTS](docs/AGENTS.md) | MCP, the crew, Agent Designer, providers, generative assets |
 | [STUDIO](docs/STUDIO.md) | Multi-agent studio: roles, board, feedback, playtests, loops |
 | [INTEGRATIONS](docs/INTEGRATIONS.md) | Skills, subagents and setup for Claude Code, Codex, Gemini CLI and Cursor |

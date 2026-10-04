@@ -131,7 +131,7 @@ final class EngineStore {
     private(set) var environment: JSON = .null
     private(set) var cameraYaw: Float = 0
     private(set) var cameraPitch: Float = 0
-    /// Movie render queue: the running/last render, and the open Render Movie sheet.
+    /// Movie renderer: the running/last render, and the open Render Movie sheet.
     private(set) var movie: MovieProgress?
     var movieRequest: MovieRequest?
     var gizmoMode: GizmoMode = .move { didSet { applyGizmo() } }
@@ -415,7 +415,7 @@ final class EngineStore {
 
     func clearLogs() { logs.removeAll() }
 
-    // MARK: Movie render queue
+    // MARK: Movie renderer
 
     /// Starts a background movie render (the engine advances it frame by frame in `tick`).
     @discardableResult

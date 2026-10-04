@@ -24,7 +24,7 @@ Result<std::vector<std::pair<float, float>>> parseCurve(std::string_view text);
 /// Invalid strings fall back to the plain fields and report a warning.
 GpuCurves bakeCurves(const ParticleEmitter& em, std::string* warning = nullptr);
 
-/// FGA vector field (Unreal / Houdini / EmberGen text export):
+/// FGA vector field (the text format Houdini and EmberGen export):
 /// "nx,ny,nz,\nminx,miny,minz,\nmaxx,maxy,maxz,\n vx,vy,vz,\n ..." (x fastest).
 Result<VectorField> parseFga(std::string_view text);
 Result<VectorField> loadFga(const std::string& path);

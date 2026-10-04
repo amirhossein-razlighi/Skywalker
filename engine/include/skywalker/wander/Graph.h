@@ -1,11 +1,11 @@
 #pragma once
-// Blueprint-style node graph view of Wander code.
+// Visual node-graph view of Wander code.
 //
 // toGraph() turns a parsed script into a JSON node graph: every handler, fn and test is a
 // *body* with an entry node; statements are exec-flow nodes chained by exec wires
 // (`if` has then/elif/else outputs, loops a `body` output); expressions are data nodes
 // (operators, calls, member access, ...) wired into statement inputs; literals and
-// plain names sit inline on input pins (`value`), like Unreal's pin defaults. States are
+// plain names sit inline on input pins (`value`) as pin defaults. States are
 // sub-graphs holding their handlers. Nodes get an automatic layout; saved positions
 // (Script::graph) override it.
 //

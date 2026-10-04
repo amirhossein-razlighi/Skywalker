@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// Skywalker editor theme: a dense, graphite "pro tool" palette (in the family of Unreal,
-/// Blender and Xcode) with one calm sky-blue accent, an orange selection color that
+/// Skywalker editor theme: a dense, graphite "pro tool" palette (in the family of professional
+/// DCC tools such as Blender, and of Xcode) with one calm sky-blue accent, an orange selection color that
 /// matches the viewport outline, and a soft violet reserved for AI/agent affordances.
 enum Theme {
     // Surfaces

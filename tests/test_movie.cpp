@@ -1,4 +1,4 @@
-// Movie render queue: frame timing, camera paths, transform interpolation, PNG sequences and
+// Movie renderer: frame timing, camera paths, transform interpolation, PNG sequences and
 // resume, determinism on the CPU renderer, cancellation, the tool surface (docs/MOVIE_RENDER.md).
 
 #include <doctest/doctest.h>

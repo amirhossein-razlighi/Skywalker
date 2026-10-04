@@ -155,7 +155,7 @@ A sequence is a timeline of tracks:
 
 All shots take `target` (an entity or a point; entities are aimed at their bounds centre), `offset`, `fov` (a number or [from, to]), `roll` and `ease` (default `smooth`).
 
-The `sequencer` component (`sequence`, `playOnStart`, `loop`, `speed`, `preview`, `time`) plays the sequence when the simulation starts, or on `sequence_play` or Wander `play_sequence`. While editing, `preview` shows it frozen at `time`; like every editor preview it is applied per frame and never saved. Render a sequence to video with the [Movie render queue](movie-render.md).
+The `sequencer` component (`sequence`, `playOnStart`, `loop`, `speed`, `preview`, `time`) plays the sequence when the simulation starts, or on `sequence_play` or Wander `play_sequence`. While editing, `preview` shows it frozen at `time`; like every editor preview it is applied per frame and never saved. Render a sequence to video with the [Movie renderer](movie-render.md).
 
 <video controls muted loop playsinline preload="none" poster="../../assets/video/meridian_accord/zoom_to_pont_aurel.webp">
   <source src="../../assets/video/meridian_accord/zoom_to_pont_aurel.mp4" type="video/mp4">
@@ -338,5 +338,5 @@ To start a cutscene from gameplay, set `play_on_start` to false when you create 
 - Tools: [`animation_list`](../reference/tools/animation.md#animation_list), [`animator_setup`](../reference/tools/animation.md#animator_setup), [`animation_preview`](../reference/tools/animation.md#animation_preview), [`animator_set`](../reference/tools/animation.md#animator_set), [`bone_attach`](../reference/tools/animation.md#bone_attach), [`bone_ik`](../reference/tools/animation.md#bone_ik), [`sequence_create`](../reference/tools/animation.md#sequence_create), [`sequence_key`](../reference/tools/animation.md#sequence_key), [`sequence_camera_shot`](../reference/tools/animation.md#sequence_camera_shot), [`sequence_get`](../reference/tools/animation.md#sequence_get), [`sequence_play`](../reference/tools/animation.md#sequence_play), [`sequence_scrub`](../reference/tools/animation.md#sequence_scrub), [`asset_import`](../reference/tools/asset.md#asset_import).
 - Components: [`animator`](../reference/components/animation.md#animator), [`attach`](../reference/components/animation.md#attach), [`ik`](../reference/components/animation.md#ik), [`sequencer`](../reference/components/animation.md#sequencer).
 - Wander: [`set_param`](../reference/wander.md#animation-set_param), [`trigger`](../reference/wander.md#animation-trigger), [`play_animation`](../reference/wander.md#animation-play_animation), [`anim_state`](../reference/wander.md#animation-anim_state), [`play_sequence`](../reference/wander.md#animation-play_sequence).
-- Related pages: [Movie render queue](movie-render.md), [Physics and navigation](physics.md), [Assets and prefabs](assets.md).
+- Related pages: [Movie renderer](movie-render.md), [Physics and navigation](physics.md), [Assets and prefabs](assets.md).
 - Design document: [docs/ANIMATION.md](https://github.com/amirhossein-razlighi/Skywalker/blob/main/docs/ANIMATION.md).

@@ -94,7 +94,7 @@ sequence_play {sequence:"Director", action:"play", from:0}
 - `sequence_scrub` works only while editing. `persist:true` leaves the editor showing that time; `save_dir` must exist (`frame_0000.png`, ...). In Wander: `play_sequence(e, start?)`.
 - Sequencer `mesh.color` keys show only on entities with inline surfaces, not ones using a `mesh.material` asset.
 
-## Workflow C: render a movie (the Movie Render Queue)
+## Workflow C: render a movie (the movie renderer)
 
 `movie_render` renders offline and deterministically from the scene state (restored afterwards): a sequence (its whole length, or `start`/`end`), an inline
 `camera` move, or the scene camera for `duration` seconds. Engine doc: `skywalker://docs/MOVIE_RENDER`.

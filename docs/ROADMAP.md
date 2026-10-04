@@ -23,7 +23,7 @@ The ground-up expansion described in [PLAN](PLAN.md):
   - 2D sprites, tilemaps and lights; UI layout and SDF text; dialogue.
 - **Production:**
   - Blender bridge;
-  - Movie Render Queue (HEVC/ProRes, motion blur);
+  - Movie renderer (HEVC/ProRes, motion blur);
   - standalone player and `skywalker build` into signed macOS apps.
 
 ## Next
@@ -32,7 +32,7 @@ The ground-up expansion described in [PLAN](PLAN.md):
 |---|---|
 | Rendering | Impostor wind sway and HLOD for buildings; virtual shadow maps; hardware ray-traced reflections and GI on M3+; skin subsurface profiles; decals; virtualized geometry for scanned assets |
 | Platforms | Vulkan backend (Windows/Linux), then D3D12; iOS player; an editor shell for non-Mac platforms |
-| World | World partition / streaming for very large maps; road and spline tools; procedural city kit |
+| World | Cell-based world streaming for very large maps; road and spline tools; procedural city kit |
 | Wander | Debugger (breakpoints, watch, step) in the editor; hot-reload of native modules |
 | Agents | Built-in generator adapters (image, 3D, audio); screenshot diffing for visual review; spending limits per loop |
 | Editor | Multi-select editing, prefab overrides, docking layouts, a timeline editor for sequences, profiler panel |

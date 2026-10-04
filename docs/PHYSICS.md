@@ -1,23 +1,22 @@
 # Physics and navigation
 
 Skywalker simulates rigid bodies, characters, triggers and joints with
-[Jolt Physics](https://github.com/jrouwe/JoltPhysics) (the engine behind Horizon Forbidden West),
-and finds paths with [Recast/Detour](https://github.com/recastnavigation/recastnavigation) (the
-navmesh library behind Unity's and Unreal's navigation). Everything is reachable from the editor,
-from Wander, and from agent tools.
+[Jolt Physics](https://github.com/jrouwe/JoltPhysics), and finds paths with
+[Recast/Detour](https://github.com/recastnavigation/recastnavigation). Everything is reachable from
+the editor, from Wander, and from agent tools.
 
-The component model mirrors Unity and Unreal, so what you know transfers:
+The physics components:
 
-| Skywalker | Unity | Unreal |
-|---|---|---|
-| `collider` alone | Collider (static) | Static mesh collision |
-| `body` + `collider` | Rigidbody + Collider | Simulate Physics |
-| child entities with `collider` | compound colliders | multiple collision primitives |
-| `character` | CharacterController | Character Movement |
-| `joint` | Joint components | Physics Constraint |
-| `physics_world` | Physics settings | World/Project settings |
-| `navmesh` | NavMeshSurface | Nav Mesh Bounds + RecastNavMesh |
-| `nav_agent` | NavMeshAgent | AI controller + path following |
+| Component | What it is for |
+|---|---|
+| `collider` alone | Static geometry: floors, walls and level meshes that never move |
+| `body` + `collider` | A simulated rigid body (dynamic or kinematic) with its collision shape |
+| child entities with `collider` | A compound shape: several colliders under one body |
+| `character` | A capsule character controller that walks, climbs steps and slides along walls |
+| `joint` | A constraint between two bodies (or a body and the world): fixed, hinge, ball, slider, distance or spring |
+| `physics_world` | Scene-wide settings: gravity, substeps, layer pairs that never collide, sleeping |
+| `navmesh` | Navigation-mesh bake settings and the saved bake (one per scene) |
+| `nav_agent` | An entity that finds paths on the navmesh and follows them with crowd avoidance |
 
 ## Quick start for agents
 
@@ -309,7 +308,9 @@ to see where a dropped object lands, and `sim_trace` to record body positions ov
   carve the navmesh. No off-mesh links (jumps, ladders) yet.
 - Collide events are begin-only (no "collide end"); trigger exit is reported.
 - Heightmap files: `.r16`/`.raw` (16-bit) and `.hdr`; PNG heightmaps need an image decoder in core.
-- Non-uniform scale under rotated parents uses the product of scales (Unity's "lossy scale").
+- Non-uniform scale under rotated parents is approximated by the product of the scales along the
+  hierarchy (no shear), so a non-uniformly scaled parent with a rotated child can fit a collider
+  slightly off.
 - Large static levels: static geometry is re-validated every 8th tick (teleports every tick), so
   editing a static collider during play takes effect within 8 ticks.
 

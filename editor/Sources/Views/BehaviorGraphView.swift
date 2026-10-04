@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-// Blueprint-style node graph for a Wander behavior.
+// Visual node graph for a Wander behavior.
 //
 // The graph comes from the engine (`behavior_graph`): every handler, fn and test is a
 // *body* with an entry node, statements chained by exec wires and expressions wired into

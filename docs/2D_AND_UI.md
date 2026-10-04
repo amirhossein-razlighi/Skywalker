@@ -57,13 +57,13 @@ fonts. Wrapping prefers spaces, breaks long words, and handles CJK.
   pin the element (its `position` is an offset, `size` its size); `fill`, `top_stretch`,
   `middle_stretch`, `bottom_stretch`, `left_stretch`, `center_stretch`, `right_stretch` stretch it
   (insets from `margin`; on an axis that does not stretch, the margin insets the element from the edge it is
-  anchored to, e.g. a `bottom_stretch` box with margin bottom 40 floats 40 px above the bottom); `custom` uses `anchorMin/anchorMax/pivot` like Unity's RectTransform.
+  anchored to, e.g. a `bottom_stretch` box with margin bottom 40 floats 40 px above the bottom); `custom` uses `anchorMin`/`anchorMax` (fractions of the parent rectangle the element's corners follow) and `pivot` (the point of the element that `position` places).
 - **Layouts**: `row`/`column` stack children with `gap`, `padding`, `align` (cross axis:
   start/center/end/stretch — stretch also stretches fit-to-content children, whose text then wraps)
   and `justify` (start/center/end/space_between); `flex` shares leftover space. `grid` fills
   `columns` equal cells. `fit` sizes an element to its text or children.
-- **Canvas scaling**: `scale_with_screen` keeps layouts proportional across resolutions (Unity's
-  "Scale With Screen Size", blending width/height by `match`); `constant` is 1 px = 1 px.
+- **Canvas scaling**: `scale_with_screen` keeps layouts proportional across resolutions (the canvas
+  scales from its reference resolution, blending the width and height ratios by `match`); `constant` is 1 px = 1 px.
 - **Styles** cascade from the canvas `theme`, then its `styleSheet`, by widget kind, `.class`
   (the element's `style`) and `#Name`, then the element's `styleOverrides`. State blocks `hover`,
   `pressed`, `focus`, `checked`, `disabled` apply while active, with animated transitions.

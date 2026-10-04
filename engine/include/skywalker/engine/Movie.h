@@ -1,6 +1,6 @@
 #pragma once
-// Movie render queue (docs/MOVIE_RENDER.md): offline, deterministic rendering of cinematics to
-// PNG sequences and video files — the equivalent of Unreal's Movie Render Queue / Unity's Recorder.
+// Movie renderer (docs/MOVIE_RENDER.md): offline, deterministic rendering of cinematics to
+// PNG sequences and video files, with accumulated motion blur and resumable jobs.
 //
 //   what      a sequence (its whole length or a range), an inline camera path (keyframes or
 //             procedural shots), or simply the scene camera for a duration

@@ -110,8 +110,8 @@ See the `terrain_*` and `foliage_add` tools.
 - **Exposure:** `autoExposure`, `exposureCompensation` (EV), `adaptationSpeed`. Manual
   `exposure` still multiplies.
 - **Looks:** `look` is one of `warm`, `cool`, `teal_orange`, `golden_hour`, `bleach`,
-  `noir`, `vivid`, `moonlight` or `vintage`. `lut` takes a `.cube` file (Resolve /
-  Premiere / Unreal format) and overrides the look. `lookStrength` blends either.
+  `noir`, `vivid`, `moonlight` or `vintage`. `lut` takes a `.cube` file (the format
+  DaVinci Resolve and Premiere export) and overrides the look. `lookStrength` blends either.
 - **Lens character:** `grain`, `chromaticAberration`, `vignette`, `sharpen`.
 
 ### Debug and film views (`viewport_capture`, `viewport_debug_view`)
@@ -326,8 +326,8 @@ Presets: `fire`, `embers`, `smoke`, `steam`, `sparks`, `rain`, `snow`, `mist`, `
 
 ### Volumetric fluids (`fluid` component)
 
-Fire and smoke as a real fluid simulation, the way offline tools (Blender Mantaflow,
-Houdini Pyro) and Unreal's Niagara Fluids do it — on the GPU, in real time.
+Fire and smoke as a real fluid simulation on a voxel grid, the way offline tools (Blender
+Mantaflow, Houdini Pyro) do it, but on the GPU and in real time.
 
 | | |
 |---|---|
@@ -462,8 +462,8 @@ renders them and checks for leaks.
 Imported trees, bushes and rocks are often 50k–3M triangles each. Drawn as meshes out to
 a 1–2 km cull distance they cost billions of triangles. Beyond a per-layer **transition
 distance**, instances draw as **octahedral impostors** instead: camera-facing cards that
-read a pre-rendered atlas of the model seen from many directions. This is the same
-technique as Fortnite / Unreal's impostors and Horizon's distant vegetation.
+read a pre-rendered atlas of the model seen from many directions, so a distant forest costs
+a few triangles per tree.
 
 **Bake** (GPU, lazy, cached):
 - Every foliage layer whose model has 300+ triangles gets an impostor (`impostors: false`

@@ -6,7 +6,7 @@ description: "Physics and navigation in Skywalker - Jolt rigid bodies, colliders
 # Physics and navigation
 
 Load skywalker-core first. Engine doc: `skywalker://docs/PHYSICS`. Jolt simulates bodies, characters, triggers and joints; Recast/Detour bakes the navmesh. The simulation is **deterministic**
-(fixed 1/60 s ticks, ordered events), so verify with `sim_control step` and `sim_trace`, not by eye. Components mirror Unity/Unreal:
+(fixed 1/60 s ticks, ordered events), so verify with `sim_control step` and `sim_trace`, not by eye. The components:
 `collider` alone = static geometry, `body` + `collider` = rigid body, `character` = character controller, `joint`, `physics_world` (scene settings), `navmesh`, `nav_agent`.
 
 ## Presets: make things physical with `physics_add`

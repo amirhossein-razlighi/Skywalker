@@ -1,7 +1,7 @@
-# Movie Render Queue
+# Movie rendering
 
-Offline, deterministic rendering of cinematics to video files and image sequences: Skywalker's
-equivalent of Unreal's Movie Render Queue and Unity's Recorder. Agents use the `movie_render` tool,
+Offline, deterministic rendering of cinematics to video files and image sequences, with real
+motion blur, supersampling and resumable jobs. Agents use the `movie_render` tool,
 humans use **Game ▸ Render Movie…** (⌥⌘M) or the film button of a Sequencer, and scripts use
 `skywalker movie`.
 
@@ -189,7 +189,7 @@ the viewport shows the frames as they are rendered, with progress, ETA and Cance
 
 - Skinned characters are posed at 60 Hz: within one shutter interval at 24 fps their pose changes at
   most twice, so very fast limbs blur in two steps.
-- Sub-frames are accumulated after tone mapping (like Unreal's MRQ temporal samples), so very bright
+- Sub-frames (the temporal samples of the shutter) are accumulated after tone mapping, so very bright
   highlights streak a little dimmer than an in-HDR accumulation would.
 - No alpha channel (ProRes 4444 is encoded opaque); no audio track.
 - The film grain pattern changes per sub-frame and averages out under motion blur.

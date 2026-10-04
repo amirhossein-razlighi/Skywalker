@@ -15,7 +15,7 @@ Arguments are validated before a tool runs: unknown keys, wrong types and bad en
 | [Entity](entity.md) | 10 | Create, read, change, move, duplicate and delete entities; read component schemas. |
 | [History](history.md) | 1 | Undo, redo and the attributed edit history. |
 | [View](view.md) | 8 | See the scene: captures with entity boxes, debug views, multi-view sheets, selection and the editor camera. |
-| [Render](render.md) | 17 | Environment, effects, hair, shaders, render layers, impostors, benchmarks and the movie render queue. |
+| [Render](render.md) | 17 | Environment, effects, hair, shaders, render layers, impostors, benchmarks and the movie renderer. |
 | [World](world.md) | 15 | Terrain, foliage, water queries and spatial placement on real geometry. |
 | [Asset](asset.md) | 27 | The asset database, import and download, materials, textures, prefabs, audio generation and previews. |
 | [Wander](wander.md) | 9 | Write, check, test, graph and inspect Wander behaviors. |
@@ -72,7 +72,7 @@ Arguments are validated before a tool runs: unknown keys, wrong types and bad en
 | [`groom_update`](render.md#groom_update) | Render | Change a groom's fields (or switch to another preset and then apply `fields`). |
 | [`impostor_bake`](render.md#impostor_bake) | Render | Bake the octahedral impostors of foliage layers now: each heavy model (an imported tree, bush, rock or grass clump; one mesh or every part of a prefab) is captured from up to 32x32 directions into an atlas of albedo, normal and depth, and instances beyond the layer's transition distance render as impostors (lit, shadowed and depth-correct like real geometry). |
 | [`light_shadows`](render.md#light_shadows) | Render | Turn shadows of point/spot lights on or off and tune them, for one light, a list, or every light ("all", optionally only one kind). |
-| [`movie_render`](render.md#movie_render) | Render | Render a cinematic to video or a PNG sequence, offline and deterministically (the Movie Render Queue). |
+| [`movie_render`](render.md#movie_render) | Render | Render a cinematic to video or a PNG sequence, offline and deterministically (the movie renderer). |
 | [`perf_stats`](render.md#perf_stats) | Render | Frame cost and scene complexity: GPU and CPU frame time, draw calls, lights, terrain nodes, foliage instances, entities, behaviors and assets. |
 | [`render_layers`](render.md#render_layers) | Render | Render layers (20): MeshRenderer.layers says which layers a mesh is on; Camera.cullMask and Light.cullMask say which layers a camera draws and a light illuminates (a mesh is drawn / lit when they share a layer). |
 | [`shader_get`](render.md#shader_get) | Render | The renderer's current shader source (Metal Shading Language). |

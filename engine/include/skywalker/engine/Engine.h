@@ -333,7 +333,7 @@ public:
     physics::PhysicsSystem& physics() { return *physics_; }
     nav::NavSystem& navigation() { return *nav_; }
 
-    // --- Movie render queue (docs/MOVIE_RENDER.md) ------------------------------------------
+    // --- Movie renderer (docs/MOVIE_RENDER.md) ------------------------------------------
     /// Renders a movie to completion on this thread; `progress` (and "movie_progress" events) report each frame.
     Result<Json> renderMovie(const movie::Options& options, const std::function<void(const Json&)>& progress = {});
     /// Starts a movie render that update() advances one sub-frame at a time (the editor stays live).
@@ -474,7 +474,7 @@ private:
     std::unique_ptr<SocketServer> server_;
     std::unique_ptr<World2D> world2d_;
     std::unique_ptr<studio::Studio> studio_;
-    // Movie render queue (Movie.cpp)
+    // Movie renderer (Movie.cpp)
     std::unique_ptr<movie::Job> movie_;
     Json lastMovie_;
     std::atomic<bool> movieCancel_{false};

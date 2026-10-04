@@ -58,7 +58,7 @@ A frame renders one or more jittered sub-samples:
 
 - **Real time** (the editor viewport, play mode, the player): one sample per frame, with temporal history. GI,
   reflections and AO converge over a few frames.
-- **Stills and cinematics** (`viewport_capture`, `skywalker render`, the movie render queue): `samples` jittered
+- **Stills and cinematics** (`viewport_capture`, `skywalker render`, the movie renderer): `samples` jittered
   sub-samples are accumulated in one render, so the image is supersampled and GI and reflections come out
   noise-free. `samples: 1` is the fastest preview; 4 is the capture default; 16 to 32 make final stills.
 

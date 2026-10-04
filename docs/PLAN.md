@@ -1,24 +1,24 @@
 # Skywalker v0.1 "Studio": the plan
 
-Goal: match the features that matter most in Unity and Unreal, built agent-first. Every
-capability is a tool, every tool works the same from the editor, the in-editor crew, the
-headless CLI, Claude Code, Codex, Gemini CLI, and Cursor. The showcase must hold up next to
-Assassin's Creed, Cyberpunk 2077, Black Myth: Wukong, Hollow Knight, Stardew-style farm sims,
-Hearts of Iron IV, and Suzerain.
+Goal: cover the features a modern production game engine is expected to have, built
+agent-first. Every capability is a tool, every tool works the same from the editor, the
+in-editor crew, the headless CLI, Claude Code, Codex, Gemini CLI, and Cursor. The showcase must
+hold up at commercial quality across genres: open-world action, a neon city, a 2D platformer, a
+farm sim, a grand-strategy map and a narrative desk game, all original.
 
 ## Gap analysis (v0.0.2 → v0.1)
 
-| Area | Unity / Unreal baseline | v0.0.2 | v0.1 target |
+| Area | Industry baseline | v0.0.2 | v0.1 target |
 |---|---|---|---|
-| **3D rendering** | TAA/TSR, SSR, GI (Lumen/APV), clustered lights, instancing, LOD, terrain, foliage, decals, volumetric clouds, full post stack | PBR, CSM, IBL, SSAO, bloom, water SSR, fluids | TAA + motion vectors, GPU instancing + LOD, terrain with splat layers, instanced foliage with wind, general SSR, SSGI, clustered (forward+) lights, decals, volumetric clouds, auto-exposure, DOF, motion blur, grading LUT, grain, CA |
+| **3D rendering** | TAA/TSR, SSR, real-time GI, clustered lights, instancing, LOD, terrain, foliage, decals, volumetric clouds, full post stack | PBR, CSM, IBL, SSAO, bloom, water SSR, fluids | TAA + motion vectors, GPU instancing + LOD, terrain with splat layers, instanced foliage with wind, general SSR, SSGI, clustered (forward+) lights, decals, volumetric clouds, auto-exposure, DOF, motion blur, grading LUT, grain, CA |
 | **2D** | Sprites, atlases, flipbooks, tilemaps, 2D lights, pixel-perfect camera | none | Sprite + SpriteAnimator, atlases, tilemaps, 2D lights with normal maps, parallax layers, pixel-perfect ortho |
-| **Text & UI** | TextMeshPro/UMG: SDF text, layout, widgets, data binding | none | SDF fonts (stb_truetype), world text, a UI canvas with anchors, stacks, widgets, 9-slice, input, Wander bindings, and a dialogue system |
+| **Text & UI** | SDF text, layout, widgets, data binding | none | SDF fonts (stb_truetype), world text, a UI canvas with anchors, stacks, widgets, 9-slice, input, Wander bindings, and a dialogue system |
 | **Animation** | Skinned meshes, clips, blend trees, state machines, IK, timelines | none | glTF skins and clips, GPU skinning, crossfades, 1D blend spaces, animator state machine, look-at IK, sequencer tracks |
-| **Physics** | PhysX/Chaos: rigid bodies, colliders, character controller, joints, triggers, queries | mesh raycast only | Jolt: bodies, colliders (box, sphere, capsule, mesh, height field), character controller, triggers, joints, ray/shape casts |
+| **Physics** | Rigid bodies, colliders, character controller, joints, triggers, queries | mesh raycast only | Jolt: bodies, colliders (box, sphere, capsule, mesh, height field), character controller, triggers, joints, ray/shape casts |
 | **Audio** | Spatial sources, mixer, music | none | miniaudio: spatial sources, buses, music, one-shots from Wander |
 | **Input** | Action maps, gamepad | keys | Action maps, gamepad (GameController), mouse look |
 | **AI/navigation** | NavMesh, agents, behavior trees | none | Recast/Detour navmesh, nav agents, Wander state machines |
-| **Scripting** | C#/C++, Blueprints | Wander (tree-walking interpreter) | Wander 2: functions, state machines, coroutines (`wait`), lists, maps, modules; a bytecode VM; C++ AOT; native C++ modules; a node-graph (Blueprint-style) view; and a natural-language → spec → code pipeline |
+| **Scripting** | A managed or native language, visual scripting | Wander (tree-walking interpreter) | Wander 2: functions, state machines, coroutines (`wait`), lists, maps, modules; a bytecode VM; C++ AOT; native C++ modules; a visual node-graph view; and a natural-language → spec → code pipeline |
 | **Agents** | (none) | crew in the editor, MCP | Studio: roster of specialists, task board, playtest bots, feedback, director decisions, defined loops, headless runner, editor Studio panel |
 | **Tool integrations** | (none) | MCP | Skills and plugins for Claude Code, Codex, Gemini CLI, and Cursor; MCP resources and prompts; `skywalker setup <client>` |
 | **DCC** | Live links (Blender, Maya, Houdini) | none | Blender bridge: run scripts, round-trip assets, FBX→glTF conversion, live session add-on; adapters for Maya, 3ds Max, and Houdini where installed |

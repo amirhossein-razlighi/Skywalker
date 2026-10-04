@@ -38,7 +38,7 @@ CATEGORIES = OrderedDict([
     ("entity", ("Entity", "Create, read, change, move, duplicate and delete entities; read component schemas.")),
     ("history", ("History", "Undo, redo and the attributed edit history.")),
     ("view", ("View", "See the scene: captures with entity boxes, debug views, multi-view sheets, selection and the editor camera.")),
-    ("render", ("Render", "Environment, effects, hair, shaders, render layers, impostors, benchmarks and the movie render queue.")),
+    ("render", ("Render", "Environment, effects, hair, shaders, render layers, impostors, benchmarks and the movie renderer.")),
     ("world", ("World", "Terrain, foliage, water queries and spatial placement on real geometry.")),
     ("asset", ("Asset", "The asset database, import and download, materials, textures, prefabs, audio generation and previews.")),
     ("wander", ("Wander", "Write, check, test, graph and inspect Wander behaviors.")),

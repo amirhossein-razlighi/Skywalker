@@ -98,7 +98,7 @@ hide:
   </a>
   <a class="sky-feature" href="manual/movie-render/">
     <img src="assets/images/shots/chancellors_desk/the_decree.webp" alt="A cinematic still" loading="lazy">
-    <div><h3>Movie render queue</h3><p>Deterministic offline renders to HEVC, ProRes or PNG with real accumulated motion blur.</p></div>
+    <div><h3>Movie renderer</h3><p>Deterministic offline renders to HEVC, ProRes or PNG with real accumulated motion blur.</p></div>
   </a>
 </div>
 

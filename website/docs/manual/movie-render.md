@@ -1,4 +1,4 @@
-# Movie render queue
+# Movie renderer
 
 The movie renderer turns cinematics into video files and image sequences, offline and deterministically. You use it
 for trailers, cutscene previews, look-development turntables and any shot that must come out the same every time.

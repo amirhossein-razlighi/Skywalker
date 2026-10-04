@@ -212,7 +212,7 @@ bloom) that costs 7.4 ms per frame on its own:
 | Empty `on tick` × 5,000 entities | 0.24 ms | |
 
 **Movie rendering**, smugglers_cove at 1920 × 1080, 24 fps, `samples: 8`, `shutter: 0.5`, `simulate: true`: about
-230 ms per frame ([Movie render queue](movie-render.md)).
+230 ms per frame ([Movie renderer](movie-render.md)).
 
 ## Recipe: find and fix a slow frame
 

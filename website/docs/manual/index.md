@@ -101,7 +101,7 @@ Strand hair and fur, particles and fluids, skeletal animation and cinematics.
 |---|---|
 | [Studio and crews](studio.md) | Agent crews, tasks, feedback, loops and playtests inside a project |
 | [DCC bridge](dcc.md) | Agents working in Blender (and, through untested adapters, Maya, Houdini and 3ds Max), with results imported as assets |
-| [Movie render queue](movie-render.md) | Offline cinematics with accumulated samples and real motion blur |
+| [Movie renderer](movie-render.md) | Offline cinematics with accumulated samples and real motion blur |
 | [Shipping](shipping.md) | `game.json`, quality presets and packaging a standalone macOS app |
 | [Performance](performance.md) | Budgets and measurements across rendering, simulation and effects |
 

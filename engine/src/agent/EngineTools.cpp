@@ -1208,7 +1208,7 @@ void registerEngineTools(Engine& engine) {
     tools::addHairTools(engine, reg);
     tools::addImpostorTools(engine, reg);
     tools::addGameTools(engine, reg);  // engine/src/agent/GameTools.cpp
-    tools::addMovieTools(engine, reg);  // engine/src/agent/MovieTools.cpp (movie render queue)
+    tools::addMovieTools(engine, reg);  // engine/src/agent/MovieTools.cpp (movie renderer)
     tools::addRenderLayerTools(engine, reg);  // engine/src/agent/RenderLayerTools.cpp (render layers, cull masks)
     tools::addProcessTools(engine, reg);  // ProcessTools.cpp: process_info, sim_teleport, sim_display
     tools::addShadowTools(engine, reg);  // engine/src/agent/ShadowTools.cpp (point / spot light shadows)

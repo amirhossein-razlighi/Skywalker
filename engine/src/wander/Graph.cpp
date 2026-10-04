@@ -1,4 +1,4 @@
-// Wander code <-> Blueprint-style node graphs (see Graph.h for the JSON format).
+// Wander code <-> visual node graphs (see Graph.h for the JSON format).
 
 #include "skywalker/wander/Graph.h"
 

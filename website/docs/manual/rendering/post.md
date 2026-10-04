@@ -116,7 +116,7 @@ things stay sharp instead of ghosting. MetalFX upscaling reads the same buffer.
 `motionBlur` on the camera is the shutter fraction. In real time it is a post-process blur of camera and object
 motion: the largest motion per tile of about 40 pixels and its neighbors drives a depth-aware gather, so moving
 objects blur over a sharp background. The blur length is capped at two tiles. Movie renders use a real accumulated
-shutter instead (see [Movie render queue](../movie-render.md)).
+shutter instead (see [Movie renderer](../movie-render.md)).
 
 `debug_view: "motion"` shows the velocity buffer: hue is direction, strength is speed on a log scale. Capture it with
 `samples: 1` right after something moved. On an M1 Pro at 1920×1080 the velocity buffer costs about 0.2 to 0.4 ms per

@@ -1,7 +1,7 @@
 #pragma once
 // Text layout: UTF-8, rich text, kerning, wrapping and alignment.
 //
-// Rich text tags (TextMeshPro-style, case-insensitive; unknown tags are kept as literal text):
+// Rich text tags (HTML-like, case-insensitive; unknown tags are kept as literal text):
 //   <b> <i> <u> <s>                    bold (SDF dilation), italic (shear), underline, strikethrough
 //   <color=#ff8800> <color=red>        text color (hex or a CSS color name)
 //   <alpha=#80> <alpha=0.5>            opacity

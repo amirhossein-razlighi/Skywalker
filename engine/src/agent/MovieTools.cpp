@@ -1,4 +1,4 @@
-// Movie render queue tool (docs/MOVIE_RENDER.md): movie_render renders sequences, inline camera
+// Movie renderer tool (docs/MOVIE_RENDER.md): movie_render renders sequences, inline camera
 // paths or the scene camera to PNG sequences and video files; also reports and cancels renders.
 
 #include <algorithm>
@@ -190,7 +190,7 @@ using namespace schema;
 
 void addMovieTools(Engine& engine, ToolRegistry& reg) {
     reg.add({"movie_render", "Render movie",
-             "Render a cinematic to video or a PNG sequence, offline and deterministically (the Movie Render Queue). "
+             "Render a cinematic to video or a PNG sequence, offline and deterministically (the movie renderer). "
              "Renders a sequence (`sequence`: its entity or .sequence.json, whole length or start/end), an inline camera "
              "move (`camera`: {keys: [{t, eye, target, fov?, roll?}]} splined, or {shots: [{shot: orbit|dolly|crane|track|"
              "pan|static|path|flyover, duration, target, ...sequence_camera_shot fields}]} where each shot is a cut), or the "

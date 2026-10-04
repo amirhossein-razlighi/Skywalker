@@ -1,4 +1,4 @@
-// Movie render queue: frame timing, inline camera paths and the render job (docs/MOVIE_RENDER.md).
+// Movie renderer: frame timing, inline camera paths and the render job (docs/MOVIE_RENDER.md).
 //
 // Sub-frame time. The simulation keeps its fixed 1/60 s tick (changing it would make a movie
 // render diverge from the game it records). A sub-frame at movie time τ runs the simulation to

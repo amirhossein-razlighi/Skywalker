@@ -179,7 +179,7 @@ show the world between the last two ticks (`engine/Interpolation.h`):
 Simulation, tools and captures never see the in-between values: `viewport_capture` and
 `capture()` show the exact tick state unless asked for an `alpha`. The editor viewport and the
 standalone player feed real frame time (`Engine::update`) and render with
-`renderToSurface`, which uses the current alpha. The movie render queue uses the same history
+`renderToSurface`, which uses the current alpha. The movie renderer uses the same history
 and scope for its sub-frames (`Movie.cpp`).
 
 **`on frame` handlers** run once per displayed frame, after interpolation, for cosmetic

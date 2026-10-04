@@ -47,7 +47,7 @@ The ground-up expansion of the engine into a complete, agent-first toolset.
 === "Production"
 
     - The Blender bridge, with adapters for other design apps.
-    - The movie render queue (H.264, HEVC, ProRes, PNG; real motion blur).
+    - The movie renderer (H.264, HEVC, ProRes, PNG; real motion blur).
     - The standalone player and `skywalker build` into signed macOS apps.
 
 ## Next
@@ -56,7 +56,7 @@ The ground-up expansion of the engine into a complete, agent-first toolset.
 |---|---|
 | Rendering | Impostor wind sway and hierarchical LODs for buildings; virtual shadow maps; hardware ray-traced reflections and GI on newer Apple GPUs; skin subsurface profiles; decals; virtualized geometry for scanned assets |
 | Platforms | A Vulkan backend (Windows, Linux), then D3D12; an iOS player; an editor shell for other platforms |
-| World | World partition and streaming for very large maps; road and spline tools; a procedural city kit |
+| World | Cell-based world streaming for very large maps; road and spline tools; a procedural city kit |
 | Wander | A debugger (breakpoints, watches, stepping) in the editor; hot reload of native modules |
 | Agents | Built-in generator adapters (image, 3D, audio); screenshot diffing for visual review; spending limits per loop |
 | Editor | Multi-select editing, nested prefabs and prefab variants, docking layouts, a timeline editor for sequences, a profiler panel |
