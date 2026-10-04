@@ -14,7 +14,7 @@ pipeline cache").
 | `release` | Optimized build |
 | `asan` | AddressSanitizer + UndefinedBehaviorSanitizer (engine, CLI and tests; no editor) |
 | `tsan` | ThreadSanitizer (engine, CLI and tests) |
-| `headless` | Engine, CLI and tests only. Use this on Linux or in CI (falls back to the CPU renderer). |
+| `headless` | Engine, CLI and tests only. Use this on Linux or in CI (falls back to the CPU renderer). See [Linux](#linux). |
 
 ```bash
 cmake --preset debug
@@ -41,6 +41,33 @@ File › Open Project… (⌘O) switches projects; the editor reopens the last o
 > access to `~/Documents` (or Desktop, Downloads) after each rebuild. To avoid it, sign
 > with a stable identity: configure with `-DSKY_CODESIGN_IDENTITY="Apple Development"` and
 > every build is signed with it; or keep projects outside protected folders.
+
+## Linux
+
+The `headless` preset builds the engine, the CLI and the test suite on Linux with GCC 13 or Clang 18 and runs every
+test on the CPU renderer; CI (`headless-linux`) builds it and runs `ctest --preset headless` on Ubuntu 24.04. Metal,
+the editor and AVFoundation video encoding are macOS-only: the tests that need them report a message and pass.
+
+```bash
+sudo apt-get install -y ninja-build zlib1g-dev libcurl4-openssl-dev
+cmake --preset headless && cmake --build --preset headless
+ctest --preset headless --output-on-failure
+cmake --preset asan && cmake --build --preset asan && ./build/asan/tests/skywalker_tests   # ASan + UBSan work on Linux too
+```
+
+Portability rules learned from the Linux port:
+
+- **File times.** `std::filesystem::file_time_type` has an implementation-defined epoch (1970 in libc++, 2174 in
+  libstdc++, so raw counts are negative on Linux). For hot reload and cache keys use `sky::fileModifiedNs()`
+  (`core/FileTime.h`): nanoseconds since the Unix epoch, `-1` when the file is missing. Never test the sign of a raw
+  `time_since_epoch().count()`.
+- **Warnings.** GCC's `-Wshadow` also flags a lambda parameter that shadows an enclosing `if` declaration, and a local
+  type that shadows a member type; Clang does not. Both presets build with warnings as errors, so build with GCC
+  before pushing engine changes that CI runs on Linux.
+- **Case-sensitive file systems.** macOS volumes are usually case-insensitive, Linux ones are not: refer to project
+  files with their exact case.
+- **No `/proc`, no `timeout` on macOS.** Code and scripts must run on both; prefer portable C++ (`std::filesystem`,
+  `std::chrono`) over platform files.
 
 ## Tests
 
