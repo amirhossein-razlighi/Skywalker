@@ -40,7 +40,10 @@ groom_export {"entity": "Head", "path": "grooms/head.hair"}
 ```
 
 Presets: `hair_straight`, `hair_wavy`, `hair_curly`, `hair_ponytail`, `hair_short` (heads: they
-grow on the upper back of the mesh), `fur_short`, `fur_long` (cover the whole mesh).
+grow on the upper back of the mesh), `fur_short`, `fur_long` (cover the whole mesh), and for
+rigged characters `hair_scalp`, `beard`, `eyebrows`, `fur_dense`. On a rigged mesh the roots
+ride the animated skin and strands collide with capsules fitted to the skeleton: see
+[CHARACTERS.md](CHARACTERS.md#hair-and-fur-on-animated-characters).
 
 ### How a groom is built
 
@@ -216,5 +219,5 @@ live for a scene; budget hair with `strands`, `segments` and the LOD fields.
   with sphere/capsule/plane proxies.
 - One sub-emitter per emitter; a sub-emitter's own sub-emitter chain works up to 4 levels.
 - The deep opacity map covers the sun only; lamps light hair without self-shadowing.
-- Skin subsurface scattering (screen-space) is not done yet; surfaces use the wrap + transmission
-  `subsurface` term.
+- Skin uses the pre-integrated `skin` material model ([CHARACTERS.md](CHARACTERS.md#material-models-skin-eye-cloth-hair_card)),
+  not a screen-space diffusion pass.

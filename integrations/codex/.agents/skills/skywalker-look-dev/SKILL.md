@@ -122,7 +122,8 @@ The live editor viewport renders at a **tier** so heavy worlds stay responsive w
 ## Materials for realism
 
 Use presets (`material_create {path, preset}`: gold, silver, copper, chrome, brushed_steel, iron, plastic, rubber, ceramic, car_paint, glass,
-water, ice, skin, wax, leaves, snow, velvet, neon, toon, toon_metal, clay) and `texture_generate` (albedo + normal + ORM) with
+water, ice, skin, wax, leaves, snow, velvet, neon, toon, toon_metal, clay; character models skin, eye, cloth, hair_card: subsurface skin with
+`scatterRadius` mm and pores, refracted irises with `irisCenter`/`irisRadius`, cloth sheen, anisotropic hair cards; check with `debug_view:"sss_mask"`) and `texture_generate` (albedo + normal + ORM) with
 `triplanar` so nothing stretches on scaled shapes. Real surfaces vary: add `normalMap`/`ormMap`, keep `roughness` between 0.3 and 0.9 for
 most dielectrics, `metallic` 0 or 1 (rarely in between), `subsurface` for leaves/skin/wax/snow, `clearcoat` for paint and varnish.
 

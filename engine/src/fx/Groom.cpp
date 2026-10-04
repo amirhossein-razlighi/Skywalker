@@ -295,14 +295,10 @@ std::vector<Vec3> weldedNormals(const MeshData& m) {
         return (static_cast<uint64_t>(q(p.x)) * 73856093ull) ^ (static_cast<uint64_t>(q(p.y)) * 19349663ull) ^
                (static_cast<uint64_t>(q(p.z)) * 83492791ull);
     };
+    // The authored normals of every vertex at a position, averaged: smooth meshes (whose duplicates at UV
+    // seams share one normal) keep their normals exactly, flat-shaded corners get the mean of their faces.
     std::unordered_map<uint64_t, Vec3> sum;
-    // Face normals weighted by area, accumulated per position.
-    for (size_t t = 0; t + 2 < m.indices.size(); t += 3) {
-        uint32_t i0 = m.indices[t], i1 = m.indices[t + 1], i2 = m.indices[t + 2];
-        Vec3 fn = cross(vpos(m, i1) - vpos(m, i0), vpos(m, i2) - vpos(m, i0));
-        if (dot(fn, vnorm(m, i0) + vnorm(m, i1) + vnorm(m, i2)) < 0.f) fn = -fn;  // agree with the authored side
-        for (uint32_t i : {i0, i1, i2}) sum[key(vpos(m, i))] += fn;
-    }
+    for (size_t i = 0; i < n; ++i) sum[key(vpos(m, static_cast<uint32_t>(i)))] += vnorm(m, static_cast<uint32_t>(i));
     for (size_t i = 0; i < n; ++i) {
         Vec3 own = vnorm(m, static_cast<uint32_t>(i));
         auto it = sum.find(key(vpos(m, static_cast<uint32_t>(i))));
