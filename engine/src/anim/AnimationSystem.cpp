@@ -953,7 +953,8 @@ AnimationSystem::SeqInstance* AnimationSystem::seqInstance(EntityId e) {
     return &s;
 }
 
-void AnimationSystem::applySequence(EntityId owner, SeqInstance& s, float t, float prevT, bool playing, FrameOverrides* ov) {
+void AnimationSystem::applySequence(EntityId owner, SeqInstance& s, float t, float prevT, bool playing, FrameOverrides* ov,
+                                    bool valuesOnly) {
     const SequenceDef& def = *s.def;
     auto entity = [&](const std::string& ref, const char* what) -> EntityId {
         EntityId id = ref.empty() ? kNoEntity : scene_.find(ref);
@@ -968,6 +969,7 @@ void AnimationSystem::applySequence(EntityId owner, SeqInstance& s, float t, flo
     };
     for (const Track& track : def.tracks) {
         if (track.muted || track.keys.empty()) continue;
+        if (valuesOnly && (track.type == TrackType::Event || track.type == TrackType::Animation)) continue;
         switch (track.type) {
             case TrackType::Property: {
                 size_t dot = track.property.find('.');
@@ -1104,6 +1106,14 @@ Json AnimationSystem::sequenceState(EntityId e) {
 
 void AnimationSystem::setSequenceScrub(EntityId e, float seconds) { scrubs_[e] = std::max(0.f, seconds); }
 void AnimationSystem::clearSequenceScrub(EntityId e) { scrubs_.erase(e); }
+
+AnimationSystem::FrameOverrides AnimationSystem::overrideSequenceAt(EntityId e, float seconds) {
+    FrameOverrides ov;
+    ov.active = true;
+    SeqInstance* s = seqInstance(e);
+    if (s && s->def) applySequence(e, *s, seconds, seconds, false, &ov, /*valuesOnly=*/true);
+    return ov;
+}
 
 EntityId AnimationSystem::sequenceCamera(EntityId e, float seconds) {
     SeqInstance* s = seqInstance(e);

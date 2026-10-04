@@ -16,6 +16,7 @@
 #include "skywalker/agent/SocketServer.h"
 #include "skywalker/core/Log.h"
 #include "skywalker/core/Strings.h"
+#include "skywalker/engine/Movie.h"
 #include "skywalker/native/NativeModules.h"
 #include "skywalker/assets/Prefab.h"
 #include "skywalker/render/Gltf.h"
@@ -177,6 +178,7 @@ Engine::Engine(EngineConfig config)
 }
 
 Engine::~Engine() {
+    movie_.reset();  // a running movie render restores the scene and closes its files first
     {
         // Refuse new jobs and release any thread waiting on a queued one, *then* join the
         // server threads; otherwise a connection thread could wait on a job never pumped.
@@ -354,6 +356,14 @@ void Engine::step(int ticks) {
 }
 
 void Engine::update(double seconds) {
+    if (movie_) {  // a movie render owns the simulation: one sub-frame per update, agents still served
+        pump();
+        if (movie_ && !movie_->advance()) {
+            lastMovie_ = movie_->status();
+            movie_.reset();
+        }
+        return;
+    }
     // Hot reload: rescan the project for changed assets every couple of seconds while editing.
     assetScanTimer_ += seconds;
     if (assetScanTimer_ >= 2.0 && playState_ == PlayState::Editing && !drag_.entity && !gizmoDrag_) {
@@ -388,7 +398,10 @@ void Engine::update(double seconds) {
     if (ticks) step(ticks);
 }
 
-double Engine::effectsTime() const { return playState_ == PlayState::Editing ? previewTime_ : runtime_->time(); }
+double Engine::effectsTime() const {
+    if (effectsTimeOverride_) return *effectsTimeOverride_;  // movie sub-frames
+    return playState_ == PlayState::Editing ? previewTime_ : runtime_->time();
+}
 
 fx::Ocean& Engine::oceanFor(EntityId e, const Water& w) {
     fx::Ocean& ocean = oceans_[e];
@@ -669,6 +682,7 @@ Result<Capture> Engine::capture(const CaptureOptions& opts) {
 }
 
 Status Engine::renderToSurface(void* surface, int width, int height) {
+    if (movie_) return renderer_->present(surface);  // show the movie frames as they render
     auto start = std::chrono::steady_clock::now();
     CaptureOptions opts;
     opts.width = width;

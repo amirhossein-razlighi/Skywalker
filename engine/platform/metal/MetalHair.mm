@@ -180,7 +180,7 @@ void MetalHair::simulate(id<MTLCommandBuffer> cmd, const FrameData& frame) {
         float widthM = p.widthRoot * 0.001f * scale;
         float ratio = widthM / (pixelAt1m * (ortho ? 1.f : dist));
         float fraction = 1.f;
-        if (frame.samples <= 1 && g.N > 20000) {
+        if (frame.samples <= 1 && !frame.offline.enabled && g.N > 20000) {
             // Real time: thin strands far away merge into the coverage of fewer, more opaque
             // ones, and the strand count follows the groom's size on screen (geometry is the cost
             // on tile-based GPUs). Stills (accumulated sub-samples) always draw every strand.

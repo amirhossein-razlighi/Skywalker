@@ -249,6 +249,16 @@ struct FrameData {
     /// Viewport quality: 0 full (play, captures), 1 balanced, 2 fast (editing a heavy world).
     /// Lower tiers pick coarser LODs and cheaper shadows; the engine also trims the environment.
     int quality = 0;
+    /// Offline (movie) rendering, see docs/MOVIE_RENDER.md. Each render() is one independent
+    /// sub-frame accumulated by the caller: no TAA history even at samples = 1, the sub-pixel
+    /// jitter continues the sequence at `sampleOffset` (so sub-frames cover distinct positions),
+    /// and auto exposure adapts by `exposureDt` seconds per render (temporally stable, no
+    /// pumping) instead of converging instantly like a still. `resetHistory` (a cut) re-meters.
+    struct Offline {
+        bool enabled = false;
+        int sampleOffset = 0;
+        float exposureDt = 0.f;
+    } offline;
 
     static constexpr size_t kMaxLights = 1024;       // clustered lighting on surfaces
     static constexpr size_t kMaxEffectLights = 16;   // the most important ones also light water, particles, fog
