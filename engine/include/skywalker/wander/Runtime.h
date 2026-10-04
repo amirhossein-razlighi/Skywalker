@@ -48,6 +48,7 @@ struct RuntimeMessage {
 
 /// Native (AOT-compiled) code for one program; see wander/Aot.h.
 struct NativeProgram;
+class Debugger;
 
 /// Hooks used by the test runner (wander_test) to drive a sandbox.
 struct TestHooks {
@@ -254,6 +255,11 @@ public:
     void setRecordSceneWrites(bool on) { recordSceneWrites_ = on; }
     bool recordSceneWrites() const { return recordSceneWrites_; }
 
+    // --- Debugging (Debugger.h; docs/WANDER.md "Debugging") -------------------------------------
+    /// Breakpoints, stepping and inspection of this runtime's scripts. Costs nothing while idle.
+    Debugger& debugger() { return *debugger_; }
+    const Debugger& debugger() const { return *debugger_; }
+
     /// Execution budget per handler run, in instructions (loops charge their length per
     /// iteration, calls the callee's length).
     static constexpr int64_t kBudget = 1'000'000;
@@ -266,6 +272,7 @@ public:
 
 private:
     friend class CallContext;
+    friend class Debugger;
     friend struct ExecState;
     friend struct Vm;
     friend struct NativeBridge;
@@ -290,6 +297,7 @@ private:
     std::unordered_map<uint64_t, std::shared_ptr<const NativeProgram>> native_;
     std::string sceneWriteGuard_;
     bool recordSceneWrites_ = false;
+    std::unique_ptr<Debugger> debugger_;
 };
 
 }  // namespace sky::wander

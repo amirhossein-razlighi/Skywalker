@@ -171,6 +171,10 @@ set(SKY_ENGINE_SOURCES
     # Agent link: followable events and tools served by external processes (docs/PYTHON_AGENTS.md)
     src/agent/AgentLink.cpp
     src/agent/AgentLinkTools.cpp
+    # Wander debugger: breakpoints, stepping, inspection; debugged ticks on a handoff thread (docs/WANDER.md)
+    src/wander/Debugger.cpp
+    src/engine/EngineDebug.cpp
+    src/agent/WanderDebugTools.cpp
 )
 
 # DCC bridge: the Python helper library and the Blender add-on are embedded so the engine can

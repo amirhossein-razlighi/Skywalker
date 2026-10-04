@@ -173,6 +173,8 @@ public:
     void pause();
     void stop();
     void step(int ticks);
+    /// The Wander debugger holds the simulation mid-tick (a breakpoint): no ticks run until it continues.
+    bool debugHolding() const;
     /// Advance real time: pumps posted jobs and runs fixed simulation steps when playing.
     void update(double seconds);
     /// The simulation half of update(): accumulates real time and runs the whole ticks it covers
@@ -395,6 +397,15 @@ private:
     FrameData buildFrameData(const CaptureOptions& opts);  // frame() without the display-time setup (EngineFlow.cpp)
     void stepPhysics();                                    // one tick of physics under the process gate (EngineFlow.cpp)
     void resetFrameFlow();                                 // play/stop: interpolation history and pacing (EngineFlow.cpp)
+    // Wander debugger (EngineDebug.cpp): debugged ticks run on a thread that hands control back at a stop.
+    struct DebugRun;
+    std::unique_ptr<DebugRun> debugRun_;
+    void initDebugger();
+    void runTicks(int ticks);           // step()'s simulation loop
+    bool debugStep(int ticks);          // true when the debugger runs (or holds) these ticks
+    void driveDebugRun();               // main thread: the paused VM continues until it stops again or finishes
+    void abortDebugRun();               // play stops while paused: the tick in progress is abandoned
+    ToolResult debugGuard(std::string_view tool) const;  // refuses world-changing tools while paused
     void presented(const FrameData& f, float alpha);       // after a real-time frame (EngineFlow.cpp)
 
     EngineConfig config_;
