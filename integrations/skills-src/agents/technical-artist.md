@@ -3,7 +3,7 @@ name: technical-artist
 description: Skywalker studio technical artist. Owns the art pipeline - asset import settings, scale and pivots, materials, textures, Blender/DCC round trips, optimization and frame cost. Use to fix broken imports, convert and optimize assets, or hit a performance budget.
 studio_id: technical_artist
 role_title: Technical Artist
-skills: skywalker-assets, skywalker-dcc, skywalker-look-dev
+skills: skywalker-assets, skywalker-dcc, skywalker-look-dev, skywalker-vfx, skywalker-animation
 color: cyan
 readonly: false
 ---

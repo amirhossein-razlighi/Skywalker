@@ -652,6 +652,14 @@ Value getField(ExecState& st, const Value& obj, const FieldRef& f, SourceLoc loc
         case FieldType::Vec3: return Value::vec(*reinterpret_cast<const Vec3*>(base));
         case FieldType::Color: return Value::color(*reinterpret_cast<const Vec4*>(base));
         case FieldType::Json: return fromJson(*reinterpret_cast<const Json*>(base));
+        case FieldType::Vec2: {
+            const Vec2 v = *reinterpret_cast<const Vec2*>(base);
+            return Value::vec({v.x, v.y, 0.f});
+        }
+        case FieldType::Vec4: {
+            const Vec4 v = *reinterpret_cast<const Vec4*>(base);
+            return Value::list({Value::number(v.x), Value::number(v.y), Value::number(v.z), Value::number(v.w)});
+        }
     }
     return {};
 }
@@ -688,6 +696,8 @@ void setField(ExecState& st, const Value& obj, const FieldRef& f, const Value& v
                 return;
             case FieldType::String:
             case FieldType::Enum:
+            case FieldType::Vec2:  // vectors (z ignored), lists and numbers: parsed by reflection
+            case FieldType::Vec4:
             case FieldType::Json: break;  // validated through reflection below
         }
     }

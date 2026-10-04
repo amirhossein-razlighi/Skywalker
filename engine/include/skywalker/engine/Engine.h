@@ -6,6 +6,7 @@
 // jobs which run in `pump()` on the main thread (called from `update()`). This keeps
 // the core lock-free and deterministic while still allowing many concurrent agents.
 
+#include <atomic>
 #include <cstdint>
 #include <deque>
 #include <functional>
@@ -14,6 +15,7 @@
 #include <mutex>
 #include <optional>
 #include <unordered_map>
+#include <unordered_set>
 #include <string>
 #include <vector>
 
@@ -25,6 +27,7 @@
 #include "skywalker/audio/AudioSystem.h"
 #include "skywalker/core/Json.h"
 #include "skywalker/engine/Gizmo.h"
+#include "skywalker/fx/Groom.h"
 #include "skywalker/fx/Ocean.h"
 #include "skywalker/fx/Particles.h"
 #include "skywalker/input/ActionMap.h"
@@ -40,9 +43,14 @@
 namespace sky {
 
 class SocketServer;
+class World2D;
 class NativeModules;
 namespace studio {
 class Studio;
+}
+namespace movie {
+struct Options;
+class Job;
 }
 
 /// Registers the engine's Wander builtins (effects, water, and every subsystem's) in the
@@ -86,7 +94,18 @@ struct CaptureOptions {
     /// 1 = a single real-time frame (temporal AA uses history from previous frames).
     int samples = 4;
     int debugView = 0;  // see FrameData::debugView
+    bool clay = false;  // every surface matte white clay (look-dev of form and light; "sketch to fill" films)
+    int quality = 0;    // FrameData::quality: 0 full, 1 balanced, 2 fast
+    // Movie sub-frames (docs/MOVIE_RENDER.md): FrameData::offline; a real shutter is accumulated by the
+    // caller, so the post-process motion blur is off. resetHistory marks a cut.
+    FrameData::Offline offline;
+    bool resetHistory = false;
+    bool listVisible = true;  // compute Capture::visible (skipped by movie frames)
 };
+
+/// How the live editor viewport trades quality for responsiveness while editing. Play mode
+/// and captures always render at full quality.
+enum class ViewportQuality { Full = 0, Balanced = 1, Fast = 2 };
 
 struct Capture {
     Image image;
@@ -163,6 +182,8 @@ public:
     Gizmo& gizmo() { return gizmo_; }
     /// Editor viewport looks through the scene's primary camera instead of the orbit camera.
     void setViewThroughSceneCamera(bool on) { viewSceneCamera_ = on; }
+    void setViewportQuality(ViewportQuality q) { editQuality_ = q; }
+    ViewportQuality viewportQuality() const { return editQuality_; }
     bool viewThroughSceneCamera() const { return viewSceneCamera_; }
     /// Highlights the handle under the cursor. Returns the axis or -1.
     int gizmoHover(float x, float y, int width, int height);
@@ -226,6 +247,9 @@ public:
 
     // --- Effects: particles and water -----------------------------------------------
     fx::ParticleSystem& particles() { return particles_; }
+    /// 2D, text, UI and dialogue (sprites, tilemaps, 2D lights, canvases, conversations).
+    World2D& world2d() { return *world2d_; }
+    fx::GroomSystem& grooms() { return grooms_; }  // hair & fur (generated grooms, cached)
     /// Seconds on the effects clock: simulation time while playing, a live preview clock while editing.
     double effectsTime() const;
     /// Height of the water surface at world (x, z), waves included. False if no water covers it.
@@ -242,6 +266,14 @@ public:
     Status setActionMap(input::ActionMap map);
     /// Re-reads input.json / audio.json if they changed on disk (called periodically).
     void reloadProjectSettings(bool force = false);
+    // --- Platform requests from the game (honored by the player runtime, ignored by the editor) ----------
+    /// `cursor_lock(true)` in Wander: the game wants a hidden, captured mouse (first-person look). Cleared on stop.
+    bool cursorLocked() const { return cursorLocked_; }
+    void setCursorLocked(bool on) { cursorLocked_ = on; }
+    /// `quit_game()` in Wander: the game asks to close (a "Quit" menu button). The player exits.
+    bool quitRequested() const { return quitRequested_; }
+    void requestQuit() { quitRequested_ = true; }
+    void clearQuitRequest() { quitRequested_ = false; }
     // --- Studio (multi-agent roster, board, feedback, loops; docs/STUDIO.md) -----------
     /// Created on first use from the project's agents/ and studio/ folders. Main thread only.
     studio::Studio& studio();
@@ -249,6 +281,19 @@ public:
     // --- Physics & navigation (Jolt, Recast/Detour) -------------------------------------
     physics::PhysicsSystem& physics() { return *physics_; }
     nav::NavSystem& navigation() { return *nav_; }
+
+    // --- Movie render queue (docs/MOVIE_RENDER.md) ------------------------------------------
+    /// Renders a movie to completion on this thread; `progress` (and "movie_progress" events) report each frame.
+    Result<Json> renderMovie(const movie::Options& options, const std::function<void(const Json&)>& progress = {});
+    /// Starts a movie render that update() advances one sub-frame at a time (the editor stays live).
+    Status startMovie(const movie::Options& options);
+    /// Thread-safe: the running movie render stops after the current sub-frame (its outputs stay valid).
+    void cancelMovie() { movieCancel_ = true; }
+    bool movieRendering() const { return movie_ != nullptr; }
+    /// The running (or last) movie render: progress, or its summary.
+    Json movieStatus() const;
+    /// Effects clock override for movie sub-frames (water, sky, GPU effects); nullopt = the normal clock.
+    void setEffectsTimeOverride(std::optional<double> seconds) { effectsTimeOverride_ = seconds; }
 
     // --- Events (activity feed) -----------------------------------------------------
     void emitEvent(Json event);
@@ -267,6 +312,11 @@ public:
 
 private:
     void ensureMeshUploaded(const std::string& meshKey);
+    void frameSceneView();
+    /// Real-time frames stream asset meshes: parsing and LOD building run on background
+    /// threads and the mesh appears once uploaded (captures still load synchronously).
+    void requestMeshAsync(const std::string& meshKey);
+    void drainStreamedMeshes();
     std::optional<audio::ListenerPose> listenerPose();
     void resolveTexturePaths(FrameData& f) const;
 
@@ -281,16 +331,22 @@ private:
     std::unique_ptr<anim::AnimationSystem> animation_;
     struct CachedMaterial {
         int64_t mtime = -1;
+        double checkedAt = -1e9;  // material/prefab files are re-stat'ed at most once a second
         bool ok = false;
         ResolvedMaterial material;
     };
     std::unordered_map<std::string, CachedMaterial> materials_;
     struct CachedPrefab {
         int64_t mtime = -1;
+        double checkedAt = -1e9;
         Json prefab;
     };
     std::unordered_map<std::string, CachedPrefab> prefabs_;
     std::unordered_map<std::string, std::shared_ptr<MeshData>> cpuMeshes_;
+    struct MeshStream;                      // results handed back from loader threads
+    std::shared_ptr<MeshStream> meshStream_;
+    std::unordered_set<std::string> pendingMeshes_;
+    bool streamMeshes_ = false;
     double assetScanTimer_ = 0;
     ToolRegistry tools_;
     OrbitCamera camera_;
@@ -300,6 +356,7 @@ private:
     double accumulator_ = 0;
     fx::ParticleSystem particles_;
     std::unique_ptr<world::WorldRuntime> world_;
+    fx::GroomSystem grooms_;
     std::unordered_map<EntityId, fx::Ocean> oceans_;
     double previewTime_ = 0;
     fx::Ocean& oceanFor(EntityId e, const Water& w);
@@ -322,6 +379,7 @@ private:
 
     Gizmo gizmo_;
     bool viewSceneCamera_ = false;
+    ViewportQuality editQuality_ = ViewportQuality::Fast;
     int gizmoHot_ = -1;
     std::optional<Gizmo::DragStart> gizmoDrag_;
     EntityId gizmoEntity_ = kNoEntity;
@@ -333,6 +391,8 @@ private:
         Vec3 offset;
     } drag_;
 
+    bool cursorLocked_ = false;
+    bool quitRequested_ = false;
     std::deque<Json> events_;
     std::mutex jobsMutex_;
     bool shuttingDown_ = false;   // guarded by jobsMutex_
@@ -345,7 +405,13 @@ private:
     int editDepth_ = 0;
     std::deque<std::pair<std::function<Json()>, std::promise<Json>>> jobs_;
     std::unique_ptr<SocketServer> server_;
+    std::unique_ptr<World2D> world2d_;
     std::unique_ptr<studio::Studio> studio_;
+    // Movie render queue (Movie.cpp)
+    std::unique_ptr<movie::Job> movie_;
+    Json lastMovie_;
+    std::atomic<bool> movieCancel_{false};
+    std::optional<double> effectsTimeOverride_;
 };
 
 void registerEngineTools(Engine& engine);

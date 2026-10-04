@@ -159,7 +159,7 @@ void addSequenceTools(Engine& engine, ToolRegistry& reg) {
     reg.add({"sequence_create", "Create sequence",
              "Create a cinematic sequence asset (*.sequence.json) and an entity whose `sequencer` plays it when the "
              "simulation starts. Then add content with sequence_key (keyed properties, camera cuts, events, animations) "
-             "and sequence_camera_shot (orbit / dolly / crane / track / pan / static / path moves), check frames with "
+             "and sequence_camera_shot (orbit / dolly / crane / track / pan / static / path / flyover moves), check frames with "
              "sequence_scrub and play with sequence_play. `tracks` may hold a full track list (see docs/ANIMATION.md). "
              "Example: {\"path\": \"cinematics/intro.sequence.json\", \"duration\": 10}.",
              "animation",
@@ -359,7 +359,8 @@ void addSequenceTools(Engine& engine, ToolRegistry& reg) {
              "degrees), dolly (distance [far, near] along angle, or from/to points), crane (height [low, high]), track "
              "(side-on, slides from/to meters while following the target), pan (fixed position, look from/to: entities, "
              "points or yaw degrees), static (position looking at target), path (Catmull-Rom through points, looking at "
-             "target or along the path). fov: number or [from, to] (zoom), roll in degrees, ease (default smooth). "
+             "target or along the path), flyover (straight aerial pass over the target from the angle side: distance = "
+             "half the pass length, height). fov: number or [from, to] (zoom), roll in degrees, ease (default smooth). "
              "cut=true (default) also switches to this camera at start. Missing cameras are created. Example: "
              "{\"sequence\": \"Intro\", \"camera\": \"Cam A\", \"shot\": \"orbit\", \"target\": \"Hero\", \"start\": 0, "
              "\"duration\": 5, \"radius\": 5, \"height\": 1.8, \"from\": -30, \"to\": 60}.",

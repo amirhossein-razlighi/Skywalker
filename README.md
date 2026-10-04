@@ -116,6 +116,16 @@ build/debug/bin/skywalker render examples/hello_sky/scenes/main.sky.json -o shot
 `skywalker run SCENE --ticks 600` simulates deterministically and prints logs;
 `skywalker check file.wander` compiles Wander; `skywalker call TOOL '{json}'` runs one tool.
 
+### Ship a game
+
+```bash
+build/release/bin/skywalker build --project examples/sky_dash --out ~/Builds --release   # -> Sky Dash.app
+```
+
+`skywalker build` packages a project as a standalone macOS app around `skywalker-player` (scenes, the assets they
+reference, scripts, compiled native modules, icon, ad-hoc signature); `skywalker-player PROJECT` plays a folder
+directly. Settings live in `game.json`. → [docs/SHIPPING.md](docs/SHIPPING.md)
+
 ## Documentation
 
 | Doc | What's inside |
@@ -123,9 +133,11 @@ build/debug/bin/skywalker render examples/hello_sky/scenes/main.sky.json -o shot
 | [ARCHITECTURE](docs/ARCHITECTURE.md) | Layers, threading, data flow, design decisions |
 | [WANDER](docs/WANDER.md) | The behavior language and the ECPS model |
 | [AGENTS](docs/AGENTS.md) | MCP, the crew, Agent Designer, providers, generative assets |
+| [SHIPPING](docs/SHIPPING.md) | Build a game into a macOS app: the standalone player, `game.json` settings, packaging, signing |
 | [INTEGRATIONS](docs/INTEGRATIONS.md) | Skills, subagents and setup for Claude Code, Codex, Gemini CLI and Cursor; MCP resources and prompts |
 | [ASSETS](docs/ASSETS.md) | Asset database, glTF, materials, prefabs, spatial tools |
 | [RENDERING](docs/RENDERING.md) | PBR + toon surfaces, IBL, cascaded shadows, SSAO, sky, post, recipes |
+| [MOVIE_RENDER](docs/MOVIE_RENDER.md) | Movie Render Queue: offline cinematic renders to H.264 / HEVC / ProRes / PNG with motion blur, progress, resume |
 | [BRAND](docs/BRAND.md) | Logo, app icon, colors, typography |
 | [TOOLS](docs/TOOLS.md) | Generated reference of every tool |
 | [DEVELOPMENT](docs/DEVELOPMENT.md) | Building, testing, sanitizers, profiling, conventions |

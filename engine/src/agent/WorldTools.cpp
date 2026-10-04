@@ -504,7 +504,8 @@ void addWorldTools(Engine& engine, ToolRegistry& reg) {
              object({{"frames", integer("Benchmark this many real-time frames first (default 0 = just report)")},
                      {"width", integer("Benchmark width (default 1920)")},
                      {"height", integer("Benchmark height (default 1080)")},
-                     {"view", enumeration({"editor", "scene"}, "Camera for the benchmark (default editor)")}}),
+                     {"view", enumeration({"editor", "scene"}, "Camera for the benchmark (default editor)")},
+                     {"quality", enumeration({"full", "balanced", "fast"}, "Viewport quality tier to benchmark (default full)")}}),
              false, false, [&engine](const Json& a, ToolContext&) {
                  Json bench = Json::object();
                  int frames = static_cast<int>(std::clamp<int64_t>(a.get("frames").asInt(0), 0, 600));
@@ -515,6 +516,8 @@ void addWorldTools(Engine& engine, ToolRegistry& reg) {
                      o.samples = 1;
                      o.useSceneCamera = a.get("view").asString() == "scene";
                      o.editorOverlays = false;
+                     std::string q = a.get("quality").asString();
+                     o.quality = q == "fast" ? 2 : q == "balanced" ? 1 : 0;
                      double sum = 0, lo = 1e9, hi = 0, cpu = 0;
                      for (int i = 0; i < frames + 3; ++i) {  // 3 warm-up frames
                          auto t0 = std::chrono::steady_clock::now();

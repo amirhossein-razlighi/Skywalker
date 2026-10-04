@@ -281,6 +281,11 @@ final class ViewportNSView: NSView {
         guard let name = keyName(event) else { return }
         if !editing {
             if !event.isARepeat { engine.key(name, down: true) }
+            // Printable characters also go to focused UI text fields.
+            if let chars = event.characters, !chars.isEmpty, !event.modifierFlags.contains(.command),
+               chars.unicodeScalars.allSatisfy({ $0.value >= 0x20 && $0.value != 0x7F && !(0xF700...0xF8FF).contains($0.value) }) {
+                engine.text(chars)
+            }
             return
         }
         if event.modifierFlags.contains(.command) {

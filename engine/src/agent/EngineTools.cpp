@@ -635,9 +635,11 @@ void addViewTools(Engine& engine, ToolRegistry& reg) {
                      {"overlays", boolean("Editor grid & selection highlight (default true)")},
                      {"samples", integer("Supersampling: jittered sub-frames accumulated (default 4; 1 = fastest preview, "
                                          "16-32 = final-quality stills with noise-free GI and reflections)")},
-                     {"debug_view", enumeration({"final", "albedo", "normals", "material", "gi", "reflections", "ao", "depth", "lighting"},
+                     {"clay", boolean("Render every surface as matte white clay (judge form and light; film 'sketch to fill' beats)")},
+                     {"debug_view", enumeration({"final", "albedo", "normals", "material", "gi", "reflections", "ao", "depth", "lighting", "sketch"},
                                                 "Buffer visualization for diagnosing looks: material = roughness (red) / metallic (green), "
                                                 "gi = bounce light, lighting = before screen-space GI/reflections")},
+                     {"quality", enumeration({"full", "balanced", "fast"}, "Viewport quality tier (default full; fast/balanced preview what the editor shows while editing)")},
                      {"include_image", boolean("Return the image (default true); false = only the entity list")},
                      {"save_path", string("Also write the PNG to this project-relative path")}}),
              false, false, [&engine](const Json& a, ToolContext&) {
@@ -664,9 +666,12 @@ void addViewTools(Engine& engine, ToolRegistry& reg) {
                  o.editorOverlays = a.get("overlays").asBool(true);
                  o.samples = static_cast<int>(std::clamp<int64_t>(a.get("samples").asInt(4), 1, 64));
                  {
-                     static const char* kViews[] = {"final", "albedo", "normals", "material", "gi", "reflections", "ao", "depth", "lighting"};
+                     static const char* kViews[] = {"final", "albedo", "normals", "material", "gi", "reflections", "ao", "depth", "lighting", "sketch"};
                      std::string dv = a.get("debug_view").asString();
-                     for (int i = 0; i < 9; ++i) if (dv == kViews[i]) o.debugView = i;
+                     for (int i = 0; i < 10; ++i) if (dv == kViews[i]) o.debugView = i;
+                     o.clay = a.get("clay").asBool(false);
+                     std::string q = a.get("quality").asString();
+                     o.quality = q == "fast" ? 2 : q == "balanced" ? 1 : 0;
                  }
                  auto cap = engine.capture(o);
                  if (!cap) return ToolResult::error(cap.error());
@@ -765,6 +770,25 @@ void addViewTools(Engine& engine, ToolRegistry& reg) {
                  if (a.contains("pitch")) cam.pitch = std::clamp(a.get("pitch").asFloat(), -89.f, 89.f);
                  if (a.contains("distance")) cam.distance = std::max(0.2f, a.get("distance").asFloat());
                  return ToolResult::json(cam.toJson(), "camera:");
+             }});
+
+    reg.add({"viewport_quality", "Viewport quality",
+             "How the live editor viewport renders while editing: fast (default; lower internal resolution, no "
+             "screen-space GI/reflections or light shafts, near foliage shadows, coarser LODs) keeps heavy worlds "
+             "responsive; balanced; full (what the game and captures show). Play mode always renders full.",
+             "view", object({{"quality", enumeration({"fast", "balanced", "full"}, "Editing quality (omit to read)")}}),
+             false, false, [&engine](const Json& a, ToolContext&) {
+                 static const char* names[] = {"full", "balanced", "fast"};
+                 if (a.contains("quality")) {
+                     std::string q = a.get("quality").asString();
+                     engine.setViewportQuality(q == "full" ? ViewportQuality::Full
+                                               : q == "balanced" ? ViewportQuality::Balanced
+                                                                 : ViewportQuality::Fast);
+                 }
+                 std::string cur = names[static_cast<int>(engine.viewportQuality())];
+                 ToolResult r = ToolResult::text("viewport quality: " + cur);
+                 r.structured = Json::object({{"quality", cur}});
+                 return r;
              }});
 
     reg.add({"selection_get", "Get selection",
@@ -948,7 +972,16 @@ void addAssetAndRenderTools(Engine& engine, ToolRegistry& reg) {
                      } else if (req->kind == "texture") {
                          patch = Json::object({{"texture", req->path}});
                      } else if (req->kind == "sprite") {
-                         patch = Json::object({{"mesh", "quad"}, {"texture", req->path}, {"billboard", true}, {"color", "#ffffff"}});
+                         // The target becomes a sprite (camera-facing in 3D scenes; flat when it already was a 2D sprite).
+                         EntityId target = req->target;
+                         Scene& sc = engine.scene();
+                         Json sprite = Json::object({{"texture", req->path}, {"frame", ""}, {"color", "#ffffff"}});
+                         if (!sc.get<Sprite>(target)) sprite["billboard"] = "y";
+                         Status st = engine.edit(ctx.actor, "Apply generated sprite", [&]() -> Status {
+                             if (Status r = sc.patchComponent(target, "sprite", sprite); !r) return r;
+                             return sc.get<MeshRenderer>(target) ? sc.patchComponent(target, "mesh", Json()) : Status{};
+                         });
+                         if (!st) return fail(st);
                      }
                      if (patch.isObject()) {
                          EntityId target = req->target;
@@ -1006,6 +1039,9 @@ void registerEngineTools(Engine& engine) {
     tools::addWorldTools(engine, reg);
     tools::addNetworkTools(engine, reg);
     tools::addFxTools(engine, reg);
+    tools::addTools2D(engine, reg);
+    tools::addUiTools(engine, reg);
+    tools::addDialogueTools(engine, reg);
     tools::addWorldBuildTools(engine, reg);
     tools::addAudioTools(engine, reg);
     tools::addInputTools(engine, reg);
@@ -1013,6 +1049,9 @@ void registerEngineTools(Engine& engine) {
     tools::addStudioTools(engine, reg);
     tools::addPhysicsTools(engine, reg);
     tools::addAnimationTools(engine, reg);
+    tools::addHairTools(engine, reg);
+    tools::addGameTools(engine, reg);  // engine/src/agent/GameTools.cpp
+    tools::addMovieTools(engine, reg);  // engine/src/agent/MovieTools.cpp (movie render queue)
 }
 
 }  // namespace sky

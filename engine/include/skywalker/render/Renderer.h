@@ -17,7 +17,9 @@
 #include "skywalker/core/Result.h"
 #include "skywalker/ecs/Components.h"
 #include "skywalker/math/Math.h"
+#include "skywalker/render/FxItems.h"
 #include "skywalker/render/Image.h"
+#include "skywalker/render/Render2D.h"
 #include "skywalker/scene/Scene.h"
 #include "skywalker/world/Foliage.h"
 #include "skywalker/world/Terrain.h"
@@ -87,6 +89,7 @@ struct Surface {
     bool doubleSided = false;
     float occlusionStrength = 1.f;
     float alphaCutoff = 0.f;  // > 0: alpha-tested cutout
+    bool textureAlphaOnly = false;  // use the base-color texture for its alpha (cut-out) only (clay renders)
 };
 
 struct DrawItem {
@@ -230,16 +233,32 @@ struct FrameData {
     std::vector<TerrainItem> terrains;
     std::vector<InstanceBatch> instances;
     std::vector<SkinItem> skins;  // animation: skinned draws (see SkinItem)
+    std::vector<GpuEmitterItem> gpuEmitters;  // GPU-simulated particles (hair & VFX workstream)
+    std::vector<GroomItem> grooms;            // strand hair and fur
     bool drawGrid = true;
     float time = 0;
+    Frame2D render2d;  // sprites, tilemaps, world text, 2D lights and UI (see Render2D.h)
     /// Jittered sub-samples accumulated into this frame (stills and cinematics: supersampling,
     /// noise-free GI). 1 = real-time (temporal anti-aliasing across frames).
     int samples = 1;
     /// Discards temporal history (camera cuts). Large camera jumps are detected automatically.
     bool resetHistory = false;
     /// Buffer visualization instead of the final image: 0 off, 1 albedo, 2 normals,
-    /// 3 roughness/metallic, 4 GI, 5 reflections, 6 AO, 7 depth, 8 lighting before GI.
+    /// 3 roughness/metallic, 4 GI, 5 reflections, 6 AO, 7 depth, 8 lighting before GI, 9 sketch.
     int debugView = 0;
+    /// Viewport quality: 0 full (play, captures), 1 balanced, 2 fast (editing a heavy world).
+    /// Lower tiers pick coarser LODs and cheaper shadows; the engine also trims the environment.
+    int quality = 0;
+    /// Offline (movie) rendering, see docs/MOVIE_RENDER.md. Each render() is one independent
+    /// sub-frame accumulated by the caller: no TAA history even at samples = 1, the sub-pixel
+    /// jitter continues the sequence at `sampleOffset` (so sub-frames cover distinct positions),
+    /// and auto exposure adapts by `exposureDt` seconds per render (temporally stable, no
+    /// pumping) instead of converging instantly like a still. `resetHistory` (a cut) re-meters.
+    struct Offline {
+        bool enabled = false;
+        int sampleOffset = 0;
+        float exposureDt = 0.f;
+    } offline;
 
     static constexpr size_t kMaxLights = 1024;       // clustered lighting on surfaces
     static constexpr size_t kMaxEffectLights = 16;   // the most important ones also light water, particles, fog
@@ -311,7 +330,9 @@ public:
     /// Replaces the shader source at runtime; returns compiler diagnostics on failure.
     virtual Status reloadShaders(const std::string& source) = 0;
     virtual std::string shaderSource() const = 0;
-    /// Backend statistics of the last completed frame (GPU time in ms, items drawn, ...).
+    /// Lights cast by GPU effects (glowing GPU particles), from a recent frame (no stall).
+    virtual std::vector<LightItem> effectLights() const { return {}; }
+    /// Backend statistics of the last completed frame (GPU time in ms, items drawn, effects...).
     virtual Json stats() const { return Json::object(); }
 };
 

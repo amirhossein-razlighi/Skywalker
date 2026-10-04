@@ -59,6 +59,37 @@ struct ActivityItem: Identifiable, Sendable {
     var ok: Bool
 }
 
+/// The running (or last) movie render, from the engine's movie_progress / movie_finished events.
+struct MovieProgress: Sendable {
+    var state = "rendering"  // rendering | done | cancelled | failed
+    var name = ""
+    var frame = 0
+    var frames = 0
+    var msPerFrame = 0.0
+    var eta = 0.0
+    var outputs: [String] = []
+    var error: String?
+    var finished: Bool { state != "rendering" }
+    var fraction: Double { frames > 0 ? Double(frame) / Double(frames) : 0 }
+
+    init(_ j: JSON) {
+        state = j["state"].string ?? "rendering"
+        name = j["name"].string ?? ""
+        frame = j["frame"].int ?? 0
+        frames = j["frames"].int ?? 0
+        msPerFrame = j["ms_per_frame"].number ?? 0
+        eta = j["eta_s"].number ?? 0
+        outputs = j["outputs"].array.compactMap { $0["path"].string }
+        error = j["error"].string
+    }
+}
+
+/// What the Render Movie sheet opens with (a sequence picked from the Sequencer, or nothing).
+struct MovieRequest: Identifiable, Sendable {
+    let id = UUID()
+    var sequence: UInt64?
+}
+
 /// A deferred tool call (`SkyPendingCall`) handed to a background task. The engine documents
 /// `sky_pending_run` as safe to call from any thread while the main thread stays free.
 private struct PendingCallBox: @unchecked Sendable {
@@ -83,11 +114,16 @@ final class EngineStore {
     private(set) var environment: JSON = .null
     private(set) var cameraYaw: Float = 0
     private(set) var cameraPitch: Float = 0
+    /// Movie render queue: the running/last render, and the open Render Movie sheet.
+    private(set) var movie: MovieProgress?
+    var movieRequest: MovieRequest?
     var gizmoMode: GizmoMode = .move { didSet { applyGizmo() } }
     var gizmoLocal = false { didSet { applyGizmo() } }
     var snapping = false
     var snapStep: Float = 0.5 { didSet { applyGizmo() } }
     var viewSceneCamera = false { didSet { sky_set_view_scene_camera(handle, viewSceneCamera ? 1 : 0) } }
+    /// Editing-time viewport quality (fast / balanced / full); play mode always renders full.
+    var viewportQuality = "fast" { didSet { call("viewport_quality", ["quality": .string(viewportQuality)]) } }
     @ObservationIgnored private var frameCount = 0
     @ObservationIgnored private var fpsWindowStart = Date()
     var selection: Set<UInt64> = [] {
@@ -314,6 +350,14 @@ final class EngineStore {
                 if logs.count > 500 { logs.removeFirst(logs.count - 500) }
             case "play_state":
                 playState = e["state"].string ?? playState
+            case "movie_progress", "movie_finished":
+                movie = MovieProgress(e)
+                if e["type"].string == "movie_finished" {
+                    let p = movie!
+                    append(ActivityItem(actor: actor, kind: "movie",
+                                        text: p.state == "failed" ? "movie failed: \(p.error ?? "")" : "movie \(p.state): \(p.frame) frames → \(p.outputs.first ?? "")",
+                                        ok: p.state != "failed"))
+                }
             case "selection":
                 syncSelectionFromEngine()
             case "studio":
@@ -335,6 +379,21 @@ final class EngineStore {
     }
 
     func clearLogs() { logs.removeAll() }
+
+    // MARK: Movie render queue
+
+    /// Starts a background movie render (the engine advances it frame by frame in `tick`).
+    @discardableResult
+    func startMovie(_ args: JSON) -> ToolCallResult {
+        var a = args
+        a.set("background", true)
+        let r = call("movie_render", a)
+        if !r.isError { movie = MovieProgress(r.structured) }
+        return r
+    }
+
+    func cancelMovie() { call("movie_render", ["action": "cancel"]) }
+    func dismissMovie() { if movie?.finished == true { movie = nil } }
 
     private func append(_ item: ActivityItem) {
         activity.append(item)
@@ -363,6 +422,7 @@ final class EngineStore {
     /// button: 0 left, 1 right, 2 middle.
     func mouseButton(_ button: Int, down: Bool) { sky_input_mouse_button(handle, Int32(button), down ? 1 : 0) }
     func scroll(dx: Float, dy: Float) { sky_input_scroll(handle, dx, dy) }
+    func text(_ characters: String) { sky_input_text(handle, characters) }
     func click(entity: UInt64) { sky_input_click(handle, entity) }
 
     // MARK: Assets

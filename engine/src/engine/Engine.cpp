@@ -6,6 +6,11 @@
 #include <cstdlib>
 #include <filesystem>
 #include <cstring>
+#include <fcntl.h>
+#include <sys/file.h>
+#include <unistd.h>
+#include <dispatch/dispatch.h>
+#include <mutex>
 #include <fstream>
 #include <set>
 #include <sstream>
@@ -14,10 +19,12 @@
 #include "skywalker/agent/SocketServer.h"
 #include "skywalker/core/Log.h"
 #include "skywalker/core/Strings.h"
+#include "skywalker/engine/Movie.h"
 #include "skywalker/native/NativeModules.h"
 #include "skywalker/assets/Prefab.h"
 #include "skywalker/render/Gltf.h"
 #include "skywalker/render/MeshData.h"
+#include "skywalker/ui/World2D.h"
 #include "skywalker/studio/Playtest.h"
 #include "skywalker/studio/Studio.h"
 
@@ -46,8 +53,20 @@ Json AssetRequest::toJson() const {
     return j;
 }
 
+namespace {
+/// The project root is absolute everywhere: relative roots break asset lookups that mix
+/// resolved (absolute) and project-relative paths, e.g. `--project examples/x` from the CLI.
+EngineConfig withAbsoluteProject(EngineConfig config) {
+    std::error_code ec;
+    fs::path abs = fs::absolute(config.projectDir.empty() ? fs::path(".") : fs::path(config.projectDir), ec);
+    if (!ec) config.projectDir = abs.lexically_normal().string();
+    while (config.projectDir.size() > 1 && config.projectDir.back() == '/') config.projectDir.pop_back();
+    return config;
+}
+}  // namespace
+
 Engine::Engine(EngineConfig config)
-    : config_(std::move(config)),
+    : config_(withAbsoluteProject(std::move(config))),
       scene_(std::make_unique<Scene>()),
       history_(std::make_unique<History>(*scene_)),
       builtins_(std::make_unique<wander::BuiltinRegistry>(&wander::BuiltinRegistry::global())),
@@ -104,14 +123,20 @@ Engine::Engine(EngineConfig config)
         if (!s) return s.error();
         return Json();
     };
+    world2d_ = std::make_unique<World2D>(config_.projectDir);
     world::WorldRuntime::Hooks hooks;
     hooks.resolvePath = [this](const std::string& p) { return resolvePath(p); };
     hooks.material = [this](const std::string& p) { return resolveMaterial(p); };
     hooks.meshBounds = [this](const std::string& key) -> std::optional<Aabb> {
         ensureMeshUploaded(key);
+        if (pendingMeshes_.count(key)) return std::nullopt;
         const MeshData* m = cpuMesh(key);
         if (!m) return std::nullopt;
         return m->bounds;
+    };
+    hooks.meshReady = [this](const std::string& key) {
+        ensureMeshUploaded(key);
+        return !pendingMeshes_.count(key);
     };
     hooks.sceneSurface = [this](float x, float z, float top, float bottom, float& y, Vec3& n) {
         auto hit = raycast(Ray{{x, top, z}, {0, -1, 0}});
@@ -168,6 +193,7 @@ Engine::Engine(EngineConfig config)
 }
 
 Engine::~Engine() {
+    movie_.reset();  // a running movie render restores the scene and closes its files first
     {
         // Refuse new jobs and release any thread waiting on a queued one, *then* join the
         // server threads; otherwise a connection thread could wait on a job never pumped.
@@ -280,6 +306,8 @@ void Engine::play() {
         runtime_->reset(/*keepQueuedEvents=*/true);
         accumulator_ = 0;
         particles_.reset();  // play sessions replay exactly
+        world2d_->reset();
+        world2d_->onPlay(*scene_, *runtime_);  // auto-start dialogues
         animation_->reset();
         animation_->setPlaying(true);
         physics_->beginPlay();  // the world is built from the scene on the first tick
@@ -304,11 +332,13 @@ void Engine::stop() {
     playSnapshot_ = Json();
     runtime_->reset();
     particles_.reset();
+    world2d_->reset();
     animation_->reset();
     animation_->setPlaying(false);
     physics_->endPlay();
     nav_->endPlay();
     input_ = {};
+    cursorLocked_ = false;
     audio_->stopAll();
     std::erase_if(selection_, [&](EntityId id) { return !scene_->exists(id); });
     emitEvent(Json::object({{"type", "play_state"}, {"state", "editing"}}));
@@ -321,7 +351,9 @@ void Engine::step(int ticks) {
     }
     for (int i = 0; i < ticks; ++i) {
         actionMap_.evaluate(input_);  // device state + agent input -> actions for this tick
+        world2d_->preTick(*scene_, input_, *runtime_, kFixedDt);  // UI input, dialogue
         runtime_->tick(kFixedDt, input_);
+        world2d_->postTick(*scene_, *runtime_, kFixedDt);  // sprite animation, 2D cameras
         animation_->tick(kFixedDt);  // sequencers, animators, bone attachments
         native_->tick(kFixedDt);     // per-tick systems of native modules
         physics_->step(static_cast<float>(kFixedDt), *runtime_);  // nav steering, bodies, characters, contacts
@@ -339,6 +371,14 @@ void Engine::step(int ticks) {
 }
 
 void Engine::update(double seconds) {
+    if (movie_) {  // a movie render owns the simulation: one sub-frame per update, agents still served
+        pump();
+        if (movie_ && !movie_->advance()) {
+            lastMovie_ = movie_->status();
+            movie_.reset();
+        }
+        return;
+    }
     // Hot reload: rescan the project for changed assets every couple of seconds while editing.
     assetScanTimer_ += seconds;
     if (assetScanTimer_ >= 2.0 && playState_ == PlayState::Editing && !drag_.entity && !gizmoDrag_) {
@@ -352,6 +392,7 @@ void Engine::update(double seconds) {
         float dt = static_cast<float>(std::min(seconds, 0.1));
         previewTime_ += dt;
         particles_.update(*scene_, dt);
+        world2d_->preview(*scene_, dt);
         animation_->editorUpdate(dt);
     }
     settingsTimer_ += seconds;
@@ -372,7 +413,10 @@ void Engine::update(double seconds) {
     if (ticks) step(ticks);
 }
 
-double Engine::effectsTime() const { return playState_ == PlayState::Editing ? previewTime_ : runtime_->time(); }
+double Engine::effectsTime() const {
+    if (effectsTimeOverride_) return *effectsTimeOverride_;  // movie sub-frames
+    return playState_ == PlayState::Editing ? previewTime_ : runtime_->time();
+}
 
 fx::Ocean& Engine::oceanFor(EntityId e, const Water& w) {
     fx::Ocean& ocean = oceans_[e];
@@ -415,8 +459,75 @@ void Engine::setSelection(std::vector<EntityId> ids, const std::string& actor) {
 // Rendering
 // ---------------------------------------------------------------------------
 
+struct Engine::MeshStream {
+    std::mutex mutex;
+    struct Done {
+        std::string key;
+        std::shared_ptr<MeshData> mesh;
+        std::string error;
+    };
+    std::vector<Done> done;
+};
+
+void Engine::requestMeshAsync(const std::string& key) {
+    if (!pendingMeshes_.insert(key).second) return;
+    if (!meshStream_) meshStream_ = std::make_shared<MeshStream>();
+    mesh::LoadOptions lo;
+    auto [file, part] = mesh::splitPart(key.substr(6));
+    lo.part = part;
+    if (const AssetRecord* rec = assets_->find(file)) {
+        lo.normalize = rec->importSettings.get("normalize").asBool(true);
+        lo.zUp = rec->importSettings.get("zUp").asBool(false);
+        lo.turnAround = rec->importSettings.get("turnAround").asBool(false);
+    }
+    struct Job {
+        std::shared_ptr<MeshStream> stream;
+        std::string key, path;
+        mesh::LoadOptions lo;
+    };
+    auto* job = new Job{meshStream_, key, resolvePath(file), lo};
+    dispatch_async_f(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), job, [](void* ctx) {
+        std::unique_ptr<Job> j(static_cast<Job*>(ctx));
+        MeshStream::Done d{j->key, nullptr, {}};
+        auto data = mesh::loadMeshFile(j->path, j->lo);
+        if (data) {
+            d.mesh = std::make_shared<MeshData>(std::move(data.value()));
+            if (d.mesh->lods.empty() && d.mesh->indices.size() / 3 >= 3000) mesh::buildLods(*d.mesh);
+        } else {
+            d.error = data.error().message;
+        }
+        std::lock_guard lock(j->stream->mutex);
+        j->stream->done.push_back(std::move(d));
+    });
+}
+
+void Engine::drainStreamedMeshes() {
+    if (!meshStream_ || pendingMeshes_.empty()) return;
+    std::vector<MeshStream::Done> done;
+    {
+        std::lock_guard lock(meshStream_->mutex);
+        done.swap(meshStream_->done);
+    }
+    for (auto& d : done) {
+        if (!pendingMeshes_.erase(d.key) || scene_->assetBounds.count(d.key)) continue;  // stale or loaded meanwhile
+        if (!d.mesh) {
+            log::warn("asset", d.error);
+            cpuMeshes_[d.key] = nullptr;
+            scene_->assetBounds[d.key] = {Vec3(-0.5f), Vec3(0.5f)};
+            continue;
+        }
+        cpuMeshes_[d.key] = d.mesh;
+        (void)renderer_->uploadMesh(d.key, *d.mesh);
+        scene_->assetBounds[d.key] = d.mesh->bounds;
+    }
+}
+
 void Engine::ensureMeshUploaded(const std::string& meshKey) {
     if (meshKey.rfind("asset:", 0) != 0 || scene_->assetBounds.count(meshKey)) return;
+    if (streamMeshes_ && !cpuMeshes_.count(meshKey)) {
+        requestMeshAsync(meshKey);
+        return;
+    }
     const MeshData* mesh = cpuMesh(meshKey);
     if (!mesh) {
         scene_->assetBounds[meshKey] = {Vec3(-0.5f), Vec3(0.5f)};  // don't retry every frame
@@ -431,6 +542,27 @@ void Engine::ensureMeshUploaded(const std::string& meshKey) {
     scene_->assetBounds[meshKey] = mesh->bounds;
 }
 
+namespace {
+/// Interactive tiers: the expensive, slowly converging parts of the frame (screen-space GI and
+/// reflections, light shafts, depth of field, far foliage and its shadows) are trimmed and the frame renders at a lower internal resolution (MetalFX
+/// upscales it). Full quality is untouched.
+void applyViewportQuality(FrameData& f, int quality) {
+    f.quality = quality;
+    if (quality <= 0) return;
+    Environment& env = f.environment;
+    bool fast = quality >= 2;
+    env.renderScale = std::min(env.renderScale, fast ? 0.5f : 0.75f);
+    f.camera.aperture = 0.f;
+    f.camera.motionBlur = 0.f;
+    if (!fast) return;
+    env.gi = 0.f;
+    env.ssr = 0.f;
+    env.godRays = 0.f;
+    env.shadowDistance = env.shadowDistance > 0.f ? std::min(env.shadowDistance, 150.f) : 150.f;
+    for (auto& b : f.instances) b.cullDistance *= 0.4f;
+}
+}  // namespace
+
 FrameData Engine::frame(const CaptureOptions& opts) {
     // Animation previews while editing (sequencer scrub, bone attachments) hold for this frame only.
     struct PreviewGuard {
@@ -439,15 +571,23 @@ FrameData Engine::frame(const CaptureOptions& opts) {
         ~PreviewGuard() { a.endFrame(ov); }
     } previewGuard{*animation_, animation_->beginFrame(playState_ == PlayState::Editing)};
     ViewCamera view = camera_.toView();
+    EntityId viewCamera = kNoEntity;  // the scene camera entity looked through (camera2d applies to it)
     if (opts.hasCustomView) {
         view = opts.customView;
     } else if (opts.useSceneCamera || opts.cameraEntity) {
         ViewCamera sc;
-        if (sceneCamera(*scene_, sc, opts.cameraEntity)) view = sc;
+        if (sceneCamera(*scene_, sc, opts.cameraEntity)) {
+            view = sc;
+            viewCamera = render2d::activeCamera(*scene_, opts.cameraEntity);
+        }
     } else if (playState_ != PlayState::Editing || viewSceneCamera_) {
         ViewCamera sc;
-        if (sceneCamera(*scene_, sc)) view = sc;
+        if (sceneCamera(*scene_, sc)) {
+            view = sc;
+            viewCamera = render2d::activeCamera(*scene_);
+        }
     }
+    const float texelSnap = viewCamera ? world2d_->adjustView(*scene_, viewCamera, view, opts.width, opts.height) : 0.f;
     BuildOptions bo;
     bo.editorOverlays = opts.editorOverlays && playState_ == PlayState::Editing;
     bo.selection = selection_;
@@ -461,8 +601,17 @@ FrameData Engine::frame(const CaptureOptions& opts) {
     f.samples = opts.samples;
     f.debugView = opts.debugView;
     if (!opts.fog) f.environment.fogDensity = 0;
+    world2d_->gather(*scene_, f, bo.editorOverlays ? selection_ : std::vector<EntityId>{}, bo.time, texelSnap);  // 2D + UI
     // Effects: simulated particles (+ the light fires cast) and FFT water.
     particles_.gather(*scene_, view, f.particles, f.lights);
+    {  // [hair+vfx] GPU particles, hair grooms, and the lights GPU effects cast (from a recent frame)
+        auto meshes = [this](const std::string& key) { return cpuMesh(key); };
+        auto paths = [this](const std::string& path) { return resolvePath(path); };
+        particles_.gatherGpu(*scene_, meshes, paths, f.gpuEmitters);
+        grooms_.gather(*scene_, meshes, paths, f.grooms);
+        for (const auto& ge : f.gpuEmitters) ensureMeshUploaded(ge.particleMesh);
+        for (const LightItem& l : renderer_->effectLights()) f.lights.push_back(l);
+    }
     prioritizeLights(f);
     std::vector<EntityId> waterIds;
     for (EntityId e : scene_->entities()) {
@@ -490,7 +639,7 @@ FrameData Engine::frame(const CaptureOptions& opts) {
     std::erase_if(oceans_, [&](const auto& kv) { return std::find(waterIds.begin(), waterIds.end(), kv.first) == waterIds.end(); });
     // Terrain and foliage (resolved texture paths included). Captures generate all foliage
     // in range; the live viewport streams a few chunks per frame.
-    world_->gather(*scene_, view, f, opts.samples <= 1);
+    world_->gather(*scene_, view, f, opts.samples <= 1 && !opts.offline.enabled);
     {
         std::vector<std::string> meshes;
         for (const auto& b : f.instances) {
@@ -501,6 +650,31 @@ FrameData Engine::frame(const CaptureOptions& opts) {
             t.selected = bo.editorOverlays && std::find(selection_.begin(), selection_.end(), t.entity) != selection_.end();
         }
     }
+    applyViewportQuality(f, opts.quality);
+    if (opts.clay) {
+        auto clay = [](Surface& s) {
+            s.color = {0.82f, 0.81f, 0.79f, s.color.w};
+            s.emissive = {0, 0, 0, 1};
+            s.metallic = 0.f;
+            s.roughness = 0.65f;
+            s.texture.clear(), s.normalMap.clear(), s.ormMap.clear(), s.emissiveMap.clear();
+            s.shading = s.shading == Shading::Water ? s.shading : Shading::Pbr;
+        };
+        for (auto& d : f.draws) clay(d.surface);
+        for (auto& b : f.instances) {
+            std::string tex = b.surface.alphaCutoff > 0.f ? b.surface.texture : "";  // keep leaf cut-outs
+            clay(b.surface);
+            b.surface.texture = tex;
+            b.surface.textureAlphaOnly = true;
+        }
+        for (auto& t : f.terrains) {
+            for (auto& l : t.layers) clay(l.surface);
+        }
+    }
+    if (!pendingMeshes_.empty()) {  // not streamed in yet: draw nothing rather than a placeholder cube
+        std::erase_if(f.draws, [&](const DrawItem& d) { return pendingMeshes_.count(d.mesh) > 0; });
+        std::erase_if(f.instances, [&](const InstanceBatch& b) { return pendingMeshes_.count(b.mesh) > 0; });
+    }
     resolveTexturePaths(f);
     if (bo.editorOverlays && selection_.size() == 1 && scene_->exists(selection_[0]) && !opts.annotate) {
         GizmoFrame gf = Gizmo::frameFor(scene_->worldMatrix(selection_[0]), view, gizmo_.local);
@@ -509,25 +683,66 @@ FrameData Engine::frame(const CaptureOptions& opts) {
     return f;
 }
 
+namespace {
+/// Offline renders (captures, benchmarks) from every Skywalker process on this machine take
+/// turns on the GPU: many agents rendering heavy stills at once starve the window server
+/// and can trip the GPU watchdog. Released when the capture ends (or the process exits).
+class GpuJobLock {
+public:
+    GpuJobLock() {
+        const char* home = std::getenv("HOME");
+        std::string dir = std::string(home && *home ? home : "/tmp") + "/.skywalker";
+        std::error_code ec;
+        fs::create_directories(dir, ec);
+        fd_ = ::open((dir + "/gpu.lock").c_str(), O_CREAT | O_RDWR | O_CLOEXEC, 0644);
+        if (fd_ >= 0) ::flock(fd_, LOCK_EX);
+    }
+    ~GpuJobLock() {
+        if (fd_ < 0) return;
+        ::flock(fd_, LOCK_UN);
+        ::close(fd_);
+    }
+    GpuJobLock(const GpuJobLock&) = delete;
+    GpuJobLock& operator=(const GpuJobLock&) = delete;
+
+private:
+    int fd_ = -1;
+};
+}  // namespace
+
 Result<Capture> Engine::capture(const CaptureOptions& opts) {
+    GpuJobLock gpuLock;
     Capture c;
     c.frame = frame(opts);
+    c.frame.resetHistory = c.frame.resetHistory || opts.resetHistory;
+    if (opts.offline.enabled) {
+        c.frame.offline = opts.offline;
+        c.frame.camera.motionBlur = 0.f;
+    }
     if (Status s = renderer_->render(c.frame); !s) return s.error();
     auto img = renderer_->readback();
     if (!img) return img.error();
     c.image = std::move(img.value());
+    if (!opts.listVisible) return c;
     c.visible = visibleEntities(*scene_, c.frame);
+    world2d_->refineVisible(c.frame, c.visible, *scene_);  // real boxes for sprites, tiles, text, UI
     if (opts.annotate) annotate(c.image, c.visible);
     return c;
 }
 
 Status Engine::renderToSurface(void* surface, int width, int height) {
+    if (movie_) return renderer_->present(surface);  // show the movie frames as they render
     auto start = std::chrono::steady_clock::now();
     CaptureOptions opts;
     opts.width = width;
     opts.height = height;
     opts.samples = 1;  // real time: temporal anti-aliasing across frames
+    opts.quality = playState_ == PlayState::Editing ? static_cast<int>(editQuality_) : 0;
+    world2d_->setViewport(width, height);  // the UI maps the normalized mouse into this view
+    drainStreamedMeshes();
+    streamMeshes_ = true;
     FrameData f = frame(opts);
+    streamMeshes_ = false;
     Status s = renderer_->render(f);
     if (s) s = renderer_->present(surface);
     double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
@@ -603,7 +818,12 @@ EntityId Engine::pickAt(float x, float y, int width, int height) {
     CaptureOptions opts;
     opts.width = width;
     opts.height = height;
-    return pick(*scene_, frame(opts), x, y);
+    FrameData f = frame(opts);
+    // UI and sprites first. While playing, UI under the pointer consumes the click (no 3D pick).
+    const bool playing = playState_ != PlayState::Editing;
+    if (EntityId ui = world2d_->pick(*scene_, f, x, y, true)) return playing ? kNoEntity : ui;
+    if (EntityId sprite = world2d_->pick(*scene_, f, x, y, false)) return sprite;
+    return pick(*scene_, f, x, y);
 }
 
 void Engine::beginDrag(EntityId id, float x, float y, int width, int height) {
@@ -776,8 +996,30 @@ Status Engine::loadScene(const std::string& path) {
     selection_.clear();
     animation_->reset();
     scenePath_ = path;
+    if (s) frameSceneView();
     emitEvent(Json::object({{"type", "scene"}, {"action", "load"}, {"name", scene_->name}, {"path", path}}));
     return s;
+}
+
+void Engine::frameSceneView() {
+    // Open where the scene is meant to be seen: its gameplay camera, else above the terrain
+    // looking across it (the default orbit would start inside large worlds).
+    ViewCamera sc;
+    if (sceneCamera(*scene_, sc)) {
+        Vec3 dir = normalize(sc.target - sc.eye);
+        camera_.lookAt(sc.eye, sc.eye + dir * 12.f);
+        return;
+    }
+    for (EntityId e : scene_->entities()) {
+        const Terrain* t = scene_->get<Terrain>(e);
+        if (!t) continue;
+        Vec3 c = scene_->worldMatrix(e).translation();
+        float y = c.y;
+        world_->terrainHeight(*scene_, c.x, c.z, y);
+        Vec3 target{c.x, y, c.z};
+        camera_.lookAt(target + Vec3{t->size * 0.18f, t->size * 0.09f, t->size * 0.18f}, target);
+        return;
+    }
 }
 
 Status Engine::saveScene(const std::string& path) {
@@ -832,6 +1074,7 @@ std::string stripAssetPrefix(const std::string& ref) {
 std::vector<std::string> Engine::refreshAssets() {
     std::vector<std::string> changed = assets_->refresh();
     for (const auto& path : changed) {
+        world2d_->invalidate(resolvePath(path));  // images, atlases, tilesets, dialogue scripts
         animation_->invalidate(path);
         switch (assetTypeForPath(path)) {
             case AssetType::Script: runtime_->refreshModules(); break;
@@ -1136,13 +1379,22 @@ void Engine::resolveTexturePaths(FrameData& f) const {
     }
 }
 
+namespace {
+double monotonicSeconds() {
+    return std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+}
+}  // namespace
+
 const ResolvedMaterial* Engine::resolveMaterial(const std::string& path) {
     std::string rel = assets_->relative(resolvePath(stripAssetPrefix(path)));
     if (rel.empty()) rel = path;
+    CachedMaterial& c = materials_[rel];
+    double now = monotonicSeconds();
+    if (now - c.checkedAt < 1.0) return c.ok ? &c.material : nullptr;  // hot path: many lookups per frame
+    c.checkedAt = now;
     std::error_code ec;
     auto t = fs::last_write_time(resolvePath(rel), ec);
     int64_t mtime = ec ? -2 : std::chrono::duration_cast<std::chrono::nanoseconds>(t.time_since_epoch()).count();
-    CachedMaterial& c = materials_[rel];
     if (c.mtime != mtime) {
         c.mtime = mtime;
         auto m = loadMaterial(resolvePath(rel));
@@ -1159,11 +1411,16 @@ const ResolvedMaterial* Engine::resolveMaterial(const std::string& path) {
 Result<Json> Engine::loadPrefabAsset(const std::string& path) {
     std::string rel = assets_->relative(resolvePath(stripAssetPrefix(path)));
     if (rel.empty()) rel = stripAssetPrefix(path);
+    double now = monotonicSeconds();
+    if (auto it = prefabs_.find(rel); it != prefabs_.end() && it->second.mtime >= 0 && now - it->second.checkedAt < 1.0) {
+        return it->second.prefab;
+    }
     std::error_code ec;
     auto t = fs::last_write_time(resolvePath(rel), ec);
     if (ec) return Error::make("not_found", "no prefab " + rel, "use asset_list type=prefab to see prefabs");
     int64_t mtime = std::chrono::duration_cast<std::chrono::nanoseconds>(t.time_since_epoch()).count();
     CachedPrefab& c = prefabs_[rel];
+    c.checkedAt = now;
     if (c.mtime != mtime) {
         auto p = loadPrefab(resolvePath(rel));
         if (!p) return p.error();

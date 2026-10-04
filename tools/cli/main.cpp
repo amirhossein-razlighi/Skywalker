@@ -11,6 +11,8 @@
 //   skywalker call TOOL [JSON] [--scene FILE]        call one tool, print the result
 //   skywalker tools [--markdown|--json]              list tools
 //   skywalker studio status|agents|board|feedback|loops|run --project DIR ...   (StudioCommand.cpp)
+//   skywalker build --project DIR --out DIR [--name N --icon F --release --all-assets]   package a macOS app (BuildCommand.cpp)
+//   skywalker movie SCENE [JSON] -o out.mp4 [...]    render a cinematic to video / PNG frames (MovieCommand.cpp)
 //   skywalker version
 
 #include <sys/socket.h>
@@ -38,6 +40,8 @@ using namespace sky;
 
 int runStudio(const std::vector<std::string>& raw);  // StudioCommand.cpp
 int runSetup(const std::vector<std::string>& raw);   // SetupCommand.cpp
+int runBuild(const std::vector<std::string>& raw);   // BuildCommand.cpp
+int runMovie(const std::vector<std::string>& raw);   // MovieCommand.cpp
 
 namespace {
 
@@ -99,6 +103,9 @@ int usage() {
                  "  skywalker tools [--markdown|--json]\n"
                  "  skywalker studio status|agents|board|feedback|loops --project DIR\n"
                  "  skywalker studio run --project DIR --loop NAME [--iterations N] [--dry-run] [--yes]\n"
+                 "  skywalker build --project DIR --out DIR [--name N] [--icon F.png] [--release] [--all-assets]   package a macOS app\n"
+                 "  skywalker movie SCENE [JSON] -o out.mp4 [--sequence S] [--resolution 1080p] [--fps N] [--samples N]\n"
+                 "                    [--shutter F] [--simulate] [--clay|--sketch] [--resume] ...   render a cinematic (movie --help)\n"
                  "  skywalker version\n",
                  SKY_VERSION_STRING);
     return 2;
@@ -356,6 +363,8 @@ int main(int argc, char** argv) {
     if (cmd == "tools") return runTools(args);
     if (cmd == "studio") return runStudio(args.raw);
     if (cmd == "setup") return runSetup(args.raw);
+    if (cmd == "build") return runBuild(args.raw);
+    if (cmd == "movie") return runMovie(args.raw);
     if (cmd == "version" || cmd == "--version") {
         std::printf("skywalker %s\n", SKY_VERSION_STRING);
         return 0;

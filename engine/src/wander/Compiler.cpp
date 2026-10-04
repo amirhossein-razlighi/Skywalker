@@ -1979,6 +1979,8 @@ private:
                 case FieldType::Enum: return kTString;
                 case FieldType::Vec3: return kTVec;
                 case FieldType::Color: return kTColor;
+                case FieldType::Vec2: return kTVec;  // read as (x, y, 0)
+                case FieldType::Vec4:
                 case FieldType::Json: return kTAny;
             }
         }

@@ -24,6 +24,7 @@ SRC = HERE / "skills-src"
 
 # Words that look like tool names but are not (recipe names, file paths, wander functions...).
 ALLOW = {
+    "sprite_anim", "ui_canvas", "physics_world", "nav_agent", "nav_ignore", "dialogue_var", "dialogue_choose",  # components / builtins
     "terrain_chunk", "wind_loop", "rain_loop", "fire_crackle_loop", "ocean_waves_loop", "ambient_drone", "footstep_grass", "footstep_stone",
     "footstep_wood", "ui_click", "ui_hover", "play_sound", "stop_sound", "set_volume", "water_height", "tool_timeout_sec", "startup_timeout_sec",
     "studio_id", "scene_query", "place_on_surface", "sim_trace", "audio_info", "asset_list", "playtest_run", "perf_stats", "select_unit",
@@ -42,6 +43,7 @@ ALLOW = {
     "sound_designer", "qa_lead", "role_creative_director", "new_game", "look_dev", "playtest_loop", "studio_status", "studio_setup",
     "studio_agent", "studio_overview", "studio_roster", "studio_board", "studio_feedback", "studio_loops", "ask_for_approval",
 }
+# Tool-name prefixes that mark a backticked token as a tool reference (every live tool's prefix is added too).
 FAMILIES = {
     "entity", "scene", "terrain", "studio", "dcc", "asset", "audio", "sim", "viewport", "camera", "selection", "material", "texture",
     "prefab", "fx", "foliage", "playtest", "behavior", "wander", "environment", "shader", "perf", "input", "place", "water", "component",
@@ -183,7 +185,7 @@ def check_file(path: Path, tools: dict[str, dict], words: set[str], problems: li
         if any(a <= m.start() < b for a, b in in_fence):
             continue
         token = re.split(r"[\s{(]", m.group(1))[0].rstrip(",.;:")
-        if re.fullmatch(r"[a-z]+(_[a-z0-9]+)+", token) and token.split("_")[0] in FAMILIES and token not in words and token not in ALLOW:
+        if re.fullmatch(r"[a-z]+(_[a-z0-9]+)+", token) and token.split("_")[0] in (FAMILIES | {name.split("_")[0] for name in tools}) and token not in words and token not in ALLOW:
             line = text[: m.start()].count("\n") + 1
             problems.append(f"{rel}:{line}: `{token}` looks like an engine tool but no such tool/argument exists")
     for lang, block, first_line in fenced_blocks(text):

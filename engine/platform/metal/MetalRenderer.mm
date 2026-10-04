@@ -22,6 +22,7 @@
 
 #import <Foundation/Foundation.h>
 #import <Metal/Metal.h>
+#import <MetalFX/MetalFX.h>
 #import <MetalKit/MetalKit.h>
 #import <QuartzCore/CAMetalLayer.h>
 #include <simd/simd.h>
@@ -38,12 +39,14 @@
 
 #include <dispatch/dispatch.h>
 
+#include "MetalFx.h"  // [hair+vfx] GPU particles and strand hair
 #include "skywalker/core/Log.h"
 #include "skywalker/render/ColorGrading.h"
 #include "skywalker/render/Hdr.h"
 #include "skywalker/render/LightClusters.h"
 #include "skywalker/render/MeshData.h"
 #include "skywalker/render/Renderer.h"
+#include "MetalRenderer2D.h"  // 2D world quads + UI (Frame2D)
 
 namespace sky {
 
@@ -357,6 +360,13 @@ public:
         if (!device_) return false;
         queue_ = [device_ newCommandQueue];
         textureLoader_ = [[MTKTextureLoader alloc] initWithDevice:device_];
+        fx_ = std::make_unique<MetalFx>(  // [hair+vfx]
+            device_, queue_,
+            [this](const std::string& key) {
+                const GpuMesh* m = mesh(key);
+                return m ? FxMesh{m->vertices, m->indices, m->indexCount} : FxMesh{};
+            },
+            [this](const std::string& path, bool srgb) { return texture(path, srgb); });
         Status s = buildPipelines(kDefaultShaderSource);
         if (!s) {
             log::error("render", "built-in shaders failed to compile: " + s.error().message);
@@ -408,6 +418,8 @@ public:
         bd.storageMode = MTLStorageModePrivate;
         brdfLut_ = [device_ newTextureWithDescriptor:bd];
         bakeBrdf();
+        r2d_ = std::make_unique<MetalRenderer2D>(device_);  // 2D + UI
+        if (!r2d_->init()) r2d_.reset();
         for (auto& r : ring_) r = [device_ newBufferWithLength:kRingSize options:MTLResourceStorageModeShared | MTLResourceCPUCacheModeWriteCombined];
         buildTerrainPatch();
         auto volume3D = [&](NSUInteger n) {
@@ -430,19 +442,26 @@ public:
     }
 
     Json stats() const override {
-        return Json::object({{"gpuMs", std::round(gpuMs_->load() * 100.0) / 100.0},
+        Json j = Json::object({{"gpuMs", std::round(gpuMs_->load() * 100.0) / 100.0},
                              {"culledDraws", static_cast<int64_t>(culled_)},
                              {"terrainNodes", static_cast<int64_t>(terrainNodesDrawn_)},
                              {"instancesDrawn", static_cast<int64_t>(instancesDrawn_)},
                              {"trianglesDrawn", static_cast<int64_t>(lastTriangles_)},
+                             {"gpuFaults", static_cast<int64_t>(gpuFaults_->load())},
                              {"meshesCached", static_cast<int64_t>(meshes_.size())},
                              {"texturesCached", static_cast<int64_t>(textures_.size())},
                              {"instanceBuffers", static_cast<int64_t>(instanceBuffers_.size())}});
+        if (fx_) {  // [hair+vfx] frame/simulation GPU times, emitters, grooms
+            const Json fx = fx_->stats();
+            for (const auto& [k, v] : fx.members()) j[k] = v;
+        }
+        return j;
     }
 
     RendererInfo info() const override { return {"metal", device_ ? std::string(device_.name.UTF8String) : ""}; }
 
     std::string shaderSource() const override { return source_; }
+    std::vector<LightItem> effectLights() const override { return fx_->effectLights(); }  // [hair+vfx]
 
     Status reloadShaders(const std::string& source) override {
         @autoreleasepool {
@@ -468,11 +487,20 @@ public:
         meshes_.erase(key);
         textures_.erase(key + "#srgb");
         textures_.erase(key + "#linear");
+        if (r2d_) r2d_->invalidate(key);  // 2D
     }
 
     Status render(const FrameData& frame) override {
         @autoreleasepool {
-            ensureTargets(frame.width, frame.height);
+            // Offline (movie) sub-frames are accumulated by the caller: always the still path.
+            const bool accumulateFrame = std::clamp(frame.samples, 1, 256) > 1 || frame.offline.enabled;
+            const float renderScale = accumulateFrame ? 1.f : std::clamp(frame.environment.renderScale, 0.33f, 1.f);
+            ensureTargets(frame.width, frame.height, renderScale);
+            // Upscaling: interactive editor tiers use the GPU-only MetalFX spatial scaler after our
+            // own TAA (cheap, robust under load); full-quality frames use the temporal scaler.
+            const bool scaled = !accumulateFrame && renderScale < 0.999f;
+            const bool spatialUpscale = scaled && frame.quality > 0 && spatialScaler() != nil;
+            const bool upscale = scaled && !spatialUpscale && temporalScaler() != nil;
             ensureHdri(frame.environment);
             const Environment& env = frame.environment;
             Cascades cascades = computeCascades(frame);
@@ -492,23 +520,21 @@ public:
                 motionValid_ = false;
             }
             const int samples = std::clamp(frame.samples, 1, 256);
-            const bool accumulate = samples > 1;
+            const bool accumulate = accumulateFrame;
             const bool jittered = accumulate || env.taa;
-            const float w = static_cast<float>(std::max(frame.width, 1)), h = static_cast<float>(std::max(frame.height, 1));
+            const uint64_t jitterBase = frame.offline.enabled ? static_cast<uint64_t>(std::max(frame.offline.sampleOffset, 0)) : 0;
+            const float w = static_cast<float>(hdr_.width), h = static_cast<float>(hdr_.height);  // internal resolution
 
             // Bound the frames in flight so the transient ring is never overwritten in use.
             dispatch_semaphore_wait(inFlight_, DISPATCH_TIME_FOREVER);
             ringIndex_ = (ringIndex_ + 1) % kFramesInFlight;
             ringOffset_ = 0;
+            // Accumulated stills commit one command buffer per sub-sample: a single multi-second
+            // command buffer trips the GPU watchdog ("progress timeout") and starves the window
+            // server, while short ones let the system interleave its own work.
             id<MTLCommandBuffer> cmd = [queue_ commandBuffer];
             cmd.label = @"Skywalker Frame";
-            dispatch_semaphore_t sem = inFlight_;
-            auto gpuMs = gpuMs_;
-            [cmd addCompletedHandler:^(id<MTLCommandBuffer> done) {
-                double ms = (done.GPUEndTime - done.GPUStartTime) * 1000.0;
-                if (ms > 0.0) gpuMs->store(ms);
-                dispatch_semaphore_signal(sem);
-            }];
+            id<MTLCommandBuffer> firstCmd = cmd;
             lightsBuf_ = transient(allLights.data(), allLights.size() * sizeof(GPULight));
             clusterCellsBuf_ = transient(grid.cells.data(), grid.cells.size() * sizeof(uint32_t));
             clusterIndexBuf_ = transient(grid.indices.data(), grid.indices.size() * sizeof(uint32_t));
@@ -517,10 +543,13 @@ public:
             encodeEnvironment(cmd, frame, base);
             lodFrame_ = &frame;
             trianglesDrawn_ = 0;
+            chooseFoliageBudgetBias(frame);
+            fx_->simulate(frame, depthPrev_, gbufB_, prevViewProj_, historyValid_);  // [hair+vfx]
             encodeShadows(cmd, frame, base, cascades);
+            if (r2d_) r2d_->encodeOccluders(cmd, frame);  // 2D shadow casters
             for (int i = 0; i < samples; ++i) {
                 // Sub-pixel jitter (Halton 2,3): TAA spreads it over frames, stills over sub-samples.
-                Vec2 j = jittered ? halton23(accumulate ? static_cast<uint64_t>(i) : frameIndex_) : Vec2{0, 0};
+                Vec2 j = jittered ? halton23(accumulate ? jitterBase + static_cast<uint64_t>(i) : frameIndex_) : Vec2{0, 0};
                 Vec2 jn{j.x * 2.f / w, j.y * 2.f / h};
                 Mat4 jvp = Mat4::translate({jn.x, jn.y, 0.f}) * vp;
                 FrameUniforms fu = base;
@@ -538,22 +567,46 @@ public:
                 encodeResolve(cmd, frame, fu);
                 encodeEffects(cmd, frame, fu, lights, i == 0);
                 encodeVolumetrics(cmd, frame, fu, lights, seed);
-                int mode = accumulate ? 2 : (env.taa && historyValid_ ? 1 : 0);
+                int mode = accumulate ? 2 : (env.taa && historyValid_ && !upscale ? 1 : 0);
                 encodeTemporal(cmd, frame, fu, mode, 1.f / static_cast<float>(i + 1));
+                if (upscale) encodeUpscale(cmd, fu, j);
                 id<MTLBlitCommandEncoder> blit = [cmd blitCommandEncoder];
                 [blit copyFromTexture:depthResolved_ toTexture:depthPrev_];
                 [blit endEncoding];
                 if (!accumulate) historyValid_ = true;
+                if (accumulate && i + 1 < samples) {
+                    [cmd commit];
+                    cmd = [queue_ commandBuffer];
+                    cmd.label = @"Skywalker Frame (sub-sample)";
+                }
             }
             if (accumulate) historyValid_ = true;  // the converged still seeds later TAA frames
+            if (spatialUpscale) encodeSpatialUpscale(cmd);
+            postSource_ = upscale || spatialUpscale ? upscaled_ : taa_[taaCurrent_];
             encodePost(cmd, frame, accumulate, base);
             if (frame.debugView > 0) {
                 PostUniforms pu{};
                 pu.params = simd_make_float4(static_cast<float>(frame.debugView), 0, 0, 0);
+                pu.texel = simd_make_float4(1.f / std::max(frame.width, 1), 1.f / std::max(frame.height, 1), 0, 0);
                 fullscreen(cmd, debugViewPipeline_, resolve_, {gbufA_, gbufB_, giOut_, ssrOut_, aoBlurred_, depthResolved_, hdr_},
                            &pu, sizeof(pu), false, @"Debug view");
             }
+            if (r2d_) r2d_->encodeUI(cmd, frame, resolve_, depthResolved_);  // UI at output resolution
             encodeOverlays(cmd, frame, base);
+            fx_->trackFrame(cmd);  // [hair+vfx] GPU frame time
+            {
+                dispatch_semaphore_t sem = inFlight_;
+                auto gpuMs = gpuMs_;
+                auto faults = gpuFaults_;
+                [cmd addCompletedHandler:^(id<MTLCommandBuffer> done) {
+                    double ms = (done.GPUEndTime - firstCmd.GPUStartTime) * 1000.0;  // whole frame, all sub-samples
+                    if (ms > 0.0) gpuMs->store(ms);
+                    if (done.status == MTLCommandBufferStatusError || firstCmd.status == MTLCommandBufferStatusError) {
+                        faults->fetch_add(1);  // timeouts, page faults: the next frames run in safe mode
+                    }
+                    dispatch_semaphore_signal(sem);
+                }];
+            }
             [cmd commit];
             lastCommand_ = cmd;
             evictWorldCaches();
@@ -590,6 +643,12 @@ public:
             [cmd waitUntilCompleted];
             if (cmd.status == MTLCommandBufferStatusError) {
                 return Error::make("gpu_error", cmd.error ? cmd.error.localizedDescription.UTF8String : "readback failed");
+            }
+            if (lastCommand_ && lastCommand_.status == MTLCommandBufferStatusError) {
+                return Error::make("gpu_error",
+                                   std::string("the frame failed on the GPU: ") +
+                                       (lastCommand_.error ? lastCommand_.error.localizedDescription.UTF8String : "unknown error"),
+                                   "the scene is too heavy or a shader faulted; lower samples/resolution or check perf_stats");
             }
             Image img(static_cast<int>(w), static_cast<int>(h));
             const auto* src = static_cast<const uint8_t*>(buffer.contents);
@@ -673,7 +732,7 @@ private:
                                      "cloudsFragment",
                                      "cloudTemporalFragment", "cloudShapeKernel", "cloudDetailKernel", "lumaFragment",
                                      "exposureFragment", "motionBlurFragment", "dofCocFragment", "dofBlurFragment",
-                                     "dofCombineFragment"}) {
+                                     "dofCombineFragment", "motionVectorFragment"}) {
             if (!fn(required)) {
                 return Error::make("shader_missing_function", std::string("shader source must define ") + required);
             }
@@ -775,7 +834,8 @@ private:
         id<MTLRenderPipelineState> dofCoc = motionBlur ? make("fullscreenVertex", "dofCocFragment", kHDRFormat, 1, Blend::None, false, &e) : nil;
         id<MTLRenderPipelineState> dofBlur = dofCoc ? make("fullscreenVertex", "dofBlurFragment", kHDRFormat, 1, Blend::None, false, &e) : nil;
         id<MTLRenderPipelineState> dofCombine = dofBlur ? make("fullscreenVertex", "dofCombineFragment", kHDRFormat, 1, Blend::None, false, &e) : nil;
-        if (!dofCombine) volume = nil;
+        id<MTLRenderPipelineState> motionVec = dofCombine ? make("fullscreenVertex", "motionVectorFragment", MTLPixelFormatRG16Float, 1, Blend::None, false, &e) : nil;
+        if (!motionVec) volume = nil;
         if (volume) {
             for (const char* k : {"fluidAdvect", "fluidCorrect", "fluidCombust", "fluidCurl", "fluidForces", "fluidDivergence",
                                   "fluidJacobi", "fluidProject"}) {
@@ -837,6 +897,8 @@ private:
         dofCocPipeline_ = dofCoc;
         dofBlurPipeline_ = dofBlur;
         dofCombinePipeline_ = dofCombine;
+        motionPipeline_ = motionVec;
+        if (fx_) fx_->build(lib, FxFormats{kHDRFormat, kGbufAFormat, kGbufBFormat, kDepthFormat, kSamples, kShadowAtlas / 2});  // [hair+vfx]
         return {};
     }
 
@@ -862,25 +924,19 @@ private:
         return t;
     }
 
-    void ensureTargets(int width, int height) {
+    /// Scene targets render at the internal resolution (renderScale x output); post-processing
+    /// and the final image use the output resolution. MetalFX upscales between the two.
+    void ensureTargets(int width, int height, float scale) {
         auto w = static_cast<NSUInteger>(std::max(width, 1));
         auto h = static_cast<NSUInteger>(std::max(height, 1));
-        if (resolve_ && resolve_.width == w && resolve_.height == h) return;
+        auto iw = static_cast<NSUInteger>(std::max<long>(16, std::lround(static_cast<double>(w) * scale)));
+        auto ih = static_cast<NSUInteger>(std::max<long>(16, std::lround(static_cast<double>(h) * scale)));
+        if (resolve_ && resolve_.width == w && resolve_.height == h && hdr_.width == iw && hdr_.height == ih) return;
         const MTLTextureUsage rt = MTLTextureUsageRenderTarget | MTLTextureUsageShaderRead;
+        // --- output resolution ---
         resolve_ = target2D(kColorFormat, w, h, rt);
-        hdr_ = target2D(kHDRFormat, w, h, rt);
-        lit_ = target2D(kHDRFormat, w, h, rt);
-        gbufA_ = target2D(kGbufAFormat, w, h, rt);
-        gbufB_ = target2D(kGbufBFormat, w, h, rt);
-        for (auto& t : taa_) t = target2D(kHDRFormat, w, h, rt);
-        historyValid_ = false;
-        depthResolved_ = target2D(kDepthFormat, w, h, rt);
-        const NSUInteger hw = std::max<NSUInteger>(1, w / 2), hh = std::max<NSUInteger>(1, h / 2);
-        aoRaw_ = target2D(kAOFormat, hw, hh, rt);
-        aoBlurred_ = target2D(kAOFormat, hw, hh, rt);
-
-        // Bloom mip chain (half resolution).
-        MTLTextureDescriptor* bd = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:kHDRFormat width:hw height:hh mipmapped:YES];
+        const NSUInteger ow2 = std::max<NSUInteger>(1, w / 2), oh2 = std::max<NSUInteger>(1, h / 2);
+        MTLTextureDescriptor* bd = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:kHDRFormat width:ow2 height:oh2 mipmapped:YES];
         bd.mipmapLevelCount = std::min<NSUInteger>(kBloomLevels, bd.mipmapLevelCount);
         bd.storageMode = MTLStorageModePrivate;
         bd.usage = rt | MTLTextureUsagePixelFormatView;
@@ -892,21 +948,11 @@ private:
                                                                  levels:NSMakeRange(i, 1)
                                                                  slices:NSMakeRange(0, 1)]);
         }
-        sceneCopy_ = target2D(kHDRFormat, w, h, MTLTextureUsageShaderRead);
-        volumetric_ = target2D(kHDRFormat, hw, hh, rt);
-        depthCopy_ = target2D(kDepthFormat, w, h, MTLTextureUsageShaderRead);
-        msaaColor_ = targetMSAA(kHDRFormat, w, h);
-        msaaGbufA_ = targetMSAA(kGbufAFormat, w, h);
-        msaaGbufB_ = targetMSAA(kGbufBFormat, w, h);
-        depthPrev_ = target2D(kDepthFormat, w, h, MTLTextureUsageShaderRead);
-        giRaw_ = target2D(kHDRFormat, hw, hh, rt);
-        ssrRaw_ = target2D(kHDRFormat, hw, hh, rt);
-        for (auto& t : giHist_) t = target2D(kHDRFormat, hw, hh, rt);
-        cloudRaw_ = target2D(kHDRFormat, hw, hh, rt);
         postA_ = target2D(kHDRFormat, w, h, rt);
         postB_ = target2D(kHDRFormat, w, h, rt);
-        dofCoc_ = target2D(kHDRFormat, hw, hh, rt);
-        dofBlur_ = target2D(kHDRFormat, hw, hh, rt);
+        upscaled_ = target2D(kHDRFormat, w, h, rt | MTLTextureUsageShaderWrite);
+        dofCoc_ = target2D(kHDRFormat, ow2, oh2, rt);
+        dofBlur_ = target2D(kHDRFormat, ow2, oh2, rt);
         {
             const NSUInteger qw = std::max<NSUInteger>(1, w / 4), qh = std::max<NSUInteger>(1, h / 4);
             MTLTextureDescriptor* ld = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRG16Float width:qw height:qh mipmapped:YES];
@@ -916,9 +962,79 @@ private:
             for (auto& t : exposure_) t = target2D(MTLPixelFormatR32Float, 1, 1, rt);
             exposureValid_ = false;
         }
-        for (auto& t : cloudHist_) t = target2D(kHDRFormat, hw, hh, rt);
+        // --- internal (scene) resolution ---
+        hdr_ = target2D(kHDRFormat, iw, ih, rt);
+        lit_ = target2D(kHDRFormat, iw, ih, rt);
+        gbufA_ = target2D(kGbufAFormat, iw, ih, rt);
+        gbufB_ = target2D(kGbufBFormat, iw, ih, rt);
+        for (auto& t : taa_) t = target2D(kHDRFormat, iw, ih, rt);
+        historyValid_ = false;
+        depthResolved_ = target2D(kDepthFormat, iw, ih, rt);
+        motion_ = target2D(MTLPixelFormatRG16Float, iw, ih, rt);
+        const NSUInteger hw = std::max<NSUInteger>(1, iw / 2), hh = std::max<NSUInteger>(1, ih / 2);
+        aoRaw_ = target2D(kAOFormat, hw, hh, rt);
+        aoBlurred_ = target2D(kAOFormat, hw, hh, rt);
+        sceneCopy_ = target2D(kHDRFormat, iw, ih, MTLTextureUsageShaderRead);
+        volumetric_ = target2D(kHDRFormat, hw, hh, rt);
+        depthCopy_ = target2D(kDepthFormat, iw, ih, MTLTextureUsageShaderRead);
+        msaaColor_ = targetMSAA(kHDRFormat, iw, ih);
+        msaaGbufA_ = targetMSAA(kGbufAFormat, iw, ih);
+        msaaGbufB_ = targetMSAA(kGbufBFormat, iw, ih);
+        msaaDepth_ = targetMSAA(kDepthFormat, iw, ih);
+        depthPrev_ = target2D(kDepthFormat, iw, ih, MTLTextureUsageShaderRead);
+        giRaw_ = target2D(kHDRFormat, hw, hh, rt);
+        ssrRaw_ = target2D(kHDRFormat, hw, hh, rt);
+        for (auto& t : giHist_) t = target2D(kHDRFormat, hw, hh, rt);
         for (auto& t : ssrHist_) t = target2D(kHDRFormat, hw, hh, rt);
-        msaaDepth_ = targetMSAA(kDepthFormat, w, h);
+        cloudRaw_ = target2D(kHDRFormat, hw, hh, rt);
+        for (auto& t : cloudHist_) t = target2D(kHDRFormat, hw, hh, rt);
+        // Rebuilt for the new sizes on demand. MetalFX encodes asynchronously (on the Neural
+        // Engine for the ML scaler), so the old scaler must outlive work already queued with it.
+        if (scaler_) retiredScalers_.push_back({scaler_, frameIndex_});
+        scaler_ = nil;
+        spatialScaler_ = nil;
+    }
+
+    /// MetalFX spatial upscaler (GPU only) from the anti-aliased internal image to the output.
+    id<MTLFXSpatialScaler> spatialScaler() {
+        if (spatialScaler_) return spatialScaler_;
+        if (![MTLFXSpatialScalerDescriptor supportsDevice:device_]) return nil;
+        MTLFXSpatialScalerDescriptor* d = [MTLFXSpatialScalerDescriptor new];
+        d.colorTextureFormat = kHDRFormat;
+        d.outputTextureFormat = kHDRFormat;
+        d.inputWidth = hdr_.width;
+        d.inputHeight = hdr_.height;
+        d.outputWidth = upscaled_.width;
+        d.outputHeight = upscaled_.height;
+        d.colorProcessingMode = MTLFXSpatialScalerColorProcessingModeHDR;
+        spatialScaler_ = [d newSpatialScalerWithDevice:device_];
+        return spatialScaler_;
+    }
+
+    void encodeSpatialUpscale(id<MTLCommandBuffer> cmd) {
+        id<MTLFXSpatialScaler> sc = spatialScaler();
+        sc.colorTexture = taa_[taaCurrent_];
+        sc.outputTexture = upscaled_;
+        [sc encodeToCommandBuffer:cmd];
+        [cmd addCompletedHandler:^(id<MTLCommandBuffer>) { (void)sc; }];
+    }
+
+    /// MetalFX temporal upscaler from the internal to the output resolution (nil if unsupported).
+    id<MTLFXTemporalScaler> temporalScaler() {
+        if (scaler_) return scaler_;
+        if (![MTLFXTemporalScalerDescriptor supportsDevice:device_]) return nil;
+        MTLFXTemporalScalerDescriptor* d = [MTLFXTemporalScalerDescriptor new];
+        d.colorTextureFormat = kHDRFormat;
+        d.depthTextureFormat = kDepthFormat;
+        d.motionTextureFormat = MTLPixelFormatRG16Float;
+        d.outputTextureFormat = kHDRFormat;
+        d.inputWidth = hdr_.width;
+        d.inputHeight = hdr_.height;
+        d.outputWidth = upscaled_.width;
+        d.outputHeight = upscaled_.height;
+        d.autoExposureEnabled = YES;
+        scaler_ = [d newTemporalScalerWithDevice:device_];
+        return scaler_;
     }
 
     GpuMesh makeMesh(const MeshData& m) {
@@ -967,6 +1083,7 @@ private:
         float scale = std::max({length(d.model.transformDir({1, 0, 0})), length(d.model.transformDir({0, 1, 0})),
                                 length(d.model.transformDir({0, 0, 1}))});
         float dist = distance(lodFrame_->camera.eye, d.worldBounds.center());
+        bias += lodFrame_->quality >= 2 ? 1 : 0;
         return std::min(m.lodFor(pixelsPerUnit(*lodFrame_, dist) * scale) + bias, m.lodCount - 1);
     }
     int lodForChunk(const GpuMesh& m, const InstanceBatch& b, int bias = 0) const {
@@ -974,10 +1091,11 @@ private:
         const Vec3 e = lodFrame_->camera.eye;
         Vec3 c{std::clamp(e.x, b.bounds.min.x, b.bounds.max.x), std::clamp(e.y, b.bounds.min.y, b.bounds.max.y),
                std::clamp(e.z, b.bounds.min.z, b.bounds.max.z)};
+        bias += (lodFrame_->quality >= 2 ? 1 : 0) + foliageBudgetBias_;  // fast editing view, triangle budget
         int lod = std::min(m.lodFor(pixelsPerUnit(*lodFrame_, distance(e, c)) * 1.3f) + bias, m.lodCount - 1);
         // Leaf/grass cards thin out badly when simplified hard: keep the canopy readable
-        // (distant forests should use impostors).
-        if (b.surface.alphaCutoff > 0.f) lod = std::min(lod, 1 + bias);
+        // (distant forests should use impostors) unless the triangle budget forbids it.
+        if (b.surface.alphaCutoff > 0.f && lodFrame_->quality < 2 && foliageBudgetBias_ == 0) lod = std::min(lod, 1 + bias);
         return lod;
     }
 
@@ -1161,7 +1279,7 @@ private:
         bool shadows = env.sunElevation > 0.f && env.sunIntensity > 0.f;
         fu.params = simd_make_float4(env.exposure, static_cast<float>(std::min(frame.lights.size(), FrameData::kMaxEffectLights)),
                                      shadows ? 1.f : 0.f, 1.f / static_cast<float>(kShadowAtlas));
-        float w = static_cast<float>(std::max(frame.width, 1)), h = static_cast<float>(std::max(frame.height, 1));
+        float w = static_cast<float>(hdr_ ? hdr_.width : std::max(frame.width, 1)), h = static_cast<float>(hdr_ ? hdr_.height : std::max(frame.height, 1));
         fu.viewport = simd_make_float4(w, h, 1.f / w, 1.f / h);
         float mode = env.skyMode == "atmosphere" ? 1.f : 0.f;
         if (env.skyMode == "hdri") mode = hdri_ ? 2.f : 1.f;  // no panorama loaded: fall back to the atmosphere
@@ -1205,7 +1323,7 @@ private:
         du.material3 = simd_make_float4(s.clearcoat, s.subsurface, s.rim, s.outline);
         du.maps = maps;
         du.outlineColor = lin(s.outlineColor);
-        du.material4 = simd_make_float4(s.alphaCutoff, 0, 0, 0);
+        du.material4 = simd_make_float4(s.alphaCutoff, s.textureAlphaOnly ? 1.f : 0.f, 0, 0);
         return du;
     }
 
@@ -1325,6 +1443,7 @@ private:
                 drawFoliageShadows(enc, frame, fr, lvp);
                 [enc setRenderPipelineState:shadowPipeline_];
                 [enc setCullMode:MTLCullModeNone];
+                fx_->encodeShadowCaster(enc, frame, lvp);  // [hair+vfx] hair and mesh particles
             }
         }
         [enc endEncoding];
@@ -1604,6 +1723,41 @@ private:
         return u;
     }
 
+    /// Hard safety net for instanced foliage: if the visible instances would exceed the
+    /// triangle budget at the chosen LODs, coarsen them until they fit. Very long GPU frames
+    /// trip the system GPU watchdog and stall the whole desktop.
+    static constexpr uint64_t kFoliageTriangleBudget = 120'000'000;
+    void chooseFoliageBudgetBias(const FrameData& frame) {
+        foliageBudgetBias_ = 0;
+        // After a GPU fault (watchdog timeout, page fault) the renderer stays in safe mode:
+        // a quarter of the geometry budget so the frame stays far from the watchdog.
+        const int faults = gpuFaults_->load();
+        if (faults != reportedFaults_) {
+            reportedFaults_ = faults;
+            log::error("render", "GPU command buffer failed (" + std::to_string(faults) +
+                                     " so far): rendering in safe mode with a reduced geometry budget");
+        }
+        const uint64_t budget = faults > 0 ? kFoliageTriangleBudget / 4 : kFoliageTriangleBudget;
+        if (frame.instances.empty()) return;
+        const Frustum fr(frame.viewProjection());
+        for (int bias = 0; bias <= 4; ++bias) {
+            foliageBudgetBias_ = bias;
+            uint64_t total = 0;
+            for (const InstanceBatch& b : frame.instances) {
+                if (!b.instances || b.instances->empty() || !fr.intersects(b.bounds)) continue;
+                Vec3 c{std::clamp(frame.camera.eye.x, b.bounds.min.x, b.bounds.max.x),
+                       std::clamp(frame.camera.eye.y, b.bounds.min.y, b.bounds.max.y),
+                       std::clamp(frame.camera.eye.z, b.bounds.min.z, b.bounds.max.z)};
+                if (distance(c, frame.camera.eye) > b.cullDistance) continue;
+                const GpuMesh* m = mesh(b.mesh);
+                if (!m) continue;
+                int lod = std::clamp(lodForChunk(*m, b), 0, m->lodCount - 1);
+                total += static_cast<uint64_t>(m->lodCount_[lod] / 3) * b.instances->size();
+            }
+            if (total <= budget) return;
+        }
+    }
+
     void drawFoliage(id<MTLRenderCommandEncoder> enc, const FrameData& frame, const Frustum& fr) {
         if (frame.instances.empty()) return;
         bool cutBound = false, first = true;
@@ -1650,7 +1804,8 @@ private:
             if (!b.castShadows || !b.instances || b.instances->empty() || !fr.intersects(b.bounds)) continue;
             Vec3 c{std::clamp(frame.camera.eye.x, b.bounds.min.x, b.bounds.max.x), std::clamp(frame.camera.eye.y, b.bounds.min.y, b.bounds.max.y),
                    std::clamp(frame.camera.eye.z, b.bounds.min.z, b.bounds.max.z)};
-            if (distance(c, frame.camera.eye) > b.cullDistance) continue;
+            float dist = distance(c, frame.camera.eye);
+            if (dist > b.cullDistance || (frame.quality >= 2 && dist > 60.f)) continue;  // fast view: near shadows only
             const GpuMesh* m = mesh(b.mesh);
             if (!m) continue;
             if (!bound) {
@@ -1791,6 +1946,7 @@ private:
             }
             drawMesh(enc, d);
         }
+        fx_->encodeOpaque(enc, frame);  // [hair+vfx] strand hair, lit mesh particles
 
         // Terrain and instanced foliage (opaque)
         terrainNodesDrawn_ = 0;
@@ -1842,6 +1998,7 @@ private:
             [enc drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:6];
         }
 
+        if (r2d_) r2d_->encodeWorld(enc, rp, frame);  // 2D: sprites, tiles, world text (depth-tested)
         [enc endEncoding];
     }
 
@@ -2171,7 +2328,7 @@ private:
                        const std::vector<GPULight>& lights, bool simulate) {
         bool anyWater = false;
         for (const auto& w : frame.water) anyWater = anyWater || (w.ocean && w.ocean->resolution > 0);
-        if (!anyWater && frame.particles.empty() && frame.volumes.empty()) {
+        if (!anyWater && frame.particles.empty() && frame.volumes.empty() && !fx_->hasTransparent(frame)) {  // [hair+vfx]
             oceans_.clear();
             fluids_.clear();
             return;
@@ -2272,6 +2429,9 @@ private:
                   instanceCount:frame.particles.size()];
             [enc endEncoding];
         }
+        fx_->encodeTransparent(cmd, frame,  // [hair+vfx] GPU particles
+                               FxSceneInputs{shadowMap_, envCube_, depthCopy_, lit_, &fu, sizeof(fu), lights.data(),
+                                             lights.size() * sizeof(GPULight)});
     }
 
     void encodeVolumetrics(id<MTLCommandBuffer> cmd, const FrameData& frame, const FrameUniforms& fu,
@@ -2402,10 +2562,29 @@ private:
         t.params = simd_make_float4(static_cast<float>(mode), weight, 0.9f, volumetricActive_ ? 1.f : 0.f);
         t.texel = simd_make_float4(1.f / hdr_.width, 1.f / hdr_.height, 1.f / volumetric_.width, 1.f / volumetric_.height);
         id<MTLTexture> dst = taa_[taaCurrent_ ^ 1];
-        fullscreenFU(cmd, temporalPipeline_, dst, {lit_, volumetric_, taa_[taaCurrent_], depthResolved_}, fu, &t, sizeof(t),
+        fullscreenFU(cmd, temporalPipeline_, dst, {lit_, volumetric_, taa_[taaCurrent_], depthResolved_, fx_->reactiveMask()}, fu, &t, sizeof(t),  // [hair+vfx] reactive
                      mode == 1 ? @"TAA" : (mode == 2 ? @"Accumulate" : @"Scene resolve"));
         taaCurrent_ ^= 1;
         (void)frame;
+    }
+
+    /// MetalFX temporal upscaling: camera motion vectors from depth, then the scaler.
+    void encodeUpscale(id<MTLCommandBuffer> cmd, const FrameUniforms& fu, Vec2 jitterPx) {
+        fullscreenFU(cmd, motionPipeline_, motion_, {depthResolved_}, fu, &fu.temporal, sizeof(fu.temporal), @"Motion vectors");
+        id<MTLFXTemporalScaler> sc = temporalScaler();
+        sc.colorTexture = taa_[taaCurrent_];
+        sc.depthTexture = depthResolved_;
+        sc.motionTexture = motion_;
+        sc.outputTexture = upscaled_;
+        sc.jitterOffsetX = -jitterPx.x;
+        sc.jitterOffsetY = jitterPx.y;
+        sc.motionVectorScaleX = static_cast<float>(motion_.width);
+        sc.motionVectorScaleY = static_cast<float>(motion_.height);
+        sc.reset = !historyValid_;
+        sc.depthReversed = NO;
+        [sc encodeToCommandBuffer:cmd];
+        [cmd addCompletedHandler:^(id<MTLCommandBuffer>) { (void)sc; }];  // keep it alive until the GPU is done
+        std::erase_if(retiredScalers_, [&](const RetiredScaler& r) { return frameIndex_ - r.frame > 30; });
     }
 
     void encodeAO(id<MTLCommandBuffer> cmd, const FrameData& frame) {
@@ -2516,7 +2695,7 @@ private:
 
     void encodePost(id<MTLCommandBuffer> cmd, const FrameData& frame, bool accumulated, const FrameUniforms& base) {
         const Environment& env = frame.environment;
-        id<MTLTexture> src = taa_[taaCurrent_];
+        id<MTLTexture> src = postSource_ ?: taa_[taaCurrent_];
         const ViewCamera& cam = frame.camera;
         LensUniformsGpu lu{};
         float fl = 12.f / std::tan(radians(std::clamp(cam.fovDeg, 5.f, 170.f)) * 0.5f);  // focal length (mm), 24 mm sensor
@@ -2547,8 +2726,12 @@ private:
             id<MTLBlitCommandEncoder> blit = [cmd blitCommandEncoder];
             [blit generateMipmapsForTexture:lum_];
             [blit endEncoding];
-            float dt = 1.f / 60.f;
-            simd_float4 ep = simd_make_float4(accumulated || !exposureValid_ ? -1.f : dt * env.adaptationSpeed * 3.f,
+            // Stills converge instantly; real time and offline movie frames adapt over time (offline:
+            // by the movie's frame time, re-metering at cuts) so exposure never pumps frame to frame.
+            const bool offline = frame.offline.enabled;
+            float dt = offline ? std::max(frame.offline.exposureDt, 0.f) : 1.f / 60.f;
+            const bool converge = !exposureValid_ || (offline ? frame.resetHistory : accumulated);
+            simd_float4 ep = simd_make_float4(converge ? -1.f : dt * env.adaptationSpeed * 3.f,
                                               0.f, -10.f, 10.f);
             id<MTLTexture> dst = exposure_[exposureCurrent_ ^ 1];
             fullscreen(cmd, exposurePipeline_, dst, {lum_, exposure_[exposureCurrent_]}, &ep, sizeof(ep), false, @"Exposure adapt");
@@ -2613,7 +2796,18 @@ private:
         foliageShadowAlphaPipeline_,
         cloudsPipeline_, cloudTemporalPipeline_, lumaPipeline_, exposurePipeline_, motionBlurPipeline_, dofCocPipeline_,
         dofBlurPipeline_, dofCombinePipeline_;
-    id<MTLTexture> lum_, exposure_[2], postA_, postB_, dofCoc_, dofBlur_, lut_;
+    id<MTLTexture> lum_, exposure_[2], postA_, postB_, dofCoc_, dofBlur_, lut_, upscaled_, motion_, postSource_;
+    int foliageBudgetBias_ = 0;
+    std::shared_ptr<std::atomic<int>> gpuFaults_ = std::make_shared<std::atomic<int>>(0);
+    int reportedFaults_ = 0;
+    id<MTLFXTemporalScaler> scaler_;
+    id<MTLFXSpatialScaler> spatialScaler_;
+    struct RetiredScaler {
+        id<MTLFXTemporalScaler> scaler;
+        uint64_t frame = 0;
+    };
+    std::vector<RetiredScaler> retiredScalers_;
+    id<MTLRenderPipelineState> motionPipeline_;
     std::vector<id<MTLTexture>> lumViews_;
     int exposureCurrent_ = 0;
     bool exposureValid_ = false;
@@ -2674,6 +2868,8 @@ private:
     uint64_t frameIndex_ = 0;
     bool aoActive_ = false;
     bool volumetricActive_ = false;
+    std::unique_ptr<MetalRenderer2D> r2d_;  // 2D world quads + UI
+    std::unique_ptr<MetalFx> fx_;  // [hair+vfx]
 };
 
 }  // namespace

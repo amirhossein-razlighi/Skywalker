@@ -102,6 +102,10 @@ public:
     void clearSequenceScrub(EntityId e);
     /// The camera a sequence shows at `seconds` (camera cut, else a shot's camera).
     EntityId sequenceCamera(EntityId e, float seconds);
+    /// Movie rendering (docs/MOVIE_RENDER.md): applies the property, camera-cut and shot tracks of the
+    /// sequence on `e` at exactly `seconds` (a sub-frame time between fixed ticks) for one rendered frame;
+    /// restore with endFrame(). Event and animation tracks are left to the simulation.
+    FrameOverrides overrideSequenceAt(EntityId e, float seconds);
 
 private:
     struct Instance;
@@ -118,7 +122,8 @@ private:
     Mat4 modelToWorld(const Instance& inst, EntityId animatorEntity) const;
     void updateAttachments(FrameOverrides* overrides);
     SeqInstance* seqInstance(EntityId e);
-    void applySequence(EntityId e, SeqInstance& s, float t, float prevT, bool playing, FrameOverrides* overrides);
+    void applySequence(EntityId e, SeqInstance& s, float t, float prevT, bool playing, FrameOverrides* overrides,
+                       bool valuesOnly = false);
     bool writeComponent(EntityId e, const std::string& component, const Json& patch, FrameOverrides* overrides);
     void warnOnce(const std::string& key, const std::string& message);
 

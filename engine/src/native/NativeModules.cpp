@@ -700,7 +700,16 @@ Status NativeModules::load() {
     return {};
 }
 
+Status NativeModules::usePrebuilt(const std::string& library) {
+    std::error_code ec;
+    if (!fs::exists(library, ec)) return Error::make("not_found", "no precompiled native module at " + library);
+    prebuiltOnly_ = true;
+    impl_->lastBuilt = library;
+    return load();
+}
+
 Status NativeModules::reloadIfChanged() {
+    if (prebuiltOnly_) return load();  // shipped: the library is final, never rebuilt
     if (!hasSources()) {
         unload();
         return {};
@@ -870,7 +879,7 @@ void NativeModules::onPlay() {
         engine_.runtime().log(kNoEntity, "native module: " + s.error().message, "native");
         log::warn("native", s.error().message);
     }
-    if (autoAot_) {
+    if (autoAot_ && !prebuiltOnly_) {
         auto r = compileBehaviors({}, false);
         if (r && r->get("failed").asInt() > 0) {
             engine_.runtime().log(kNoEntity, "AOT: " + std::to_string(r->get("failed").asInt()) +

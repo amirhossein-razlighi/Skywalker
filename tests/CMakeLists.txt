@@ -26,9 +26,15 @@ set(SKY_TEST_SOURCES
     test_texturegen.cpp
     test_import.cpp
     test_fx.cpp
+    test_text.cpp
+    test_2d.cpp
+    test_ui.cpp
+    test_dialogue.cpp
+    test_2d_tools.cpp
     test_wander_examples.cpp
     test_wander2.cpp
     test_wander_native.cpp
+    test_hair_vfx.cpp
     test_world.cpp
     test_audio.cpp
     test_input.cpp
@@ -42,11 +48,17 @@ set(SKY_TEST_SOURCES
     test_anim_engine.cpp
     test_sequencer.cpp
     test_integrations.cpp
+    test_game.cpp
+    test_movie.cpp
 )
 
 add_executable(skywalker_tests ${SKY_TEST_SOURCES})
 target_link_libraries(skywalker_tests PRIVATE sky::engine sky::capi doctest::doctest)
 target_compile_definitions(skywalker_tests PRIVATE
     SKY_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
+if(TARGET skywalker-player)
+    add_dependencies(skywalker_tests skywalker-player)
+    target_compile_definitions(skywalker_tests PRIVATE SKY_PLAYER_PATH="$<TARGET_FILE:skywalker-player>")
+endif()
 
 add_test(NAME skywalker_tests COMMAND skywalker_tests)

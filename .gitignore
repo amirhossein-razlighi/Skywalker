@@ -87,3 +87,4 @@ samples/
 # Terrain caches (regenerated deterministically from each terrain generator)
 examples/*/terrain/*.terrain
 examples/*/terrain/*.r16
+examples/*/studio/usage.json
