@@ -335,7 +335,8 @@ static float3 hairShade(constant HairParams& H, constant FrameUniforms& f, const
                         const device uint2* clusterCells, const device uint* clusterIndices, HairShadeIn s,
                         float2 pixel, depth2d<float> shadowAtlas, texturecube<float> envTex, depth2d<float> domDepth,
                         depth2d<float> domOpaque, texture2d<float> domDensity, thread float3& albedoOut,
-                        thread float3& normalOut, depth2d_array<float> localShadows) {
+                        thread float3& normalOut, depth2d_array<float> localShadows, constant ProbeBlock& probes,
+                        const device uint* probeClusters, texturecube_array<float> probeAtlas) {
     float3 V = normalize(f.cameraPos.xyz - s.worldPos);
     if (f.cameraForward.w > 0.5) V = -f.cameraForward.xyz;
     float3 Tt = normalize(s.tangent);
@@ -353,7 +354,8 @@ static float3 hairShade(constant HairParams& H, constant FrameUniforms& f, const
     float3 color = hairBSDF(T, V, L, C, rough, radial, tilt, specular, scatter, shadowAmt) * f.sunColor.rgb * f.sunDir.w * vis;
     // Punctual lights: directional ones everywhere, point / spot lights from this pixel's cluster.
     int dirCount = int(f.cluster2.y);
-    uint2 cell = clusterCells[clusterOf(f, pixel, s.worldPos)];
+    const uint cluster = clusterOf(f, pixel, s.worldPos);
+    uint2 cell = clusterCells[cluster];
     int total = dirCount + int(cell.y);
     for (int k = 0; k < total; ++k) {
         int i = k < dirCount ? k : int(clusterIndices[cell.x + uint(k - dirCount)]);
@@ -361,15 +363,17 @@ static float3 hairShade(constant HairParams& H, constant FrameUniforms& f, const
         float3 rad = localLightAt(lights[i], s.worldPos, float3(0.0), Ll, localShadows, pixel, 4, f.extra.y);
         color += hairBSDF(T, V, Ll, C, rough, radial, tilt, specular, scatter, 1.0) * rad;
     }
-    // Sky light: diffuse around the strand plus a glossy reflection, occluded inside the groom.
+    // Sky (or reflection probe) light: diffuse around the strand plus a glossy reflection, occluded
+    // inside the groom.
     float3 Nf = normalize(V - T * dot(V, T) + 1e-5);
-    float ambientK = f.ground.w;
-    float maxMip = f.extra.z;
     float occ = mix(1.0, saturate(dot(domT, float3(0.333)) * 0.7 + 0.3), H.shade.z) * mix(0.45, 1.0, smoothstep(0.0, 0.4, s.t));
     float3 albedo = sqrt(C) * 0.8;
-    float3 irr = (envTex.sample(cubeSampler, Nf, level(maxMip)).rgb + envTex.sample(cubeSampler, float3(0, 1, 0), level(maxMip)).rgb) * 0.5;
-    float3 spec = envTex.sample(cubeSampler, reflect(-V, Nf), level(clamp(rough * 1.5, 0.0, 1.0) * maxMip)).rgb;
-    color += (irr * albedo * scatter + spec * 0.06 * specular * f.sky.w) * ambientK * occ;
+    const float3 Rf = reflect(-V, Nf);
+    const float envRough = clamp(rough * 1.5, 0.0, 1.0);
+    EnvLight env = environmentLight(f, probes, probeClusters, probeAtlas, envTex, cluster, s.worldPos, Nf, Rf, envRough);
+    EnvLight envUp = environmentLight(f, probes, probeClusters, probeAtlas, envTex, cluster, s.worldPos, float3(0, 1, 0), Rf, envRough);
+    float3 irr = (env.irr + envUp.irr) * 0.5;
+    color += (irr * albedo * scatter + env.spec * 0.06 * specular) * occ;
     float fogAmt = fogFactor(f, s.worldPos);
     float3 fogC = f.fog.rgb + f.sunColor.rgb * f.sunDir.w * pow(saturate(dot(-V, L)), 8.0) * 0.25;
     color = mix(color, fogC, fogAmt);
@@ -468,12 +472,15 @@ fragment HairOut hairFragment(HairVOut in [[stage_in]], constant HairParams& H [
                               depth2d<float> shadowAtlas [[texture(1)]], texturecube<float> envTex [[texture(5)]],
                               depth2d<float> domDepth [[texture(9)]], depth2d<float> domOpaque [[texture(10)]],
                               texture2d<float> domDensity [[texture(11)]],
-                              depth2d_array<float> localShadows [[texture(32)]]) {
+                              depth2d_array<float> localShadows [[texture(32)]],
+                              constant ProbeBlock& probes [[buffer(10)]], const device uint* probeClusters [[buffer(11)]],
+                              texturecube_array<float> probeAtlas [[texture(33)]]) {
     uint mask = hairSampleMask(in.coverage, in.position.xy, in.rand, f.temporal.z * 7.0 + f.temporal.w);
     if (mask == 0u) discard_fragment();
     HairShadeIn s{in.worldPos, in.tangent, in.t, in.rand};
     float3 albedo, N;
-    float3 c = hairShade(H, f, lights, clusterCells, clusterIndices, s, in.position.xy, shadowAtlas, envTex, domDepth, domOpaque, domDensity, albedo, N, localShadows);
+    float3 c = hairShade(H, f, lights, clusterCells, clusterIndices, s, in.position.xy, shadowAtlas, envTex, domDepth, domOpaque, domDensity, albedo, N, localShadows, probes,
+                         probeClusters, probeAtlas);
     HairOut o;
     o.color = float4(c, 1.0);
     o.gbufA = float4(albedo, 1.0);
@@ -525,7 +532,9 @@ fragment HairOut hairCardFragment(HairCardOut in [[stage_in]], constant HairPara
                                   depth2d<float> shadowAtlas [[texture(1)]], texturecube<float> envTex [[texture(5)]],
                                   depth2d<float> domDepth [[texture(9)]], depth2d<float> domOpaque [[texture(10)]],
                                   texture2d<float> domDensity [[texture(11)]],
-                                  depth2d_array<float> localShadows [[texture(32)]]) {
+                                  depth2d_array<float> localShadows [[texture(32)]],
+                                  constant ProbeBlock& probes [[buffer(10)]], const device uint* probeClusters [[buffer(11)]],
+                                  texturecube_array<float> probeAtlas [[texture(33)]]) {
     // Procedural strand pattern across the card, thinning toward the tip and the edges.
     float strands = H.cards.y;
     float x = in.u * strands + in.rand * 13.0;
@@ -537,7 +546,8 @@ fragment HairOut hairCardFragment(HairCardOut in [[stage_in]], constant HairPara
     if (mask == 0u) discard_fragment();
     HairShadeIn s{in.worldPos, in.tangent, in.t, fract(floor(x) * 0.618)};
     float3 albedo, N;
-    float3 c = hairShade(H, f, lights, clusterCells, clusterIndices, s, in.position.xy, shadowAtlas, envTex, domDepth, domOpaque, domDensity, albedo, N, localShadows);
+    float3 c = hairShade(H, f, lights, clusterCells, clusterIndices, s, in.position.xy, shadowAtlas, envTex, domDepth, domOpaque, domDensity, albedo, N, localShadows, probes,
+                         probeClusters, probeAtlas);
     HairOut o;
     o.color = float4(c, 1.0);
     o.gbufA = float4(albedo, 1.0);

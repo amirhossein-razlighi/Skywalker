@@ -48,6 +48,10 @@ const std::vector<DebugViewInfo>& debugViews() {
         {kShadowAtlas, "shadow_atlas", "final",
          "the local (point / spot) shadow atlas: 4 quadrants of shadow maps (near white, far dark), one outline per "
          "light view: green re-rendered this frame, blue cached, orange waiting for the update budget (shadow_atlas_info)"},
+        {kReflectionProbes, "reflection_probes", "final",
+         "which reflection probe lights each pixel: the scene tinted with each probe's color (probe_info debugColor; blends "
+         "mix their colors, gray = sky only), every influence volume outlined in its color (dashed where hidden), capture "
+         "points as dots"},
     };
     return kViews;
 }

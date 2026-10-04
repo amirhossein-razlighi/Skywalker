@@ -154,7 +154,10 @@ fragment MainOut terrainFragment(TerrainOut in [[stage_in]],
                                  texture2d<float> l6a [[texture(25)]], texture2d<float> l6n [[texture(26)]], texture2d<float> l6o [[texture(27)]],
                                  texture2d<float> l7a [[texture(28)]], texture2d<float> l7n [[texture(29)]], texture2d<float> l7o [[texture(30)]],
                                  texture2d<float> overlayTex [[texture(31)]],
-                                 depth2d_array<float> localShadows [[texture(32)]]) {
+                                 depth2d_array<float> localShadows [[texture(32)]],
+                                 constant ProbeBlock& probes [[buffer(10)]],
+                                 const device uint* probeClusters [[buffer(11)]],
+                                 texturecube_array<float> probeAtlas [[texture(33)]]) {
     float3 wp = in.worldPos;
     float3 V = normalize(f.cameraPos.xyz - wp);
     if (f.cameraForward.w > 0.5) V = -f.cameraForward.xyz;
@@ -280,7 +283,7 @@ fragment MainOut terrainFragment(TerrainOut in [[stage_in]],
         return mainOut(float4(debugSurfaceColor(dbg, ds, f), 1.0), s.albedo, 1.0, Ngeo, 1.0, kGbufNoLighting);
     }
     float3 color = shadeSurface(s, Ngeo, wp, in.position.xy, V, false, 0.0, f, lights, clusterCells, clusterIndices, shadowAtlas,
-                                envTex, brdfLut, cloudShape, localShadows) + overlayGlow;
+                                envTex, brdfLut, cloudShape, localShadows, probes, probeClusters, probeAtlas) + overlayGlow;
     if (tu.water.z > 0.5) color = mix(color, float3(1.0, 0.5, 0.1), 0.15);  // selection tint
     color = applyFog(color, wp, V, f);
     return mainOut(float4(color, 1.0), s.albedo, s.ao, N, s.roughness, s.metallic);
@@ -761,7 +764,10 @@ fragment ImpostorFragmentOut impostorFragment(ImpostorOut in [[stage_in]],
                                               texturecube<float> envTex [[texture(5)]],
                                               texture2d<float> brdfLut [[texture(6)]],
                                               texture3d<float> cloudShape [[texture(7)]],
-                                              depth2d_array<float> localShadows [[texture(32)]]) {
+                                              depth2d_array<float> localShadows [[texture(32)]],
+                                              constant ProbeBlock& probes [[buffer(10)]],
+                                              const device uint* probeClusters [[buffer(11)]],
+                                              texturecube_array<float> probeAtlas [[texture(33)]]) {
     const bool ortho = f.cameraForward.w > 0.5;
     const float3 ray = ortho ? in.eyeModel : normalize(in.modelPos - in.eyeModel);
     ImpostorSample smp = sampleImpostor(atlasA, atlasB, ic, in.modelPos, ray, in.frames, in.weights);
@@ -806,7 +812,7 @@ fragment ImpostorFragmentOut impostorFragment(ImpostorOut in [[stage_in]],
         m = mainOut(float4(debugSurfaceColor(dbg, ds, f), alpha), s.albedo, 1.0, N, 1.0, kGbufNoLighting);
     } else {
         float3 color = shadeSurface(s, N, worldPos, in.position.xy, V, false, 0.0, f, lights, clusterCells, clusterIndices,
-                                    shadowAtlas, envTex, brdfLut, cloudShape, localShadows);
+                                    shadowAtlas, envTex, brdfLut, cloudShape, localShadows, probes, probeClusters, probeAtlas);
         color = applyFog(color, worldPos, V, f);
         m = mainOut(float4(color, alpha), s.albedo, 1.0, N, s.roughness, 0.0);
     }

@@ -129,7 +129,10 @@ fragment EffectOut waterFragment(WaterOut in [[stage_in]],
                                texture2d<float> j1 [[texture(12)]],
                                texture2d<float> j2 [[texture(13)]],
                                texture2d<float> pano [[texture(14)]],
-                               depth2d_array<float> localShadows [[texture(32)]]) {
+                               depth2d_array<float> localShadows [[texture(32)]],
+                               constant ProbeBlock& probes [[buffer(10)]],
+                               const device uint* probeClusters [[buffer(11)]],
+                               texturecube_array<float> probeAtlas [[texture(33)]]) {
     bool endless = w.params2.z > 0.5;
     float2 xz = in.baseXZ;
     if (!endless) {
@@ -192,6 +195,9 @@ fragment EffectOut waterFragment(WaterOut in [[stage_in]],
     R = normalize(R);
     float3 envR = f.sky.x > 1.5 ? panorama(R, f, pano, max(f.hdri.z - 1.5, 0.0) + rough * 9.0)
                                 : envTex.sample(cubeSampler, R, level(rough * f.extra.z * 1.5)).rgb;
+    // Off-screen reflections: the reflection probes around the water (pools, canals, flooded streets), else the sky.
+    envR = probeRadiance(probes, probeClusters, probeAtlas, clusterOf(f, in.position.xy, in.worldPos), in.worldPos, R,
+                         min(rough * 1.5, 1.0), envR, 1.0);
     float4 ssr = traceSSR(f, in.worldPos, R, sceneTex, sceneDepth);
     float3 refl = mix(envR, ssr.rgb, ssr.a) * f.sky.w;
     float F = saturate((0.02 + 0.98 * pow(1.0 - NdotV, 5.0)) * w.params.z);

@@ -45,6 +45,7 @@
 #include "MetalFx.h"  // [hair+vfx] GPU particles and strand hair
 #include "MetalMesh.h"
 #include "MetalShadows.h"  // [local shadows] point / spot light shadow atlas
+#include "MetalProbes.h"  // [reflection probes] probe atlas, captures, filtering
 #include "skywalker/core/Log.h"
 #include "skywalker/render/ColorGrading.h"
 #include "skywalker/render/Hdr.h"
@@ -406,6 +407,7 @@ public:
                 return out;
             });
         shadows_ = std::make_unique<MetalShadows>(device_);  // [local shadows]
+        probes_ = std::make_unique<MetalProbes>(device_, queue_);  // [reflection probes]
         Status s = buildPipelines(builtinSource_, true);
         if (!s) {
             log::error("render", "built-in shaders failed to compile: " + s.error().message);
@@ -514,6 +516,7 @@ public:
             j["instancesDrawn"] = f.get("meshInstances").asInt() + f.get("impostorInstances").asInt();
         }
         if (shadows_) j["localShadows"] = shadows_->stats();  // [local shadows]
+        if (probes_) j["reflectionProbes"] = probes_->stats();  // [reflection probes]
         if (fx_) {  // [hair+vfx] frame/simulation GPU times, emitters, grooms
             const Json fx = fx_->stats();
             for (const auto& [k, v] : fx.members()) j[k] = v;
@@ -556,6 +559,16 @@ public:
     Json localShadowInfo() const override { return shadows_ ? shadows_->info() : Json(); }  // [local shadows]
     void invalidateLocalShadows() override {
         if (shadows_) shadows_->invalidate();
+    }
+    // [reflection probes]
+    Json reflectionProbeInfo(const FrameData* frame) const override { return probes_ ? probes_->info(frame) : Json(); }
+    void invalidateReflectionProbes(EntityId entity) override {
+        if (probes_) probes_->invalidate(entity);
+    }
+    Result<Image> reflectionProbeImage(EntityId entity, int mip) override {
+        @autoreleasepool {
+            return probes_->faceImage(entity, mip);
+        }
     }
 
     Status reloadShaders(const std::string& source) override {
@@ -622,6 +635,7 @@ public:
             std::vector<GPULight> lights(allLights.begin(),
                                          allLights.begin() + static_cast<std::ptrdiff_t>(std::min(allLights.size(), FrameData::kMaxEffectLights)));
             const LightGrid grid = buildLightGrid(frame);
+            probes_->plan(frame, grid, accumulateFrame);  // [reflection probes] slots, captures, shaded probes
             base.cluster = simd_make_float4(static_cast<float>(grid.tilesX), static_cast<float>(grid.tilesY),
                                             static_cast<float>(grid.slices), std::log(grid.zFar / grid.zNear));
             const Mat4 vp = frame.viewProjection();
@@ -666,6 +680,8 @@ public:
             lightsBuf_ = transient(allLights.data(), allLights.size() * sizeof(GPULight));
             clusterCellsBuf_ = transient(grid.cells.data(), grid.cells.size() * sizeof(uint32_t));
             clusterIndexBuf_ = transient(grid.indices.data(), grid.indices.size() * sizeof(uint32_t));
+            probeBlockBuf_ = transient(&probes_->block(), sizeof(probes::GpuProbeBlock));  // [reflection probes]
+            probeMaskBuf_ = transient(probes_->clusterMasks().data(), probes_->clusterMasks().size() * sizeof(uint32_t));
             encodeSkinning(cmd, frame);  // animation: posed vertices for every pass below
             ensureCloudNoise(cmd);
             encodeEnvironment(cmd, frame, base);
@@ -698,6 +714,12 @@ public:
                 [sc commit];
                 cmd = [queue_ commandBuffer];
                 cmd.label = @"Skywalker Frame (lit)";
+            }
+            if (probes_->hasCaptures()) {  // [reflection probes] captures + filtering (own, timed command buffers; local shadows ready)
+                [cmd commit];
+                encodeProbeCaptures(frame, base);
+                cmd = [queue_ commandBuffer];
+                cmd.label = @"Skywalker Frame (after probes)";
             }
             if (r2d_) r2d_->encodeOccluders(cmd, frame);  // 2D shadow casters
             for (int i = 0; i < samples; ++i) {
@@ -748,6 +770,8 @@ public:
             // impostors tints the final image and lighting_only only changes materials: no debug pass.
             if (frame.debugView == debugview::kShadowAtlas) {  // [local shadows]
                 shadows_->encodeDebug(cmd, resolve_);
+            } else if (frame.debugView == debugview::kReflectionProbes) {  // [reflection probes]
+                probes_->encodeDebug(cmd, resolve_, depthResolved_, frame, &base, sizeof(base));
             } else if (frame.debugView > 0 && frame.debugView != debugview::kImpostors && frame.debugView != debugview::kLightingOnly) {
                 PostUniforms pu{};
                 pu.params = simd_make_float4(static_cast<float>(frame.debugView), 0, 0, 0);
@@ -893,7 +917,7 @@ private:
             "exposureFragment", "motionBlurFragment", "dofCocFragment", "dofBlurFragment",
             "dofCombineFragment", "motionVectorFragment", "wireframeFragment", "overdrawFragment",
             "motionTileMaxFragment", "motionNeighborMaxFragment", "fxExposureFragment",
-            "shadowClearVertex", "shadowAtlasDebugFragment"};
+            "shadowClearVertex", "shadowAtlasDebugFragment", "probeSkyFragment", "probeFilterKernel", "probeDebugFragment"};
         return kRequired;
     }
 
@@ -1054,6 +1078,11 @@ private:
         // [foliage] GPU-driven foliage and impostor pipelines (same shader library).
         if (Status fs = foliage_->build(lib, FoliageFormats{kHDRFormat, kGbufAFormat, kGbufBFormat, kDepthFormat, kSamples, kVelocityFormat}); !fs) return fs;
         if (Status ls = shadows_->build(lib, kColorFormat); !ls) return ls;  // [local shadows]
+        if (Status ps = probes_->build(lib, ProbeFormats{kHDRFormat, kGbufAFormat, kGbufBFormat, kVelocityFormat, kDepthFormat,
+                                                         kColorFormat, kSamples});
+            !ps) {
+            return ps;  // [reflection probes]
+        }
         skyPipeline_ = sky;
         meshPipeline_ = mesh;
         meshBlendPipeline_ = meshBlend;
@@ -1720,6 +1749,157 @@ private:
         fx_->encodeShadowCaster(enc, frame, lvp);  // [hair+vfx] hair and mesh particles
     }
 
+    // --- [reflection probes] -----------------------------------------------------------------
+    /// Probe resources wherever surfaces are lit: the shaded probes (buffer 10), their cluster masks
+    /// (buffer 11) and the cube-array atlas (texture 33).
+    void bindProbes(id<MTLRenderCommandEncoder> enc) {
+        if (!probeBlockBuf_.buffer || !probeMaskBuf_.buffer) return;
+        [enc setFragmentBuffer:probeBlockBuf_.buffer offset:probeBlockBuf_.offset atIndex:10];
+        [enc setFragmentBuffer:probeMaskBuf_.buffer offset:probeMaskBuf_.offset atIndex:11];
+        [enc setFragmentTexture:probes_->atlas() atIndex:33];
+    }
+
+    /// Captures this frame's planned probe faces through the scene path (sky, meshes, terrain; no post).
+    void encodeProbeCaptures(const FrameData& frame, const FrameUniforms& base) {
+        const uint64_t triangles = trianglesDrawn_;  // captures do not count as the frame's geometry
+        MetalProbes::Callbacks cb;
+        cb.sunShadow = [&](id<MTLCommandBuffer> c, const ProbeItem& p, const Mat4& vp, id<MTLTexture> target) {
+            encodeProbeSunShadow(c, frame, p, vp, target, base.params.z > 0.5f);
+        };
+        cb.drawFace = [&](id<MTLRenderCommandEncoder> enc, const MetalProbes::Face& face) { drawProbeFace(enc, frame, base, face); };
+        probes_->capture(frame, cb, gpuFaults_);
+        trianglesDrawn_ = triangles;
+    }
+
+    /// The probe's sun shadow: one orthographic view around the capture in the top-left quadrant of
+    /// `target` (the probes' own map, laid out like cascade 0 of the sun's; cleared only without a sun).
+    void encodeProbeSunShadow(id<MTLCommandBuffer> cmd, const FrameData& frame, const ProbeItem& p, const Mat4& vp,
+                              id<MTLTexture> target, bool sun) {
+        MTLRenderPassDescriptor* rp = [MTLRenderPassDescriptor renderPassDescriptor];
+        rp.depthAttachment.texture = target;
+        rp.depthAttachment.loadAction = MTLLoadActionClear;
+        rp.depthAttachment.clearDepth = 1.0;
+        rp.depthAttachment.storeAction = MTLStoreActionStore;
+        profileRenderPass(rp, "Probe sun shadow", "probes");
+        id<MTLRenderCommandEncoder> enc = [cmd renderCommandEncoderWithDescriptor:rp];
+        enc.label = @"Probe sun shadow";
+        if (!sun) {
+            [enc endEncoding];
+            return;
+        }
+        [enc setRenderPipelineState:shadowPipeline_];
+        [enc setDepthStencilState:depthWrite_];
+        [enc setCullMode:MTLCullModeNone];
+        [enc setDepthBias:1.0f slopeScale:2.0f clamp:0.01f];
+        const double tile = static_cast<double>(target.width / 2);
+        [enc setViewport:MTLViewport{0.0, 0.0, tile, tile, 0.0, 1.0}];
+        [enc setScissorRect:MTLScissorRect{0, 0, static_cast<NSUInteger>(tile), static_cast<NSUInteger>(tile)}];
+        simd_float4x4 lvp = toSimd(vp);
+        [enc setVertexBytes:&lvp length:sizeof(lvp) atIndex:2];
+        const Frustum fr(vp);
+        bool alphaBound = false;
+        for (const DrawItem& d : frame.draws) {
+            if (!d.castShadows || d.surface.color.w < 0.5f || d.surface.shading == Shading::Unlit || (d.layers & p.cullMask) == 0) continue;
+            if (!fr.intersects(d.worldBounds)) continue;
+            const GpuMesh* m = mesh(d.mesh);
+            if (!m) continue;
+            DrawUniforms du = drawUniforms(d);
+            id<MTLTexture> cutTex = d.surface.alphaCutoff > 0.f ? texture(d.surface.texture, true) : nil;
+            if ((cutTex != nil) != alphaBound) {
+                [enc setRenderPipelineState:cutTex ? shadowAlphaPipeline_ : shadowPipeline_];
+                alphaBound = cutTex != nil;
+            }
+            if (cutTex) {
+                [enc setFragmentBytes:&du length:sizeof(du) atIndex:0];
+                [enc setFragmentTexture:cutTex atIndex:0];
+            }
+            [enc setVertexBuffer:m->vertices offset:0 atIndex:0];
+            [enc setVertexBytes:&du length:sizeof(du) atIndex:1];
+            drawLod(enc, *m, lodForDraw(*m, d, 1));
+        }
+        drawTerrainShadows(enc, frame, fr, lvp);
+        [enc endEncoding];
+    }
+
+    /// One probe face: the regular scene pipelines with the face's camera, the probe's sun shadow, the
+    /// lights that reach the capture (one cluster), probes off (single bounce) and, for interior probes,
+    /// the probe's ambient instead of the sky's light.
+    void drawProbeFace(id<MTLRenderCommandEncoder> enc, const FrameData& frame, const FrameUniforms& base, const MetalProbes::Face& face) {
+        const ProbeItem& p = *face.probe;
+        const float size = static_cast<float>(face.size);
+        FrameUniforms fu = base;
+        fu.viewProj = fu.viewProjNoJitter = fu.prevViewProj = toSimd(face.viewProj);
+        fu.invViewProj = toSimd(face.viewProj.inverse());
+        fu.cameraPos = v4(p.capture, frame.time);
+        fu.cameraForward = v4(probes::faceBasis(face.face).forward, 0.f);
+        fu.viewport = simd_make_float4(size, size, 1.f / size, 1.f / size);
+        for (int c = 0; c < kCascades; ++c) fu.cascadeViewProj[c] = toSimd(face.sunViewProj);
+        fu.cascadeSplits = simd_make_float4(face.sunRadius, face.sunRadius, face.sunRadius, face.sunRadius);
+        fu.temporal = simd_make_float4(0, 0, 0, 0);
+        fu.debug = simd_make_float4(0, 0, 0, 0);
+        fu.extra.w = 0.f;  // no texture mip bias
+        fu.params.w = 1.f / static_cast<float>(std::max<NSUInteger>(face.sunShadow.width, 1));  // the probes' sun shadow map
+        uint32_t directional = 0;
+        std::vector<uint32_t> indices = probes::captureLights(frame, p, directional);
+        const uint32_t cells[2] = {0u, static_cast<uint32_t>(indices.size())};
+        if (indices.empty()) indices.push_back(0);  // Metal requires a bound buffer
+        fu.cluster = simd_make_float4(1, 1, 1, std::log(p.farPlane / p.nearPlane));
+        fu.cluster2 = simd_make_float4(p.nearPlane, static_cast<float>(directional), frame.time, 0);
+        Alloc blockBuf = transient(face.block, sizeof(probes::GpuProbeBlock));
+        Alloc indexBuf = transient(indices.data(), indices.size() * sizeof(uint32_t));
+
+        // Sky (the environment cube) behind everything.
+        [enc setRenderPipelineState:probes_->skyPipeline()];
+        [enc setDepthStencilState:depthNone_];
+        [enc setFragmentBytes:&fu length:sizeof(fu) atIndex:0];
+        [enc setFragmentTexture:skyCube_ atIndex:0];
+        [enc drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:3];
+
+        [enc setVertexBytes:&fu length:sizeof(fu) atIndex:2];
+        [enc setFragmentBytes:&fu length:sizeof(fu) atIndex:1];
+        [enc setFragmentBuffer:lightsBuf_.buffer offset:lightsBuf_.offset atIndex:2];
+        [enc setFragmentBytes:cells length:sizeof(cells) atIndex:3];
+        [enc setFragmentBuffer:indexBuf.buffer offset:indexBuf.offset atIndex:4];
+        [enc setFragmentTexture:face.sunShadow atIndex:1];
+        [enc setFragmentTexture:envCube_ atIndex:5];
+        [enc setFragmentTexture:brdfLut_ atIndex:6];
+        [enc setFragmentTexture:cloudShape_ atIndex:7];
+        [enc setFragmentTexture:shadows_->atlas() atIndex:32];
+        [enc setFragmentBuffer:blockBuf.buffer offset:blockBuf.offset atIndex:10];  // bounce light: probes reaching the capture
+        [enc setFragmentBytes:&face.mask length:sizeof(face.mask) atIndex:11];
+        [enc setFragmentTexture:probes_->atlas() atIndex:33];
+        [enc setRenderPipelineState:meshPipeline_];
+        [enc setDepthStencilState:depthWrite_];
+        const Frustum frustum(face.viewProj);
+        std::vector<const DrawItem*> blended;
+        bool cutoutBound = false;
+        for (size_t di = 0; di < frame.draws.size(); ++di) {
+            const DrawItem& d = frame.draws[di];
+            if ((d.layers & p.cullMask) == 0 || !frustum.intersects(d.worldBounds)) continue;
+            if (d.surface.color.w < 0.999f) {
+                blended.push_back(&d);
+                continue;
+            }
+            const bool cut = d.surface.alphaCutoff > 0.f;
+            if (cut != cutoutBound) {
+                [enc setRenderPipelineState:cut ? meshCutoutPipeline_ : meshPipeline_];
+                cutoutBound = cut;
+            }
+            drawMesh(enc, d, di);
+        }
+        const Vec3 eye = p.capture;
+        drawTerrains(enc, frame, frustum, nil, &eye);
+        [enc setFragmentTexture:cloudShape_ atIndex:7];  // terrain layers use slots 7+
+        if (!blended.empty()) {
+            std::sort(blended.begin(), blended.end(), [&](const DrawItem* a, const DrawItem* b) {
+                return distance(eye, a->worldBounds.center()) > distance(eye, b->worldBounds.center());
+            });
+            [enc setRenderPipelineState:meshBlendPipeline_];
+            [enc setDepthStencilState:depthRead_];
+            for (const DrawItem* d : blended) drawMesh(enc, *d, static_cast<size_t>(d - frame.draws.data()));
+        }
+    }
+
     // --- Transient per-frame data ----------------------------------------------------------
     struct Alloc {
         id<MTLBuffer> buffer;
@@ -1964,7 +2144,7 @@ private:
     }
 
     void drawTerrains(id<MTLRenderCommandEncoder> enc, const FrameData& frame, const Frustum& fr,
-                      id<MTLRenderPipelineState> pso = nil) {
+                      id<MTLRenderPipelineState> pso = nil, const Vec3* lodEye = nullptr) {
         if (frame.terrains.empty()) return;
         [enc setRenderPipelineState:pso ?: terrainPipeline_];
         [enc setCullMode:MTLCullModeNone];
@@ -1972,7 +2152,7 @@ private:
             if (!item.data) continue;
             TerrainGpu& g = terrainGpu(item);
             std::vector<TerrainNodeGpu> nodes;
-            selectTerrainNodes(item, g, frame.camera.eye, fr, item.detail, nodes);
+            selectTerrainNodes(item, g, lodEye ? *lodEye : frame.camera.eye, fr, item.detail, nodes);
             if (nodes.empty()) continue;
             TerrainUniformsGpu u = terrainUniforms(item);
             Alloc nb = transient(nodes.data(), nodes.size() * sizeof(TerrainNodeGpu));
@@ -2165,6 +2345,7 @@ private:
         [enc setFragmentTexture:brdfLut_ atIndex:6];
         [enc setFragmentTexture:cloudShape_ atIndex:7];
         [enc setFragmentTexture:shadows_->atlas() atIndex:32];  // [local shadows] meshes, terrain, foliage, hair
+        bindProbes(enc);  // [reflection probes] meshes, terrain, foliage, hair
         [enc setRenderPipelineState:meshPipeline_];
         [enc setDepthStencilState:depthWrite_];
         std::vector<const DrawItem*> blended, outlined;
@@ -2644,6 +2825,7 @@ private:
             [enc setFragmentTexture:depthCopy_ atIndex:7];
             [enc setFragmentTexture:(hdri_ ?: white_) atIndex:14];
             [enc setFragmentTexture:shadows_->atlas() atIndex:32];  // [local shadows]
+            bindProbes(enc);  // [reflection probes] off-screen reflections on water
             std::vector<EntityId> live;
             for (const WaterItem& w : frame.water) {
                 if (!w.ocean || w.ocean->resolution == 0) continue;
@@ -2767,6 +2949,7 @@ private:
         for (id<MTLTexture> t : inputs) [enc setFragmentTexture:t atIndex:i++];
         [enc setFragmentBytes:&fu length:sizeof(fu) atIndex:0];
         [enc setFragmentBytes:uniforms length:size atIndex:1];
+        bindProbes(enc);  // [reflection probes] SSGI misses and the lighting resolve
         [enc drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:3];
         [enc endEncoding];
     }
@@ -3231,6 +3414,8 @@ private:
     // [debug views]
     id<MTLRenderPipelineState> wireframePipeline_, overdrawPipeline_, terrainWirePipeline_, terrainOverdrawPipeline_;
     std::unique_ptr<MetalShadows> shadows_;  // [local shadows]
+    std::unique_ptr<MetalProbes> probes_;    // [reflection probes]
+    Alloc probeBlockBuf_{}, probeMaskBuf_{};  // [reflection probes] this frame's shaded probes and cluster masks
 };
 
 }  // namespace

@@ -26,4 +26,11 @@ struct LightGrid {
 /// Lights must be ordered with directional lights first (prioritizeLights does this).
 LightGrid buildLightGrid(const FrameData& frame, int maxPerCluster = 128);
 
+/// The clusters a world-space sphere may touch (conservative): slices s0..s1, tiles tx0..tx1 x ty0..ty1.
+/// False when the sphere is outside the view. Used for lights and reflection probes.
+struct ClusterRange {
+    int s0 = 0, s1 = 0, tx0 = 0, tx1 = 0, ty0 = 0, ty1 = 0;
+};
+bool sphereClusters(const LightGrid& grid, const FrameData& frame, Vec3 center, float radius, ClusterRange& out);
+
 }  // namespace sky

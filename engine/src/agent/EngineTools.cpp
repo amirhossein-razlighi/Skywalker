@@ -755,7 +755,10 @@ void addViewTools(Engine& engine, ToolRegistry& reg) {
                      {"alpha", number("While playing: render the in-between frame a real-time display shows this far between "
                                       "the last two ticks (0..1; render interpolation). Default 1 = the exact tick state")},
                      {"frame_handlers", boolean("While playing: also run the cosmetic `on frame` Wander handlers for this "
-                                                "image (camera shake, UI tweens); their writes are undone afterwards")}}),
+                                                "image (camera shake, UI tweens); their writes are undone afterwards")},
+                     {"probe", schema::entity("Return this reflection probe's captured cubemap instead (6 faces as a "
+                                              "horizontal cross: +Y on top; -X, +Z, +X, -Z across; -Y below)")},
+                     {"probe_mip", integer("With probe: roughness level 0 (sharp) .. 5 (the diffuse ambient)")}}),
              false, false, [&engine](const Json& a, ToolContext&) {
                  CaptureOptions o;
                  o.interpolationAlpha = std::clamp(a.get("alpha").asFloat(1.f), 0.f, 1.f);
@@ -793,6 +796,12 @@ void addViewTools(Engine& engine, ToolRegistry& reg) {
                  }
                  auto cap = engine.capture(o);
                  if (!cap) return ToolResult::error(cap.error());
+                 if (a.contains("probe")) {  // [reflection probes] the probe's cubemap (the frame above captured it)
+                     auto img = probeCubemapImage(engine, a.get("probe"), static_cast<int>(a.get("probe_mip").asInt(0)));
+                     if (!img) return ToolResult::error(img.error());
+                     cap->image = std::move(*img);
+                     cap->visible.clear();
+                 }
                  Json visible = Json::array();
                  std::ostringstream os;
                  os << "Rendered " << o.width << "x" << o.height << ". Visible entities (nearest first):\n";
@@ -1212,6 +1221,7 @@ void registerEngineTools(Engine& engine) {
     tools::addRenderLayerTools(engine, reg);  // engine/src/agent/RenderLayerTools.cpp (render layers, cull masks)
     tools::addProcessTools(engine, reg);  // ProcessTools.cpp: process_info, sim_teleport, sim_display
     tools::addShadowTools(engine, reg);  // engine/src/agent/ShadowTools.cpp (point / spot light shadows)
+    tools::addProbeTools(engine, reg);  // engine/src/agent/ProbeTools.cpp (reflection probes)
     tools::addPrefabTools(engine, reg);  // engine/src/agent/PrefabTools.cpp (entity links, linked prefabs)
     tools::addLegalTools(engine, reg);  // engine/src/agent/LegalTools.cpp (terms, privacy, acceptance state)
     tools::addAgentLinkTools(engine, reg);  // engine/src/agent/AgentLinkTools.cpp: events_poll, tool_host_*

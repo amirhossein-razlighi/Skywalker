@@ -19,6 +19,7 @@
 #include "skywalker/math/Math.h"
 #include "skywalker/render/FxItems.h"
 #include "skywalker/render/Image.h"
+#include "skywalker/render/ProbeItems.h"
 #include "skywalker/render/Render2D.h"
 #include "skywalker/scene/Scene.h"
 #include "skywalker/world/Foliage.h"
@@ -293,6 +294,7 @@ struct FrameData {
     std::vector<SkinItem> skins;  // animation: skinned draws (see SkinItem)
     std::vector<GpuEmitterItem> gpuEmitters;  // GPU-simulated particles (hair & VFX workstream)
     std::vector<GroomItem> grooms;            // strand hair and fur
+    std::vector<ProbeItem> probes;            // reflection probes (render/ReflectionProbes.h)
     bool drawGrid = true;
     float time = 0;
     Frame2D render2d;  // sprites, tilemaps, world text, 2D lights and UI (see Render2D.h)
@@ -306,7 +308,8 @@ struct FrameData {
     /// 8 lighting before GI, 9 sketch, 10 impostors, 11 wireframe, 12 overdraw, 13 unshaded,
     /// 14 lighting_only, 15 shadow_cascades, 16 light_complexity, 17 lod, 18 emission, 19 specular,
     /// 20 uv_checker, 21 texel_density, 22 motion (velocity buffer: hue = direction, brightness = speed),
-    /// 23 shadow_atlas (the local point / spot shadow atlas, one outline per light view)).
+    /// 23 shadow_atlas (the local point / spot shadow atlas, one outline per light view), 24 reflection_probes
+    /// (which probe lights each pixel, influence volumes and capture points)).
     int debugView = 0;
     /// Viewport quality: 0 full (play, captures), 1 balanced, 2 fast (editing a heavy world).
     /// Lower tiers pick coarser LODs and cheaper shadows; the engine also trims the environment.
@@ -323,6 +326,7 @@ struct FrameData {
     } offline;
 
     static constexpr int kDebugViewShadowAtlas = 23;  // debugView: the local shadow atlas (debugview::kShadowAtlas)
+    static constexpr int kDebugViewReflectionProbes = 24;  // debugView: reflection probes (debugview::kReflectionProbes)
     static constexpr size_t kMaxLights = 1024;       // clustered lighting on surfaces
     static constexpr size_t kMaxEffectLights = 16;   // the most important ones also light water, particles, fog
     Mat4 viewProjection() const { return projection * view; }
@@ -409,6 +413,19 @@ public:
     /// (shadow_atlas_info). `invalidate` makes every shadow re-render on the next frame.
     virtual Json localShadowInfo() const { return Json(); }
     virtual void invalidateLocalShadows() {}
+    /// Reflection probes of the last frame: atlas, budgets, per-probe state, warnings (probe_info). The
+    /// frame adds staleness and setup warnings. `invalidateReflectionProbes` re-captures one probe (0 = all).
+    virtual Json reflectionProbeInfo(const FrameData* frame) const {
+        (void)frame;
+        return Json();
+    }
+    virtual void invalidateReflectionProbes(EntityId entity) { (void)entity; }
+    /// The six faces of a probe's captured cubemap as one image (a horizontal cross, tonemapped), `mip`
+    /// levels below its sharpest (rougher reflections). Needs a frame rendered with the probe ready.
+    virtual Result<Image> reflectionProbeImage(EntityId entity, int mip) {
+        (void)entity, (void)mip;
+        return Error::make("unsupported", "probe images need a GPU renderer backend", "run on macOS (Metal)");
+    }
     /// Bakes the impostors of these models now (or loads them from their cache files unless
     /// `force`). Returns one entry per model: key, label, atlas size, frames, tile, bake time,
     /// whether it came from the cache, and the cache path.

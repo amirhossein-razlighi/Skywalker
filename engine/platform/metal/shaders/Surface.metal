@@ -76,6 +76,7 @@ static float3 shadeSurface(SurfaceData s, float3 Ngeo, float3 worldPos, float2 f
                            constant FrameUniforms& f, const device GPULight* lights, const device uint2* clusterCells,
                            const device uint* clusterIndices, depth2d<float> shadowAtlas, texturecube<float> envTex,
                            texture2d<float> brdfLut, texture3d<float> cloudShape, depth2d_array<float> localShadows,
+                           constant ProbeBlock& probes, const device uint* probeClusters, texturecube_array<float> probeAtlas,
                            uint layers = 1u) {
     // Sun
     float3 L = -f.sunDir.xyz;
@@ -86,7 +87,8 @@ static float3 shadeSurface(SurfaceData s, float3 Ngeo, float3 worldPos, float2 f
 
     // Punctual lights: directional ones everywhere, point/spot lights from this pixel's cluster.
     int dirCount = int(f.cluster2.y);
-    uint2 cell = clusterCells[clusterOf(f, fragXY, worldPos)];
+    const uint cluster = clusterOf(f, fragXY, worldPos);
+    uint2 cell = clusterCells[cluster];
     int total = dirCount + int(cell.y);
     const float shadowNoise = ditherNoise(fragXY, f.temporal);  // PCF rotation, new every frame / sub-sample
     for (int k = 0; k < total; ++k) {
@@ -104,34 +106,35 @@ static float3 shadeSurface(SurfaceData s, float3 Ngeo, float3 worldPos, float2 f
     }
     color = max(color, 0.0);  // negative lights darken, never below black
 
-    // Image-based lighting (sky cubemap). `ambient` scales how much sky light reaches the
-    // scene (interiors, caves, night); `reflections` scales the specular part.
+    // Image-based lighting: reflection probes over the sky cubemap (Probes.metal). `ambient` scales how
+    // much sky light reaches the scene (interiors, caves, night); `reflections` scales the specular part.
     float ambientK = f.ground.w * 2.0;
     float maxMip = f.extra.z;
     float NdotV = max(dot(s.N, V), 1e-4);
-    float3 irradiance = envTex.sample(cubeSampler, s.N, level(maxMip)).rgb;
+    float3 R = reflect(-V, s.N);
+    EnvLight env = environmentLight(f, probes, probeClusters, probeAtlas, envTex, cluster, worldPos, s.N, R, s.roughness);
     float3 indirect;
     if (toon) {
         float up = s.N.y * 0.5 + 0.5;
         float3 hemi = mix(f.ground.rgb, mix(f.skyHorizon.rgb, f.skyTop.rgb, 0.6), up);
-        indirect = (hemi * 0.6 + irradiance * 0.4) * s.albedo * ambientK * 0.5;
+        indirect = (hemi * 0.6 * ambientK * 0.5 + env.irr * 0.4) * s.albedo;
     } else {
         float3 F0 = mix(float3(0.04), s.albedo, s.metallic);
-        float3 R = reflect(-V, s.N);
-        float3 prefiltered = envTex.sample(cubeSampler, R, level(s.roughness * maxMip)).rgb;
         float2 ab = brdfLut.sample(linearClamp, float2(NdotV, 1.0 - s.roughness)).rg;
         float3 Fr = F0 * ab.x + ab.y;
         float3 kd = (1.0 - Fr) * (1.0 - s.metallic);
-        float3 diffuse = irradiance * s.albedo * kd;
+        float3 diffuse = env.irr * s.albedo * kd;
         float specOcclusion = saturate(pow(NdotV + s.ao, exp2(-16.0 * s.roughness - 1.0)) - 1.0 + s.ao);
-        float3 specular = prefiltered * Fr * f.sky.w * specOcclusion;
+        float3 specular = env.spec * Fr * specOcclusion;
         if (s.clearcoat > 0.0) {
             float Fc = 0.04 + 0.96 * pow(1.0 - NdotV, 5.0);
-            float3 ccEnv = envTex.sample(cubeSampler, reflect(-V, Ngeo), level(0.06 * maxMip)).rgb;
-            specular = specular * (1.0 - Fc * s.clearcoat) + ccEnv * Fc * s.clearcoat * f.sky.w;
+            float3 Rc = reflect(-V, Ngeo);
+            float3 ccEnv = probeRadiance(probes, probeClusters, probeAtlas, cluster, worldPos, Rc, 0.06,
+                                         envTex.sample(cubeSampler, Rc, level(0.06 * maxMip)).rgb * f.sky.w * f.ground.w, f.sky.w);
+            specular = specular * (1.0 - Fc * s.clearcoat) + ccEnv * Fc * s.clearcoat;
             diffuse *= 1.0 - Fc * s.clearcoat;
         }
-        indirect = (diffuse * s.ao + specular) * ambientK * 0.5;
+        indirect = diffuse * s.ao + specular;
     }
     // Rim light (stylized sheen along silhouettes, tinted by the sky)
         if (rim > 0.0) {
@@ -232,7 +235,10 @@ fragment MainOut meshFragment(MeshOut in [[stage_in]],
                               texturecube<float> envTex [[texture(5)]],
                               texture2d<float> brdfLut [[texture(6)]],
                               texture3d<float> cloudShape [[texture(7)]],
-                              depth2d_array<float> localShadows [[texture(32)]]) {
+                              depth2d_array<float> localShadows [[texture(32)]],
+                              constant ProbeBlock& probes [[buffer(10)]],
+                              const device uint* probeClusters [[buffer(11)]],
+                              texturecube_array<float> probeAtlas [[texture(33)]]) {
     // Foliage crossfading into its impostor: complementary dither (the impostor keeps the rest).
     if (in.fade > 0.0 && ditherNoise(in.position.xy, f.temporal) < in.fade) discard_fragment();
     float3 V = normalize(f.cameraPos.xyz - in.worldPos);
@@ -308,7 +314,8 @@ fragment MainOut meshFragment(MeshOut in [[stage_in]],
     // Render layers of this draw (DrawUniforms.motion.y; 0 = unset, e.g. mesh particles: layer 1).
     const uint layers = d.motion.y > 0.5 ? uint(d.motion.y) : 1u;
     float3 color = shadeSurface(s, Ngeo, in.worldPos, in.position.xy, V, toon, d.material3.z, f, lights, clusterCells,
-                                clusterIndices, shadowAtlas, envTex, brdfLut, cloudShape, localShadows, layers) + emissive;
+                                clusterIndices, shadowAtlas, envTex, brdfLut, cloudShape, localShadows, probes, probeClusters,
+                                probeAtlas, layers) + emissive;
     color = applyFog(color, in.worldPos, V, f);
 
 
