@@ -103,6 +103,8 @@ struct Gather2DOptions {
     float time = 0.f;  // effects clock (flicker)
     std::vector<EntityId> selection;
     float pixelSnap = 0.f;  // world units per texel to snap unrotated quads to (0 = off)
+    /// Localization: maps a text component's text as written ("@sign.shop") to what is drawn. Unset = as written.
+    std::function<std::string(const std::string& text, EntityId entity)> text;
 };
 
 /// Fills frame.render2d (sprites, tile layers, world text, 2D lights, halos, screen boxes).

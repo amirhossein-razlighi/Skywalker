@@ -11,18 +11,31 @@
 namespace sky {
 
 World2D::World2D(std::string projectDir)
-    : assets_(std::make_unique<render2d::Assets2D>(std::move(projectDir))), ui_(std::make_unique<ui::UiSystem>(*assets_)) {}
+    : assets_(std::make_unique<render2d::Assets2D>(projectDir)),
+      ui_(std::make_unique<ui::UiSystem>(*assets_)),
+      localization_(std::make_unique<loc::Localization>(std::move(projectDir))) {
+    ui_->setTextResolver([this](const std::string& text, const Scene& scene, EntityId e) { return localizedText(text, scene, e); });
+}
 
 World2D::~World2D() = default;
 
 void World2D::setProjectDir(const std::string& dir) {
     assets_->setProjectDir(dir);
+    localization_->setProjectDir(dir);
     scripts_.clear();
 }
 
 void World2D::invalidate(const std::string& absolutePath) {
     assets_->invalidate(absolutePath);
     scripts_.erase(absolutePath);
+    const std::string ext = absolutePath.size() > 3 ? absolutePath.substr(absolutePath.size() - 3) : std::string();
+    if (ext == ".po" || ext == "csv") localization_->refresh(true);  // string tables: hot reload now
+}
+
+std::string World2D::localizedText(const std::string& text, const Scene& scene, EntityId e) {
+    if (text.size() < 2 || text[0] != '@') return text;  // the common case: no lookup
+    const EntityRecord* r = scene.record(e);
+    return localization_->text(text, r ? r->vars : Json::object());  // the entity's vars fill {placeholders}
 }
 
 void World2D::setViewport(int width, int height) {
@@ -31,6 +44,7 @@ void World2D::setViewport(int width, int height) {
 }
 
 void World2D::reset() {
+    localization_->clearLocale(loc::Localization::Scope::Game);  // set_locale() during play is undone with it
     conversations_.clear();
     ui_->reset();
     pointerWasDown_ = false;
@@ -49,6 +63,7 @@ void World2D::gather(const Scene& scene, FrameData& frame, const std::vector<Ent
     o.time = time;
     o.selection = selection;
     o.pixelSnap = pixelSnap;
+    o.text = [this, &scene](const std::string& text, EntityId e) { return localizedText(text, scene, e); };
     render2d::gather2D(scene, *assets_, frame, o);
     ui_->setSelection(selection);
     ui_->build(scene, frame, time);
@@ -258,6 +273,11 @@ dialogue::RunnerEvents World2D::events(Scene& scene, EntityId e, wander::Runtime
         if (runtime) runtime->emit("dialogue:" + cmd);
     };
     ev.node = [runtime](const std::string&) { (void)runtime; };
+    ev.localize = [this](const std::string& lineId, const std::string& source) { return localization_->line(lineId, source); };
+    ev.speaker = [this](const std::string& name) {
+        const std::string* s = localization_->find("speaker." + name);  // optional: names often need no translation
+        return s ? *s : name;
+    };
     return ev;
 }
 

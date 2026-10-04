@@ -822,7 +822,7 @@ void gatherText(Ctx& c, EntityId e, size_t sceneIndex, const Text& t) {
     lp.maxWidth = t.maxWidth;
     lp.align = text::alignFromString(t.align);
     lp.lineSpacing = t.lineSpacing;
-    text::TextLayout lay = text::layoutText(c.assets.fonts(), t.text, lp);
+    text::TextLayout lay = text::layoutText(c.assets.fonts(), c.opts.text ? c.opts.text(t.text, e) : t.text, lp);
     if (lay.glyphs.empty() && lay.decorations.empty()) return;
     const float boxW = t.maxWidth > 0.f ? t.maxWidth : lay.width;
     float ox = lp.align == text::Align::Center ? -boxW * 0.5f : lp.align == text::Align::Right ? -boxW : 0.f;

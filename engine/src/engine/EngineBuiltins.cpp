@@ -13,6 +13,7 @@
 namespace sky {
 
 void registerRenderLayerBuiltins(wander::BuiltinRegistry& reg);  // RenderBuiltins.cpp: layer_mask
+void registerLocaleBuiltins(wander::BuiltinRegistry& reg);  // locale/LocaleBuiltins.cpp: tr, set_locale, locale, locales
 
 namespace {
 
@@ -160,6 +161,7 @@ void registerEngineBuiltins() {
         registerFlowBuiltins(reg);  // pause_game, time_scale, teleport (EngineFlow.cpp)
         // Subsystem builtins: one line each.
         registerRenderLayerBuiltins(reg);  // render layers (RenderBuiltins.cpp)
+        registerLocaleBuiltins(reg);  // localization (locale/LocaleBuiltins.cpp)
     });
 }
 

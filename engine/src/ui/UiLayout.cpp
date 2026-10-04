@@ -464,6 +464,10 @@ Layout UiSystem::computeLayout(const Scene& scene, int width, int height) const 
                 n.parent = parentNode;
                 n.depth = depth;
                 n.el = *el;
+                if (textResolver_) {  // "@key" texts show the localized string (layout measures what is drawn)
+                    if (!n.el.text.empty()) n.el.text = textResolver_(n.el.text, scene, e);
+                    if (!n.el.placeholder.empty()) n.el.placeholder = textResolver_(n.el.placeholder, scene, e);
+                }
                 for (auto& c : str::split(el->style, ' ')) {
                     std::string t = str::trim(c);
                     if (!t.empty()) n.classes.push_back(t.front() == '.' ? t.substr(1) : t);

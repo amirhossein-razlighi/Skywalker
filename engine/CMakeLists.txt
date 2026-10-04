@@ -171,6 +171,14 @@ set(SKY_ENGINE_SOURCES
     # Agent link: followable events and tools served by external processes (docs/PYTHON_AGENTS.md)
     src/agent/AgentLink.cpp
     src/agent/AgentLinkTools.cpp
+    # Localization: string tables (CSV, PO), plural rules, messages, audits (docs/LOCALIZATION.md)
+    src/locale/LocaleRules.cpp
+    src/locale/Message.cpp
+    src/locale/StringTables.cpp
+    src/locale/Localization.cpp
+    src/locale/LocaleAudit.cpp
+    src/locale/LocaleBuiltins.cpp
+    src/agent/LocaleTools.cpp
 )
 
 # DCC bridge: the Python helper library and the Blender add-on are embedded so the engine can
