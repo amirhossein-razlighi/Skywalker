@@ -259,6 +259,11 @@ fragment MainOut terrainFragment(TerrainOut in [[stage_in]],
     s.clearcoat = 0.0;
     s.subsurface = 0.0;
     s.N = N;
+    s.coatRoughness = 1.0;
+    s.Nc = Ngeo;
+    s.flakes = 0.0;
+    s.flakeRoughness = 1.0;
+    s.Nf = N;
     const int dbg = debugMode(f);  // [debug views]
     if (dbg == kDbgLightingOnly) {
         s.albedo = float3(1.0);
@@ -783,6 +788,11 @@ fragment ImpostorFragmentOut impostorFragment(ImpostorOut in [[stage_in]],
     s.clearcoat = 0.0;
     s.subsurface = smp.subsurface;
     s.N = N;
+    s.coatRoughness = 1.0;
+    s.Nc = N;
+    s.flakes = 0.0;
+    s.flakeRoughness = 1.0;
+    s.Nf = N;
     float a = ic.surface.x * ic.surface.x;
     a = sqrt(a * a + min(0.5 * dot(dn, dn), 0.18));
     s.roughness = clamp(sqrt(a), 0.045, 1.0);
@@ -940,8 +950,13 @@ fragment ImpostorBakeTargets impostorBakeFragment(ImpostorBakeOut in [[stage_in]
                                                   texture2d<float> ormTex [[texture(3)]],
                                                   texture2d<float> emissiveTex [[texture(4)]]) {
     (void)sampleId;  // per-sample shading: the alpha test resolves to coverage
+    // Near-full-resolution maps: a frame texel spans many material texels, and the box-filtered
+    // alpha of coarse mips falls under the cutoff on leaf cards (the leaves vanish, leaving bare
+    // twigs). Point-like samples of the fine alpha average, over the MSAA samples and the atlas's
+    // coverage-preserving mips, to the true leaf coverage.
+    constexpr float kBakeMipBias = -6.0;
     MaterialSample m = evaluateMaterial(in.modelPos, in.normal, in.uv, in.color, frontFacing, d, albedoTex, normalTex, ormTex,
-                                        emissiveTex, true);
+                                        emissiveTex, true, kBakeMipBias);
     float depth = dot(in.modelPos - b.center.xyz, b.forward.xyz) / b.center.w;
     ImpostorBakeTargets o;
     o.albedo = float4(m.s.albedo, 1.0);

@@ -32,7 +32,7 @@ struct ImpostorModel;
 namespace sky::impostor {
 
 /// Bumped whenever the bake output changes, so caches from older engines are rebuilt.
-constexpr int kBakeVersion = 1;
+constexpr int kBakeVersion = 2;  // 2: material maps sampled near full resolution (leaf coverage)
 constexpr int kDefaultFrames = 12;
 constexpr int kMinFrames = 4, kMaxFrames = 32;
 /// Mip levels kept per atlas: frame tiles are multiples of 16 texels, so levels 0..4 never mix

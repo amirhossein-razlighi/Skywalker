@@ -30,6 +30,13 @@ const std::vector<float> kGearRatios{2.66f, 1.78f, 1.3f, 1.0f, 0.74f};
 
 bool startsWithWheel(const std::string& name) { return str::startsWith(str::lower(name), "wheel"); }
 
+/// Parts of a wheel that steer and ride the suspension but do not spin: its children named
+/// caliper* or hub* (brake calipers, hub carriers, knuckles).
+bool isWheelHubPart(const std::string& name) {
+    const std::string n = str::lower(name);
+    return str::startsWith(n, "caliper") || str::startsWith(n, "hub");
+}
+
 std::vector<std::pair<float, float>> curveFrom(const Json& j, const std::vector<std::pair<float, float>>& fallback) {
     std::vector<std::pair<float, float>> out;
     if (j.isArray()) {
@@ -59,8 +66,9 @@ Vec3 divide(Vec3 a, Vec3 b) {
     return {a.x / safe(b.x), a.y / safe(b.y), a.z / safe(b.z)};
 }
 
-/// World-space bounds of the meshes in a subtree (wheel visuals), or nullopt.
-std::optional<Aabb> subtreeMeshBounds(const Scene& s, EntityId root, const MeshProvider& meshes) {
+/// Bounds of the meshes in a subtree (wheel visuals) in the space `frame` maps world space into (the vehicle's
+/// body space), or nullopt. Measuring each mesh in that space keeps the box tight on a rotated vehicle.
+std::optional<Aabb> subtreeMeshBounds(const Scene& s, EntityId root, const MeshProvider& meshes, const Mat4& frame) {
     std::vector<EntityId> stack{root};
     Aabb box{Vec3(1e30f), Vec3(-1e30f)};
     bool any = false;
@@ -69,14 +77,18 @@ std::optional<Aabb> subtreeMeshBounds(const Scene& s, EntityId root, const MeshP
         stack.pop_back();
         if (const MeshRenderer* mr = s.get<MeshRenderer>(e)) {
             const MeshData* md = meshes && str::startsWith(mr->mesh, "asset:") ? meshes(mr->mesh) : nullptr;
-            Aabb b = (md ? md->bounds : s.localBounds(e)).transformed(s.worldMatrix(e));
+            Aabb b = (md ? md->bounds : s.localBounds(e)).transformed(frame * s.worldMatrix(e));
             if (b.min.x <= b.max.x) {
                 box.min = vmin(box.min, b.min);
                 box.max = vmax(box.max, b.max);
                 any = true;
             }
         }
-        for (EntityId c : s.children(e)) stack.push_back(c);
+        for (EntityId c : s.children(e)) {
+            const EntityRecord* r = s.record(c);
+            if (r && isWheelHubPart(r->name)) continue;  // calipers don't size the wheel
+            stack.push_back(c);
+        }
     }
     if (!any) return std::nullopt;
     return box;
@@ -102,6 +114,7 @@ struct WheelSetup {
     Transform restLocal;
     Mat4 restInChassis;
     Vec3 restCenterChassis;
+    std::vector<std::pair<EntityId, Transform>> hubParts;  // non-spinning children and their rest local poses
 };
 
 struct Fit {
@@ -169,17 +182,7 @@ Fit fitWheels(const Scene& s, EntityId e, const Vehicle& v, const MeshProvider& 
         }
         std::optional<Aabb> measured;
         if (w.visual != kNoEntity) {
-            if (auto world = subtreeMeshBounds(s, w.visual, meshes)) {
-                Aabb local{Vec3(1e30f), Vec3(-1e30f)};
-                for (int i = 0; i < 8; ++i) {
-                    Vec3 corner{(i & 1) ? world->max.x : world->min.x, (i & 2) ? world->max.y : world->min.y,
-                                (i & 4) ? world->max.z : world->min.z};
-                    Vec3 p = worldToBody.transformPoint(corner);
-                    local.min = vmin(local.min, p);
-                    local.max = vmax(local.max, p);
-                }
-                measured = local;
-            }
+            measured = subtreeMeshBounds(s, w.visual, meshes, worldToBody);
         }
         Vec3 pos;
         if (Vec3 given; reflect::jsonToVec3(entry.get("position"), given)) {
@@ -222,6 +225,11 @@ Fit fitWheels(const Scene& s, EntityId e, const Vehicle& v, const MeshProvider& 
             if (const Transform* t = s.get<Transform>(w.visual)) w.restLocal = *t;
             w.restInChassis = chain * w.restLocal.local();
             w.restCenterChassis = divide(pos, scale);
+            for (EntityId c : s.children(w.visual)) {
+                const EntityRecord* r = s.record(c);
+                const Transform* t = s.get<Transform>(c);
+                if (r && t && isWheelHubPart(r->name)) w.hubParts.emplace_back(c, *t);
+            }
         }
         w.entry = entry;
         fit.wheels.push_back(w);
@@ -955,6 +963,19 @@ void VehicleSet::postStep(Scene* s, float dt, int collisionSteps) {
             Decomposed d = decompose(local);
             tr->position = d.translation;
             tr->rotation = quatToEuler(d.rotation);
+            if (!ws.hubParts.empty()) {
+                // Calipers and hubs: the same pose without the spin, expressed under the spinning wheel.
+                Mat4 steerOnly = Mat4::translate(centerChassis) * Mat4::rotateEulerDeg({0.f, degrees(w->GetSteerAngle()), 0.f}) *
+                                 Mat4::translate(-ws.restCenterChassis) * ws.restInChassis;
+                Mat4 unspin = m.inverse() * steerOnly;
+                for (const auto& [part, rest] : ws.hubParts) {
+                    Transform* pt = s->get<Transform>(part);
+                    if (!pt) continue;
+                    Decomposed pd = decompose(unspin * rest.local());
+                    pt->position = pd.translation;
+                    pt->rotation = quatToEuler(pd.rotation);
+                }
+            }
         }
 
         // Engine audio: pitch follows the rpm, volume the load.

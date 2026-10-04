@@ -10,7 +10,7 @@ const std::vector<DebugViewInfo>& debugViews() {
         {kFinal, "final", "final", "the finished image (default)"},
         {kAlbedo, "albedo", "gbuffer", "base color without lighting (linear albedo from the G-buffer)"},
         {kNormals, "normals", "gbuffer", "world normals as RGB (x right = red, y up = green, z = blue)"},
-        {kMaterial, "material", "gbuffer", "roughness in red, metallic in green"},
+        {kMaterial, "material", "gbuffer", "roughness in red, metallic in green (clearcoated paint shows its coat roughness)"},
         {kGi, "gi", "gbuffer", "screen-space bounce light only"},
         {kReflections, "reflections", "gbuffer", "screen-space reflections only"},
         {kAo, "ao", "gbuffer", "ambient occlusion (white = open, black = occluded)"},

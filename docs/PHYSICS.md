@@ -332,7 +332,9 @@ It adds the body (chassis mass, no linear damping), a **box collider fitted to t
 (the wheels themselves never collide; the suspension holds the car up), the preset, a `chase_camera` on the scene
 camera, a looping `audio/engine_loop.wav` (synthesized) on the car, and the drive input actions. Its result lists the
 fitted wheels and any warnings. A model with the wheels baked into the body mesh cannot spin them: separate them first
-(`dcc_*` tools or a modeling app).
+(`dcc_*` tools or a modeling app). Children of a wheel named `caliper*` or `hub*` (brake calipers, hub carriers) steer and
+ride the suspension with it but do not spin, and they do not count when the wheel's size is measured: put the rim, tire
+and brake disc on the wheel, and the caliper as its child.
 
 ### Component fields
 

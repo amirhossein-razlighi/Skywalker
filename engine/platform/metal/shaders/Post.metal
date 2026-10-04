@@ -27,7 +27,12 @@ fragment float4 bloomPrefilter(FullscreenOut in [[stage_in]], texture2d<float> s
     float soft = clamp(brightness - p.params.z + knee, 0.0, 2.0 * knee);
     soft = soft * soft / (4.0 * knee + 1e-4);
     float contribution = max(soft, brightness - p.params.z) / max(brightness, 1e-4);
-    return float4(min(c * contribution, float3(64.0)), 1.0);
+    // Clamp what feeds the glow by its brightest channel (texel.z = Environment.bloomClamp), keeping the hue: a sun
+    // glint or an LED blooms as a tight halo instead of a blown-out blob.
+    float3 b = c * contribution;
+    float limit = p.texel.z > 0.0 ? p.texel.z : 64.0;
+    b *= min(1.0, limit / max(max(b.r, max(b.g, b.b)), 1e-4));
+    return float4(b, 1.0);
 }
 
 fragment float4 bloomDown(FullscreenOut in [[stage_in]], texture2d<float> src [[texture(0)]],
@@ -547,7 +552,7 @@ fragment float4 debugViewFragment(FullscreenOut in [[stage_in]], constant PostUn
     float3 c = 0.0;
     if (mode == 1) c = gbufA.sample(pointClamp, uv).rgb;
     else if (mode == 2) c = b.w >= 1.5 ? float3(0.0) : octDecode(b.xy) * 0.5 + 0.5;
-    else if (mode == 3) c = b.w >= 1.5 ? float3(0.0) : float3(b.z, saturate(b.w), 0.0);
+    else if (mode == 3) c = b.w >= 1.5 ? float3(0.0) : float3(b.z, gbufMetallic(b.w), 0.0);
     else if (mode == 4) c = tonemapACES(gi.sample(linearClamp, uv).rgb);
     else if (mode == 5) { float4 r = ssr.sample(linearClamp, uv); c = tonemapACES(r.rgb) * r.a; }
     else if (mode == 6) c = float3(ao.sample(linearClamp, uv).r);

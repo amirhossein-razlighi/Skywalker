@@ -4995,6 +4995,12 @@
     "maximum": 10,
     "description": "Brightness where glow starts (lower = more glow)"
    },
+   "bloomClamp": {
+    "type": "number",
+    "minimum": 0.1,
+    "maximum": 64,
+    "description": "Brightest (exposed) value that feeds the glow: 2-8 keeps sun glints, chrome and LED lights crisp instead of blown-out halos; 64 = effectively unlimited"
+   },
    "saturation": {
     "type": "number",
     "minimum": 0,

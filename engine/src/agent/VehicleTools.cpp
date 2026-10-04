@@ -40,14 +40,11 @@ std::optional<Aabb> chassisBounds(Engine& engine, EntityId vehicle, bool wheels)
         bool wheel = inWheel || (e != vehicle && physics::isWheelVisual(s, vehicle, e));
         if (const MeshRenderer* m = s.get<MeshRenderer>(e); m && wheel == wheels) {
             const MeshData* md = str::startsWith(m->mesh, "asset:") ? engine.cpuMesh(m->mesh) : nullptr;
-            Aabb b = (md ? md->bounds : s.localBounds(e)).transformed(s.worldMatrix(e));
-            for (int i = 0; i < 8; ++i) {
-                Vec3 c{(i & 1) ? b.max.x : b.min.x, (i & 2) ? b.max.y : b.min.y, (i & 4) ? b.max.z : b.min.z};
-                Vec3 p = toLocal.transformPoint(c);
-                box.min = vmin(box.min, p);
-                box.max = vmax(box.max, p);
-                any = true;
-            }
+            // Straight into chassis space (going through a world-space box would inflate it on a turned car).
+            Aabb b = (md ? md->bounds : s.localBounds(e)).transformed(toLocal * s.worldMatrix(e));
+            box.min = vmin(box.min, b.min);
+            box.max = vmax(box.max, b.max);
+            any = true;
         }
         for (EntityId c : s.children(e)) {
             if (s.get<RigidBody>(c)) continue;

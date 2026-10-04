@@ -618,6 +618,12 @@
       "maximum": 10,
       "description": "Brightness where glow starts (lower = more glow)"
      },
+     "bloomClamp": {
+      "type": "number",
+      "minimum": 0.1,
+      "maximum": 64,
+      "description": "Brightest (exposed) value that feeds the glow: 2-8 keeps sun glints, chrome and LED lights crisp instead of blown-out halos; 64 = effectively unlimited"
+     },
      "saturation": {
       "type": "number",
       "minimum": 0,
@@ -1645,11 +1651,7 @@
        "motion",
        "shadow_atlas",
        "reflection_probes",
-       "vehicles",
-       "skeleton",
-       "ik_targets",
-       "groom_roots",
-       "sss_mask"
+       "vehicles"
       ],
       "description": "Diagnostic view instead of the final image. Buffers: albedo, normals, material (roughness red / metallic green), gi, reflections, ao, depth, lighting. Shading: unshaded, lighting_only (white material), emission, specular. Geometry: wireframe, overdraw (heat map), lod (green 0 .. red 3), uv_checker, texel_density (green = 512 texels/m). Lights: shadow_cascades (red/green/blue/yellow), light_complexity (lights per pixel heat map), shadow_atlas (point/spot shadow maps, outlined per light: green re-rendered, blue cached, orange waiting; see shadow_atlas_info), reflection_probes (which probe lights each pixel, their volumes; see probe_info). Motion: the velocity buffer (hue = direction, strength = speed). Also sketch, impostors. Full legend: viewport_debug_view {\"list\": true}"
      },
@@ -1863,11 +1865,7 @@
        "motion",
        "shadow_atlas",
        "reflection_probes",
-       "vehicles",
-       "skeleton",
-       "ik_targets",
-       "groom_roots",
-       "sss_mask"
+       "vehicles"
       ],
       "description": "Debug view to show (final = normal image); omit to read the current one"
      },
@@ -2518,7 +2516,7 @@
   {
    "name": "material_create",
    "title": "Create material",
-   "description": "Create a reusable material asset (*.mat.json): color, metallic, roughness, emissive (glows with bloom), albedo texture with tiling, unlit. Character models: preset skin (scatterColor, scatterRadius mm, lobeMix, microNormal), eye (irisCenter, irisRadius, irisDepth, corneaRoughness, eyeShadow), cloth (sheenColor, sheenRoughness, fuzz), hair_card (hairShift, hairSpecular, hairDirection, alphaMode dither|coverage). Assign it with material_assign. Example: {\"path\": \"materials/face.mat.json\", \"preset\": \"skin\", \"texture\": \"textures/face.png\"}.",
+   "description": "Create a reusable material asset (*.mat.json): color, metallic, roughness, emissive (glows with bloom), albedo texture with tiling, unlit. Assign it with material_assign.",
    "inputSchema": {
     "type": "object",
     "properties": {
@@ -2566,13 +2564,9 @@
        "pbr",
        "toon",
        "unlit",
-       "water",
-       "skin",
-       "eye",
-       "cloth",
-       "hair_card"
+       "water"
       ],
-      "description": "pbr = physically based, toon = cel bands + crisp highlights, unlit = flat, water = animated waves; character models: skin (subsurface scattering, dual-lobe specular, pores, transmission), eye (refracted iris, wet cornea, shadowed corners), cloth (sheen and fuzz), hair_card (anisotropic strand highlights, dithered or coverage alpha)"
+      "description": "pbr = physically based, toon = cel bands + crisp highlights, unlit = flat, water = animated waves"
      },
      "normalMap": {
       "type": "string",
@@ -2639,140 +2633,23 @@
       "maximum": 1,
       "description": "Alpha-tested cutout threshold (foliage, sails, fences); 0 = off"
      },
-     "scatterColor": {
-      "description": "skin: relative distance each color scatters under the surface (red farthest: the warm glow in shadow edges and backlit ears) — hex string \"#rrggbb[aa]\" or [r,g,b(,a)] in 0..1"
-     },
-     "scatterRadius": {
-      "type": "number",
-      "minimum": 0,
-      "maximum": 50,
-      "description": "skin: scattering distance of the reddest light in millimeters (1-4)"
-     },
-     "lobeMix": {
+     "clearcoatRoughness": {
       "type": "number",
       "minimum": 0,
       "maximum": 1,
-      "description": "skin: weight of the second, broader specular lobe (0.1-0.2)"
+      "description": "Roughness of the clearcoat layer (0.02 mirror lacquer .. 0.3 satin; default 0.06)"
      },
-     "lobeRoughness": {
-      "type": "array",
-      "items": {
-       "type": "number"
-      },
-      "minItems": 2,
-      "maxItems": 2,
-      "description": "skin: roughness multipliers of the two specular lobes [sharp, broad]"
-     },
-     "microNormal": {
-      "type": "number",
-      "minimum": 0,
-      "maximum": 2,
-      "description": "skin: procedural pore detail strength (fades with distance)"
-     },
-     "microNormalTiling": {
-      "type": "number",
-      "minimum": 1,
-      "maximum": 4000,
-      "description": "skin: pore detail repeats per UV unit"
-     },
-     "transmission": {
-      "type": "number",
-      "minimum": 0,
-      "maximum": 4,
-      "description": "skin: light through thin parts (ears, nostrils, fingers), from the sun's shadow-map thickness"
-     },
-     "irisCenter": {
-      "type": "array",
-      "items": {
-       "type": "number"
-      },
-      "minItems": 2,
-      "maxItems": 2,
-      "description": "eye: UV of the iris center in the eye texture"
-     },
-     "irisCenter2": {
-      "type": "array",
-      "items": {
-       "type": "number"
-      },
-      "minItems": 2,
-      "maxItems": 2,
-      "description": "eye: UV of a second iris when both eyes share one texture (each pixel uses the nearer); [-1, -1] = none"
-     },
-     "irisRadius": {
-      "type": "number",
-      "minimum": 0.001,
-      "maximum": 0.5,
-      "description": "eye: UV radius of the iris"
-     },
-     "irisDepth": {
-      "type": "number",
-      "minimum": 0,
-      "maximum": 0.3,
-      "description": "eye: parallax depth of the iris under the cornea (UV units)"
-     },
-     "corneaRoughness": {
-      "type": "number",
-      "minimum": 0.01,
-      "maximum": 0.5,
-      "description": "eye: roughness of the wet cornea highlight"
-     },
-     "eyeShadow": {
+     "flakes": {
       "type": "number",
       "minimum": 0,
       "maximum": 1,
-      "description": "eye: darkening toward the eye corners (lids and lashes)"
+      "description": "Metallic flakes in the base layer (car paint sparkle): share of the base reflection, 0 = none, 0.3-0.6 = metallic paint"
      },
-     "limbusDarkening": {
+     "flakeSize": {
       "type": "number",
-      "minimum": 0,
-      "maximum": 1,
-      "description": "eye: dark ring around the iris"
-     },
-     "sheenColor": {
-      "description": "cloth: color of the soft sheen at grazing angles (velvet, wool, cotton) — hex string \"#rrggbb[aa]\" or [r,g,b(,a)] in 0..1"
-     },
-     "sheenRoughness": {
-      "type": "number",
-      "minimum": 0.07,
-      "maximum": 1,
-      "description": "cloth: 0.3 satin .. 1 felt"
-     },
-     "fuzz": {
-      "type": "number",
-      "minimum": 0,
-      "maximum": 2,
-      "description": "cloth: extra rim of loose fibers"
-     },
-     "hairShift": {
-      "type": "number",
-      "minimum": -1,
-      "maximum": 1,
-      "description": "hair_card: primary highlight shift along the strand"
-     },
-     "hairSpecular": {
-      "type": "number",
-      "minimum": 0,
-      "maximum": 4,
-      "description": "hair_card: highlight strength"
-     },
-     "hairDirection": {
-      "type": "string",
-      "enum": [
-       "v",
-       "-v",
-       "u",
-       "-u"
-      ],
-      "description": "hair_card: strand direction in the card's UVs (root to tip)"
-     },
-     "alphaMode": {
-      "type": "string",
-      "enum": [
-       "dither",
-       "coverage"
-      ],
-      "description": "hair_card: dither = stochastic transparency that resolves to soft strands under TAA and stills; coverage = alpha to coverage (MSAA)"
+      "minimum": 5e-05,
+      "maximum": 0.05,
+      "description": "Flake size in meters in the mesh's own space (default 0.0015; real flakes are smaller, a little larger reads better on screen)"
      },
      "path": {
       "type": "string",
@@ -2802,10 +2679,7 @@
        "neon",
        "toon",
        "toon_metal",
-       "clay",
-       "eye",
-       "cloth",
-       "hair_card"
+       "clay"
       ],
       "description": "Start from a built-in material (other fields override it)"
      }
@@ -2876,13 +2750,9 @@
        "pbr",
        "toon",
        "unlit",
-       "water",
-       "skin",
-       "eye",
-       "cloth",
-       "hair_card"
+       "water"
       ],
-      "description": "pbr = physically based, toon = cel bands + crisp highlights, unlit = flat, water = animated waves; character models: skin (subsurface scattering, dual-lobe specular, pores, transmission), eye (refracted iris, wet cornea, shadowed corners), cloth (sheen and fuzz), hair_card (anisotropic strand highlights, dithered or coverage alpha)"
+      "description": "pbr = physically based, toon = cel bands + crisp highlights, unlit = flat, water = animated waves"
      },
      "normalMap": {
       "type": "string",
@@ -2949,140 +2819,23 @@
       "maximum": 1,
       "description": "Alpha-tested cutout threshold (foliage, sails, fences); 0 = off"
      },
-     "scatterColor": {
-      "description": "skin: relative distance each color scatters under the surface (red farthest: the warm glow in shadow edges and backlit ears) — hex string \"#rrggbb[aa]\" or [r,g,b(,a)] in 0..1"
-     },
-     "scatterRadius": {
-      "type": "number",
-      "minimum": 0,
-      "maximum": 50,
-      "description": "skin: scattering distance of the reddest light in millimeters (1-4)"
-     },
-     "lobeMix": {
+     "clearcoatRoughness": {
       "type": "number",
       "minimum": 0,
       "maximum": 1,
-      "description": "skin: weight of the second, broader specular lobe (0.1-0.2)"
+      "description": "Roughness of the clearcoat layer (0.02 mirror lacquer .. 0.3 satin; default 0.06)"
      },
-     "lobeRoughness": {
-      "type": "array",
-      "items": {
-       "type": "number"
-      },
-      "minItems": 2,
-      "maxItems": 2,
-      "description": "skin: roughness multipliers of the two specular lobes [sharp, broad]"
-     },
-     "microNormal": {
-      "type": "number",
-      "minimum": 0,
-      "maximum": 2,
-      "description": "skin: procedural pore detail strength (fades with distance)"
-     },
-     "microNormalTiling": {
-      "type": "number",
-      "minimum": 1,
-      "maximum": 4000,
-      "description": "skin: pore detail repeats per UV unit"
-     },
-     "transmission": {
-      "type": "number",
-      "minimum": 0,
-      "maximum": 4,
-      "description": "skin: light through thin parts (ears, nostrils, fingers), from the sun's shadow-map thickness"
-     },
-     "irisCenter": {
-      "type": "array",
-      "items": {
-       "type": "number"
-      },
-      "minItems": 2,
-      "maxItems": 2,
-      "description": "eye: UV of the iris center in the eye texture"
-     },
-     "irisCenter2": {
-      "type": "array",
-      "items": {
-       "type": "number"
-      },
-      "minItems": 2,
-      "maxItems": 2,
-      "description": "eye: UV of a second iris when both eyes share one texture (each pixel uses the nearer); [-1, -1] = none"
-     },
-     "irisRadius": {
-      "type": "number",
-      "minimum": 0.001,
-      "maximum": 0.5,
-      "description": "eye: UV radius of the iris"
-     },
-     "irisDepth": {
-      "type": "number",
-      "minimum": 0,
-      "maximum": 0.3,
-      "description": "eye: parallax depth of the iris under the cornea (UV units)"
-     },
-     "corneaRoughness": {
-      "type": "number",
-      "minimum": 0.01,
-      "maximum": 0.5,
-      "description": "eye: roughness of the wet cornea highlight"
-     },
-     "eyeShadow": {
+     "flakes": {
       "type": "number",
       "minimum": 0,
       "maximum": 1,
-      "description": "eye: darkening toward the eye corners (lids and lashes)"
+      "description": "Metallic flakes in the base layer (car paint sparkle): share of the base reflection, 0 = none, 0.3-0.6 = metallic paint"
      },
-     "limbusDarkening": {
+     "flakeSize": {
       "type": "number",
-      "minimum": 0,
-      "maximum": 1,
-      "description": "eye: dark ring around the iris"
-     },
-     "sheenColor": {
-      "description": "cloth: color of the soft sheen at grazing angles (velvet, wool, cotton) — hex string \"#rrggbb[aa]\" or [r,g,b(,a)] in 0..1"
-     },
-     "sheenRoughness": {
-      "type": "number",
-      "minimum": 0.07,
-      "maximum": 1,
-      "description": "cloth: 0.3 satin .. 1 felt"
-     },
-     "fuzz": {
-      "type": "number",
-      "minimum": 0,
-      "maximum": 2,
-      "description": "cloth: extra rim of loose fibers"
-     },
-     "hairShift": {
-      "type": "number",
-      "minimum": -1,
-      "maximum": 1,
-      "description": "hair_card: primary highlight shift along the strand"
-     },
-     "hairSpecular": {
-      "type": "number",
-      "minimum": 0,
-      "maximum": 4,
-      "description": "hair_card: highlight strength"
-     },
-     "hairDirection": {
-      "type": "string",
-      "enum": [
-       "v",
-       "-v",
-       "u",
-       "-u"
-      ],
-      "description": "hair_card: strand direction in the card's UVs (root to tip)"
-     },
-     "alphaMode": {
-      "type": "string",
-      "enum": [
-       "dither",
-       "coverage"
-      ],
-      "description": "hair_card: dither = stochastic transparency that resolves to soft strands under TAA and stills; coverage = alpha to coverage (MSAA)"
+      "minimum": 5e-05,
+      "maximum": 0.05,
+      "description": "Flake size in meters in the mesh's own space (default 0.0015; real flakes are smaller, a little larger reads better on screen)"
      },
      "path": {
       "type": "string",
@@ -3112,10 +2865,7 @@
        "neon",
        "toon",
        "toon_metal",
-       "clay",
-       "eye",
-       "cloth",
-       "hair_card"
+       "clay"
       ],
       "description": "Start from a built-in material (other fields override it)"
      }
@@ -3730,10 +3480,6 @@
      "passes": {
       "type": "boolean",
       "description": "Add the per-pass GPU timeline and CPU scopes (profile: passes, groups, cpu)"
-     },
-     "characters": {
-      "type": "boolean",
-      "description": "With frames: also benchmark with hair and fur hidden to measure what grooms cost to draw (characters.groomRenderGpuMs)"
      }
     },
     "additionalProperties": false
@@ -8075,7 +7821,7 @@
   {
    "name": "animator_setup",
    "title": "Set up animator",
-   "description": "Create a state machine controller (*.animctl.json) for a character and assign it. preset=locomotion (default) finds idle/walk/run/jump clips by name and builds: parameter `speed` (m/s) driving a 1D blend Idle -> Walk -> Run whose thresholds are the clips' real root speeds (feet don't slide when you set speed to the actual velocity), and if there is a jump clip a `jump` trigger with Jump -> back to locomotion. preset=clips: one state per clip, no transitions (drive with play_animation). preset=directional: a polar 2D blend space for strafing characters: parameters `moveX` (right) and `moveY` (forward) in m/s drive idle, forward, back, left, right and diagonal clips placed at their measured root velocities (direction and speed blend separately: no slowdown or foot sliding between directions). Override clip choices with `clips` ({\"idle\": \"Breathe\", \"run\": \"Sprint\"}), or pass a full `controller` document (parameters, layers with states/blend/blend2d, transitions with \"when\" conditions like \"speed > 0.1 and grounded\", exit times, events, masks) — it is validated with did-you-mean errors. Then drive it from Wander: set_param(self, \"speed\", v), trigger(self, \"jump\"), play_animation(self, \"Wave\").",
+   "description": "Create a state machine controller (*.animctl.json) for a character and assign it. preset=locomotion (default) finds idle/walk/run/jump clips by name and builds: parameter `speed` (m/s) driving a 1D blend Idle -> Walk -> Run whose thresholds are the clips' real root speeds (feet don't slide when you set speed to the actual velocity), and if there is a jump clip a `jump` trigger with Jump -> back to locomotion. preset=clips: one state per clip, no transitions (drive with play_animation). Override clip choices with `clips` ({\"idle\": \"Breathe\", \"run\": \"Sprint\"}), or pass a full `controller` document (parameters, layers with states/blend/blend2d, transitions with \"when\" conditions like \"speed > 0.1 and grounded\", exit times, events, masks) — it is validated with did-you-mean errors. Then drive it from Wander: set_param(self, \"speed\", v), trigger(self, \"jump\"), play_animation(self, \"Wave\").",
    "inputSchema": {
     "type": "object",
     "properties": {
@@ -8090,14 +7836,13 @@
       "type": "string",
       "enum": [
        "locomotion",
-       "clips",
-       "directional"
+       "clips"
       ],
       "description": "Generated controller (default locomotion)"
      },
      "clips": {
       "type": "object",
-      "description": "Clip choice overrides: idle, walk, run, jump; directional: idle, forward, back, left, right, forward_left, forward_right, back_left, back_right"
+      "description": "Clip choice overrides: idle, walk, run, jump"
      },
      "controller": {
       "type": "object",
@@ -8842,7 +8587,7 @@
   {
    "name": "groom_create",
    "title": "Create hair or fur",
-   "description": "Grow strand hair or fur on an entity's mesh (a head, a bust, an animal body) from a preset, ready to tweak. Presets: hair_straight, hair_wavy, hair_curly, hair_ponytail, hair_short (heads: they grow on the upper back of the mesh; set maskDirection/maskAngle or a vertex-color mask for your model), fur_short, fur_long (cover the whole mesh); for rigged characters: hair_scalp (dense scalp hair on the Head bone's vertices), beard, eyebrows (regions in the head's bounds, mirrored brows), fur_dense (a creature's coat). On a rigged mesh the roots ride the animated skin (attach auto: rooted on triangles, follow, maxSpeed, capsules fitted to the skeleton as colliders); maskBone / maskCenter / maskRadius / maskSpace limit growth to a region. `overrides` patches groom fields, e.g. {\"melanin\": 0.2, \"length\": 0.5, \"strands\": 100000}. Color is physically based: melanin 0 white .. 0.3 blond .. 0.8 brown .. 1 black, redness for auburn/ginger, dye for unnatural tints. Hair is simulated (gravity, wind, collisions with the mesh) and rendered as real strands with Marschner shading and self-shadowing. Example: {\"entity\": \"Head\", \"preset\": \"hair_wavy\", \"overrides\": {\"melanin\": 0.25}}. Grooms stack: the first groom goes on the mesh entity itself, every further one (a beard and eyebrows on a scalp) on a new child entity named after the preset (or `name`) that grows on the same mesh and skin; `replace: true` replaces the existing groom instead. On a character root without a mesh, hair grows on its largest skinned part (the body). The result's `entity` is the groom's entity (edit it with groom_update, remove it with entity_delete). Example: {\"entity\": \"Hero\", \"preset\": \"beard\", \"overrides\": {\"melanin\": 0.6}}.",
+   "description": "Grow strand hair or fur on an entity's mesh (a head, a bust, an animal body) from a preset, ready to tweak. Presets: hair_straight, hair_wavy, hair_curly, hair_ponytail, hair_short (heads: they grow on the upper back of the mesh; set maskDirection/maskAngle or a vertex-color mask for your model), fur_short, fur_long (cover the whole mesh). `overrides` patches groom fields, e.g. {\"melanin\": 0.2, \"length\": 0.5, \"strands\": 100000}. Color is physically based: melanin 0 white .. 0.3 blond .. 0.8 brown .. 1 black, redness for auburn/ginger, dye for unnatural tints. Hair is simulated (gravity, wind, collisions with the mesh) and rendered as real strands with Marschner shading and self-shadowing. Example: {\"entity\": \"Head\", \"preset\": \"hair_wavy\", \"overrides\": {\"melanin\": 0.25}}.",
    "inputSchema": {
     "type": "object",
     "properties": {
@@ -8851,7 +8596,7 @@
        "integer",
        "string"
       ],
-      "description": "Entity with the mesh to grow on, or a character root (its body mesh)"
+      "description": "Entity with the mesh to grow on (gets the groom component)"
      },
      "preset": {
       "type": "string",
@@ -8862,25 +8607,13 @@
        "hair_ponytail",
        "hair_short",
        "fur_short",
-       "fur_long",
-       "beard",
-       "eyebrows",
-       "hair_scalp",
-       "fur_dense"
+       "fur_long"
       ],
       "description": "Starting style"
      },
      "overrides": {
       "type": "object",
       "description": "Groom fields to change"
-     },
-     "name": {
-      "type": "string",
-      "description": "Name of the groom's own entity when it is added beside other grooms (default: the preset, e.g. \"Beard\")"
-     },
-     "replace": {
-      "type": "boolean",
-      "description": "Replace the groom already on `entity` instead of adding another one"
      }
     },
     "additionalProperties": false,
@@ -8921,11 +8654,7 @@
        "hair_ponytail",
        "hair_short",
        "fur_short",
-       "fur_long",
-       "beard",
-       "eyebrows",
-       "hair_scalp",
-       "fur_dense"
+       "fur_long"
       ],
       "description": "Reset to this preset first"
      },
@@ -8952,7 +8681,7 @@
   {
    "name": "groom_info",
    "title": "Hair or fur info",
-   "description": "Strand, guide and point counts, memory (CPU and GPU), generation time and the measured GPU cost (simulation and drawing) of a groom, or of every groom in the scene when `entity` is omitted. Use it to budget hair (e.g. keep a hero head under ~2 ms at 1080p). On a character (or a mesh with several grooms) it lists every groom growing on it (`grooms`).",
+   "description": "Strand, guide and point counts, memory (CPU and GPU), generation time and the measured GPU cost (simulation and drawing) of a groom, or of every groom in the scene when `entity` is omitted. Use it to budget hair (e.g. keep a hero head under ~2 ms at 1080p).",
    "inputSchema": {
     "type": "object",
     "properties": {
@@ -9129,7 +8858,7 @@
   {
    "name": "game_settings",
    "title": "Game settings (game.json)",
-   "description": "Read or change the project's shipping settings in game.json: startScene, window {width,height,fullscreen,resizable,vsync}, quality (low|medium|high|ultra), renderScale, quitOnEscape, pauseOnFocusLoss, icon (a PNG, 1024x1024 recommended), bundleId (reverse-DNS), version, copyright, plus include/exclude globs for packaging, and the description fields (id, title, genre, mood, pitch), and mounts: shared folders outside the project addressed by a top-level name, e.g. {\"mounts\": {\"kit\": \"../_kit\"}} makes kit/characters/guard.prefab.json resolve into ../_kit (assets, prefabs, materials and animations load from it; game_build copies what the game uses), and saves {version, maxSlots, compress, migrate} for save games (docs/SAVE_GAMES.md). `get` returns the effective settings, the resolved start scene and validation problems. `set` merges the given fields (null removes one) and validates them. Example: {\"operation\":\"set\",\"settings\":{\"title\":\"Sky Dash\",\"startScene\":\"scenes/main.sky.json\",\"window\":{\"width\":1280,\"height\":720}}}",
+   "description": "Read or change the project's shipping settings in game.json: startScene, window {width,height,fullscreen,resizable,vsync}, quality (low|medium|high|ultra), renderScale, quitOnEscape, pauseOnFocusLoss, icon (a PNG, 1024x1024 recommended), bundleId (reverse-DNS), version, copyright, plus include/exclude globs for packaging, and the description fields (id, title, genre, mood, pitch), and mounts: shared folders outside the project addressed by a top-level name, e.g. {\"mounts\": {\"kit\": \"../_kit\"}} makes kit/characters/guard.prefab.json resolve into ../_kit (assets, prefabs, materials and animations load from it; game_build copies what the game uses). `get` returns the effective settings, the resolved start scene and validation problems. `set` merges the given fields (null removes one) and validates them. Example: {\"operation\":\"set\",\"settings\":{\"title\":\"Sky Dash\",\"startScene\":\"scenes/main.sky.json\",\"window\":{\"width\":1280,\"height\":720}}}",
    "inputSchema": {
     "type": "object",
     "properties": {
@@ -9430,11 +9159,7 @@
        "motion",
        "shadow_atlas",
        "reflection_probes",
-       "vehicles",
-       "skeleton",
-       "ik_targets",
-       "groom_roots",
-       "sss_mask"
+       "vehicles"
       ],
       "description": "Buffer visualization, shading debug view (wireframe, lod, unshaded, ...) or the pencil sketch look; see viewport_capture"
      },
@@ -11341,1260 +11066,6 @@
    },
    "annotations": {
     "title": "Test drive",
-    "readOnlyHint": true,
-    "destructiveHint": false,
-    "openWorldHint": false
-   },
-   "_meta": {
-    "skywalker/category": "physics"
-   }
-  },
-  {
-   "name": "particles2d_create",
-   "title": "Create 2D particles",
-   "description": "Create pixel-art particles for a 2D game from a preset, ready to tweak: rain (streaks over the whole view), drizzle, snow (drifting flakes), leaves and petals (falling, swaying), fireflies (glowing, twinkling, wandering), smoke (chimney puffs), ripples (puddle rings while it rains), dust (motes in sunlight), sparkle (water glints). Weather presets (rain, drizzle, snow, ripples) wrap: their box tiles endlessly so they fill whatever the camera shows, wherever the entity is. Untextured particles are solid pixel rectangles (`pixelSize` texels); give a `texture` sheet (with `columns`/`rows`, `frames`, `animate` random|life|loop) for leaves, flakes or ripple rings. `overrides` patches fields, e.g. {\"rate\": 400, \"color\": \"#9fc4ff\", \"pixelsPerUnit\": 16}. Simulated on fixed ticks while playing (deterministic, reset on stop). Example: particles2d_create {\"preset\": \"fireflies\", \"position\": [12, 4, 0], \"overrides\": {\"area\": [14, 6]}}.",
-   "inputSchema": {
-    "type": "object",
-    "properties": {
-     "preset": {
-      "type": "string",
-      "enum": [
-       "rain",
-       "drizzle",
-       "snow",
-       "leaves",
-       "petals",
-       "fireflies",
-       "smoke",
-       "ripples",
-       "dust",
-       "sparkle"
-      ],
-      "description": "Preset"
-     },
-     "name": {
-      "type": "string",
-      "description": "Entity name (default: the preset's name)"
-     },
-     "position": {
-      "type": "array",
-      "items": {
-       "type": "number"
-      },
-      "minItems": 3,
-      "maxItems": 3,
-      "description": "World position (center of the emission box)"
-     },
-     "parent": {
-      "type": [
-       "integer",
-       "string"
-      ],
-      "description": "Parent entity (e.g. a chimney)"
-     },
-     "overrides": {
-      "type": "object",
-      "description": "particles2d fields to change"
-     }
-    },
-    "additionalProperties": false,
-    "required": [
-     "preset"
-    ]
-   },
-   "annotations": {
-    "title": "Create 2D particles",
-    "readOnlyHint": false,
-    "destructiveHint": false,
-    "openWorldHint": false
-   },
-   "_meta": {
-    "skywalker/category": "render"
-   }
-  },
-  {
-   "name": "particles2d_info",
-   "title": "2D particle stats",
-   "description": "Live state of particles2d emitters: particles alive, cap, rate, box, wrap, and the bounds the live particles cover (world units). Use it to check that weather is running while playing, or to find emitters that hit their maxParticles cap. Without `entity` lists every emitter in the scene.",
-   "inputSchema": {
-    "type": "object",
-    "properties": {
-     "entity": {
-      "type": [
-       "integer",
-       "string"
-      ],
-      "description": "Emitter (default: all)"
-     }
-    },
-    "additionalProperties": false
-   },
-   "annotations": {
-    "title": "2D particle stats",
-    "readOnlyHint": true,
-    "destructiveHint": false,
-    "openWorldHint": false
-   },
-   "_meta": {
-    "skywalker/category": "render"
-   }
-  },
-  {
-   "name": "character_inspect",
-   "title": "Inspect character",
-   "description": "Everything about a character's animation and look in one call: the humanoid bone map of its skeleton (slots like hips, leftHand, rightFoot with the bone names found, convention mixamo / suffixed / generic, missing slots), key bone positions in the world, clips with their root speed (m/s) and root turn (degrees per cycle), root motion / in-place / root yaw settings, retargeting (retargetFrom and how its clips map), foot and hand IK status of the last solve (contact, locked, ground offset, slope, pelvis drop, hand reach error), hair and fur attachment (follows the skin?, bound roots, colliders), and the material model of every mesh part (skin, eye, cloth, hair_card, pbr). Start here before retargeting, adding IK or grooming a character. Example: {\"entity\": \"Hero\"}.",
-   "inputSchema": {
-    "type": "object",
-    "properties": {
-     "entity": {
-      "type": [
-       "integer",
-       "string"
-      ],
-      "description": "The character (or any of its parts)"
-     },
-     "clips": {
-      "type": "boolean",
-      "description": "Include the clip list (default true)"
-     }
-    },
-    "additionalProperties": false,
-    "required": [
-     "entity"
-    ]
-   },
-   "annotations": {
-    "title": "Inspect character",
-    "readOnlyHint": true,
-    "destructiveHint": false,
-    "openWorldHint": false
-   },
-   "_meta": {
-    "skywalker/category": "animation"
-   }
-  },
-  {
-   "name": "character_ik",
-   "title": "Character foot and hand IK",
-   "description": "Set up automatic foot IK, hand targets and turning for a humanoid character (adds or updates its characterIk component; undoable). Feet plant on stairs, slopes and rocks under them (ground probes every tick), the pelvis drops so the lower foot reaches, feet pitch / roll onto the slope (max_slope) and lock in place while in contact (contact: auto = low and slow, velocity, events = foot_l_down / foot_l_up / foot_r_down / foot_r_up animation events, always, never), re-planting with a short step once the animation pulls a foot lock_distance away. Hands reach entities: a grip point on a staff held in the other hand (no lag), a ledge, a rail; animate the weights for grabs. turn_to turns a standing character in place (yaw degrees, or an entity / point to face). Returns the solve status. Example: {\"entity\": \"Monk\", \"feet\": true, \"left_hand\": \"Staff Grip\"}.",
-   "inputSchema": {
-    "type": "object",
-    "properties": {
-     "entity": {
-      "type": [
-       "integer",
-       "string"
-      ],
-      "description": "The character"
-     },
-     "feet": {
-      "type": "boolean",
-      "description": "Automatic foot planting (default true when the component is created)"
-     },
-     "feet_weight": {
-      "type": "number",
-      "description": "0..1 blend of the foot IK"
-     },
-     "step_height": {
-      "type": "number",
-      "description": "Meters a foot may reach up or down (stairs: 0.3-0.5)"
-     },
-     "foot_height": {
-      "type": "number",
-      "description": "Ankle height above the sole in meters (-1 = from the rest pose)"
-     },
-     "pelvis": {
-      "type": "boolean",
-      "description": "Lower the hips for the lower foot"
-     },
-     "align_feet": {
-      "type": "boolean",
-      "description": "Tilt the feet onto the slope"
-     },
-     "max_slope": {
-      "type": "number",
-      "description": "Steepest slope the feet align to (degrees)"
-     },
-     "contact": {
-      "type": "string",
-      "enum": [
-       "auto",
-       "velocity",
-       "events",
-       "always",
-       "never"
-      ],
-      "description": "When a foot locks in place"
-     },
-     "lock_speed": {
-      "type": "number",
-      "description": "m/s below which a foot counts as planted"
-     },
-     "lock_distance": {
-      "type": "number",
-      "description": "m a locked foot may lag before re-planting"
-     },
-     "smoothing": {
-      "type": "number",
-      "description": "1/s: how fast pelvis and feet follow the ground"
-     },
-     "left_hand": {
-      "description": "Entity the left hand reaches (\"\" clears)"
-     },
-     "left_hand_weight": {
-      "type": "number",
-      "description": "0..1"
-     },
-     "right_hand": {
-      "description": "Entity the right hand reaches (\"\" clears)"
-     },
-     "right_hand_weight": {
-      "type": "number",
-      "description": "0..1"
-     },
-     "hand_rotation": {
-      "type": "boolean",
-      "description": "Also orient the hands like their targets"
-     },
-     "turn_speed": {
-      "type": "number",
-      "description": "Turn-in-place rate (degrees per second)"
-     },
-     "turn_to": {
-      "description": "Turn in place: world yaw in degrees (0 = -Z), or an entity / [x, y, z] point to face"
-     },
-     "remove": {
-      "type": "boolean",
-      "description": "Remove the characterIk component"
-     }
-    },
-    "additionalProperties": false,
-    "required": [
-     "entity"
-    ]
-   },
-   "annotations": {
-    "title": "Character foot and hand IK",
-    "readOnlyHint": false,
-    "destructiveHint": false,
-    "openWorldHint": false
-   },
-   "_meta": {
-    "skywalker/category": "animation"
-   }
-  },
-  {
-   "name": "animation_retarget",
-   "title": "Retarget animations",
-   "description": "Retarget clips from one humanoid rig to another in pose space and save them as a new library (.anim) on the target's skeleton: different bone names (mixamo / suffixed like thigh_l / generic, detected by name and topology), rest poses (T-pose vs A-pose), bone axes and proportions (the hips move by the source motion scaled by the leg-length ratio; bones keep their own lengths, so nothing stretches). `source` / `target` are a library (.anim or a rigged .glb) or a character entity. preview=true only reports the bone maps and alignment. Use the result with \"<output>#<Clip>\" clip references in controllers, play_animation, or animator.retargetFrom (which retargets on the fly). Example: {\"source\": \"anims/pack.anim\", \"target\": \"Knight\", \"clips\": [\"Walk\", \"Run\"]}.",
-   "inputSchema": {
-    "type": "object",
-    "properties": {
-     "source": {
-      "description": "Library path (.anim / .glb) or character entity with the clips"
-     },
-     "target": {
-      "description": "Library path or character entity to retarget onto"
-     },
-     "clips": {
-      "type": "array",
-      "items": {
-       "type": "string",
-       "description": "Clip name"
-      },
-      "description": "Clips to retarget (default: all)"
-     },
-     "output": {
-      "type": "string",
-      "description": "Output .anim path (default: next to the target library, <target>_<source>.anim)"
-     },
-     "fps": {
-      "type": "number",
-      "description": "Resampling rate of the output clips (default 30)"
-     },
-     "translation": {
-      "type": "boolean",
-      "description": "Move the hips / root with the source (default true; false keeps them at rest)"
-     },
-     "source_map": {
-      "type": "object",
-      "description": "Slot overrides for the source, e.g. {\"leftHand\": \"L_Wrist\"}"
-     },
-     "target_map": {
-      "type": "object",
-      "description": "Slot overrides for the target"
-     },
-     "preview": {
-      "type": "boolean",
-      "description": "Only report the bone maps and alignment (no file)"
-     }
-    },
-    "additionalProperties": false,
-    "required": [
-     "source",
-     "target"
-    ]
-   },
-   "annotations": {
-    "title": "Retarget animations",
-    "readOnlyHint": true,
-    "destructiveHint": false,
-    "openWorldHint": false
-   },
-   "_meta": {
-    "skywalker/category": "animation"
-   }
-  },
-  {
-   "name": "save_game",
-   "title": "Save the game",
-   "description": "Saves the running game into a slot, exactly as Wander's save_game() would at a tick boundary: every entity with a `persist` component (whole state or chosen fields, Wander vars, spawned subtrees), tombstones for persisted scene entities that were destroyed, game_var values, the scene, the play time and the exact behavior state. Use it to make checkpoints while playtesting, then load_game to jump back. Needs play mode (sim_control play). Slots: 1-64 of [a-z0-9_-]; \"autosave\" and \"quicksave\" do not count toward game.json saves.maxSlots. Example: {\"slot\": \"checkpoint-1\", \"meta\": {\"title\": \"Before the boss\", \"chapter\": 3}}.",
-   "inputSchema": {
-    "type": "object",
-    "properties": {
-     "slot": {
-      "type": "string",
-      "description": "Slot name, e.g. \"slot1\", \"autosave\", \"checkpoint-2\""
-     },
-     "meta": {
-      "type": "object",
-      "description": "Shown in save menus: title, chapter, thumbnail (project-relative image path), anything else the game wants"
-     }
-    },
-    "additionalProperties": false,
-    "required": [
-     "slot"
-    ]
-   },
-   "annotations": {
-    "title": "Save the game",
-    "readOnlyHint": false,
-    "destructiveHint": false,
-    "openWorldHint": false
-   },
-   "_meta": {
-    "skywalker/category": "sim"
-   }
-  },
-  {
-   "name": "load_game",
-   "title": "Load a save",
-   "description": "Restores a slot into the running game: persisted entities return to their saved state (spawned ones are recreated with their ids, ones destroyed before the save are removed again), game vars, the scene (a save from another scene is an immediate scene flow change: `carry` entities come along) and the exact behavior state (state machines, timers, waiting handlers, random generator), then `on loaded` runs. Older saves are migrated (game.json saves.version / saves.migrate). Stopping play still returns to the edited scene. After loading, save_inspect on the same slot lists anything that did not restore. Example: {\"slot\": \"checkpoint-1\"}.",
-   "inputSchema": {
-    "type": "object",
-    "properties": {
-     "slot": {
-      "type": "string",
-      "description": "Slot to load (save_list shows them)"
-     }
-    },
-    "additionalProperties": false,
-    "required": [
-     "slot"
-    ]
-   },
-   "annotations": {
-    "title": "Load a save",
-    "readOnlyHint": false,
-    "destructiveHint": false,
-    "openWorldHint": false
-   },
-   "_meta": {
-    "skywalker/category": "sim"
-   }
-  },
-  {
-   "name": "save_list",
-   "title": "List save slots",
-   "description": "Lists the save slots of this project: slot, metadata (title, chapter...), file size, format and game version, play time, scene, tick and when it was saved. Damaged files are listed with an `error`. Also returns the save folder and game.json `saves` settings. Works while editing too.",
-   "inputSchema": {
-    "type": "object",
-    "properties": {},
-    "additionalProperties": false
-   },
-   "annotations": {
-    "title": "List save slots",
-    "readOnlyHint": true,
-    "destructiveHint": false,
-    "openWorldHint": false
-   },
-   "_meta": {
-    "skywalker/category": "sim"
-   }
-  },
-  {
-   "name": "save_inspect",
-   "title": "Compare a save with the game",
-   "description": "Diffs a save slot against the running game to debug \"what didn't restore\": per persisted entity, the fields whose current value differs from the saved one (path, saved, current), entities missing from the scene, entities the save destroyed or never had, game var differences, the scene and the tick. Right after load_game everything should read `same`; anything else is what the load could not bring back. Example: {\"slot\": \"autosave\", \"max_diffs\": 50}.",
-   "inputSchema": {
-    "type": "object",
-    "properties": {
-     "slot": {
-      "type": "string",
-      "description": "Slot to compare"
-     },
-     "max_diffs": {
-      "type": "integer",
-      "description": "Most field differences to list (default 200)"
-     }
-    },
-    "additionalProperties": false,
-    "required": [
-     "slot"
-    ]
-   },
-   "annotations": {
-    "title": "Compare a save with the game",
-    "readOnlyHint": true,
-    "destructiveHint": false,
-    "openWorldHint": false
-   },
-   "_meta": {
-    "skywalker/category": "sim"
-   }
-  },
-  {
-   "name": "save_delete",
-   "title": "Delete a save slot",
-   "description": "Deletes a save slot's file. Cannot be undone. Example: {\"slot\": \"slot3\"}.",
-   "inputSchema": {
-    "type": "object",
-    "properties": {
-     "slot": {
-      "type": "string",
-      "description": "Slot to delete"
-     }
-    },
-    "additionalProperties": false,
-    "required": [
-     "slot"
-    ]
-   },
-   "annotations": {
-    "title": "Delete a save slot",
-    "readOnlyHint": false,
-    "destructiveHint": true,
-    "openWorldHint": false
-   },
-   "_meta": {
-    "skywalker/category": "sim"
-   }
-  },
-  {
-   "name": "locale_list",
-   "title": "List locales",
-   "description": "Lists the game's locales: the current one and its fallback chain (pt-BR -> pt -> source), the source language, every locale with strings (count, coverage, files under locale/), game.json `localization` settings, strings requested at run time that no table has, and table file problems. Start here before translating or checking.",
-   "inputSchema": {
-    "type": "object",
-    "properties": {},
-    "additionalProperties": false
-   },
-   "annotations": {
-    "title": "List locales",
-    "readOnlyHint": true,
-    "destructiveHint": false,
-    "openWorldHint": false
-   },
-   "_meta": {
-    "skywalker/category": "render"
-   }
-  },
-  {
-   "name": "locale_set",
-   "title": "Set the locale",
-   "description": "Switches the language the game shows: texts written as \"@key\" (ui.text, ui.placeholder, text.text), tr() calls and #line dialogue lines follow at once. While playing it acts like Wander's set_locale (undone when play stops); while editing it previews a language in the editor until changed. \"\" returns to the default (game.json localization.locale, else the source language). Then viewport_capture / ui_inspect to look for overflow. Example: {\"locale\": \"fr\"}.",
-   "inputSchema": {
-    "type": "object",
-    "properties": {
-     "locale": {
-      "type": "string",
-      "description": "Locale code (\"fr\", \"pt-BR\", \"en-XA\" for the pseudo-locale); \"\" = default"
-     }
-    },
-    "additionalProperties": false,
-    "required": [
-     "locale"
-    ]
-   },
-   "annotations": {
-    "title": "Set the locale",
-    "readOnlyHint": true,
-    "destructiveHint": false,
-    "openWorldHint": false
-   },
-   "_meta": {
-    "skywalker/category": "render"
-   }
-  },
-  {
-   "name": "locale_check",
-   "title": "Check the string tables",
-   "description": "Audits localization and returns findings an agent can fix one by one: per locale the keys with no translation (and coverage); keys the project uses (\"@key\" fields, tr(\"key\") in scripts, #line dialogue ids) that no table defines; unused keys; placeholder mismatches between a translation and the source ({name} missing or extra); invalid messages; plurals missing forms the language needs (ru: one/few/many, ar: zero..many); strings longer than their budget (the table's `max` column, or source length x `budget`, default game.json maxLengthRatio); characters no font covers (CJK, Arabic...: add a font); keys requested at run time but missing. Example: {\"locale\": \"de\", \"budget\": 1.3}.",
-   "inputSchema": {
-    "type": "object",
-    "properties": {
-     "locale": {
-      "type": "string",
-      "description": "Only this locale (default: all)"
-     },
-     "budget": {
-      "type": "number",
-      "description": "Max length ratio translation / source, e.g. 1.3 (default game.json localization.maxLengthRatio)"
-     },
-     "max_findings": {
-      "type": "integer",
-      "description": "Most findings listed per category (default 200)"
-     }
-    },
-    "additionalProperties": false
-   },
-   "annotations": {
-    "title": "Check the string tables",
-    "readOnlyHint": true,
-    "destructiveHint": false,
-    "openWorldHint": false
-   },
-   "_meta": {
-    "skywalker/category": "render"
-   }
-  },
-  {
-   "name": "locale_extract",
-   "title": "Extract hard-coded texts",
-   "description": "Scans the open scene, scenes, prefabs, dialogue scripts and Wander code for hard-coded player-facing texts (ui.text, ui.placeholder, text.text, dialogue lines and choices without a #line id, `.text = \"...\"` in scripts) and proposes a key for each (\"main_menu.play\", \"dlg.intro.start.003\"); a text whose source string already exists reuses its key. With apply: true it writes the source strings to a CSV table (default locale/strings.csv), replaces the open scene's fields with \"@key\" (one undoable edit) and tags dialogue lines with #line:<key>; script strings are only reported (use tr(\"key\")). Example: {\"apply\": true}.",
-   "inputSchema": {
-    "type": "object",
-    "properties": {
-     "apply": {
-      "type": "boolean",
-      "description": "Write the table, update the open scene and tag dialogue lines (default false: proposals only)"
-     },
-     "file": {
-      "type": "string",
-      "description": "CSV table to write (default locale/strings.csv)"
-     },
-     "max": {
-      "type": "integer",
-      "description": "Most proposals returned (default 300)"
-     }
-    },
-    "additionalProperties": false
-   },
-   "annotations": {
-    "title": "Extract hard-coded texts",
-    "readOnlyHint": false,
-    "destructiveHint": false,
-    "openWorldHint": false
-   },
-   "_meta": {
-    "skywalker/category": "render"
-   }
-  },
-  {
-   "name": "locale_pseudo",
-   "title": "Generate a pseudo-locale",
-   "description": "Writes a pseudo-locale for layout testing: every string accented and about 30% longer inside brackets (\"Play\" -> \"[Ƥļáý~~]\"), placeholders, plurals and rich-text tags intact, so truncation, overflow and hard-coded texts (they stay plain) jump out. Writes locale/pseudo.csv with the locale en-XA and, by default, switches to it (like locale_set). Then viewport_capture and ui_inspect each menu; locale_set {\"locale\": \"\"} goes back. Example: {\"expand\": 0.4}.",
-   "inputSchema": {
-    "type": "object",
-    "properties": {
-     "expand": {
-      "type": "number",
-      "description": "Extra length, 0..2 (default 0.3 = 30% longer)"
-     },
-     "locale": {
-      "type": "string",
-      "description": "Pseudo-locale code (default en-XA)"
-     },
-     "activate": {
-      "type": "boolean",
-      "description": "Switch to it afterwards (default true)"
-     }
-    },
-    "additionalProperties": false
-   },
-   "annotations": {
-    "title": "Generate a pseudo-locale",
-    "readOnlyHint": false,
-    "destructiveHint": false,
-    "openWorldHint": false
-   },
-   "_meta": {
-    "skywalker/category": "render"
-   }
-  },
-  {
-   "name": "scene_flow_info",
-   "title": "Scene flow state",
-   "description": "The running game's scene flow: the current scene (alias or path), the pending change (target, preloaded assets, loading scene), loading progress, the transition (kind, phase out|loading|in|idle, alpha), loaded sub-scenes with their entity counts, the carried entities (`carried`: `carry` components, game.json sceneFlow.carry), game.json scene aliases and every scene file. Use it before and after scene_change / scene_additive_load, and to explain why something did not carry over.",
-   "inputSchema": {
-    "type": "object",
-    "properties": {},
-    "additionalProperties": false
-   },
-   "annotations": {
-    "title": "Scene flow state",
-    "readOnlyHint": true,
-    "destructiveHint": false,
-    "openWorldHint": false
-   },
-   "_meta": {
-    "skywalker/category": "scene"
-   }
-  },
-  {
-   "name": "scene_change",
-   "title": "Change scene (play)",
-   "description": "Moves the running game to another scene, as Wander's change_scene does: the scene is a game.json \"scenes\" alias or a .sky.json path (unknown names get a did-you-mean). Entities with a `carry` component, game.json sceneFlow.carry names and `keep` carry over with their behaviors running; the rest is replaced. The change runs over the next ticks (transition out, preloading, swap, transition in); step the simulation to see it, or pass immediate: true to swap now. Stopping play returns the editor to the scene play started in. Example: {\"scene\": \"level2\", \"transition\": \"fade\", \"duration\": 0.4, \"spawn_at\": \"Door_West\"}.",
-   "inputSchema": {
-    "type": "object",
-    "properties": {
-     "scene": {
-      "type": "string",
-      "description": "Alias or .sky.json path"
-     },
-     "transition": {
-      "description": "\"none\" | \"fade\" | \"crossfade\", or {kind, duration, color}"
-     },
-     "duration": {
-      "type": "number",
-      "description": "Transition seconds (0..10)"
-     },
-     "color": {
-      "type": "string",
-      "description": "Fade color, e.g. \"#000000\""
-     },
-     "keep": {
-      "type": "array",
-      "items": {
-       "type": "string",
-       "description": "Entity name"
-      },
-      "description": "More entities to carry over this time"
-     },
-     "spawn_at": {
-      "type": "string",
-      "description": "Entity of the new scene the player moves to (carry.spawn, else tag \"player\")"
-     },
-     "loading": {
-      "type": "string",
-      "description": "Loading scene shown while the target preloads (\"\" = none; default game.json sceneFlow.loadingScene)"
-     },
-     "immediate": {
-      "type": "boolean",
-      "description": "Swap now, without transition or preloading (default false)"
-     }
-    },
-    "additionalProperties": false,
-    "required": [
-     "scene"
-    ]
-   },
-   "annotations": {
-    "title": "Change scene (play)",
-    "readOnlyHint": false,
-    "destructiveHint": false,
-    "openWorldHint": false
-   },
-   "_meta": {
-    "skywalker/category": "scene"
-   }
-  },
-  {
-   "name": "scene_additive_load",
-   "title": "Load a sub-scene (play)",
-   "description": "Adds a scene's entities to the running game (a room, a streaming chunk, a UI overlay) with fresh entity ids and returns its handle. The sub-scene owns exactly the entities it created, so scene_additive_unload removes those and nothing else. Options: id (handle; default the alias or file name), parent (entity to load under), offset (added to its root positions). Loads now (between ticks); `on scene_loaded` runs next tick. Example: {\"scene\": \"rooms/cellar\", \"offset\": [40, 0, 0]}.",
-   "inputSchema": {
-    "type": "object",
-    "properties": {
-     "scene": {
-      "type": "string",
-      "description": "Alias or .sky.json path"
-     },
-     "id": {
-      "type": "string",
-      "description": "Handle for unloading (default: alias or file name, made unique)"
-     },
-     "parent": {
-      "type": [
-       "integer",
-       "string"
-      ],
-      "description": "Entity to load under (default: the root)"
-     },
-     "offset": {
-      "type": "array",
-      "items": {
-       "type": "number"
-      },
-      "minItems": 3,
-      "maxItems": 3,
-      "description": "Added to the sub-scene's root positions"
-     }
-    },
-    "additionalProperties": false,
-    "required": [
-     "scene"
-    ]
-   },
-   "annotations": {
-    "title": "Load a sub-scene (play)",
-    "readOnlyHint": false,
-    "destructiveHint": false,
-    "openWorldHint": false
-   },
-   "_meta": {
-    "skywalker/category": "scene"
-   }
-  },
-  {
-   "name": "scene_additive_unload",
-   "title": "Unload a sub-scene (play)",
-   "description": "Removes a sub-scene loaded with scene_additive_load or Wander's load_additive: exactly the entities it created. Entities the game added under them at run time are kept and moved to the root (listed as orphans). Removes now (between ticks). Example: {\"handle\": \"cellar\"}.",
-   "inputSchema": {
-    "type": "object",
-    "properties": {
-     "handle": {
-      "type": "string",
-      "description": "Sub-scene handle (scene_flow_info lists them)"
-     }
-    },
-    "additionalProperties": false,
-    "required": [
-     "handle"
-    ]
-   },
-   "annotations": {
-    "title": "Unload a sub-scene (play)",
-    "readOnlyHint": false,
-    "destructiveHint": false,
-    "openWorldHint": false
-   },
-   "_meta": {
-    "skywalker/category": "scene"
-   }
-  },
-  {
-   "name": "wander_break_set",
-   "title": "Set a Wander breakpoint",
-   "description": "Stops the running game at a line of a behavior script so you can inspect it (wander_stack, wander_eval). `script` is the behavior's script name as in behavior_set (or a used module path, \"scripts/ai.wander\"); omit it to stop in any script at that line. The breakpoint moves to the first line with code. Options: condition (a Wander expression over the frame's locals and vars: \"hp < 3\"), hit_count (\"5\" = the 5th hit, \">=5\", \"%10\"), log (a logpoint: logs \"hp={hp}\" instead of stopping), entity (only that entity). on_error: true stops at any runtime error instead (line not needed). Costs nothing until set. Example: {\"script\": \"Guard\", \"line\": 12, \"condition\": \"hp <= 0\"}.",
-   "inputSchema": {
-    "type": "object",
-    "properties": {
-     "script": {
-      "type": "string",
-      "description": "Behavior script name (behavior_set name) or module path; omit for any script"
-     },
-     "line": {
-      "type": "integer",
-      "description": "1-based line"
-     },
-     "condition": {
-      "type": "string",
-      "description": "Stop only when this Wander expression is true"
-     },
-     "hit_count": {
-      "type": "string",
-      "description": "\"N\" (the Nth hit), \">=N\", \"%N\""
-     },
-     "log": {
-      "type": "string",
-      "description": "Logpoint message with {expressions}; never stops"
-     },
-     "entity": {
-      "type": [
-       "integer",
-       "string"
-      ],
-      "description": "Only stop for this entity"
-     },
-     "on_error": {
-      "type": "boolean",
-      "description": "Stop at runtime errors (true) or not (false)"
-     }
-    },
-    "additionalProperties": false
-   },
-   "annotations": {
-    "title": "Set a Wander breakpoint",
-    "readOnlyHint": true,
-    "destructiveHint": false,
-    "openWorldHint": false
-   },
-   "_meta": {
-    "skywalker/category": "wander"
-   }
-  },
-  {
-   "name": "wander_break_clear",
-   "title": "Clear Wander breakpoints",
-   "description": "Removes breakpoints: one by id, every breakpoint of a script, or all (no arguments). on_error: false also stops breaking on errors. With no breakpoints left the debugger costs nothing again. Example: {\"id\": 2}.",
-   "inputSchema": {
-    "type": "object",
-    "properties": {
-     "id": {
-      "type": "integer",
-      "description": "Breakpoint id (wander_break_list)"
-     },
-     "script": {
-      "type": "string",
-      "description": "Every breakpoint of this script"
-     },
-     "on_error": {
-      "type": "boolean",
-      "description": "false: stop breaking on runtime errors"
-     }
-    },
-    "additionalProperties": false
-   },
-   "annotations": {
-    "title": "Clear Wander breakpoints",
-    "readOnlyHint": true,
-    "destructiveHint": false,
-    "openWorldHint": false
-   },
-   "_meta": {
-    "skywalker/category": "wander"
-   }
-  },
-  {
-   "name": "wander_break_list",
-   "title": "List Wander breakpoints",
-   "description": "Breakpoints and logpoints with their script, line (and the line asked for when it moved), condition, hit condition, hits so far, whether a compiled script has code there, plus break-on-error.",
-   "inputSchema": {
-    "type": "object",
-    "properties": {},
-    "additionalProperties": false
-   },
-   "annotations": {
-    "title": "List Wander breakpoints",
-    "readOnlyHint": true,
-    "destructiveHint": false,
-    "openWorldHint": false
-   },
-   "_meta": {
-    "skywalker/category": "wander"
-   }
-  },
-  {
-   "name": "wander_debug_state",
-   "title": "Wander debugger state",
-   "description": "Whether the game is paused in the Wander debugger, why (breakpoint, step, pause, error with its message) and where (script, line, function, entity, state), plus the breakpoints. wait_ms waits for the next stop when running (agent connections; the game must be playing). Example: {\"wait_ms\": 5000}.",
-   "inputSchema": {
-    "type": "object",
-    "properties": {
-     "wait_ms": {
-      "type": "integer",
-      "description": "Wait up to this long for the next stop (0 = answer now)"
-     }
-    },
-    "additionalProperties": false
-   },
-   "annotations": {
-    "title": "Wander debugger state",
-    "readOnlyHint": true,
-    "destructiveHint": false,
-    "openWorldHint": false
-   },
-   "_meta": {
-    "skywalker/category": "wander"
-   }
-  },
-  {
-   "name": "wander_continue",
-   "title": "Continue (Wander debugger)",
-   "description": "Resumes a game paused in the Wander debugger. It runs until the next stop or the end of the ticks in progress, then answers with the debugger state; wait_ms keeps waiting for the next stop on agent connections. Example: {\"wait_ms\": 2000}.",
-   "inputSchema": {
-    "type": "object",
-    "properties": {
-     "wait_ms": {
-      "type": "integer",
-      "description": "Then wait up to this long for the next stop"
-     }
-    },
-    "additionalProperties": false
-   },
-   "annotations": {
-    "title": "Continue (Wander debugger)",
-    "readOnlyHint": true,
-    "destructiveHint": false,
-    "openWorldHint": false
-   },
-   "_meta": {
-    "skywalker/category": "wander"
-   }
-  },
-  {
-   "name": "wander_step",
-   "title": "Step (Wander debugger)",
-   "description": "Steps a paused behavior: over (the next statement of this function; calls run through), into (the next statement anywhere, entering called functions), out (back in the caller). When the handler ends, the step stops at the next statement any behavior runs. Answers with where it stopped. Example: {\"mode\": \"into\"}.",
-   "inputSchema": {
-    "type": "object",
-    "properties": {
-     "mode": {
-      "type": "string",
-      "enum": [
-       "over",
-       "into",
-       "out"
-      ],
-      "description": "over (default), into or out"
-     },
-     "wait_ms": {
-      "type": "integer",
-      "description": "Wait up to this long for the stop"
-     }
-    },
-    "additionalProperties": false
-   },
-   "annotations": {
-    "title": "Step (Wander debugger)",
-    "readOnlyHint": true,
-    "destructiveHint": false,
-    "openWorldHint": false
-   },
-   "_meta": {
-    "skywalker/category": "wander"
-   }
-  },
-  {
-   "name": "wander_pause",
-   "title": "Pause behaviors (Wander debugger)",
-   "description": "Stops at the next statement any behavior runs (the game is frozen mid-tick there; resume with wander_continue). Unlike sim_control pause it stops inside the code, so wander_stack shows where each behavior is. wait_ms waits for the stop on agent connections. Example: {\"wait_ms\": 1000}.",
-   "inputSchema": {
-    "type": "object",
-    "properties": {
-     "wait_ms": {
-      "type": "integer",
-      "description": "Wait up to this long for the stop"
-     }
-    },
-    "additionalProperties": false
-   },
-   "annotations": {
-    "title": "Pause behaviors (Wander debugger)",
-    "readOnlyHint": true,
-    "destructiveHint": false,
-    "openWorldHint": false
-   },
-   "_meta": {
-    "skywalker/category": "wander"
-   }
-  },
-  {
-   "name": "wander_stack",
-   "title": "Wander call stack",
-   "description": "The paused behavior's call stack, innermost first: function, script, line and column, entity, behavior and state, each frame's arguments and locals (value and display text), the entity's vars, and globals (time, frame, dt). Example: {\"vars\": true}.",
-   "inputSchema": {
-    "type": "object",
-    "properties": {
-     "vars": {
-      "type": "boolean",
-      "description": "Include args, locals and vars (default true)"
-     }
-    },
-    "additionalProperties": false
-   },
-   "annotations": {
-    "title": "Wander call stack",
-    "readOnlyHint": true,
-    "destructiveHint": false,
-    "openWorldHint": false
-   },
-   "_meta": {
-    "skywalker/category": "wander"
-   }
-  },
-  {
-   "name": "wander_eval",
-   "title": "Evaluate in a paused frame",
-   "description": "Evaluates a Wander expression in a paused frame (0 = innermost): its locals, arguments, the behavior's vars, `self` and every read-only builtin are available (\"distance(self, target)\", \"items.length\"). Watch expressions: call it at each stop. Read-only: assignments to the scene fail (use wander_set_var). Example: {\"expression\": \"hp * 2 + bonus\", \"frame\": 0}.",
-   "inputSchema": {
-    "type": "object",
-    "properties": {
-     "expression": {
-      "type": "string",
-      "description": "Wander expression"
-     },
-     "frame": {
-      "type": "integer",
-      "description": "Frame index (0 = innermost)"
-     }
-    },
-    "additionalProperties": false,
-    "required": [
-     "expression"
-    ]
-   },
-   "annotations": {
-    "title": "Evaluate in a paused frame",
-    "readOnlyHint": true,
-    "destructiveHint": false,
-    "openWorldHint": false
-   },
-   "_meta": {
-    "skywalker/category": "wander"
-   }
-  },
-  {
-   "name": "wander_set_var",
-   "title": "Set a variable while paused",
-   "description": "Changes a local, an argument or one of the entity's vars in a paused frame, then the behavior continues with it (test a fix without restarting). The value is JSON ([x, y, z] is a vector). Example: {\"name\": \"hp\", \"value\": 10}.",
-   "inputSchema": {
-    "type": "object",
-    "properties": {
-     "name": {
-      "type": "string",
-      "description": "Variable name"
-     },
-     "value": {
-      "description": "New value (JSON)"
-     },
-     "frame": {
-      "type": "integer",
-      "description": "Frame index (0 = innermost)"
-     }
-    },
-    "additionalProperties": false,
-    "required": [
-     "name",
-     "value"
-    ]
-   },
-   "annotations": {
-    "title": "Set a variable while paused",
-    "readOnlyHint": false,
-    "destructiveHint": false,
-    "openWorldHint": false
-   },
-   "_meta": {
-    "skywalker/category": "wander"
-   }
-  },
-  {
-   "name": "physics2d_info",
-   "title": "2D physics info",
-   "description": "The 2D physics world (Box2D) at a glance: settings (gravity, sub-steps, debug draw), counts (bodies by motion, awake/sleeping, shapes, sensors, chains, characters, joints, contacts), each body and character2d with its velocity, sleeping/grounded state, tilemap collision pieces (merged loops/boxes/polygons), and warnings (bad polygons, unknown layers, missing joint bodies). Works while editing (an edit-time mirror) and playing. Pass entity for one entity only. Example: {\"entity\": \"Player\"}.",
-   "inputSchema": {
-    "type": "object",
-    "properties": {
-     "entity": {
-      "type": [
-       "integer",
-       "string"
-      ],
-      "description": "Only this entity"
-     },
-     "limit": {
-      "type": "integer",
-      "description": "Max bodies listed (default 50)"
-     }
-    },
-    "additionalProperties": false
-   },
-   "annotations": {
-    "title": "2D physics info",
-    "readOnlyHint": true,
-    "destructiveHint": false,
-    "openWorldHint": false
-   },
-   "_meta": {
-    "skywalker/category": "physics"
-   }
-  },
-  {
-   "name": "physics2d_add",
-   "title": "Make 2D physical",
-   "description": "Make 2D entities physical with a preset (one undoable edit); colliders are fitted to the sprite. platformer_player = character2d controller (drive with move2d/jump2d in Wander); crate = dynamic box; ball = bouncy dynamic circle; one_way_platform = static box you can jump through from below; tilemap_collision = merged collision from the entity's tilemap (solid layers, per-tile slopes and one-way tiles); static_ground = static box; sensor_zone = trigger area (on trigger_enter / on trigger_exit); moving_platform = kinematic box (move it with its transform or body2d.velocity); remove = strip the 2D physics components. `overrides` patches the components: {\"collider2d\": {\"restitution\": 0.9}, \"character2d\": {\"jumpSpeed\": 14}}. Example: {\"entity\": \"Player\", \"preset\": \"platformer_player\"}.",
-   "inputSchema": {
-    "type": "object",
-    "properties": {
-     "entity": {
-      "type": [
-       "integer",
-       "string"
-      ],
-      "description": "Entity (or use entities)"
-     },
-     "entities": {
-      "type": "array",
-      "items": {
-       "type": [
-        "integer",
-        "string"
-       ],
-       "description": "Entity id (number) or exact name"
-      },
-      "description": "Entities to change"
-     },
-     "preset": {
-      "type": "string",
-      "enum": [
-       "platformer_player",
-       "crate",
-       "ball",
-       "one_way_platform",
-       "tilemap_collision",
-       "static_ground",
-       "sensor_zone",
-       "moving_platform",
-       "remove"
-      ],
-      "description": "What the entities become"
-     },
-     "overrides": {
-      "type": "object",
-      "description": "Component patches: {\"body2d\": {...}, \"collider2d\": {...}, \"character2d\": {...}}"
-     }
-    },
-    "additionalProperties": false,
-    "required": [
-     "preset"
-    ]
-   },
-   "annotations": {
-    "title": "Make 2D physical",
-    "readOnlyHint": false,
-    "destructiveHint": false,
-    "openWorldHint": false
-   },
-   "_meta": {
-    "skywalker/category": "physics"
-   }
-  },
-  {
-   "name": "physics2d_settle",
-   "title": "Settle with 2D physics",
-   "description": "Drop 2D objects with a real simulation and keep where they come to rest: only the listed entities move (as dynamic bodies, even without body2d), everything else is frozen; the result is ONE undoable edit. Use after placing crates, rocks or props on a level so they rest on the ground and on each other. Example: {\"entities\": [\"Crate 1\", \"Crate 2\"], \"seconds\": 3}.",
-   "inputSchema": {
-    "type": "object",
-    "properties": {
-     "entity": {
-      "type": [
-       "integer",
-       "string"
-      ],
-      "description": "Entity to settle (or use entities)"
-     },
-     "entities": {
-      "type": "array",
-      "items": {
-       "type": [
-        "integer",
-        "string"
-       ],
-       "description": "Entity id (number) or exact name"
-      },
-      "description": "Entities to settle"
-     },
-     "seconds": {
-      "type": "number",
-      "description": "Max simulated seconds (default 4, max 30); stops early when everything sleeps"
-     },
-     "freeze_others": {
-      "type": "boolean",
-      "description": "Keep other dynamic bodies still (default true)"
-     }
-    },
-    "additionalProperties": false
-   },
-   "annotations": {
-    "title": "Settle with 2D physics",
-    "readOnlyHint": false,
-    "destructiveHint": false,
-    "openWorldHint": false
-   },
-   "_meta": {
-    "skywalker/category": "physics"
-   }
-  },
-  {
-   "name": "physics2d_query",
-   "title": "2D physics query",
-   "description": "Ask the 2D collision world (collider2d shapes, character2d capsules) on the XY plane — works while editing and playing. raycast = first hit along a ray; raycast_all = every entity along it; overlap_circle / overlap_box = entities touching the shape at origin (is this spot free?); point = entities containing the point. Sensors are ignored unless include_sensors. Example: {\"type\": \"raycast\", \"origin\": [2, 5], \"direction\": [0, -1]}.",
-   "inputSchema": {
-    "type": "object",
-    "properties": {
-     "type": {
-      "type": "string",
-      "enum": [
-       "raycast",
-       "raycast_all",
-       "overlap_circle",
-       "overlap_box",
-       "point"
-      ],
-      "description": "Query kind"
-     },
-     "origin": {
-      "type": "array",
-      "items": {
-       "type": "number"
-      },
-      "minItems": 2,
-      "maxItems": 3,
-      "description": "Ray start, shape center or point [x, y]"
-     },
-     "direction": {
-      "type": "array",
-      "items": {
-       "type": "number"
-      },
-      "minItems": 2,
-      "maxItems": 3,
-      "description": "Ray direction [x, y] (default [0, -1])"
-     },
-     "max_distance": {
-      "type": "number",
-      "description": "Max ray distance (default 100)"
-     },
-     "radius": {
-      "type": "number",
-      "description": "overlap_circle radius (default 0.5)"
-     },
-     "half_extents": {
-      "type": "array",
-      "items": {
-       "type": "number"
-      },
-      "minItems": 2,
-      "maxItems": 3,
-      "description": "overlap_box half size [x, y] (default [0.5, 0.5])"
-     },
-     "angle": {
-      "type": "number",
-      "description": "overlap_box rotation in degrees"
-     },
-     "exclude": {
-      "type": "array",
-      "items": {
-       "type": [
-        "integer",
-        "string"
-       ],
-       "description": "Entity id (number) or exact name"
-      },
-      "description": "Entities to ignore"
-     },
-     "include_sensors": {
-      "type": "boolean",
-      "description": "Also report sensors"
-     },
-     "layers": {
-      "type": "array",
-      "items": {
-       "type": "string"
-      },
-      "description": "Only these collision layers"
-     }
-    },
-    "additionalProperties": false,
-    "required": [
-     "type",
-     "origin"
-    ]
-   },
-   "annotations": {
-    "title": "2D physics query",
     "readOnlyHint": true,
     "destructiveHint": false,
     "openWorldHint": false

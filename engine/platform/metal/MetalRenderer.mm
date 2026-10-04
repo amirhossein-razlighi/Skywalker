@@ -131,8 +131,10 @@ struct DrawUniforms {
     simd_float4 motion;       // x = moves (prevModel differs or a previous skinned pose is bound)
     // --- appended (character material models) ---
     simd_float4 character[3];  // Surface::model (skin, eye, cloth, hair_card parameters)
+    // --- appended (car paint) ---
+    simd_float4 material5;    // x = clearcoat roughness, y = flakes, z = flake size (m)
 };
-static_assert(sizeof(DrawUniforms) == 384, "must match DrawUniforms in Common.metal");
+static_assert(sizeof(DrawUniforms) == 400, "must match DrawUniforms in Common.metal");
 
 struct PostUniforms {
     simd_float4 params;
@@ -1639,6 +1641,7 @@ private:
         du.prevModel = du.model;  // static unless drawMesh knows better (velocity buffer)
         du.motion = simd_make_float4(0, static_cast<float>(d.layers & 0xFFFFFu), 0, 0);  // y = render layers (light masks)
         for (int i = 0; i < 3; ++i) du.character[i] = simd_make_float4(s.model[i].x, s.model[i].y, s.model[i].z, s.model[i].w);
+        du.material5 = simd_make_float4(s.clearcoatRoughness, s.flakes, s.flakeSize, 0);
         return du;
     }
 
@@ -3401,7 +3404,7 @@ private:
         pu.grade = simd_make_float4(env.temperature, env.tint, sharpen, autoExp ? 1.f : 0.f);
         const size_t levels = bloomViews_.size();
         if (env.bloomIntensity > 0.001f && levels > 0) {
-            pu.texel = simd_make_float4(1.f / src.width, 1.f / src.height, 0, 0);
+            pu.texel = simd_make_float4(1.f / src.width, 1.f / src.height, env.bloomClamp, 0);  // z = bloom clamp
             fullscreen(cmd, bloomPrefilterPipeline_, bloomViews_[0], {src, exposureTex}, &pu, sizeof(pu), false, @"Bloom prefilter");
             for (size_t i = 1; i < levels; ++i) {
                 pu.texel = simd_make_float4(1.f / bloomViews_[i - 1].width, 1.f / bloomViews_[i - 1].height, 0, 0);

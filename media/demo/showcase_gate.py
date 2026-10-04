@@ -5,6 +5,7 @@
             [--sequences sequences/a.sequence.json,sequences/b.sequence.json] [--frames 12]
             [--width 1920 --height 1080 --samples 16] [--out shots] [--stylized] [--no-strict]
             [--preview]   # 1280x720, 8 samples: quick iterations
+            [--movie [--shutter 0.5]]   # frames through movie_render: pre-rolled particles, motion blur
 
 For each of `frames` moments spread across the sequences (default: every *.sequence.json played by an
 entity of the scene), it renders the sequence's live camera (sequence keys and animation applied),
@@ -110,6 +111,9 @@ def main(argv=None):
     ap.add_argument("--perf-frames", type=int, default=30, help="real-time frames benchmarked per hero view")
     ap.add_argument("--perf-views", type=int, default=3, help="how many shots to benchmark")
     ap.add_argument("--preview", action="store_true", help="1280x720 at 8 samples (iteration)")
+    ap.add_argument("--movie", action="store_true",
+                    help="render sequence moments with movie_render (pre-rolled particles and animation, shutter motion blur)")
+    ap.add_argument("--shutter", type=float, default=0.5, help="--movie: open shutter as a fraction of the frame")
     a = ap.parse_args(argv)
     if a.preview:
         a.width, a.height, a.samples = 1280, 720, 8
@@ -141,8 +145,19 @@ def main(argv=None):
             else:
                 args = {"view": "scene"}
             try:
-                sky.call("viewport_capture", width=a.width, height=a.height, samples=a.samples, annotate=False, overlays=False,
-                         include_image=False, save_path=png, **args)
+                if a.movie and path:
+                    # The movie renderer pre-rolls the sequence to t (particles, smoke and animation have their history)
+                    # and opens a shutter (motion blur), so the still is a frame of the film.
+                    frames = os.path.join(out, f"shot_{i:02d}_####.png")
+                    sky.call("movie_render", sequence=path, output=frames, start=max(t - 0.5 / 30, 0.0), duration=1 / 30, fps=30,
+                             width=a.width, height=a.height, samples=a.samples, shutter=a.shutter, warmup=4)
+                    first = sorted(glob.glob(os.path.join(out, f"shot_{i:02d}_*.png")))
+                    os.replace(first[0], png)
+                    for extra in first[1:]:
+                        os.remove(extra)
+                else:
+                    sky.call("viewport_capture", width=a.width, height=a.height, samples=a.samples, annotate=False, overlays=False,
+                             include_image=False, save_path=png, **args)
                 audit_args = {"strict": not a.no_strict, "stylized": a.stylized, "width": a.width, "height": a.height}
                 if path:
                     sky.call("sequence_scrub", sequence=path, clear=True)

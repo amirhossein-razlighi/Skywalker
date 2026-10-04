@@ -32,7 +32,7 @@ from the closest preset, never from nothing.
 | Clouds | `clouds (cover 0..1), cloudMode: volumetric\|flat, cloudHeight, cloudThickness, cloudDensity (0.3 wispy..2 stormy), cloudScale, cloudSpeed` |
 | Light bounce | `ambient (0..10), reflections (IBL strength), ao, aoRadius, gi (0..1 screen-space bounce + emissive), giDistance, ssr (0..1 glossy reflections)` |
 | Air | `fogColor, fogDensity (0..1, exponential), fogHeight (pools near ground), godRays (0..8, 1 natural), haze (0.005 clear..0.1 misty), windSpeed, windDirection` |
-| Image | `taa, sharpen, tonemap: aces\|agx\|neutral\|filmic\|none, exposure, autoExposure, exposureCompensation (EV), adaptationSpeed, temperature, tint, saturation, contrast, bloomIntensity, bloomThreshold, vignette, grain, chromaticAberration` |
+| Image | `taa, sharpen, tonemap: aces\|agx\|neutral\|filmic\|none, exposure, autoExposure, exposureCompensation (EV), adaptationSpeed, temperature, tint, saturation, contrast, bloomIntensity, bloomThreshold, bloomClamp (2-8: crisp sun glints and LEDs), vignette, grain, chromaticAberration` |
 | Grade | `look: none\|warm\|cool\|teal_orange\|golden_hour\|bleach\|noir\|vivid\|moonlight\|vintage`, `lookStrength (0..1)`, `lut` (project-relative `.cube`) |
 
 ## Starting recipes (validated starting points, then tune)
@@ -134,6 +134,8 @@ water, ice, skin, wax, leaves, snow, velvet, neon, toon, toon_metal, clay; chara
 `scatterRadius` mm and pores, refracted irises with `irisCenter`/`irisRadius`, cloth sheen, anisotropic hair cards; check with `debug_view:"sss_mask"`) and `texture_generate` (albedo + normal + ORM) with
 `triplanar` so nothing stretches on scaled shapes. Real surfaces vary: add `normalMap`/`ormMap`, keep `roughness` between 0.3 and 0.9 for
 most dielectrics, `metallic` 0 or 1 (rarely in between), `subsurface` for leaves/skin/wax/snow, `clearcoat` for paint and varnish.
+Car paint: the `car_paint` preset, then `clearcoatRoughness` (0.03 polished lacquer) and `flakes` (0.3-0.5 metallic, 0 solid)
+with `flakeSize` (meters, ~0.0015) on a material asset; the coat picks up probes and screen-space reflections.
 
 ## Quality gate: `scene_audit` (no placeholder shapes on camera)
 

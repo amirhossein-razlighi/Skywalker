@@ -230,6 +230,7 @@ Scene-wide sky, sun, ambient light, fog and exposure.
 | `showGrid` | boolean | Draw the editor ground grid |  |
 | `bloomIntensity` | number | Glow around bright/emissive things (0 = off) | 0 .. 5 |
 | `bloomThreshold` | number | Brightness where glow starts (lower = more glow) | 0 .. 10 |
+| `bloomClamp` | number | Brightest (exposed) value that feeds the glow: 2-8 keeps sun glints, chrome and LED lights crisp instead of blown-out halos; 64 = effectively unlimited | 0.1 .. 64 |
 | `saturation` | number | Color saturation (1 = neutral) | 0 .. 2 |
 | `contrast` | number | Contrast (1 = neutral) | 0.5 .. 2 |
 | `vignette` | number | Darken the image corners | 0 .. 1 |

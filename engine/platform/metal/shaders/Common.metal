@@ -76,8 +76,10 @@ struct DrawUniforms {
     float4 motion;        // x = moves (prevModel differs or a previous skinned pose is bound), y = render layers (bits as a float), zw = unused
     // --- appended (character material models: skin, eye, cloth, hair_card; Characters.metal) ---
     float4 character[3];  // packed per model by toSurface() (assets/Material.cpp)
+    // --- appended (car paint) ---
+    float4 material5;     // x = clearcoat roughness, y = flakes (0..1), z = flake size (m, object space), w = unused
 };
-static_assert(sizeof(DrawUniforms) == 384, "DrawUniforms must match MetalRenderer.mm");
+static_assert(sizeof(DrawUniforms) == 400, "DrawUniforms must match MetalRenderer.mm");
 
 struct PostUniforms {
     float4 params;   // x = exposure, y = bloom intensity, z = bloom threshold, w = saturation
@@ -159,7 +161,10 @@ struct MeshOut {
 // Main pass outputs: lit HDR color + G-buffer.
 //   gbufA (RGBA8):   rgb = albedo (linear), a = material ambient occlusion
 //   gbufB (RGBA16F): xy = octahedral normal, z = roughness, w = metallic (0..1) or a
-//                    "no screen-space lighting" flag (>= 2: sky, unlit, toon, outlines)
+//                    "no screen-space lighting" flag (>= 2: sky, unlit, toon, outlines).
+//                    Clearcoated surfaces store the coat instead (normal and roughness of the
+//                    lacquer, so screen-space reflections and probes land on the coat) and a
+//                    negative w that packs the coat strength and the base metallic (gbufCoat*).
 //   velocity (RG16F): object motion only, in uv of the previous frame's projection (see
 //                    objectMotion); 0 = static. Camera motion is added from depth afterwards
 //                    (motionVectorFragment), so passes that don't write it stay correct.
@@ -212,6 +217,19 @@ static float2 objectMotion(constant FrameUniforms& f, float3 worldPos, float3 pr
     float4 b = f.prevViewProj * float4(worldPos, 1.0);
     if (a.w <= 1e-4 || b.w <= 1e-4) return float2(0.0);
     return (a.xy / a.w - b.xy / b.w) * float2(0.5, -0.5);
+}
+
+// Clearcoat in the G-buffer's w: -(1 + coat level 1..15 + 0.05 + 0.9 * metallic). The fraction stays
+// inside [0.05, 0.95] so half-float rounding never crosses a level; the metallic keeps ~0.02 precision.
+static float gbufCoatEncode(float metallic, float clearcoat) {
+    return -(1.05 + clamp(floor(clearcoat * 15.0 + 0.5), 1.0, 15.0) + 0.9 * saturate(metallic));
+}
+static bool gbufHasCoat(float w) { return w < -1.5; }
+static float gbufCoat(float w) { return floor(-w - 1.0) / 15.0; }
+static float gbufMetallic(float w) {
+    if (!gbufHasCoat(w)) return saturate(w);
+    float a = -w - 1.0;
+    return saturate((a - floor(a) - 0.05) / 0.9);
 }
 
 static MainOut mainOutFlat(float4 color) { return mainOut(color, float3(0.0), 1.0, float3(0, 1, 0), 1.0, kGbufNoLighting); }
@@ -285,6 +303,12 @@ struct SurfaceData {
     float clearcoat;
     float subsurface;
     float3 N;
+    // Car paint (meshes; other paths set clearcoat = flakes = 0 and leave the rest unused).
+    float coatRoughness;   // the lacquer's own roughness
+    float3 Nc;             // the lacquer's normal: the smooth geometric normal (normal maps and flakes stay under it)
+    float flakes;          // share of the base specular reflected by metallic flakes (applyFlakes)
+    float flakeRoughness;  // roughness of the flake lobe (grows as flakes shrink below a pixel)
+    float3 Nf;             // this pixel's flake normal
 };
 
 static float3 directLight(SurfaceData s, float3 V, float3 L, float3 radiance, float specScale = 1.0) {
@@ -302,6 +326,13 @@ static float3 directLight(SurfaceData s, float3 V, float3 L, float3 radiance, fl
     float3 F0 = mix(float3(0.04), s.albedo, s.metallic);
     float3 F = F_Schlick(F0, VdotH);
     float3 spec = D_GGX(NdotH, a) * V_SmithGGX(NdotV, max(nl, 1e-4), a) * F * specScale;
+    // Metallic flakes: tiny tilted mirrors that glint where they line up with the light.
+    if (s.flakes > 0.0) {
+        float af = s.flakeRoughness * s.flakeRoughness;
+        float3 Ff = F_Schlick(mix(s.albedo, float3(1.0), 0.15), VdotH);
+        float3 fl = D_GGX(saturate(dot(s.Nf, H)), af) * V_SmithGGX(NdotV, max(nl, 1e-4), af) * Ff * specScale;
+        spec = mix(spec, fl, s.flakes);
+    }
     float3 kd = (1.0 - F) * (1.0 - s.metallic);
     float3 color = (kd * s.albedo / M_PI_F * diffNdotL + spec * nl) * radiance * M_PI_F;
     // Transmission (thin parts glow when backlit)
@@ -309,12 +340,14 @@ static float3 directLight(SurfaceData s, float3 V, float3 L, float3 radiance, fl
         float back = pow(saturate(dot(V, -L)), 4.0) * s.subsurface;
         color += s.albedo * radiance * back * 0.6 * (1.0 - s.metallic);
     }
-    // Clearcoat lobe (fixed glossy layer, IOR 1.5)
+    // Clearcoat lobe (a lacquer layer, IOR 1.5, on the smooth geometric normal with its own roughness)
     if (s.clearcoat > 0.0) {
-        float ac = 0.06 * 0.06;
+        float ac = s.coatRoughness * s.coatRoughness;
+        float ncl = saturate(dot(s.Nc, L));
         float Fc = 0.04 + 0.96 * pow(1.0 - VdotH, 5.0);
-        float cc = D_GGX(NdotH, ac) * V_SmithGGX(NdotV, max(nl, 1e-4), ac) * Fc * s.clearcoat * specScale;
-        color = color * (1.0 - Fc * s.clearcoat) + cc * radiance * nl * M_PI_F;
+        float cc = D_GGX(saturate(dot(s.Nc, H)), ac) * V_SmithGGX(max(dot(s.Nc, V), 1e-4), max(ncl, 1e-4), ac) * Fc * s.clearcoat *
+                   specScale;
+        color = color * (1.0 - Fc * s.clearcoat) + cc * radiance * ncl * M_PI_F;
     }
     return color;
 }

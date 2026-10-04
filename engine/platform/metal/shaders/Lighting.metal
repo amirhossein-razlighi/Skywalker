@@ -295,7 +295,9 @@ static float4 bilateralHalf(texture2d<float> t, float2 uv, float2 halfTexel, dep
 // The lit scene of the main pass carries the sky's image-based light. The resolve swaps it, per PBR
 // pixel of the G-buffer, for: reflection probes (kProbes: lightingResolveProbesFragment) over the sky;
 // then screen-space GI for diffuse and screen-space reflections where the trace found something, so the
-// order is SSR first, then probes, then the sky. SSAO darkens the indirect diffuse.
+// order is SSR first, then probes, then the sky. SSAO darkens the indirect diffuse. Clearcoated pixels
+// (car paint) carry the coat in the G-buffer: the swap applies to the coat's reflection, while their base
+// layer keeps the sky light of the main pass.
 template <bool kProbes>
 static float4 resolveLighting(FullscreenOut in, constant FrameUniforms& f, constant ResolveUniforms& r, texture2d<float> color,
                               texture2d<float> gbufA, texture2d<float> gbufB, depth2d<float> depthTex, texture2d<float> aoTex,
@@ -311,7 +313,8 @@ static float4 resolveLighting(FullscreenOut in, constant FrameUniforms& f, const
     float3 N = octDecode(gb.xy);
     float3 V = normalize(f.cameraPos.xyz - p);
     if (f.cameraForward.w > 0.5) V = -f.cameraForward.xyz;
-    float rough = gb.z, metal = saturate(gb.w);
+    float rough = gb.z, metal = gbufMetallic(gb.w);
+    const bool coat = gbufHasCoat(gb.w);
     float3 albedo = ga.rgb;
     float aoMat = ga.a;
     float fogT = 1.0 - fogFactor(f, p);
@@ -322,6 +325,9 @@ static float4 resolveLighting(FullscreenOut in, constant FrameUniforms& f, const
     float2 ab = brdfLut.sample(linearClamp, float2(NdotV, 1.0 - rough)).rg;
     float3 Fr = F0 * ab.x + ab.y;
     float3 kd = (1.0 - Fr) * (1.0 - metal);
+    // The coat's Fresnel weight (as in the main pass); it also dims the base layer under it.
+    const float coatW = coat ? (0.04 + 0.96 * pow(1.0 - NdotV, 5.0)) * gbufCoat(gb.w) : 0.0;
+    kd *= 1.0 - coatW;
     const bool ssrOn = r.params2.x > 0.5;
 
     // What the main pass added (the sky), and what replaces it (probes over the sky).
@@ -355,7 +361,7 @@ static float4 resolveLighting(FullscreenOut in, constant FrameUniforms& f, const
             float3 hit = conf > 1e-3 ? ssr.rgb / max(ssr.a, 1e-3) : envSpec;
             spec += (mix(envSpec, hit, conf) - envSpec) * ssao;
         }
-        delta += Fr * specOcc * fogT * spec;
+        delta += (coat ? float3(coatW) : Fr * specOcc) * fogT * spec;
     }
     return float4(max(c.rgb + delta, 0.0), c.a);
 }
