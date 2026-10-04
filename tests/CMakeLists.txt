@@ -63,6 +63,7 @@ set(SKY_TEST_SOURCES
     test_custom_tools.cpp
     test_audit.cpp
     test_characters.cpp
+    test_physics2d.cpp
 )
 
 add_executable(skywalker_tests ${SKY_TEST_SOURCES})
