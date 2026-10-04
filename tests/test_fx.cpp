@@ -169,6 +169,19 @@ TEST_CASE("fx: fires light the scene with a flickering light") {
     CHECK(lights[0].intensity > 1.f);
 }
 
+TEST_CASE("fx: fuel-less fluid presets (steam, smoke) do not glow like flames") {
+    // The volume shader turns heat into blackbody emission; steam and smoke inject heat only
+    // for buoyancy, so their presets must switch the flame emission off.
+    for (const char* name : {"steam_vent", "volume_smoke"}) {
+        Json p = fx::fluidPreset(name);
+        INFO(name);
+        REQUIRE(p.size() > 0);
+        CHECK(p.get("fuel").asNumber() == 0.0);
+        CHECK(p.get("flameIntensity").asNumber() == 0.0);
+    }
+    CHECK(fx::fluidPreset("volume_fire").get("flameIntensity").asNumber() > 0.0);
+}
+
 TEST_CASE("fx: tools, Wander and water queries") {
     auto e = makeFxEngine();
     Json fire = callTool(*e, "fx_create", R"({"effect":"campfire","position":[2,0,0]})");
