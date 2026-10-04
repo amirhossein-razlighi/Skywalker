@@ -31,6 +31,7 @@
 #include <atomic>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <filesystem>
 #include <functional>
@@ -817,6 +818,12 @@ private:
             }
         }
         if (pipelineCache_) pipelineCache_->setBypass(!builtin);  // hot-reloaded sources are not archived
+        struct BypassReset {  // every return path below re-enables the archive
+            MetalPipelineCache* cache;
+            ~BypassReset() {
+                if (cache) cache->setBypass(false);
+            }
+        } bypassReset{pipelineCache_.get()};
 
         enum class Blend { None, Alpha, Additive, Premultiplied };
         // `mainPass` pipelines render into the scene pass: HDR color + HDR indirect light.
@@ -981,7 +988,6 @@ private:
         terrainWirePipeline_ = terrainWire;
         terrainOverdrawPipeline_ = terrainOverdraw;
         if (fx_) fx_->build(lib, FxFormats{kHDRFormat, kGbufAFormat, kGbufBFormat, kDepthFormat, kSamples, kShadowAtlas / 2});  // [hair+vfx]
-        if (pipelineCache_) pipelineCache_->setBypass(false);
         libraryMs_ = libMs;  // [shader cache] engine_info.shaders
         pipelinesMs_ = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
         shaderLibraryOrigin_ = builtin ? origin : "source (shader_set)";

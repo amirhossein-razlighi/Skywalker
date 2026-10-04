@@ -243,6 +243,11 @@ id<MTLComputePipelineState> MetalPipelineCache::compute(id<MTLFunction> fn, NSEr
 
 std::shared_ptr<AsyncRenderPipeline> MetalPipelineCache::requestRender(MTLRenderPipelineDescriptor* d) {
     auto job = std::make_shared<AsyncRenderPipeline>();
+    if (!d || !d.vertexFunction) {  // Metal asserts on these; report instead
+        job->error = "pipeline descriptor has no vertex function (missing or misspelled shader entry point?)";
+        job->done.store(true, std::memory_order_release);
+        return job;
+    }
     MTLRenderPipelineDescriptor* c = [d copy];
     pending_.fetch_add(1);
     // The cache outlives its jobs: owners keep the shared_ptr, and the job holds its own result.
@@ -269,6 +274,11 @@ std::shared_ptr<AsyncRenderPipeline> MetalPipelineCache::requestRender(MTLRender
 
 std::shared_ptr<AsyncComputePipeline> MetalPipelineCache::requestCompute(id<MTLFunction> fn) {
     auto job = std::make_shared<AsyncComputePipeline>();
+    if (!fn) {
+        job->error = "no compute function (missing or misspelled kernel name?)";
+        job->done.store(true, std::memory_order_release);
+        return job;
+    }
     pending_.fetch_add(1);
     std::weak_ptr<MetalPipelineCache> weak = gCurrent;
     id<MTLDevice> device = device_;
