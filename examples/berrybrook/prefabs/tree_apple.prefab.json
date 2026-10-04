@@ -1,0 +1,188 @@
+{
+  "format": "skywalker.prefab",
+  "version": 1,
+  "name": "Prefab tree_apple",
+  "root": {
+    "name": "Prefab tree_apple",
+    "enabled": true,
+    "tags": [],
+    "vars": {},
+    "components": {
+      "transform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      }
+    },
+    "children": [
+      {
+        "name": "Prefab tree_apple bark",
+        "enabled": true,
+        "tags": [],
+        "vars": {},
+        "components": {
+          "transform": {
+            "position": [
+              0,
+              0,
+              0
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          },
+          "mesh": {
+            "mesh": "asset:dcc/kit/tree_apple_bark.glb",
+            "color": "#ccccd1",
+            "metallic": 0,
+            "roughness": 0.55,
+            "emissive": "#000000",
+            "texture": "",
+            "visible": true,
+            "billboard": false,
+            "material": "materials/kit_bark.mat.json",
+            "unlit": false,
+            "shading": "pbr",
+            "normalMap": "",
+            "ormMap": "",
+            "emissiveMap": "",
+            "normalStrength": 1,
+            "tiling": 1,
+            "triplanar": false,
+            "clearcoat": 0,
+            "subsurface": 0,
+            "rim": 0,
+            "outline": 0,
+            "outlineColor": "#0a0a0f",
+            "doubleSided": false,
+            "castShadows": true,
+            "alphaCutoff": 0
+          }
+        }
+      },
+      {
+        "name": "Prefab tree_apple canopy",
+        "enabled": true,
+        "tags": [],
+        "vars": {},
+        "components": {
+          "transform": {
+            "position": [
+              0,
+              0,
+              0
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          },
+          "mesh": {
+            "mesh": "asset:dcc/kit/tree_apple_canopy.glb",
+            "color": "#ccccd1",
+            "metallic": 0,
+            "roughness": 0.55,
+            "emissive": "#000000",
+            "texture": "",
+            "visible": true,
+            "billboard": false,
+            "material": "materials/kit_canopy.mat.json",
+            "unlit": false,
+            "shading": "pbr",
+            "normalMap": "",
+            "ormMap": "",
+            "emissiveMap": "",
+            "normalStrength": 1,
+            "tiling": 1,
+            "triplanar": false,
+            "clearcoat": 0,
+            "subsurface": 0,
+            "rim": 0,
+            "outline": 0,
+            "outlineColor": "#0a0a0f",
+            "doubleSided": false,
+            "castShadows": true,
+            "alphaCutoff": 0
+          }
+        }
+      },
+      {
+        "name": "Prefab tree_apple fruit",
+        "enabled": true,
+        "tags": [],
+        "vars": {},
+        "components": {
+          "transform": {
+            "position": [
+              0,
+              0,
+              0
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          },
+          "mesh": {
+            "mesh": "asset:dcc/kit/tree_apple_fruit.glb",
+            "color": "#ccccd1",
+            "metallic": 0,
+            "roughness": 0.55,
+            "emissive": "#000000",
+            "texture": "",
+            "visible": true,
+            "billboard": false,
+            "material": "materials/kit_fruit.mat.json",
+            "unlit": false,
+            "shading": "pbr",
+            "normalMap": "",
+            "ormMap": "",
+            "emissiveMap": "",
+            "normalStrength": 1,
+            "tiling": 1,
+            "triplanar": false,
+            "clearcoat": 0,
+            "subsurface": 0,
+            "rim": 0,
+            "outline": 0,
+            "outlineColor": "#0a0a0f",
+            "doubleSided": false,
+            "castShadows": true,
+            "alphaCutoff": 0
+          }
+        }
+      }
+    ]
+  }
+}

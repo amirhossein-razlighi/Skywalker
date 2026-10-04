@@ -1,0 +1,13 @@
+{
+  "guid": "4b0a20a9177f72b05f0fc57bfdb2dc95",
+  "type": "prefab",
+  "tags": [
+    "berrybrook"
+  ],
+  "description": "Berrybrook flowers tulip (procedural, Blender)",
+  "source": {
+    "by": "mcp:director",
+    "fromEntity": "Prefab flowers_tulip"
+  },
+  "import": {}
+}

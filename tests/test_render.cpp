@@ -124,11 +124,12 @@ TEST_CASE("frame: visible entities, picking and scene camera") {
     ViewCamera sc;
     CHECK_FALSE(sceneCamera(s, sc));
     EntityId camE = s.create("Cam");
-    (void)s.patchComponent(camE, "camera", Json::object({{"fov", 40}}));
+    (void)s.patchComponent(camE, "camera", Json::object({{"fov", 40}, {"tiltShift", 0.5}}));
     s.get<Transform>(camE)->position = {1, 2, 3};
     REQUIRE(sceneCamera(s, sc));
     CHECK(sc.eye == Vec3{1, 2, 3});
     CHECK(sc.fovDeg == doctest::Approx(40));
+    CHECK(sc.tiltShift == doctest::Approx(0.5f));  // the miniature lens reaches the post stack
 }
 
 TEST_CASE("frame: hidden, disabled and child-of-disabled entities are not drawn") {

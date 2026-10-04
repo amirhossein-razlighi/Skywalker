@@ -1,0 +1,182 @@
+{
+  "format": "skywalker.uistyle",
+  "extends": "light",
+  "vars": {
+    "cream": "#fff7e8",
+    "ink": "#5a3a28",
+    "berry": "#e0525c",
+    "leaf": "#6aa553",
+    "honey": "#d9a35f"
+  },
+  "rules": {
+    "canvas": {
+      "font": "serif",
+      "fontSize": 22,
+      "color": "$ink"
+    },
+    ".cozy": {
+      "background": "#fff8ebf2",
+      "background2": "#fbebd2f2",
+      "radius": 18,
+      "borderWidth": 3,
+      "borderColor": "#c99568",
+      "padding": [
+        10,
+        18
+      ],
+      "shadowColor": "#5a3a2850",
+      "shadowOffset": [
+        0,
+        6
+      ],
+      "shadowBlur": 18
+    },
+    ".day": {
+      "font": "serif",
+      "fontSize": 30,
+      "bold": true,
+      "color": "$ink"
+    },
+    ".time": {
+      "font": "Inter",
+      "fontSize": 17,
+      "color": "#8a6448",
+      "letterSpacing": 0.04
+    },
+    ".coins": {
+      "font": "serif",
+      "fontSize": 36,
+      "bold": true,
+      "color": "#b0662c"
+    },
+    ".slot": {
+      "background": "#fff6e6f0",
+      "background2": "#f6e2c4f0",
+      "radius": 14,
+      "borderWidth": 3,
+      "borderColor": "#caa07a",
+      "shadowColor": "#5a3a2840",
+      "shadowOffset": [
+        0,
+        4
+      ],
+      "shadowBlur": 10
+    },
+    ".slot_on": {
+      "background": "#fffaf0",
+      "background2": "#ffe9c2",
+      "radius": 14,
+      "borderWidth": 4,
+      "borderColor": "#e0525c",
+      "shadowColor": "#e0525c80",
+      "shadowOffset": [
+        0,
+        3
+      ],
+      "shadowBlur": 16
+    },
+    ".count": {
+      "font": "Inter",
+      "fontSize": 15,
+      "bold": true,
+      "color": "#ffffff",
+      "textOutline": 0.25,
+      "textOutlineColor": "#5a3a28"
+    },
+    ".key": {
+      "font": "Inter",
+      "fontSize": 12,
+      "bold": true,
+      "color": "#a07a5a"
+    },
+    ".hint": {
+      "font": "Inter",
+      "fontSize": 18,
+      "bold": true,
+      "color": "#fff8ec",
+      "textShadowColor": "#3a2416e0",
+      "textShadowOffset": [
+        0,
+        2
+      ],
+      "textOutline": 0.12,
+      "textOutlineColor": "#5a3a2890"
+    },
+    ".toast": {
+      "background": "#6aa553ee",
+      "background2": "#5b9447ee",
+      "radius": 20,
+      "padding": [
+        8,
+        22
+      ],
+      "font": "serif",
+      "fontSize": 22,
+      "color": "#ffffff",
+      "shadowColor": "#2a401c60",
+      "shadowOffset": [
+        0,
+        4
+      ],
+      "shadowBlur": 12
+    },
+    ".dialogue_box": {
+      "background": "#fff8ebf4",
+      "background2": "#fbe9cff4",
+      "radius": 22,
+      "borderWidth": 3,
+      "borderColor": "#c99568",
+      "shadowColor": "#5a3a2860",
+      "shadowOffset": [
+        0,
+        8
+      ],
+      "shadowBlur": 28
+    },
+    ".dialogue_portrait": {
+      "radius": 80,
+      "borderWidth": 3,
+      "borderColor": "#e0525c",
+      "background": "#fde9d2",
+      "imageFit": "cover"
+    },
+    ".dialogue_name": {
+      "font": "serif",
+      "fontSize": 24,
+      "bold": true,
+      "color": "#e0525c",
+      "letterSpacing": 0.06
+    },
+    ".dialogue_text": {
+      "font": "serif",
+      "fontSize": 28,
+      "lineSpacing": 1.22,
+      "color": "$ink",
+      "verticalAlign": "top"
+    },
+    ".dialogue_choice": {
+      "background": "#fff3dff0",
+      "background2": "#f7e1c0f0",
+      "borderColor": "#caa07a",
+      "borderWidth": 2,
+      "radius": 14,
+      "font": "serif",
+      "fontSize": 22,
+      "color": "$ink",
+      "textAlign": "left",
+      "padding": [
+        8,
+        18
+      ],
+      "hover": {
+        "borderColor": "#e0525c"
+      }
+    },
+    ".dialogue_hint": {
+      "font": "Inter",
+      "fontSize": 13,
+      "color": "#a07a5a",
+      "textAlign": "right"
+    }
+  }
+}

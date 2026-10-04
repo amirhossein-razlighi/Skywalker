@@ -145,6 +145,7 @@ ViewCamera CameraPath::evaluate(double t, const anim::PointLookup& lookup, const
     }
     v.aperture = aperture;
     v.focusDistance = focusDistance;
+    v.tiltShift = tiltShift;
     v.motionBlur = 0.f;
     if (nearPlane) v.nearPlane = *nearPlane;
     if (farPlane) v.farPlane = *farPlane;
@@ -155,11 +156,11 @@ ViewCamera CameraPath::evaluate(double t, const anim::PointLookup& lookup, const
 Result<CameraPath> CameraPath::fromJson(const Json& j) {
     CameraPath p;
     if (!j.isObject()) return Error::make("invalid_camera", "camera must be an object with \"keys\" or \"shots\"");
-    static const std::vector<std::string> top{"keys", "shots", "aperture", "focus_distance", "near", "far"};
+    static const std::vector<std::string> top{"keys", "shots", "aperture", "focus_distance", "tilt_shift", "near", "far"};
     for (const auto& [name, v] : j.members()) {
         if (std::find(top.begin(), top.end(), name) == top.end()) {
             std::string g = str::closest(name, top, 3);
-            return Error::make("invalid_camera", "unknown camera field \"" + name + "\"", g.empty() ? "fields: keys, shots, aperture, focus_distance, near, far" : "did you mean \"" + g + "\"?");
+            return Error::make("invalid_camera", "unknown camera field \"" + name + "\"", g.empty() ? "fields: keys, shots, aperture, focus_distance, tilt_shift, near, far" : "did you mean \"" + g + "\"?");
         }
     }
     const bool hasKeys = j.get("keys").isArray() && j.get("keys").size() > 0;
@@ -170,6 +171,7 @@ Result<CameraPath> CameraPath::fromJson(const Json& j) {
     }
     p.aperture = std::max(0.f, j.get("aperture").asFloat(0.f));
     p.focusDistance = std::max(0.f, j.get("focus_distance").asFloat(0.f));
+    p.tiltShift = std::clamp(j.get("tilt_shift").asFloat(0.f), 0.f, 1.f);
     if (j.get("near").isNumber()) p.nearPlane = std::max(0.001f, j.get("near").asFloat());
     if (j.get("far").isNumber()) p.farPlane = std::max(1.f, j.get("far").asFloat());
     // Both forms reuse the sequence format (and its validation): keyframes become property tracks,

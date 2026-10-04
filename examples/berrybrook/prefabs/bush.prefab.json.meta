@@ -1,0 +1,13 @@
+{
+  "guid": "947e1859c14e3db35eb87147d23c033e",
+  "type": "prefab",
+  "tags": [
+    "berrybrook"
+  ],
+  "description": "Berrybrook bush (procedural, Blender)",
+  "source": {
+    "by": "mcp:director",
+    "fromEntity": "Prefab bush"
+  },
+  "import": {}
+}

@@ -113,6 +113,7 @@ bool sceneCamera(const Scene& scene, ViewCamera& out, EntityId preferred) {
     out.aperture = c->aperture;
     out.focusDistance = c->focusDistance;
     out.motionBlur = c->motionBlur;
+    out.tiltShift = c->tiltShift;
     return true;
 }
 

@@ -631,6 +631,8 @@ void addViewTools(Engine& engine, ToolRegistry& reg) {
                      {"fov", number("Vertical field of view in degrees for the custom view (lens: 25 tele .. 90 wide)")},
                      {"aperture", number("Custom view depth of field f-stop (1.4 shallow .. 16 deep; default off)")},
                      {"focus_distance", number("Custom view focus distance in meters (default: autofocus on the center)")},
+                     {"tilt_shift", number("Custom view tilt-shift miniature look: 0..1 blur above and below a sharp band across the "
+                                           "middle of the frame (aerial 'toy town' shots; combines with aperture)")},
                      {"annotate", boolean("Draw entity id labels (default true)")},
                      {"overlays", boolean("Editor grid & selection highlight (default true)")},
                      {"samples", integer("Supersampling: jittered sub-frames accumulated (default 4; 1 = fastest preview, "
@@ -662,6 +664,7 @@ void addViewTools(Engine& engine, ToolRegistry& reg) {
                      if (a.contains("fov")) o.customView.fovDeg = std::clamp(a.get("fov").asFloat(), 5.f, 150.f);
                      o.customView.aperture = std::max(0.f, a.get("aperture").asFloat(0.f));
                      o.customView.focusDistance = std::max(0.f, a.get("focus_distance").asFloat(0.f));
+                     o.customView.tiltShift = std::clamp(a.get("tilt_shift").asFloat(0.f), 0.f, 1.f);
                  }
                  o.annotate = a.get("annotate").asBool(true);
                  o.editorOverlays = a.get("overlays").asBool(true);

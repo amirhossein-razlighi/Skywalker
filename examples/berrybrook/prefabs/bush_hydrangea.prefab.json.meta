@@ -1,0 +1,13 @@
+{
+  "guid": "c72b9a575fcb0e99d2fe79644d5621a4",
+  "type": "prefab",
+  "tags": [
+    "berrybrook"
+  ],
+  "description": "Berrybrook bush hydrangea (procedural, Blender)",
+  "source": {
+    "by": "mcp:director",
+    "fromEntity": "Prefab bush_hydrangea"
+  },
+  "import": {}
+}

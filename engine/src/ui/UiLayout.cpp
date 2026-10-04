@@ -278,8 +278,10 @@ struct Builder {
             r.x = parent.x + mn.x * parent.w + m.w + n.el.position.x;
             r.w = std::max(0.f, width);
         } else {
+            // Along an axis that does not stretch, the margin insets the element from the edge it is
+            // anchored to (a bottom_stretch box with margin bottom 40 floats 40 px above the edge).
             r.w = p.x;
-            r.x = parent.x + mn.x * parent.w + n.el.position.x - pv.x * r.w;
+            r.x = parent.x + mn.x * parent.w + n.el.position.x - pv.x * r.w + m.w * (1.f - mn.x) - m.y * mn.x;
         }
         if (stretchY) {
             float top = parent.y + mn.y * parent.h + m.x, bottom = parent.y + mx.y * parent.h - m.z;
@@ -287,7 +289,7 @@ struct Builder {
             r.h = std::max(0.f, bottom - top);
         } else {
             r.h = p.y;
-            r.y = parent.y + mn.y * parent.h + n.el.position.y - pv.y * r.h;
+            r.y = parent.y + mn.y * parent.h + n.el.position.y - pv.y * r.h + m.x * (1.f - mn.y) - m.z * mn.y;
         }
         return r;
     }

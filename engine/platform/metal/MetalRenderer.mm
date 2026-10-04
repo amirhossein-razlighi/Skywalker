@@ -2567,7 +2567,7 @@ private:
         LensUniformsGpu lu{};
         float fl = 12.f / std::tan(radians(std::clamp(cam.fovDeg, 5.f, 170.f)) * 0.5f);  // focal length (mm), 24 mm sensor
         lu.lens = simd_make_float4(cam.aperture, cam.focusDistance, fl, 24.f);
-        lu.motion = simd_make_float4(cam.motionBlur, 0, 0, 0);
+        lu.motion = simd_make_float4(cam.motionBlur, std::clamp(cam.tiltShift, 0.f, 1.f), 0, 0);
         lu.texel = simd_make_float4(1.f / src.width, 1.f / src.height, 1.f / dofCoc_.width, 1.f / dofCoc_.height);
         lu.view = simd_make_float4(static_cast<float>(src.height), 0, 0, 0);
 
@@ -2579,7 +2579,7 @@ private:
             src = postA_;
         }
         // Depth of field.
-        if (cam.aperture > 0.01f && !cam.orthographic) {
+        if ((cam.aperture > 0.01f || cam.tiltShift > 0.001f) && !cam.orthographic) {
             fullscreenFU(cmd, dofCocPipeline_, dofCoc_, {src, depthResolved_}, base, &lu, sizeof(lu), @"DOF CoC");
             fullscreenFU(cmd, dofBlurPipeline_, dofBlur_, {dofCoc_}, base, &lu, sizeof(lu), @"DOF gather");
             id<MTLTexture> dst = src == postA_ ? postB_ : postA_;

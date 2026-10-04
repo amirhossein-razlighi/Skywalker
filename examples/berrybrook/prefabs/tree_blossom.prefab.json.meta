@@ -1,0 +1,13 @@
+{
+  "guid": "b09d5a602f5d0dabf91089b79f1fbf1a",
+  "type": "prefab",
+  "tags": [
+    "berrybrook"
+  ],
+  "description": "Berrybrook tree blossom (procedural, Blender)",
+  "source": {
+    "by": "mcp:director",
+    "fromEntity": "Prefab tree_blossom"
+  },
+  "import": {}
+}

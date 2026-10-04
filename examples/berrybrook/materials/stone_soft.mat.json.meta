@@ -1,0 +1,13 @@
+{
+  "guid": "a7f6877300e4f264a8baa35b84aac2b1",
+  "type": "material",
+  "tags": [],
+  "description": "rock (procedural PBR)",
+  "source": {
+    "generator": "texgen",
+    "kind": "rock",
+    "seed": 1,
+    "by": "mcp:director"
+  },
+  "import": {}
+}

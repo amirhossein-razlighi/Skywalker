@@ -56,7 +56,8 @@ fonts. Wrapping prefers spaces, breaks long words, and handles CJK.
 - **Anchors**: `top_left, top, top_right, left, center, right, bottom_left, bottom, bottom_right`
   pin the element (its `position` is an offset, `size` its size); `fill`, `top_stretch`,
   `middle_stretch`, `bottom_stretch`, `left_stretch`, `center_stretch`, `right_stretch` stretch it
-  (insets from `margin`); `custom` uses `anchorMin/anchorMax/pivot` like Unity's RectTransform.
+  (insets from `margin`; on an axis that does not stretch, the margin insets the element from the edge it is
+  anchored to, e.g. a `bottom_stretch` box with margin bottom 40 floats 40 px above the bottom); `custom` uses `anchorMin/anchorMax/pivot` like Unity's RectTransform.
 - **Layouts**: `row`/`column` stack children with `gap`, `padding`, `align` (cross axis:
   start/center/end/stretch — stretch also stretches fit-to-content children, whose text then wraps)
   and `justify` (start/center/end/space_between); `flex` shares leftover space. `grid` fills

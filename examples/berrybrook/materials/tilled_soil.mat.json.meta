@@ -1,0 +1,13 @@
+{
+  "guid": "f1c17549eea6a702bcb92f1a154936e7",
+  "type": "material",
+  "tags": [],
+  "description": "noise (procedural PBR)",
+  "source": {
+    "generator": "texgen",
+    "kind": "noise",
+    "seed": 1,
+    "by": "mcp:director"
+  },
+  "import": {}
+}

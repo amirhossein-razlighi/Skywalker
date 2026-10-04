@@ -1,0 +1,13 @@
+{
+  "guid": "503839cec2ca336b46e2f61bb3bac22e",
+  "type": "prefab",
+  "tags": [
+    "berrybrook"
+  ],
+  "description": "Berrybrook bush rose (procedural, Blender)",
+  "source": {
+    "by": "mcp:director",
+    "fromEntity": "Prefab bush_rose"
+  },
+  "import": {}
+}

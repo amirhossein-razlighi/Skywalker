@@ -1,0 +1,13 @@
+{
+  "guid": "f78387f312f58f06006d79b4085a853b",
+  "type": "prefab",
+  "tags": [
+    "berrybrook"
+  ],
+  "description": "Berrybrook flowers daisy (procedural, Blender)",
+  "source": {
+    "by": "mcp:director",
+    "fromEntity": "Prefab flowers_daisy"
+  },
+  "import": {}
+}

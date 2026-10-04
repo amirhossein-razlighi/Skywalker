@@ -89,6 +89,7 @@ struct CameraPath {
     anim::Track shots;                   // procedural shots (a shot track)
     float aperture = 0.f;
     float focusDistance = 0.f;
+    float tiltShift = 0.f;
     std::optional<float> nearPlane, farPlane;
 
     bool empty() const { return eye.keys.empty() && shots.keys.empty(); }

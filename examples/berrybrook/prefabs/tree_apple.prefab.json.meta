@@ -1,0 +1,13 @@
+{
+  "guid": "f0e009f97230c4da2b2f568a1ed25637",
+  "type": "prefab",
+  "tags": [
+    "berrybrook"
+  ],
+  "description": "Berrybrook tree apple (procedural, Blender)",
+  "source": {
+    "by": "mcp:director",
+    "fromEntity": "Prefab tree_apple"
+  },
+  "import": {}
+}

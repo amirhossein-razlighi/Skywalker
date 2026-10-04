@@ -1,0 +1,13 @@
+{
+  "guid": "e685a10770c67868b7b4e61741e61fc1",
+  "type": "prefab",
+  "tags": [
+    "berrybrook"
+  ],
+  "description": "Berrybrook flowers cosmos (procedural, Blender)",
+  "source": {
+    "by": "mcp:director",
+    "fromEntity": "Prefab flowers_cosmos"
+  },
+  "import": {}
+}

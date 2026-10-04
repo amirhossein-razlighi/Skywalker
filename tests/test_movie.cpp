@@ -138,7 +138,7 @@ TEST_CASE("movie camera paths: keyframes, shots, cuts, validation") {
     auto keys = CameraPath::fromJson(Json::parse(R"({"keys": [
         {"t": 0, "eye": [0, 2, 10], "target": [0, 0, 0], "fov": 40},
         {"t": 2, "eye": [10, 2, 0], "target": [0, 1, 0], "fov": 60, "roll": 10},
-        {"t": 4, "eye": [0, 2, -10], "target": [0, 0, 0]}], "aperture": 2.8})")
+        {"t": 4, "eye": [0, 2, -10], "target": [0, 0, 0]}], "aperture": 2.8, "tilt_shift": 0.6})")
                                          .value());
     REQUIRE_MESSAGE(keys.ok(), (keys.ok() ? "" : keys.error().message));
     CHECK(keys->length() == doctest::Approx(4.f));
@@ -149,6 +149,7 @@ TEST_CASE("movie camera paths: keyframes, shots, cuts, validation") {
     CHECK(v.target.y == doctest::Approx(1.f));
     CHECK(v.fovDeg == doctest::Approx(60.f));
     CHECK(v.aperture == doctest::Approx(2.8f));
+    CHECK(v.tiltShift == doctest::Approx(0.6f));
     CHECK(v.up.y < 0.999f);  // rolled
     ViewCamera mid = keys->evaluate(1.0, nullptr, base);
     CHECK(length(mid.eye - Vec3{0, 2, 10}) > 1.f);  // splined between keys
