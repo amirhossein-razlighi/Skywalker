@@ -49,6 +49,10 @@ const TypeInfo& Sprite::type() {
             SKY_FIELD(Sprite, castShadows, Bool, "Blocks shadow-casting 2D lights"),
             SKY_FIELD_RANGE(Sprite, alphaCutoff, Float, "Hard cutout below this alpha (0 = soft edges)", 0.f, 1.f),
             SKY_FIELD(Sprite, visible, Bool, "Whether the sprite is drawn"),
+            SKY_FIELD(Sprite, ySort, Bool, "Top-down depth: among ySort sprites and tile rows of the same layer and order, the one "
+                                           "lower on screen (smaller world y at the pivot) draws in front"),
+            SKY_FIELD(Sprite, palette, String, "Palette swap: *.palette.json ({\"swap\": {\"#3a7d44\": \"#d8e4ec\"}}) or a 2-row png "
+                                               "(row 0 source colors, row 1 targets); recolors the texture (seasons, variants)"),
         }};
     return info;
 }
@@ -81,7 +85,8 @@ const TypeInfo& Tilemap::type() {
             SKY_FIELD_RANGE(Tilemap, cellSize, Float, "World units per cell", 0.001f, 1000.f),
             SKY_FIELD_RANGE(Tilemap, width, Int, "Columns", 1, 4096),
             SKY_FIELD_RANGE(Tilemap, height, Int, "Rows", 1, 4096),
-            SKY_FIELD_JSON(Tilemap, layers, "[{name, data, solid (true | \"tiles\"), visible, z, tint, sortingLayer, order}] bottom to top", R"({"type": "array", "items": {"type": "object"}})"),
+            SKY_FIELD_JSON(Tilemap, layers, "[{name, data, solid (true | \"tiles\"), visible, z, tint, sortingLayer, order, ySort}] bottom to top; a ySort "
+                           "layer draws row by row, interleaved with ySort sprites (tall tiles: the tileset's sortOffset)",R"({"type": "array", "items": {"type": "object"}})"),
             SKY_FIELD_JSON(Tilemap, solidTiles, "Tile ids that collide in layers with solid: \"tiles\" ([3, \"10-20\"])", R"({"type": "array"})"),
             SKY_FIELD_JSON(Tilemap, autotile, "Terrains for auto-tiling: {\"wall\": {\"mode\": \"blob47\" | \"wang16\", \"first\": 33}} or \"tiles\": [ids]", R"({"type": "object"})"),
             SKY_FIELD(Tilemap, color, Color, "Tint"),
@@ -90,6 +95,7 @@ const TypeInfo& Tilemap::type() {
             SKY_FIELD_ENUM(Tilemap, filter, "Texture sampling", "nearest", "linear"),
             SKY_FIELD(Tilemap, lit, Bool, "Lit by 2D lights"),
             SKY_FIELD(Tilemap, castShadows, Bool, "Solid tiles block shadow-casting 2D lights"),
+            SKY_FIELD(Tilemap, palette, String, "Palette swap for the tileset image (*.palette.json or a 2-row png strip)"),
         }};
     return info;
 }

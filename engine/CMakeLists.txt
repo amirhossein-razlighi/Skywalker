@@ -86,6 +86,8 @@ set(SKY_ENGINE_SOURCES
     src/render2d/Tilemap.cpp
     src/render2d/Sprites.cpp
     src/render2d/Raster2D.cpp
+    src/render2d/Particles2D.cpp
+    src/agent/Particles2DTools.cpp
     src/ui/UiStyle.cpp
     src/ui/UiLayout.cpp
     src/ui/UiSystem.cpp

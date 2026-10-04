@@ -161,7 +161,9 @@ const char* kPixelTheme = R"JSON({
     "input": {"background": "$field", "radius": 0, "borderWidth": 3, "borderColor": "$line"},
     ".dialogue_box": {"background": "#1b1a2ef4", "background2": "#1b1a2ef4", "radius": 0, "borderWidth": 4, "borderColor": "$text",
                       "shadowColor": "#0d0c18", "shadowOffset": [6, 6], "shadowBlur": 0},
-    ".dialogue_portrait": {"radius": 0, "borderWidth": 3, "borderColor": "$text"},
+    ".dialogue_portrait": {"radius": 0, "borderWidth": 3, "borderColor": "$text", "imageFilter": "nearest"},
+    "image": {"imageFilter": "nearest"},
+    "panel": {"imageFilter": "nearest"},
     ".dialogue_choice": {"radius": 0}
   }
 })JSON";
@@ -193,7 +195,8 @@ const std::vector<std::string>& StyleSheet::propertyNames() {
         "shadowColor", "shadowOffset", "shadowBlur", "opacity", "padding", "font", "fontSize", "color", "textAlign",
         "verticalAlign", "bold", "italic", "lineSpacing", "letterSpacing", "textTransform", "textOutline",
         "textOutlineColor", "textShadowColor", "textShadowOffset", "accent", "track", "knob", "trackHeight", "knobSize",
-        "placeholderColor", "imageFit", "transition", "hover", "pressed", "focus", "checked", "disabled"};
+        "placeholderColor", "imageFit", "transition", "imageFilter", "sliceScale", "hover", "pressed", "focus", "checked",
+        "disabled"};
     return names;
 }
 
@@ -354,6 +357,8 @@ void StyleSheet::apply(const Json& props, Style& s) const {
     color("placeholderColor", s.placeholderColor);
     string("imageFit", s.imageFit);
     number("transition", s.transition);
+    string("imageFilter", s.imageFilter);
+    number("sliceScale", s.sliceScale);
 }
 
 Style StyleSheet::root() const {

@@ -66,5 +66,6 @@ void addProcessTools(Engine& engine, ToolRegistry& reg);  // ProcessTools.cpp: p
 Json readPropertyPath(const Scene& s, EntityId id, const std::string& path);
 void addShadowTools(Engine& engine, ToolRegistry& reg);  // ShadowTools.cpp: shadow_atlas_info, light_shadows
 void addPrefabTools(Engine& engine, ToolRegistry& reg);  // PrefabTools.cpp: entity_refs, copy/paste, prefab_overrides...
+void addParticles2DTools(Engine& engine, ToolRegistry& reg);  // Particles2DTools.cpp: particles2d_create, particles2d_info
 
 }  // namespace sky::tools

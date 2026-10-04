@@ -1213,6 +1213,7 @@ void registerEngineTools(Engine& engine) {
     tools::addProcessTools(engine, reg);  // ProcessTools.cpp: process_info, sim_teleport, sim_display
     tools::addShadowTools(engine, reg);  // engine/src/agent/ShadowTools.cpp (point / spot light shadows)
     tools::addPrefabTools(engine, reg);  // engine/src/agent/PrefabTools.cpp (entity links, linked prefabs)
+    tools::addParticles2DTools(engine, reg);  // engine/src/agent/Particles2DTools.cpp (pixel-art weather, fireflies)
 }
 
 }  // namespace sky
