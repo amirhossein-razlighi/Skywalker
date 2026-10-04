@@ -57,7 +57,56 @@ const ToolDef* ToolRegistry::find(std::string_view name) const {
     for (const auto& t : tools_) {
         if (t.name == name) return &t;
     }
+    return findDynamic(name);
+}
+
+const ToolDef* ToolRegistry::findDynamic(std::string_view name) const {
+    std::lock_guard lock(dynamicMutex_);
+    for (const auto& t : dynamic_) {
+        if (t->name == name) return t.get();
+    }
     return nullptr;
+}
+
+Status ToolRegistry::addDynamic(ToolDef def) {
+    for (const auto& t : tools_) {
+        if (t.name == def.name) return Error::make("name_taken", "'" + def.name + "' is a built-in tool", "pick another name");
+    }
+    std::lock_guard lock(dynamicMutex_);
+    if (dynamic_.size() + retired_.size() >= kMaxDynamicDefinitions) {
+        return Error::make("limit_reached", "too many dynamic tool definitions in this engine session",
+                           "restart the engine, or re-register tools less often");
+    }
+    auto entry = std::make_shared<const ToolDef>(std::move(def));
+    for (auto& t : dynamic_) {
+        if (t->name == entry->name) {
+            retired_.push_back(std::move(t));
+            t = std::move(entry);
+            return {};
+        }
+    }
+    dynamic_.push_back(std::move(entry));
+    return {};
+}
+
+bool ToolRegistry::removeDynamic(std::string_view name) {
+    std::lock_guard lock(dynamicMutex_);
+    for (auto it = dynamic_.begin(); it != dynamic_.end(); ++it) {
+        if ((*it)->name == name) {
+            retired_.push_back(std::move(*it));
+            dynamic_.erase(it);
+            return true;
+        }
+    }
+    return false;
+}
+
+std::vector<ToolDef> ToolRegistry::dynamicTools() const {
+    std::lock_guard lock(dynamicMutex_);
+    std::vector<ToolDef> out;
+    out.reserve(dynamic_.size());
+    for (const auto& t : dynamic_) out.push_back(*t);
+    return out;
 }
 
 ToolResult ToolResult::defer(std::function<void()> work, std::function<ToolResult()> finish, std::function<void()> cancel) {
@@ -88,6 +137,7 @@ ToolResult ToolRegistry::invoke(std::string_view name, const Json& args, ToolCon
     if (!tool) {
         std::vector<std::string> names;
         for (const auto& t : tools_) names.push_back(t.name);
+        for (const auto& t : dynamicTools()) names.push_back(t.name);
         std::string guess = str::closest(name, names, 4);
         return ToolResult::error(Error::make("unknown_tool", "no tool named '" + std::string(name) + "'",
                                              guess.empty() ? "call tools/list to see available tools"
@@ -106,7 +156,8 @@ ToolResult ToolRegistry::invoke(std::string_view name, const Json& args, ToolCon
 
 Json ToolRegistry::listJson() const {
     Json list = Json::array();
-    for (const auto& t : tools_) {
+    const std::vector<ToolDef> dynamic = dynamicTools();
+    auto describe = [&list](const ToolDef& t) {
         list.push(Json::object({{"name", t.name},
                                 {"title", t.title},
                                 {"description", t.description},
@@ -117,7 +168,9 @@ Json ToolRegistry::listJson() const {
                                                               {"openWorldHint", t.openWorld}})},
                                 // Lets clients group tools / grant permissions per category.
                                 {"_meta", Json::object({{"skywalker/category", t.category}})}}));
-    }
+    };
+    for (const auto& t : tools_) describe(t);
+    for (const auto& t : dynamic) describe(t);  // tools hosted by external processes (py_*)
     return Json::object({{"tools", list}});
 }
 

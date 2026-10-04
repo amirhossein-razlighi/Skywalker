@@ -19,6 +19,8 @@
 #include <string>
 #include <vector>
 
+#include "skywalker/agent/EventLog.h"
+#include "skywalker/agent/ToolHost.h"
 #include "skywalker/agent/ToolRegistry.h"
 #include "skywalker/anim/AnimationSystem.h"
 #include "skywalker/assets/AssetDatabase.h"
@@ -359,6 +361,14 @@ public:
     bool agentServerRunning() const;
     static std::string defaultSocketPath();
 
+    // --- Agent link: external agent processes (docs/PYTHON_AGENTS.md) -------------------------
+    /// Every emitted event, sequence-numbered and followable by many readers (events_poll). Thread-safe.
+    EventLog& eventLog() { return *eventLog_; }
+    std::shared_ptr<EventLog> eventLogShared() { return eventLog_; }
+    /// Tools served by external processes as py_* tools (tool_host_*). Thread-safe.
+    ToolHost& toolHost() { return *toolHost_; }
+    std::shared_ptr<ToolHost> toolHostShared() { return toolHost_; }
+
 private:
     void ensureMeshUploaded(const std::string& meshKey);
     void frameSceneView();
@@ -478,6 +488,9 @@ private:
     double realSinceFrame_ = 0;  // real seconds accumulated since the last presented frame
     int ticksSinceFrame_ = 0;
     FrameFlowStats flowStats_;
+    // Agent link (after tools_: the host registers py_* tools in it)
+    std::shared_ptr<EventLog> eventLog_ = std::make_shared<EventLog>(4096);
+    std::shared_ptr<ToolHost> toolHost_ = std::make_shared<ToolHost>(tools_);
 };
 
 void registerEngineTools(Engine& engine);

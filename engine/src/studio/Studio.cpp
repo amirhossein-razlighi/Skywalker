@@ -526,6 +526,8 @@ Json Message::toJson() const {
     if (!thread.empty()) j["thread"] = thread;
     j["text"] = text;
     if (!refs.members().empty()) j["refs"] = refs;
+    if (kind != "chat") j["kind"] = kind;
+    if (!data.members().empty()) j["data"] = data;
     return j;
 }
 
@@ -540,6 +542,8 @@ Message Message::fromJson(const Json& j) {
     m.thread = j.get("thread").asString();
     m.text = j.get("text").asString();
     if (j.get("refs").isObject()) m.refs = j.get("refs");
+    m.kind = j.get("kind").asString("chat");
+    if (j.get("data").isObject()) m.data = j.get("data");
     return m;
 }
 
@@ -1764,6 +1768,10 @@ Result<Message> Studio::sendMessage(const Json& spec, const std::string& actor) 
     for (const char* k : {"task", "feedback", "decision", "loop"}) {
         if (spec.contains(k)) m.refs[k] = spec.get(k);
     }
+    m.kind = slugify(spec.get("kind").asString("chat"));
+    if (m.kind.empty()) m.kind = "chat";
+    std::replace(m.kind.begin(), m.kind.end(), '-', '_');
+    if (spec.get("data").isObject()) m.data = spec.get("data");
     m.from = spec.get("from").asString();
     if (m.from.empty()) m.from = memberForActor(actor).empty() ? actor : memberForActor(actor);
     std::erase(m.to, m.from);
@@ -1773,7 +1781,7 @@ Result<Message> Studio::sendMessage(const Json& spec, const std::string& actor) 
     appendMessage(m);
     std::string who = m.to.empty() ? "#" + m.channel : "@" + m.to.front() + (m.to.size() > 1 ? " +" + std::to_string(m.to.size() - 1) : "");
     emit("message", "sent", m.id, actor, m.from + " → " + who + ": " + shortText(m.text, 100),
-         Json::object({{"channel", m.channel}, {"to", strArray(m.to)}, {"mentions", strArray(m.mentions)}}));
+         Json::object({{"channel", m.channel}, {"to", strArray(m.to)}, {"mentions", strArray(m.mentions)}, {"message", m.toJson()}}));
     return m;
 }
 

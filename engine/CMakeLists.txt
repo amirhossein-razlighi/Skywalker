@@ -160,6 +160,9 @@ set(SKY_ENGINE_SOURCES
     # Terms of Use, Privacy Notice and the local acceptance record (docs/legal/)
     src/legal/Legal.cpp
     src/agent/LegalTools.cpp
+    # Agent link: followable events and tools served by external processes (docs/PYTHON_AGENTS.md)
+    src/agent/AgentLink.cpp
+    src/agent/AgentLinkTools.cpp
 )
 
 # DCC bridge: the Python helper library and the Blender add-on are embedded so the engine can

@@ -1,0 +1,27 @@
+{
+  "agents": {
+    "nimbus": [
+      {"text": "No run reaches the goal and the bot reports nothing tagged \"goal\". Filing it.",
+       "tool_calls": [{"name": "studio_feedback_submit", "input": {
+         "category": "clarity", "severity": "high",
+         "summary": "No run can finish: nothing is tagged \"goal\"",
+         "details": "The goal pole at x=59 is untagged, so the level has no finish the game (or a bot) can detect.",
+         "evidence": {"playtest": "P-1"}, "fingerprint": "no-goal-tag"}}]},
+      {"tool_calls": [{"name": "studio_decide", "input": {
+         "feedback": "F-1", "verdict": "act", "rationale": "A level without a detectable finish cannot be completed.",
+         "tasks": [{"title": "Tag the Goal Pole as goal", "assignee": "stratus",
+                    "acceptance": ["Goal Pole has the tag goal", "every playtest run reaches the goal"]}]}}]},
+      {"text": "Decided F-1: act. T-1 for @stratus: tag the Goal Pole as goal."}
+    ],
+    "stratus": [
+      {"tool_calls": [{"name": "studio_task_claim", "input": {}}]},
+      {"tool_calls": [{"name": "scene_query", "input": {"name": "Goal*"}}]},
+      {"tool_calls": [{"name": "entity_update", "input": {"entity": "Goal Pole", "tags": ["goal"]}}]},
+      {"tool_calls": [
+        {"name": "studio_task_update", "input": {"task": "T-1", "status": "done", "comment": "Goal Pole tagged goal."}},
+        {"name": "memory_remember", "input": {"text": "Sky Dash: the level finish must carry the tag goal (bots and the game detect it by tag).",
+                                               "kind": "fact", "scope": "project", "tags": ["level", "playtest"]}}]},
+      {"text": "T-1 done: tagged the Goal Pole as goal; remembered that finishes need the goal tag."}
+    ]
+  }
+}

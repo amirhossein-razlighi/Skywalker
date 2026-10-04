@@ -214,7 +214,8 @@ Simulation is deterministic: the same scene and seed give the same report (timin
 | `studio_feedback_submit` / `_list` / `_update` | Feedback (lists include verdicts and effects). |
 | `studio_decide` | Director/producer verdicts. |
 | `studio_loop_define` / `_start` / `_advance` / `_status` / `_stop` | Loops. |
-| `studio_message_send` / `studio_inbox` | Channels, threads, @mentions. |
+| `studio_message_send` / `studio_inbox` | Channels, threads, @mentions; structured messages (`kind`, `data`), whole threads (`thread`, `after`). |
+| `studio_presence` | Live status of agents run outside the editor (working / idle / waiting / blocked). |
 | `playtest_run` / `playtest_compare` | Playtests and before/after comparison. |
 
 ## Identity: how external tools join
@@ -239,6 +240,14 @@ off and approve.
 3. `studio_loop_advance {loop, reports: [{agent, report, usage?}]}` — reports may arrive one
    at a time; the loop moves on when all pending agents reported (or `complete_stage`).
 4. Repeat until `status` is `done`, `stopped` or `awaiting_approval`.
+
+## Python agents
+
+The [Python agent layer](PYTHON_AGENTS.md) (`python/`, `sky-agents`) runs roster members with Claude or local models,
+shared memory, workflows, approvals and tracing, and drives these loops through the same tools: its agents show up in
+the Studio panel with presence, usage and attributed edits. It follows the studio live through `events_poll` and can
+serve its own tools to every agent (`tool_host_*`, `py_*` tools); `skywalker serve` is a headless engine that several
+such clients share.
 
 ## Headless runner
 

@@ -89,12 +89,15 @@ How the studio works:
 
 std::vector<AgentRunner::AllowedTool> AgentRunner::toolsFor(const AgentProfile& agent, const ToolRegistry& registry, bool loopMember) {
     std::vector<AllowedTool> out;
-    for (const auto& def : registry.all()) {
-        if (loopMember && loopControlTools().count(def.name)) continue;
+    auto consider = [&](const ToolDef& def) {
+        if (def.quiet) return;  // plumbing for external harnesses (event polls, tool-host traffic)
+        if (loopMember && loopControlTools().count(def.name)) return;
         Access access = agent.access(def.category, !def.mutates, def.openWorld);
-        if (access == Access::Off) continue;
+        if (access == Access::Off) return;
         out.push_back({llm::ToolSpec{def.name, def.description, def.inputSchema}, def.category, access});
-    }
+    };
+    for (const auto& def : registry.all()) consider(def);
+    for (const auto& def : registry.dynamicTools()) consider(def);  // py_* tools served by external processes
     return out;
 }
 

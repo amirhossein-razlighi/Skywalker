@@ -33,6 +33,7 @@ Skywalker is organized in strict layers. Lower layers never depend on higher one
 | `editor/` | SwiftUI editor (Swift 6, strict concurrency) |
 | `tools/cli` | Headless CLI and MCP stdio server |
 | `tests/` | doctest unit and integration tests |
+| `python/` | The Python agent layer (`skywalker-agents`, [PYTHON_AGENTS](PYTHON_AGENTS.md)): a client of the tool surface, never linked into the engine |
 
 ## Key decisions
 

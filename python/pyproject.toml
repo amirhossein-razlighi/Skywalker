@@ -1,0 +1,123 @@
+[build-system]
+requires = ["hatchling>=1.24"]
+build-backend = "hatchling.build"
+
+[project]
+name = "skywalker-agents"
+dynamic = ["version"]
+description = "Build, run and observe teams of AI agents on the Skywalker game engine: typed engine client, agents, shared memory, communication, workflows, evals and tracing."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "CC0-1.0"
+authors = [{ name = "Skywalker contributors" }]
+keywords = ["agents", "llm", "multi-agent", "game-engine", "mcp", "skywalker"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Typing :: Typed",
+]
+# The core needs only pydantic and PyYAML; every model provider and integration is an extra.
+dependencies = [
+    "pydantic>=2.6",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+anthropic = ["anthropic>=0.70"]
+openai = ["openai>=1.40"]
+litellm = ["litellm>=1.40"]
+images = ["pillow>=10"]
+memory-vector = ["sqlite-vec>=0.1.6"]
+embeddings = ["sentence-transformers>=3"]
+qdrant = ["qdrant-client>=1.9"]
+chroma = ["chromadb>=0.5"]
+otel = ["opentelemetry-api>=1.25", "opentelemetry-sdk>=1.25", "opentelemetry-exporter-otlp-proto-http>=1.25"]
+mcp = ["mcp>=1.2"]
+langchain = ["langchain-core>=0.3"]
+langgraph = ["langgraph>=0.2", "langchain-core>=0.3"]
+crewai = ["crewai>=0.80"]
+openai-agents = ["openai-agents>=0.1"]
+pydantic-ai = ["pydantic-ai-slim>=0.1"]
+claude-agent-sdk = ["claude-agent-sdk>=0.1"]
+all = [
+    "skywalker-agents[anthropic,openai,images,memory-vector,otel,mcp,langgraph]",
+]
+
+[project.scripts]
+sky-agents = "skywalker_agents.cli.main:main"
+
+[project.urls]
+Documentation = "https://github.com/amirhossein-razlighi/Skywalker/blob/main/docs/PYTHON_AGENTS.md"
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "pytest-asyncio>=0.24",
+    "pytest-timeout>=2.3",
+    "mypy>=1.11",
+    "ruff>=0.6",
+    "types-PyYAML>=6",
+    "pillow>=10",
+    "anthropic>=0.70",
+    "openai>=1.40",
+    "langchain-core>=0.3",
+    "mcp>=1.2",
+    "opentelemetry-api>=1.25",
+    "opentelemetry-sdk>=1.25",
+]
+
+[tool.hatch.version]
+path = "src/skywalker_agents/_version.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/skywalker_agents"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src/skywalker_agents", "tests", "examples", "README.md"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+timeout = 60
+asyncio_default_fixture_loop_scope = "function"
+markers = [
+    "integration: needs a built skywalker binary (SKYWALKER_BIN or build/release/bin/skywalker)",
+    "live: calls a real model API (needs ANTHROPIC_API_KEY); off unless SKY_AGENTS_LIVE=1",
+]
+filterwarnings = ["error::pytest.PytestUnraisableExceptionWarning"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+src = ["src", "tests", "examples"]
+
+[tool.ruff.format]
+exclude = ["src/skywalker_agents/engine/_generated.py"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF", "ASYNC", "PT", "C4", "PIE", "RET"]
+ignore = ["RUF001", "RUF002", "RUF003", "B008", "SIM108", "RET504", "PT011", "PT018", "ASYNC240", "ASYNC110"]
+
+[tool.ruff.lint.per-file-ignores]
+"src/skywalker_agents/engine/_generated.py" = ["E501", "RUF100"]
+"tests/**" = ["B011", "PT004"]
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+warn_unreachable = true
+files = ["src/skywalker_agents"]
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = [
+    "sqlite_vec", "sentence_transformers", "qdrant_client.*", "chromadb.*", "litellm", "crewai.*",
+    "agents", "agents.*", "pydantic_ai", "pydantic_ai.*", "claude_agent_sdk", "claude_agent_sdk.*",
+    "langgraph.*", "opentelemetry.exporter.*",
+]
+ignore_missing_imports = true

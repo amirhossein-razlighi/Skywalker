@@ -199,6 +199,10 @@ struct Message {
     std::string thread;                 // root message id ("" = new thread)
     std::string text;
     Json refs = Json::object();  // {task, feedback, decision, loop}
+    /// Structured messages between agent harnesses: a kind ("chat" by default; e.g. request, inform,
+    /// handoff, result, approval_request, approval_answer) and a JSON payload the text summarizes.
+    std::string kind = "chat";
+    Json data = Json::object();
 
     Json toJson() const;
     static Message fromJson(const Json& j);

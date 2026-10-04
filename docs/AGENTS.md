@@ -11,6 +11,9 @@ There are three ways an AI works with Skywalker, and all three use the same
    external agents all share it. See [STUDIO](STUDIO.md).
 3. **Generators.** Image, 3D, audio, music and video models that fulfill asset requests.
 
+Your own agent programs use the same surface; the [Python agent layer](PYTHON_AGENTS.md) (`python/`) packages it:
+a typed client, agents, shared memory, workflows, approvals, evals and tracing.
+
 ## 1. MCP
 
 Skywalker implements the [Model Context Protocol](https://modelcontextprotocol.io) server
@@ -23,6 +26,7 @@ side: `initialize` (protocol versions 2025-11-25 → 2024-11-05), `tools/list`, 
 | Auto | `skywalker mcp --auto [--project DIR]` | Default for agent configs: attach to the editor if it runs, else a headless engine. |
 | Attach to the editor | `skywalker mcp --attach [socket]` | You want to watch and co-edit live. Edits appear in the activity feed as `mcp:<client>`. |
 | Headless | `skywalker mcp --project DIR [--scene FILE]` | CI, batch generation, or no GUI. |
+| Shared headless | `skywalker serve --project DIR [--socket PATH]` | Several agents on one headless engine: they attach to its socket like to the editor (`mcp --attach PATH`). |
 
 The editor's socket (`~/.skywalker/editor.sock`, mode 0600) starts with the editor. Toggle
 it from the status bar or Settings → External Agents.
