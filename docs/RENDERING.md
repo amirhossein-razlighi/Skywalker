@@ -229,13 +229,16 @@ camera; `{"debug_view": "uv_checker"}` shows stretched or flipped UVs.
 
 Startup on an M1 Pro (`skywalker call engine_info`, release build, no Metal toolchain):
 
-| Case | Renderer startup | Library | Pipelines (86) |
+| Case | Renderer startup | Library compile | Pipelines (86) |
 |---|---|---|---|
-| Cold: new shader source, no archive | 2464 ms | 1201 ms | 1203 ms |
-| Cold source, pipelines from the archive | 1506 ms | 1167 ms | 10 ms |
-| Warm (system Metal cache) | 48–51 ms | 3 ms | 4 ms |
+| Cold: first launch after a shader change | 2464 ms | 1201 ms | 1203 ms |
+| Warm: system Metal cache and pipeline archive | 48–51 ms | 3 ms | 4 ms |
 
-The library compile is what remains cold; the precompiled `.metallib` removes it.
+macOS keeps its own per-user Metal compiler cache, so warm launches were already fast before
+the archive. The archive pays off when that cache misses while the archive hits (after an OS
+or Xcode update, a cache purge, or a shipped game whose archive was pre-warmed); recording
+it costs one ~0.3 s write on the cold launch. The cold library compile (1.2 s) is what the
+precompiled `.metallib` removes.
 
 ## Surfaces (`mesh` component and material assets)
 
