@@ -87,3 +87,6 @@ samples/
 # Terrain caches (regenerated deterministically from each terrain generator)
 examples/*/terrain/*.terrain
 examples/*/terrain/*.r16
+
+# Ashen Peaks: Blender-generated monastery kit (rebuilt by media/demo/games/ashen_peaks.py)
+examples/ashen_peaks/dcc/
