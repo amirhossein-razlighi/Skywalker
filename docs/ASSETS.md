@@ -133,7 +133,10 @@ the package under the mount name, so a shipped game needs no mount (docs/SHIPPIN
 Projects with many third-party files keep them out of version control and reproducible with a manifest (`assets.json`):
 each entry has the URL(s) (or an itch.io free-download `source`), `sha256`, `size`, `license`, `author`, `source_page` and
 the local `path` under the manifest's `root` (default `downloads/`, gitignored). Archives unpack with include / exclude
-globs and `strip`.
+globs and `strip`. To take a few files out of a large zip pack, mark the entry `"remote": true`: only the zip directory
+and the matching members are read (HTTP range requests), each member pinned by sha256 in `members`. An entry that bundles
+work by several authors lists them in `items` [{name, author, license}]; every item must pass the license check and
+appears in the credits.
 
 ```bash
 python3 media/demo/assetkit.py add-polyhaven assets.json model wooden_crate_01 --res 2k   # or textures / hdri
@@ -142,6 +145,7 @@ python3 media/demo/assetkit.py pin assets.json     # download once, record the h
 python3 media/demo/assetkit.py fetch assets.json   # parallel, resumable, sha256-verified; skips what is present
 python3 media/demo/assetkit.py check assets.json   # every license in the allowlist, every entry pinned
 python3 media/demo/assetkit.py credits assets.json # CREDITS.md grouped by license
+python3 media/demo/assetkit.py ls URL.zip --include 'clothes/*'   # what a remote zip holds, without downloading it
 ```
 
 The allowlist is CC0, CC-BY (with author), MIT, Apache-2.0, OFL and public domain; NC, ND, SA and unknown licenses are

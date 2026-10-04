@@ -87,7 +87,8 @@ which `scene_audit` uses to suggest replacements for placeholder shapes.
 For many assets, keep them out of version control in a pinned manifest instead of one `asset_download` call each:
 `python3 media/demo/assetkit.py add-polyhaven assets.json model wooden_crate_01 --res 2k`, `add-ambientcg`, then `pin`
 (downloads and records sha256), `fetch` (parallel, resumable, verified; into the ignored `downloads/` folder), `check`
-(every license in the allowlist: CC0, CC-BY, MIT, Apache, OFL) and `credits` (writes CREDITS.md).
+(every license in the allowlist: CC0, CC-BY, MIT, Apache, OFL) and `credits` (writes CREDITS.md). For a few files out
+of a big zip pack, set `"remote": true` with `extract` include globs: only those members are downloaded (`ls URL` lists a pack).
 
 ## Checklist after bringing an asset in
 

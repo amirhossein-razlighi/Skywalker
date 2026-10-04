@@ -34,6 +34,9 @@ Entry kinds:
     downloads), `sha256`, `size`, `path` (a file, or the folder an archive unpacks into) and optional
     `extract` {include: [globs], exclude: [globs], strip: N leading folders};
   * multi-file: `files` [{url, path, sha256, size}] (Poly Haven models and texture sets);
+  * a few files out of a big pack: `"remote": true` on a zip `url` with `extract` filters reads only the
+    zip directory and the wanted members through HTTP range requests; `members` pins each one by sha256
+    (`ls URL --include GLOB` lists what a pack holds without downloading it);
   * `polyhaven` / `ambientcg` blocks record how the entry was resolved, so `pin --refresh` can redo it.
 
 Licenses must be in the allowlist (CC0, CC-BY, MIT, Apache, OFL, public domain); NC / ND / SA and
@@ -45,6 +48,7 @@ import concurrent.futures
 import fnmatch
 import hashlib
 import http.cookiejar
+import io
 import json
 import os
 import re
@@ -140,6 +144,9 @@ def license_problem(entry):
         return f"license {lic!r} is not in the allowlist ({', '.join(ALLOWED_LICENSES)})"
     if lic.startswith("CC-BY") and not entry.get("author"):
         return "CC-BY needs an author for attribution"
+    for it in entry.get("items", []):  # every item of a pack must pass too
+        if p := license_problem({"license": it.get("license", ""), "author": it.get("author", "")}):
+            return f"item {it.get('name')}: {p}"
     return None
 
 
@@ -167,7 +174,7 @@ def check(manifest, require_pinned=True):
                 problems.append(f"{aid}: needs url, source or files")
             if not a.get("path"):
                 problems.append(f"{aid}: needs path")
-            if require_pinned and not a.get("sha256"):
+            if require_pinned and not (a.get("sha256") or (a.get("remote") and a.get("members"))):
                 problems.append(f"{aid}: not pinned (run pin)")
     return problems
 
@@ -283,6 +290,125 @@ def extract(archive, dest, include=None, exclude=None, strip=0):
     return count
 
 
+class RangeFile(io.RawIOBase):
+    """A seekable, read-only view of a remote file through HTTP Range requests (with a block cache).
+    zipfile reads the central directory and single members through it, so a few files can be taken
+    out of a large pack without downloading the whole archive."""
+
+    BLOCK = 1 << 18
+
+    def __init__(self, url):
+        super().__init__()
+        self.url = url
+        self.pos = 0
+        self.cache = {}
+        with _request(url, {"Range": "bytes=0-0"}) as r:
+            rng = r.headers.get("Content-Range", "")
+            if r.status != 206 or "/" not in rng:
+                raise RuntimeError(f"{url}: the server does not support range requests")
+            self.size = int(rng.rsplit("/", 1)[1])
+            self.etag = r.headers.get("ETag", "")
+        self.requests = 0
+
+    def readable(self):
+        return True
+
+    def seekable(self):
+        return True
+
+    def tell(self):
+        return self.pos
+
+    def seek(self, offset, whence=0):
+        self.pos = offset if whence == 0 else self.pos + offset if whence == 1 else self.size + offset
+        return self.pos
+
+    def _block(self, i):
+        if i not in self.cache:
+            lo = i * self.BLOCK
+            hi = min(self.size, lo + self.BLOCK) - 1
+            for attempt in range(4):
+                try:
+                    with _request(self.url, {"Range": f"bytes={lo}-{hi}"}) as r:
+                        self.cache[i] = r.read()
+                    break
+                except Exception:  # noqa: BLE001
+                    if attempt == 3:
+                        raise
+                    time.sleep(1 + attempt)
+            self.requests += 1
+            if len(self.cache) > 512:  # keep memory bounded (128 MB)
+                self.cache.pop(next(iter(self.cache)))
+        return self.cache[i]
+
+    def read(self, n=-1):
+        if n is None or n < 0:
+            n = self.size - self.pos
+        n = max(0, min(n, self.size - self.pos))
+        out = bytearray()
+        while n > 0:
+            i, off = divmod(self.pos, self.BLOCK)
+            chunk = self._block(i)[off:off + n]
+            if not chunk:
+                break
+            out += chunk
+            self.pos += len(chunk)
+            n -= len(chunk)
+        return bytes(out)
+
+    def readinto(self, b):
+        data = self.read(len(b))
+        b[:len(data)] = data
+        return len(data)
+
+
+def remote_members(url, include=None, exclude=None):
+    """Names and sizes of the files in a remote zip that match the filters (reads only the directory)."""
+    with zipfile.ZipFile(RangeFile(url)) as z:
+        return [(i.filename, i.file_size) for i in z.infolist() if not i.is_dir() and _wanted(i.filename, include, exclude)]
+
+
+def _wanted(name, include, exclude):
+    name = name.replace("\\", "/")
+    if include and not any(fnmatch.fnmatch(name, g) for g in include):
+        return False
+    return not (exclude and any(fnmatch.fnmatch(name, g) for g in exclude))
+
+
+def extract_remote(url, dest, include=None, exclude=None, strip=0, pinned=None):
+    """Extracts the matching members of a remote zip through range requests; returns {member: sha256}.
+    `pinned` ({member: sha256}) verifies every member and fails on a mismatch or a missing member."""
+    os.makedirs(dest, exist_ok=True)
+    root = os.path.realpath(dest)
+    digests = {}
+    with zipfile.ZipFile(RangeFile(url)) as z:
+        infos = [i for i in z.infolist() if not i.is_dir() and _wanted(i.filename, include, exclude)]
+        if pinned:
+            missing = set(pinned) - {i.filename for i in infos}
+            if missing:
+                raise RuntimeError(f"{url}: pinned members missing: {sorted(missing)[:5]}")
+        for info in infos:
+            parts = [p for p in info.filename.replace("\\", "/").split("/") if p not in ("", ".")]
+            if ".." in parts or len(parts) <= strip:
+                continue
+            target = os.path.realpath(os.path.join(dest, *parts[strip:]))
+            if not target.startswith(root + os.sep):
+                continue
+            os.makedirs(os.path.dirname(target), exist_ok=True)
+            h = hashlib.sha256()
+            with z.open(info) as src, open(target + ".part", "wb") as out:
+                for chunk in iter(lambda: src.read(1 << 20), b""):
+                    h.update(chunk)
+                    out.write(chunk)
+            digest = h.hexdigest()
+            if pinned and pinned.get(info.filename) not in (None, digest):
+                os.remove(target + ".part")
+                raise RuntimeError(f"sha256 mismatch for {info.filename}: got {digest}, pinned {pinned[info.filename]}")
+            os.replace(target + ".part", target)
+            digests[info.filename] = digest
+    return digests
+
+
 def _stamp_path(manifest, entry):
     return manifest.local(os.path.join(".stamps", entry["id"].replace("/", "__") + ".json"))
 
@@ -296,7 +422,7 @@ def _is_fetched(manifest, entry):
             s = json.load(f)
     except (OSError, ValueError):
         return False
-    want = entry.get("sha256") or [f.get("sha256") for f in entry.get("files", [])]
+    want = entry.get("sha256") or entry.get("members") or [f.get("sha256") for f in entry.get("files", [])]
     if s.get("sha256") != want or s.get("extract") != entry.get("extract"):
         return False
     paths = [entry["path"]] if "path" in entry else [f["path"] for f in entry.get("files", [])]
@@ -307,7 +433,7 @@ def _mark_fetched(manifest, entry):
     stamp = _stamp_path(manifest, entry)
     os.makedirs(os.path.dirname(stamp), exist_ok=True)
     with open(stamp, "w") as f:
-        json.dump({"sha256": entry.get("sha256") or [x.get("sha256") for x in entry.get("files", [])],
+        json.dump({"sha256": entry.get("sha256") or entry.get("members") or [x.get("sha256") for x in entry.get("files", [])],
                    "extract": entry.get("extract"), "time": time.strftime("%Y-%m-%d")}, f)
 
 
@@ -336,7 +462,15 @@ def fetch_entry(manifest, entry, pin=False):
         url = resolve_itch(entry["source"]["page"], entry["source"]["file"])
     if not url:
         raise RuntimeError(f"{entry['id']}: no url")
-    if _is_archive(entry):
+    if entry.get("remote") and _is_archive(entry):
+        ex = entry.get("extract") or {}
+        digests = extract_remote(url, manifest.local(entry["path"]), ex.get("include"), ex.get("exclude"), ex.get("strip", 0),
+                                 None if pin else entry.get("members"))
+        if not digests:
+            raise RuntimeError(f"{entry['id']}: the archive's include filters matched nothing")
+        if pin or not entry.get("members"):
+            entry["members"] = dict(sorted(digests.items()))
+    elif _is_archive(entry):
         with tempfile.TemporaryDirectory(dir=manifest.root if os.path.isdir(manifest.root) else None) as tmp:
             arch = os.path.join(tmp, "archive.zip")
             digest = download(url, arch, None if pin else entry.get("sha256"), entry.get("size"))
@@ -513,6 +647,8 @@ def credits_markdown(manifest, title=None, extra=None):
         for a in items:
             name = a.get("title") or a["id"]
             lines.append(f"- **{name}** by {a.get('author', 'unknown')} - [{a.get('source_page', '')}]({a.get('source_page', '')})")
+            for it in a.get("items", []):  # packs: every item with its own author and license
+                lines.append(f"  - {it.get('name')} by {it.get('author', 'unknown')} ({it.get('license', lic)})")
         lines.append("")
     for line in extra or []:
         lines.append(line)
@@ -552,12 +688,20 @@ def main(argv=None):
     ph.add_argument("type", choices=["model", "textures", "hdri"])
     ph.add_argument("ids", nargs="+")
     ph.add_argument("--res", default=None)
+    ls = sub.add_parser("ls", help="list the files of a remote zip (range requests; nothing is downloaded)")
+    ls.add_argument("url")
+    ls.add_argument("--include", default="")
     ac = sub.add_parser("add-ambientcg", help="add an ambientCG material")
     ac.add_argument("manifest")
     ac.add_argument("ids", nargs="+")
     ac.add_argument("--res", default="2K")
     a = ap.parse_args(argv)
 
+    if a.cmd == "ls":
+        inc = [g for g in a.include.split(",") if g] or None
+        for name, size in remote_members(a.url, inc):
+            log(f"{size:>12}  {name}")
+        return 0
     if a.cmd in ("add-polyhaven", "add-ambientcg"):
         m = Manifest.load(a.manifest) if os.path.exists(a.manifest) else Manifest(a.manifest)
         for i in a.ids:
@@ -592,7 +736,8 @@ def main(argv=None):
         return 0
     only = [s for s in getattr(a, "only", "").split(",") if s]
     if a.cmd == "pin":
-        unpinned = [e["id"] for e in m.assets if not e.get("sha256") and not all(x.get("sha256") for x in e.get("files", [{}]))]
+        unpinned = [e["id"] for e in m.assets if not e.get("sha256") and not e.get("members")
+                    and not all(x.get("sha256") for x in e.get("files", [{}]))]
         fetch(m, only or unpinned or ["__none__"], a.jobs, pin=True) if (only or unpinned) else log("everything is pinned")
         return 0
     status = 0
