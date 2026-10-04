@@ -94,7 +94,7 @@ end
 - **Names**: `self`, `other`, `dt`, `time`, `frame`, `state`, `state_time`, `data`. Properties: `e.position e.rotation e.scale e.color e.name e.tags e.enabled`, components `e.light.intensity`, vars `e.hp`.
 - Reserved words cannot be names: `fn return for in while do break continue wait until state go goto const test expect use with param other step`.
 - **Idioms**: always multiply per-tick change by `dt`; smooth follow `self.position = lerp(self.position, goal, 1 - exp(-8 * dt))`; prefer `state` over boolean flags; cooldown `var cd = 0` / `cd -= dt`;
-  find things with `nearest("enemy", 10)`, `find_all("coin")`, `find("Door")` and test `if x then` before using a maybe-none; share code with `use`.
+  find things with `nearest("enemy", 10)`, `find_all("coin")`, `find("Door")` and test `if x then` before using a maybe-none; inside a prefab, mark parts unique (`entity_update {entity, unique: true}`) and use `find("%Muzzle")` so each copy finds its own part; share code with `use`.
 
 Runtime facts: events arrive next tick in emission order; a handler error aborts that run (logged), **five errors disable the script**; each handler run has a 1,000,000-step budget; 256 `spawn`s per tick, 20,000 entities;
 vars are mirrored into `entity_get` after every tick; replacing a behavior while playing restarts its instance; changes made during play are restored on stop.

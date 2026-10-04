@@ -65,7 +65,7 @@ after import, capture it next to a 1.8 m reference and fix scale with `transform
 ## Using assets
 
 - Mesh on an entity: `components:{mesh:{mesh:"asset:downloads/crate/crate.glb"}}`.
-- Reuse: `prefab_create {entity, path:"prefabs/crate.prefab.json"}` then `prefab_instantiate` / `scatter {prefab}`.
+- Reuse: `prefab_create {entity, path:"prefabs/crate.prefab.json"}` then `prefab_instantiate` / `scatter {prefab}`. Instances stay linked: the scene saves only their overrides and editing the prefab updates them all. `prefab_overrides {entity}` shows what an instance changed; `prefab_apply` pushes it into the prefab, `prefab_revert` drops it, `prefab_unpack` unlinks. Old scenes with copied prefabs: `prefab_relink {prefab}`.
 - Materials: `material_create {path, preset|color|texture|normalMap|ormMap}`, `material_assign {entities, material}`; sky: `environment_update {skyMode:"hdri", hdri:"downloads/.../x.hdr"}`.
 - Textures on terrain: `terrain_layers` (see skywalker-world-building). Procedural sets:
   `texture_generate {kind:"cobblestone", name:"street", create_material:true, tiling:2}` (kinds include noise, marble, wood, planks, bricks,
