@@ -94,7 +94,19 @@ CaptureOptions characterView(Engine& engine, EntityId e, const Json& a) {
         return o;
     }
     Scene& s = engine.scene();
-    Aabb box = subtreeBounds(s, e).value_or(s.localBounds(e).transformed(s.worldMatrix(e)));
+    // Bounds from the CPU meshes: an asset that has not been drawn yet has no cached bounds in the
+    // scene (the first preview of a freshly instantiated character would frame a unit cube).
+    std::optional<Aabb> meshBox;
+    std::vector<EntityId> subtree;
+    collectSubtree(s, e, subtree);
+    for (EntityId id : subtree) {
+        const MeshRenderer* m = s.get<MeshRenderer>(id);
+        if (!m || !m->visible) continue;
+        const MeshData* md = str::startsWith(m->mesh, "asset:") ? engine.cpuMesh(m->mesh) : nullptr;
+        Aabb b = (md ? md->bounds : s.localBounds(id)).transformed(s.worldMatrix(id));
+        meshBox = meshBox ? Aabb{vmin(meshBox->min, b.min), vmax(meshBox->max, b.max)} : b;
+    }
+    Aabb box = meshBox.value_or(subtreeBounds(s, e).value_or(s.localBounds(e).transformed(s.worldMatrix(e))));
     Vec3 c = box.center();
     float radius = std::max(length(box.extents()), 0.3f) * 1.15f;  // room for limbs swinging out
     Vec3 fwd = s.worldMatrix(e).transformDir({0, 0, -1});
