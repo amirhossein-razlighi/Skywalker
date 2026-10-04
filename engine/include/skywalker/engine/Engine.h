@@ -17,6 +17,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include "skywalker/agent/EventLog.h"
@@ -46,6 +47,7 @@
 namespace sky {
 
 class SocketServer;
+class CustomTools;
 class World2D;
 class NativeModules;
 namespace studio {
@@ -145,6 +147,8 @@ public:
     /// Runs a tool as `actor` and records an activity event. The main entry point for
     /// every client (MCP, in-editor agents, editor UI).
     ToolResult callTool(std::string_view name, const Json& args, const std::string& actor);
+    /// The same with a full context (nested custom-tool calls, external tools' callbacks).
+    ToolResult callTool(std::string_view name, const Json& args, ToolContext ctx);
 
     /// Non-blocking variant of callTool() for callers that must keep running while a slow tool
     /// works (the editor's agents): beginTool() runs the quick part on the main thread. If the tool
@@ -351,9 +355,17 @@ public:
     std::vector<Json> drainEvents();
 
     // --- Cross-thread jobs ------------------------------------------------------------
-    /// Thread-safe. The job runs on the main thread during the next pump().
-    std::future<Json> post(std::function<Json()> job);
+    /// Thread-safe. The job runs on the main thread during the next pump(). A job posted on a
+    /// `lane` (the call id of an external tool it calls back for) also runs in pumpLane(lane).
+    std::future<Json> post(std::function<Json()> job, std::string lane = {});
     void pump();
+    /// Runs only the queued jobs of one lane: the main thread waiting for an external tool serves
+    /// that tool's callbacks without running anything else.
+    void pumpLane(const std::string& lane);
+    bool onMainThread() const;
+
+    // --- Custom and external tools (docs/CUSTOM_TOOLS.md) ----------------------------
+    CustomTools& customTools() { return *customTools_; }
 
     // --- Agent server (MCP over a Unix socket, for attaching external agents) ----------
     Status startAgentServer(const std::string& socketPath);
@@ -466,11 +478,17 @@ private:
     bool acceptingJobs_ = true;   // guarded by jobsMutex_
     void failQueuedJobsLocked(const std::string& why);
     void recordToolEvent(std::string_view name, const ToolResult& result, const std::string& actor);
-    Json callToolFromConnection(const std::string& tool, const Json& args, const std::string& actor);
+    Json callToolFromConnection(const std::string& tool, const Json& args, const ToolContext& ctx);
     std::mutex workMutex_;
     std::vector<std::shared_ptr<DeferredWork>> activeWork_;  // deferred tool work running on connection threads
     int editDepth_ = 0;
-    std::deque<std::pair<std::function<Json()>, std::promise<Json>>> jobs_;
+    struct Job {
+        std::function<Json()> fn;
+        std::promise<Json> promise;
+        std::string lane;
+    };
+    std::deque<Job> jobs_;
+    std::thread::id mainThread_;
     std::unique_ptr<SocketServer> server_;
     std::unique_ptr<World2D> world2d_;
     std::unique_ptr<studio::Studio> studio_;
@@ -491,6 +509,7 @@ private:
     // Agent link (after tools_: the host registers py_* tools in it)
     std::shared_ptr<EventLog> eventLog_ = std::make_shared<EventLog>(4096);
     std::shared_ptr<ToolHost> toolHost_ = std::make_shared<ToolHost>(tools_);
+    std::unique_ptr<CustomTools> customTools_;  // custom & external tools (agent/CustomTools.h)
 };
 
 void registerEngineTools(Engine& engine);

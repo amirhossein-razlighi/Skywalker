@@ -42,6 +42,7 @@ ALLOW = {
     "tools_programmer", "environment_artist", "lighting_artist", "character_artist", "vfx_artist", "technical_artist", "ui_artist",
     "sound_designer", "qa_lead", "role_creative_director", "new_game", "look_dev", "playtest_loop", "studio_status", "studio_setup",
     "studio_agent", "studio_overview", "studio_roster", "studio_board", "studio_feedback", "studio_loops", "ask_for_approval",
+    "tool_warn", "tool_fail", "tool_actor",  # Wander builtins inside custom tools
 }
 # Tool-name prefixes that mark a backticked token as a tool reference (every live tool's prefix is added too).
 FAMILIES = {
@@ -100,7 +101,27 @@ def strip_comments(text: str) -> str:
 
 def js_to_json(text: str) -> str:
     # quote bare keys: {preset: 1, "x": 2} -> {"preset": 1, "x": 2}; keys are identifiers followed by a colon after { or ,
-    return re.sub(r'([{,]\s*)([A-Za-z_][A-Za-z0-9_]*)(\s*:)', r'\1"\2"\3', text)
+    # Only outside string literals: code inside a string ("wander": "... {name: e.name} ...") stays as written.
+    out, chunk, i, in_str = [], [], 0, False
+    while i < len(text):
+        c = text[i]
+        if in_str:
+            out.append(c)
+            if c == "\\" and i + 1 < len(text):
+                out.append(text[i + 1])
+                i += 1
+            elif c == '"':
+                in_str = False
+        elif c == '"':
+            out.append(re.sub(r'([{,]\s*)([A-Za-z_][A-Za-z0-9_]*)(\s*:)', r'\1"\2"\3', "".join(chunk)))
+            chunk = []
+            out.append(c)
+            in_str = True
+        else:
+            chunk.append(c)
+        i += 1
+    out.append(re.sub(r'([{,]\s*)([A-Za-z_][A-Za-z0-9_]*)(\s*:)', r'\1"\2"\3', "".join(chunk)))
+    return "".join(out)
 
 
 def balanced(text: str, start: int) -> int:

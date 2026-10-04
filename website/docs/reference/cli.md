@@ -41,7 +41,7 @@ usage:
   skywalker check FILE.wander [--project DIR] [--disassemble] [--format]
   skywalker call TOOL [JSON] [--scene FILE] [--project DIR] [-o image.png]
   skywalker call TOOL [JSON] --attach [--as NAME] [--socket PATH]   (on the running editor)
-  skywalker tools [--markdown|--json]
+  skywalker tools [--markdown|--json] [--project DIR]
   skywalker studio status|agents|board|feedback|loops --project DIR
   skywalker studio run --project DIR --loop NAME [--iterations N] [--dry-run] [--yes]
   skywalker build --project DIR --out DIR [--name N] [--icon F.png] [--release] [--all-assets]   package a macOS app
@@ -133,7 +133,7 @@ Run one tool on a scene or project, or on the running editor with `--attach`.
 List every tool, as text, Markdown or the JSON that MCP clients receive.
 
 ```text
-  skywalker tools [--markdown|--json]
+  skywalker tools [--markdown|--json] [--project DIR]
 ```
 
 ## `skywalker studio` { #studio }

@@ -79,6 +79,8 @@ Offer tools implemented in your own process (a Python agent harness, a script) t
 | `tools[].description` | string |  | What it does, for language models |  |
 | `tools[].input_schema` | object |  | JSON Schema of the arguments |  |
 | `tools[].mutates` | boolean |  | Changes the project or game (default false) |  |
+| `tools[].capabilities` | object |  | Engine tools it calls back into while serving a call: {calls: [names or globs], mutate, network} (docs/CUSTOM_TOOLS.md); callbacks pass _meta["skywalker/call_id"] |  |
+| `tools[].limits` | object |  | {timeout_ms, max_output_bytes, max_calls} |  |
 | `host` | string |  | Your host id from an earlier registration (to update its tool set) |  |
 | `label` | string |  | Who serves these tools, shown in descriptions and tool_host_list |  |
 | `ttl_seconds` | number |  | Drop this host after this long without a poll (30-3600, default 60) |  |

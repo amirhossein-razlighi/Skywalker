@@ -1,7 +1,7 @@
 # Agents in Skywalker
 
 There are three ways an AI works with Skywalker, and all three use the same
-[tool surface](TOOLS.md):
+[tool surface](TOOLS.md), which agents can extend with [their own tools](CUSTOM_TOOLS.md):
 
 1. **External agents over MCP.** Claude Code, Codex, Cursor, Gemini CLI, or any MCP
    client.
@@ -124,7 +124,17 @@ Claude Code subagents sharing one connection identify themselves. `studio_agent_
 returns the agent's system prompt and permitted tools for any harness, and a loop's
 assignments can be executed by external subagents (see [STUDIO](STUDIO.md#identity-how-external-tools-join)).
 
-## 3. Generative assets
+## 3. Custom tools
+
+When no engine tool does what an agent needs, it defines its own with `tool_define`: Wander
+code (`fn run(args)`) or a composite pipeline of tool calls, saved in the project as
+`tools/<name>.tool.json` and registered as `user_<name>` for every client. Connected clients
+can also host tools of their own (`skywalker/tools/register` over MCP, or `tool_host_register`).
+Capabilities are an explicit allowlist, calls run with the caller's permissions, limits bound
+every call, edits are undoable, and tools that mutate the project wait for a human's
+`tool_approve` under the default policy. See [CUSTOM_TOOLS](CUSTOM_TOOLS.md).
+
+## 4. Generative assets
 
 ```
 asset_request {kind: mesh|texture|sprite|audio|music|video, prompt, style?, target?}

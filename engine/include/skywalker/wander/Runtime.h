@@ -225,6 +225,34 @@ public:
     void revertFrame();
     /// Any compiled script has an `on frame` handler.
     bool hasFrameHandlers() const;
+    // --- Calling functions directly (tools defined in Wander, docs/CUSTOM_TOOLS.md) -------------
+    struct FunctionCall {
+        int64_t budget = 1'000'000;  // instructions (same accounting as handler runs)
+        EntityId self = kNoEntity;   // `self` inside the function
+        std::string scriptName = "tool";  // shown with log lines
+    };
+    struct FunctionResult {
+        bool ok = false;
+        Value value;          // the return value
+        std::string error;    // runtime error message
+        SourceLoc loc;        // where it failed
+        std::string file;     // module file when the error is inside a `use`d module
+        int64_t instructions = 0;  // budget used
+    };
+    /// Runs a file-level `fn` of a compiled program outside the tick loop, against this runtime's
+    /// scene. Entity var writes and deferred destroys are applied to the scene before it returns.
+    /// Errors (unknown function, wrong argument count, runtime errors, budget) are reported in the
+    /// result, never thrown.
+    FunctionResult callFunction(const std::shared_ptr<const Program>& program, std::string_view name,
+                                std::vector<Value> args, const FunctionCall& options);
+    /// While not empty, assigning entity properties, vars or component fields raises this message
+    /// (read-only tools). Builtins that edit the scene are not covered: callers check those separately.
+    void setSceneWriteGuard(std::string message) { sceneWriteGuard_ = std::move(message); }
+    const std::string& sceneWriteGuard() const { return sceneWriteGuard_; }
+    /// When on, those assignments first notify the scene's ChangeObserver (the undo History), so a
+    /// tool's direct edits are recorded without snapshotting every entity up front.
+    void setRecordSceneWrites(bool on) { recordSceneWrites_ = on; }
+    bool recordSceneWrites() const { return recordSceneWrites_; }
 
     /// Execution budget per handler run, in instructions (loops charge their length per
     /// iteration, calls the callee's length).
@@ -260,6 +288,8 @@ private:
     std::unordered_map<std::type_index, void*> services_;
     std::string projectDir_;
     std::unordered_map<uint64_t, std::shared_ptr<const NativeProgram>> native_;
+    std::string sceneWriteGuard_;
+    bool recordSceneWrites_ = false;
 };
 
 }  // namespace sky::wander

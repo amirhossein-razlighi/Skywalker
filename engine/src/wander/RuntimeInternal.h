@@ -211,6 +211,8 @@ void forEachInstance(Runtime::Impl& impl, const Scene& scene, EntityId e, Fn&& f
 /// Entity var by name (none if unset); imports outside edits lazily.
 Value getEntityVar(Runtime::Impl& impl, Scene& scene, EntityId id, uint32_t sym);
 void setEntityVar(Runtime::Impl& impl, Scene& scene, EntityId id, uint32_t sym, Value v);
+/// Copies var values scripts changed into the scene's entity records (EntityRecord::vars).
+void mirrorDirtyVars(Runtime::Impl& impl, Scene& scene);
 
 /// Runs a proto (natively when compiled code is attached) from `pc`.
 Outcome runProto(ExecState& st, int proto, Value* regs, size_t pc);

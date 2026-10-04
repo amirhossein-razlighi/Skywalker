@@ -156,6 +156,29 @@ Value getEntityVar(Runtime::Impl& impl, Scene& scene, EntityId id, uint32_t sym)
     return {};
 }
 
+void mirrorDirtyVars(Runtime::Impl& impl, Scene& scene) {
+    for (auto& [id, table] : impl.vars) {
+        if (!table.anyDirty) continue;
+        table.anyDirty = false;
+        EntityRecord* rec = scene.record(id);
+        for (auto& slot : table.slots) {
+            if (!slot.dirty) continue;
+            slot.dirty = false;
+            if (!rec) continue;
+            auto& members = rec->vars.members();
+            if (slot.sceneIndex < members.size() && members[slot.sceneIndex].first == *slot.name) {
+                members[slot.sceneIndex].second = toJson(slot.value);
+            } else {
+                rec->vars[*slot.name] = toJson(slot.value);
+                for (size_t k = 0; k < members.size(); ++k) {
+                    if (members[k].first == *slot.name) slot.sceneIndex = k;
+                }
+            }
+            slot.inScene = true;
+        }
+    }
+}
+
 void setEntityVar(Runtime::Impl& impl, Scene& scene, EntityId id, uint32_t sym, Value v) {
     VarTable& t = varTable(impl, scene, id);
     int i = t.find(sym);
@@ -512,6 +535,7 @@ std::string cosmeticComponentList() {
 
 void setEntityMember(ExecState& st, EntityId id, const MemberRef& m, const Value& v, SourceLoc loc) {
     using K = MemberRef::Kind;
+    if (!st.rt.sceneWriteGuard().empty()) raise(loc, st.rt.sceneWriteGuard());
     Scene& scene = st.scene;
     if (st.cosmetic) [[unlikely]] {
         if (m.kind == K::Position || m.kind == K::Rotation || m.kind == K::Scale) {
@@ -527,6 +551,7 @@ void setEntityMember(ExecState& st, EntityId id, const MemberRef& m, const Value
                                    cosmeticComponentList() + ")");
         }
     }
+    if (st.rt.recordSceneWrites() && scene.observer()) scene.observer()->beforeEntityChange(id);
     scene.markDirty();
     switch (m.kind) {
         case K::Position:
@@ -703,7 +728,9 @@ Value getField(ExecState& st, const Value& obj, const FieldRef& f, SourceLoc loc
 }
 
 void setField(ExecState& st, const Value& obj, const FieldRef& f, const Value& v, SourceLoc loc) {
+    if (!st.rt.sceneWriteGuard().empty()) raise(loc, st.rt.sceneWriteGuard());
     EntityId id = requireEntity(st.scene, obj, loc, "the component owner");
+    if (st.rt.recordSceneWrites() && st.scene.observer()) st.scene.observer()->beforeEntityChange(id);
     const auto& r = resolveField(st, f, loc);
     if (st.cosmetic) [[unlikely]] {
         if (!cosmeticComponent(f.component)) {
@@ -1972,27 +1999,7 @@ void Runtime::tick(float dt, const InputState& input) {
     }
     impl.toDestroy.clear();
 
-    // Mirror changed vars into the scene so tools and agents see current values.
-    for (auto& [id, table] : impl.vars) {
-        if (!table.anyDirty) continue;
-        table.anyDirty = false;
-        EntityRecord* rec = scene_.record(id);
-        for (auto& slot : table.slots) {
-            if (!slot.dirty) continue;
-            slot.dirty = false;
-            if (!rec) continue;
-            auto& members = rec->vars.members();
-            if (slot.sceneIndex < members.size() && members[slot.sceneIndex].first == *slot.name) {
-                members[slot.sceneIndex].second = toJson(slot.value);
-            } else {
-                rec->vars[*slot.name] = toJson(slot.value);
-                for (size_t k = 0; k < members.size(); ++k) {
-                    if (members[k].first == *slot.name) slot.sceneIndex = k;
-                }
-            }
-            slot.inScene = true;
-        }
-    }
+    mirrorDirtyVars(impl, scene_);  // so tools and agents see current values
     impl.lastRevision = scene_.revision();
     impl.revisionValid = true;
     impl.input = nullptr;

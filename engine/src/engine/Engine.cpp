@@ -19,6 +19,7 @@
 #include <sstream>
 #include <unordered_map>
 
+#include "skywalker/agent/CustomTools.h"
 #include "skywalker/agent/SocketServer.h"
 #include "skywalker/core/Log.h"
 #include "skywalker/core/Profiler.h"
@@ -199,6 +200,8 @@ Engine::Engine(EngineConfig config)
     physics_->setNavigation(nav_.get());
     runtime_->physics = physics_.get();
     registerEngineTools(*this);
+    mainThread_ = std::this_thread::get_id();
+    customTools_ = std::make_unique<CustomTools>(*this);  // after the built-in tools: custom ones never shadow them
     log::info("engine", std::string("Skywalker ") + SKY_VERSION_STRING + " ready (renderer: " + renderer_->info().backend +
                             " " + renderer_->info().device + ")");
 }
@@ -222,15 +225,21 @@ Engine::~Engine() {
 // ---------------------------------------------------------------------------
 
 ToolResult Engine::callTool(std::string_view name, const Json& args, const std::string& actor) {
-    ToolContext ctx{actor};
+    ToolContext ctx;
+    ctx.actor = actor;
+    return callTool(name, args, std::move(ctx));
+}
+
+ToolResult Engine::callTool(std::string_view name, const Json& args, ToolContext ctx) {
     ToolResult result = tools_.call(name, args, ctx);
-    recordToolEvent(name, result, actor);
+    recordToolEvent(name, result, ctx.actor);
     return result;
 }
 
 Engine::PendingCall Engine::beginTool(std::string_view name, const Json& args, const std::string& actor) {
     PendingCall call{std::string(name), actor, {}};
-    ToolContext ctx{actor};
+    ToolContext ctx;
+    ctx.actor = actor;
     call.result = tools_.invoke(name, args, ctx);
     if (!call.result.deferred) recordToolEvent(name, call.result, actor);
     return call;
@@ -1750,7 +1759,7 @@ std::vector<Json> Engine::drainEvents() {
     return out;
 }
 
-std::future<Json> Engine::post(std::function<Json()> job) {
+std::future<Json> Engine::post(std::function<Json()> job, std::string lane) {
     std::promise<Json> promise;
     std::future<Json> future = promise.get_future();
     std::lock_guard lock(jobsMutex_);
@@ -1758,18 +1767,37 @@ std::future<Json> Engine::post(std::function<Json()> job) {
         promise.set_value(ToolResult::error(Error::make("unavailable", "the engine is not accepting requests")).toMcp());
         return future;
     }
-    jobs_.emplace_back(std::move(job), std::move(promise));
+    jobs_.push_back(Job{std::move(job), std::move(promise), std::move(lane)});
     return future;
 }
 
 void Engine::pump() {
-    std::deque<std::pair<std::function<Json()>, std::promise<Json>>> jobs;
+    std::deque<Job> jobs;
     {
         std::lock_guard lock(jobsMutex_);
         jobs.swap(jobs_);
     }
-    for (auto& [job, promise] : jobs) promise.set_value(job());
+    for (auto& job : jobs) job.promise.set_value(job.fn());
 }
+
+void Engine::pumpLane(const std::string& lane) {
+    if (lane.empty()) return;
+    std::deque<Job> jobs;
+    {
+        std::lock_guard lock(jobsMutex_);
+        for (auto it = jobs_.begin(); it != jobs_.end();) {
+            if (it->lane == lane) {
+                jobs.push_back(std::move(*it));
+                it = jobs_.erase(it);
+            } else {
+                ++it;
+            }
+        }
+    }
+    for (auto& job : jobs) job.promise.set_value(job.fn());
+}
+
+bool Engine::onMainThread() const { return std::this_thread::get_id() == mainThread_; }
 
 // ---------------------------------------------------------------------------
 // Agent server
@@ -1785,9 +1813,8 @@ Status Engine::startAgentServer(const std::string& socketPath) {
     std::error_code ec;
     fs::create_directories(fs::path(socketPath).parent_path(), ec);
     auto server = std::make_unique<SocketServer>(
-        tools_, [this](const std::string& tool, const Json& args, const std::string& actor) {
-            return callToolFromConnection(tool, args, actor);
-        });
+        tools_, [this](const std::string& tool, const Json& args, const ToolContext& ctx) { return callToolFromConnection(tool, args, ctx); },
+        customTools_->hostHandlers());
     if (Status s = server->start(socketPath); !s) return s;
     server_ = std::move(server);
     log::info("agent", "agent server listening on " + socketPath);
@@ -1817,9 +1844,7 @@ void Engine::stopAgentServer() {
 }
 
 void Engine::failQueuedJobsLocked(const std::string& why) {
-    for (auto& [job, promise] : jobs_) {
-        promise.set_value(ToolResult::error(Error::make("cancelled", why)).toMcp());
-    }
+    for (auto& job : jobs_) job.promise.set_value(ToolResult::error(Error::make("cancelled", why)).toMcp());
     jobs_.clear();
 }
 
@@ -1827,21 +1852,26 @@ void Engine::failQueuedJobsLocked(const std::string& why) {
 // A tool with slow work (ToolResult::deferred) runs that part right here, so the main thread keeps
 // serving the editor and other agents. If we give up waiting, the job is marked abandoned so it can
 // never apply changes later.
-Json Engine::callToolFromConnection(const std::string& tool, const Json& args, const std::string& actor) {
+Json Engine::callToolFromConnection(const std::string& tool, const Json& args, const ToolContext& callCtx) {
     constexpr auto kMainThreadWait = std::chrono::seconds(120);
     auto abandoned = std::make_shared<std::atomic<bool>>(false);
     auto pending = std::make_shared<ToolResult>();
-    std::future<Json> first = post([this, tool, args, actor, abandoned, pending]() -> Json {
-        if (abandoned->load()) return ToolResult::error(Error::make("timeout", "request abandoned")).toMcp();
-        ToolContext ctx{actor};
-        ToolResult r = tools_.invoke(tool, args, ctx);
-        if (r.deferred) {
-            *pending = std::move(r);
-            return Json::object({{"deferred", true}});
-        }
-        recordToolEvent(tool, r, actor);
-        return r.toMcp();
-    });
+    auto actor = std::make_shared<std::string>(callCtx.actor);
+    // Callbacks of an external tool run on its call's lane: a main thread waiting for that tool serves them.
+    std::future<Json> first = post(
+        [this, tool, args, callCtx, abandoned, pending, actor]() -> Json {
+            if (abandoned->load()) return ToolResult::error(Error::make("timeout", "request abandoned")).toMcp();
+            ToolContext ctx = callCtx;
+            ToolResult r = tools_.invoke(tool, args, ctx);
+            *actor = ctx.actor;  // a callback is attributed to whoever called the external tool
+            if (r.deferred) {
+                *pending = std::move(r);
+                return Json::object({{"deferred", true}});
+            }
+            recordToolEvent(tool, r, ctx.actor);
+            return r.toMcp();
+        },
+        callCtx.parentCall);
     if (first.wait_for(kMainThreadWait) != std::future_status::ready) {
         abandoned->store(true);
         return ToolResult::error(Error::make("timeout", "the editor did not respond in time")).toMcp();
@@ -1869,7 +1899,7 @@ Json Engine::callToolFromConnection(const std::string& tool, const Json& args, c
         return ToolResult::error(Error::make("internal_error", std::string("tool crashed: ") + e.what())).toMcp();
     }
     retire();
-    std::future<Json> second = post([this, tool, actor, work, abandoned]() -> Json {
+    std::future<Json> second = post([this, tool, actor = *actor, work, abandoned]() -> Json {
         if (abandoned->load()) return ToolResult::error(Error::make("timeout", "request abandoned")).toMcp();
         ToolResult r;
         try {
@@ -1879,7 +1909,7 @@ Json Engine::callToolFromConnection(const std::string& tool, const Json& args, c
         }
         recordToolEvent(tool, r, actor);
         return r.toMcp();
-    });
+    }, callCtx.parentCall);
     if (second.wait_for(kMainThreadWait) != std::future_status::ready) {
         abandoned->store(true);
         return ToolResult::error(Error::make("timeout", "the editor did not respond in time")).toMcp();

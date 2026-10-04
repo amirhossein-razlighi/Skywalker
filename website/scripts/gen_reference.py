@@ -52,6 +52,7 @@ CATEGORIES = OrderedDict([
     ("dcc", ("DCC", "Design-app bridge: run scripts in Blender (and other apps), convert, generate and live sessions.")),
     ("files", ("Files", "Project settings, packaging the game as an app, running it in the real player, and the legal notices.")),
     ("network", ("Network", "Licensed downloads from the web, recorded with provenance and credits.")),
+    ("tools", ("Custom tools", "Define, test, inspect, approve and manage the project's own tools (Wander, composite and hosted).")),
     ("agent", ("Agent layer", "The event log and hosted tools that external agent processes (such as the Python agent layer) use.")),
 ])
 

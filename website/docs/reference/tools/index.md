@@ -5,7 +5,7 @@ title: "Tools"
 
 # Tools
 
-Skywalker exposes **186 tools** (engine 0.1.0). The editor, its in-app agents, the CLI and every MCP client call the same tools with the same JSON arguments, so anything you read here works everywhere. 114 tools change the project; every such change is undoable and attributed to whoever made it.
+Skywalker exposes **195 tools** (engine 0.1.0). The editor, its in-app agents, the CLI and every MCP client call the same tools with the same JSON arguments, so anything you read here works everywhere. 119 tools change the project; every such change is undoable and attributed to whoever made it.
 
 Arguments are validated before a tool runs: unknown keys, wrong types and bad enum values fail with a *did you mean …?* hint. Each tool page shows the arguments, the annotations MCP clients use for approvals, and the same call as a tool call, a CLI command and a raw MCP request.
 
@@ -29,6 +29,7 @@ Arguments are validated before a tool runs: unknown keys, wrong types and bad en
 | [DCC](dcc.md) | 15 | Design-app bridge: run scripts in Blender (and other apps), convert, generate and live sessions. |
 | [Files](files.md) | 4 | Project settings, packaging the game as an app, running it in the real player, and the legal notices. |
 | [Network](network.md) | 1 | Licensed downloads from the web, recorded with provenance and credits. |
+| [Custom tools](tools.md) | 9 | Define, test, inspect, approve and manage the project's own tools (Wander, composite and hosted). |
 | [Agent layer](agent.md) | 6 | The event log and hosted tools that external agent processes (such as the Python agent layer) use. |
 
 ## Every tool
@@ -215,6 +216,15 @@ Arguments are validated before a tool runs: unknown keys, wrong types and bad en
 | [`game_settings`](files.md#game_settings) | Files | Read or change the project's shipping settings in game.json: startScene, window {width,height,fullscreen,resizable,vsync}, quality (low\|medium\|high\|ultra), renderScale, quitOnEscape, pauseOnFocusLoss, icon (a PNG, 1024x1024 recommended), bundleId (reverse-DNS), version, copyright, plus include/exclude globs for packaging, and the description fields (id, title, genre, mood, pitch). |
 | [`legal_info`](files.md#legal_info) | Files | Skywalker's Terms of Use, Privacy Notice and license: their versions and effective dates, MCP resource URIs (skywalker://docs/legal/TERMS, skywalker://docs/legal/PRIVACY, skywalker://docs/LICENSING), whether a person has accepted the current versions on this computer (status current, outdated, not_recorded), and a verified summary of data practices (no telemetry; data leaves the computer only to the AI provider or download URL the human chose). |
 | [`asset_download`](network.md#asset_download) | Network | Download an openly licensed asset (3D model .glb/.gltf/.obj/.ply/.stl, texture, .hdr sky panorama, audio, or a .zip pack of them) from a URL into the project, record its license and author, add it to CREDITS.md, and (for models) import it — optionally placing it in the scene. |
+| [`tool_approve`](tools.md#tool_approve) | Custom tools | A HUMAN approves (or rejects with approve:false) the current definition of a custom tool that needs approval (it mutates, writes files or reaches the network, or the policy is "ask"). |
+| [`tool_define`](tools.md#tool_define) | Custom tools | Create or update your OWN tool when no engine tool does what you need. |
+| [`tool_enable`](tools.md#tool_enable) | Custom tools | Turn a custom tool off (it disappears from tools/list but keeps its files and approval) or back on. |
+| [`tool_inspect`](tools.md#tool_inspect) | Custom tools | Full definition of a custom tool: code or steps, schemas, capabilities, limits, tests, status and why, approval (by whom, for which hash), stats (calls, failures, timing) and its recent calls and errors. |
+| [`tool_list_custom`](tools.md#tool_list_custom) | Custom tools | Every custom tool of the project (and external tools hosted by connected clients) with its status — active, pending_approval, rejected, disabled, offline, invalid — kind, version, author and call counts, plus the project's policy. |
+| [`tool_policy`](tools.md#tool_policy) | Custom tools | Read or set who approves custom tools in this project (game.json customTools.policy): off (disabled), ask (every tool needs a human's approval), auto (default: read-only tools run at once, tools that mutate or write files need approval), trust (no approvals). |
+| [`tool_promote`](tools.md#tool_promote) | Custom tools | Copy a project's custom tool into your user library (~/.skywalker/tools) so other projects can install it with tool_define {"from_library": "user_x"} (their approval rules apply). |
+| [`tool_remove`](tools.md#tool_remove) | Custom tools | Unregister a custom tool and delete its files (tools/&lt;name&gt;.tool.json and .wander) unless delete_files is false. |
+| [`tool_test`](tools.md#tool_test) | Custom tools | Run a custom tool's tests, or one call with "args", as a DRY RUN: scene edits are rolled back and file writes skipped, so it is safe on tools that are not approved yet. |
 | [`events_poll`](agent.md#events_poll) | Agent layer | Read the engine's live event stream (the same events the editor's Activity feed shows: tool calls with their actor, studio changes such as messages, tasks, feedback, decisions and loops, play state, selection, scene loads/saves, asset changes) after a cursor, without consuming them. |
 | [`tool_host_list`](agent.md#tool_host_list) | Agent layer | Which external processes serve py_* tools: each host's label, owner (actor), tools, queued and in-flight calls, calls served and seconds since its last poll; plus the event stream's cursor range (events_poll). |
 | [`tool_host_poll`](agent.md#tool_host_poll) | Agent layer | Fetch the calls other agents made to your py_* tools (see tool_host_register): [{call, tool, args, actor}]. |

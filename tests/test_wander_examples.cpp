@@ -9,6 +9,7 @@
 #include <set>
 #include <sstream>
 
+#include "skywalker/agent/CustomTools.h"
 #include "skywalker/engine/Engine.h"
 #include "skywalker/scene/Scene.h"
 #include "skywalker/wander/Compiler.h"
@@ -112,6 +113,10 @@ TEST_CASE("docs: every ```wander code block in docs/ compiles") {
     Scene scene;
     Runtime rt(scene);
     CompileOptions opts = rt.compileOptions();
+    // Code of custom tools (docs/CUSTOM_TOOLS.md) also has the tool-only builtins.
+    BuiltinRegistry withTools(&BuiltinRegistry::global());
+    CustomTools::registerBuiltins(withTools);
+    opts.registry = &withTools;
     size_t blocks = 0;
     for (const auto& entry : fs::directory_iterator(fs::path(SKY_SOURCE_DIR) / "docs")) {
         if (entry.path().extension() != ".md") continue;

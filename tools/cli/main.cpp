@@ -30,8 +30,10 @@
 #include <thread>
 #include <vector>
 
+#include "skywalker/agent/CustomTools.h"
 #include "skywalker/agent/McpServer.h"
 #include "skywalker/agent/SocketServer.h"
+#include "skywalker/agent/ExternalHost.h"
 #include "skywalker/core/Log.h"
 #include "skywalker/core/Strings.h"
 #include "skywalker/engine/Engine.h"
@@ -107,7 +109,7 @@ int usage() {
                  "  skywalker check FILE.wander [--project DIR] [--disassemble] [--format]\n"
                  "  skywalker call TOOL [JSON] [--scene FILE] [--project DIR] [-o image.png]\n"
                  "  skywalker call TOOL [JSON] --attach [--as NAME] [--socket PATH]   (on the running editor)\n"
-                 "  skywalker tools [--markdown|--json]\n"
+                 "  skywalker tools [--markdown|--json] [--project DIR]\n"
                  "  skywalker studio status|agents|board|feedback|loops --project DIR\n"
                  "  skywalker studio run --project DIR --loop NAME [--iterations N] [--dry-run] [--yes]\n"
                  "  skywalker build --project DIR --out DIR [--name N] [--icon F.png] [--release] [--all-assets]   package a macOS app\n"
@@ -179,21 +181,16 @@ int runMcp(const Args& args) {
     }
 
     auto engine = makeEngine(args);
-    McpSession session(engine->tools(), [&](const std::string& tool, const Json& a, const std::string& actor) {
-        return engine->callTool(tool, a, actor).toMcp();
+    McpSession session(engine->tools(), [&](const std::string& tool, const Json& a, const ToolContext& ctx) {
+        return engine->callTool(tool, a, ctx).toMcp();
     });
-    LineReader in(STDIN_FILENO);
-    std::string line;
-    while (in.next(line)) {
-        if (line.empty()) continue;
+    // The client may host tools of its own (skywalker/tools/register); see docs/CUSTOM_TOOLS.md.
+    McpStreamServer server(session, STDIN_FILENO, STDOUT_FILENO);
+    session.setHost(server.peer(), engine->customTools().hostHandlers());
+    server.run([&] {
         engine->pump();
-        if (auto response = session.handle(line)) {
-            std::fwrite(response->data(), 1, response->size(), stdout);
-            std::fputc('\n', stdout);
-            std::fflush(stdout);
-        }
         (void)engine->drainEvents();  // no UI to consume them in headless mode
-    }
+    });
     return 0;
 }
 
@@ -361,7 +358,9 @@ int runCall(const Args& args) {
 }
 
 int runTools(const Args& args) {
-    Engine engine;
+    EngineConfig cfg;
+    cfg.projectDir = args.get("--project", ".");  // the project's custom tools are listed too
+    Engine engine(cfg);
     if (args.has("--json")) {
         std::printf("%s\n", engine.tools().listJson().dump(1).c_str());
         return 0;
@@ -371,6 +370,7 @@ int runTools(const Args& args) {
         return 0;
     }
     for (const auto& t : engine.tools().all()) std::printf("%-20s %s\n", t.name.c_str(), t.title.c_str());
+    for (const auto& t : engine.tools().dynamicTools()) std::printf("%-20s %s\n", t.name.c_str(), t.title.c_str());
     return 0;
 }
 

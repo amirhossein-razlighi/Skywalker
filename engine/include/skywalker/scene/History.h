@@ -14,6 +14,8 @@
 #include <cstdint>
 #include <deque>
 #include <string>
+#include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "skywalker/core/Json.h"
@@ -48,6 +50,14 @@ public:
     bool commit();
     /// Restores all touched state to how it was at begin().
     void rollback();
+    /// Captures the before-state of every entity and the environment now, so edits that bypass
+    /// change notifications (typed component writes, e.g. by Wander code run from a tool) are
+    /// still recorded at commit. Costs one snapshot per entity.
+    void touchAll();
+    /// Entities whose state differs from the open transaction's before-state so far, and whether
+    /// the environment or the entity order changed: {"entities": [ids], "environment": bool,
+    /// "order": bool}. Only touched entities are compared.
+    Json pendingChanges() const;
 
     bool canUndo() const { return cursor_ > 0; }
     bool canRedo() const { return cursor_ < entries_.size(); }
@@ -66,6 +76,10 @@ public:
 private:
     void restore(const std::vector<EntityId>& sceneOrder, const std::vector<std::pair<EntityId, Json>>& states,
                  bool environment, const Json& env, bool reverse);
+    /// Positions of the entities in the scene order: Scene::snapshotEntity() in O(1) per entity
+    /// when many entities are snapshotted at once.
+    std::unordered_map<EntityId, size_t> orderIndex() const;
+    Json snapshot(EntityId id, const std::unordered_map<EntityId, size_t>& order) const;
 
     Scene& scene_;
     size_t capacity_;
@@ -74,6 +88,7 @@ private:
     uint64_t serial_ = 0;
     bool active_ = false;
     HistoryEntry pending_;
+    std::unordered_set<EntityId> touched_;  // entities in pending_.order (fast membership)
 };
 
 }  // namespace sky

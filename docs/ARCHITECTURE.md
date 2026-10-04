@@ -49,6 +49,9 @@ description, a JSON Schema, and a handler. The registry validates arguments
 (type/enum/required/unknown-key, with did-you-mean hints) before a handler runs. MCP,
 in-editor agents and the editor UI all call the same tools. A human and an agent can
 therefore never have different powers, and every UI action is automatically scriptable.
+Agents extend the surface at runtime: custom tools (Wander or composite, defined in the
+project) and tools hosted by connected clients register as dynamic tools in the same
+registry, under capabilities, limits and an approval policy (docs/CUSTOM_TOOLS.md).
 
 **Reflection drives everything.** A component is a plain struct plus a field table
 (`SKY_FIELD(...)`). From that one table come:
@@ -241,6 +244,7 @@ that time out are marked abandoned, so they can never apply changes later.
 |---|---|
 | A component | Struct + `type()` table in `Components.{h,cpp}`, then one `makeReflectedKind<T>()` line in `Scene::registerKinds`. JSON, schema, editor UI and Wander access follow automatically. |
 | A tool | `reg.add({...})` in `EngineTools.cpp`, using an `edit(actor, label, …)` transaction for mutations. It then appears in MCP, the editor and the docs (`skywalker tools --markdown`). |
+| A tool at runtime (no rebuild) | `tool_define` (Wander or composite, saved in `tools/`), or host it in your own process over MCP (`skywalker/tools/register`); see docs/CUSTOM_TOOLS.md. |
 | A Wander function | `reg.add(BuiltinDef{...})` in a `registerXxxBuiltins(reg)` called from `registerEngineBuiltins` (`EngineBuiltins.cpp`): name, typed params, doc, category, implementation. The compiler, `wander_reference` and the docs pick it up (see docs/WANDER.md). |
 | A render backend | Implement `Renderer` (render / readback / present / uploadMesh / reloadShaders), then add it to `createRenderer`. |
 | An LLM provider | Most need nothing: they already speak the OpenAI-compatible protocol. Otherwise implement `LLMSession` in `Providers.swift`. |

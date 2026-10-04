@@ -67,6 +67,7 @@ Json readPropertyPath(const Scene& s, EntityId id, const std::string& path);
 void addShadowTools(Engine& engine, ToolRegistry& reg);  // ShadowTools.cpp: shadow_atlas_info, light_shadows
 void addPrefabTools(Engine& engine, ToolRegistry& reg);  // PrefabTools.cpp: entity_refs, copy/paste, prefab_overrides...
 void addLegalTools(Engine& engine, ToolRegistry& reg);  // LegalTools.cpp: legal_info (docs/legal/)
+void addCustomToolTools(Engine& engine, ToolRegistry& reg);  // CustomToolTools.cpp: tool_define, tool_test, ... (docs/CUSTOM_TOOLS.md)
 void addAgentLinkTools(Engine& engine, ToolRegistry& reg);  // AgentLinkTools.cpp: events_poll, tool_host_* (docs/PYTHON_AGENTS.md)
 
 }  // namespace sky::tools

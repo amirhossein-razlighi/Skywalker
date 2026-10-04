@@ -10,6 +10,7 @@
 
 #include "ToolHelpers.h"
 #include "skywalker/agent/EventLog.h"
+#include "skywalker/agent/CustomTools.h"
 #include "skywalker/agent/ToolHost.h"
 
 namespace sky::tools {
@@ -144,7 +145,9 @@ void addAgentLinkTools(Engine& engine, ToolRegistry& reg) {
                                                                             {"title", string("Short title")},
                                                                             {"description", string("What it does, for language models")},
                                                                             {"input_schema", Json::object({{"type", "object"}, {"description", "JSON Schema of the arguments"}})},
-                                                                            {"mutates", boolean("Changes the project or game (default false)")}})},
+                                                                            {"mutates", boolean("Changes the project or game (default false)")},
+                                                                            {"capabilities", Json::object({{"type", "object"}, {"description", "Engine tools it calls back into while serving a call: {calls: [names or globs], mutate, network} (docs/CUSTOM_TOOLS.md); callbacks pass _meta[\"skywalker/call_id\"]"}})},
+                                                                            {"limits", Json::object({{"type", "object"}, {"description", "{timeout_ms, max_output_bytes, max_calls}"}})}})},
                                                {"required", Json::array({"name"})}}),
                                  "The tools to serve")},
                 {"host", string("Your host id from an earlier registration (to update its tool set)")},
@@ -157,7 +160,7 @@ void addAgentLinkTools(Engine& engine, ToolRegistry& reg) {
             std::vector<ToolHost::ToolSpec> specs;
             for (const auto& t : a.get("tools").elements()) {
                 specs.push_back({t.get("name").asString(), t.get("title").asString(), t.get("description").asString(),
-                                 t.get("input_schema"), t.get("mutates").asBool()});
+                                 t.get("input_schema"), t.get("mutates").asBool(), t.get("capabilities"), t.get("limits")});
             }
             auto id = host->registerTools(a.get("host").asString(), ctx.actor, a.get("label").asString(), specs,
                                           a.get("ttl_seconds").asNumber(0), a.get("replace").asBool());
@@ -165,7 +168,9 @@ void addAgentLinkTools(Engine& engine, ToolRegistry& reg) {
             Json names = Json::array();
             for (const auto& s : specs) names.push(ToolHost::publicName(s.name));
             engine.emitEvent(Json::object({{"type", "tool_host"}, {"action", "register"}, {"host", *id}, {"actor", ctx.actor}, {"tools", names}}));
-            return ToolResult::json(Json::object({{"host", *id}, {"tools", names}}),
+            // Hosted tools follow the project's custom tool policy: tools that mutate may wait for a human's approval.
+            Json status = engine.customTools().statusOf(names);
+            return ToolResult::json(Json::object({{"host", *id}, {"tools", names}, {"status", status}}),
                                     "serving " + std::to_string(specs.size()) + " tool(s) as host " + *id + "; now poll with tool_host_poll");
         }};
     registerTools.quiet = true;  // announces itself with a tool_host event instead

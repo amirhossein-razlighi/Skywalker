@@ -211,6 +211,7 @@ nav:
           - DCC: reference/tools/dcc.md
           - Files: reference/tools/files.md
           - Network: reference/tools/network.md
+          - Custom tools: reference/tools/tools.md
           - Agent layer: reference/tools/agent.md
       - Components:
           - reference/components/index.md

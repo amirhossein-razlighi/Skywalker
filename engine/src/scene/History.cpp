@@ -26,16 +26,57 @@ void History::begin(std::string actor, std::string label) {
     pending_.actor = std::move(actor);
     pending_.label = std::move(label);
     pending_.sceneOrderBefore = scene_.entities();
+    touched_.clear();
     active_ = true;
 }
 
 void History::beforeEntityChange(EntityId id) {
     if (!active_) return;
-    for (EntityId e : pending_.order) {
-        if (e == id) return;  // already captured the before-state
-    }
+    if (!touched_.insert(id).second) return;  // already captured the before-state
     pending_.order.push_back(id);
     pending_.before.emplace_back(id, scene_.snapshotEntity(id));
+}
+
+std::unordered_map<EntityId, size_t> History::orderIndex() const {
+    std::unordered_map<EntityId, size_t> index;
+    const std::vector<EntityId>& order = scene_.entities();
+    index.reserve(order.size());
+    for (size_t i = 0; i < order.size(); ++i) index.emplace(order[i], i);
+    return index;
+}
+
+Json History::snapshot(EntityId id, const std::unordered_map<EntityId, size_t>& order) const {
+    Json snap = scene_.entityToJson(id);  // same document as Scene::snapshotEntity()
+    if (snap.isNull()) return snap;
+    auto it = order.find(id);
+    snap["_order"] = static_cast<uint64_t>(it == order.end() ? scene_.entities().size() : it->second);
+    return snap;
+}
+
+void History::touchAll() {
+    if (!active_) return;
+    const auto order = orderIndex();
+    for (EntityId id : scene_.entities()) {
+        if (!touched_.insert(id).second) continue;
+        pending_.order.push_back(id);
+        pending_.before.emplace_back(id, snapshot(id, order));
+    }
+    beforeEnvironmentChange();
+}
+
+Json History::pendingChanges() const {
+    Json ids = Json::array();
+    bool environment = false;
+    if (active_) {
+        const auto order = orderIndex();
+        for (const auto& [id, before] : pending_.before) {
+            if (snapshot(id, order) != before) ids.push(id);
+        }
+        environment = pending_.environmentChanged &&
+                      reflect::toJson(&scene_.environment(), Environment::type()) != pending_.environmentBefore;
+    }
+    bool order = active_ && scene_.entities() != pending_.sceneOrderBefore;
+    return Json::object({{"entities", ids}, {"environment", environment}, {"order", order}});
 }
 
 void History::beforeEnvironmentChange() {
@@ -47,13 +88,15 @@ void History::beforeEnvironmentChange() {
 bool History::commit() {
     if (!active_) return false;
     active_ = false;
+    touched_.clear();
     // Capture after-states and drop entities whose state did not actually change.
     HistoryEntry entry = std::move(pending_);
     std::vector<EntityId> order;
     std::vector<std::pair<EntityId, Json>> before, after;
+    const auto index = orderIndex();
     for (size_t i = 0; i < entry.order.size(); ++i) {
         EntityId id = entry.order[i];
-        Json now = scene_.snapshotEntity(id);
+        Json now = snapshot(id, index);
         if (now == entry.before[i].second) continue;
         order.push_back(id);
         before.push_back(entry.before[i]);
@@ -80,7 +123,14 @@ bool History::commit() {
 void History::rollback() {
     if (!active_) return;
     active_ = false;
-    restore(pending_.sceneOrderBefore, pending_.before, pending_.environmentChanged, pending_.environmentBefore, true);
+    touched_.clear();
+    // Entities that ended up unchanged need no restore (touchAll() can capture thousands).
+    std::vector<std::pair<EntityId, Json>> changed;
+    const auto index = orderIndex();
+    for (auto& [id, before] : pending_.before) {
+        if (before.isNull() ? scene_.exists(id) : snapshot(id, index) != before) changed.emplace_back(id, std::move(before));
+    }
+    restore(pending_.sceneOrderBefore, changed, pending_.environmentChanged, pending_.environmentBefore, true);
     pending_ = HistoryEntry{};
 }
 
@@ -132,6 +182,7 @@ void History::clear() {
     entries_.clear();
     cursor_ = 0;
     active_ = false;
+    touched_.clear();
 }
 
 }  // namespace sky

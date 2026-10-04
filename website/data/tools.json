@@ -9698,6 +9698,504 @@
    }
   },
   {
+   "name": "tool_define",
+   "title": "Define a custom tool",
+   "description": "Create or update your OWN tool when no engine tool does what you need. Kinds: \"wander\" — Wander code `fn run(args) ... end` that queries the scene and calls allowlisted tools (call_tool) under an instruction budget; \"composite\" — a pipeline of tool calls with templated args ({{args.x}}, {{steps.find.entities}}), for_each loops and a result mapping. Declare capabilities (read_scene, mutate, calls, files) as a minimal allowlist and add tests (args -> expect) — they run as dry runs before saving. Read-only tools become callable at once (as user_<name>, listed in tools/list); tools that mutate or write files wait for a human's approval (tool_approve) under the default policy. Updating merges your fields over the current definition. Example: {\"name\":\"enemies_near\",\"description\":\"Enemies within a radius of a point with their hp...\",\"input_schema\":{\"type\":\"object\",\"properties\":{\"radius\":{\"type\":\"number\",\"default\":10}}},\"wander\":\"fn run(args)\\n  let out = []\\n  for e in find_all(\\\"enemy\\\")\\n    if distance(e, (0,0,0)) <= args.radius then out.push({name: e.name, hp: e.hp}) end\\n  end\\n  return {enemies: out}\\nend\",\"tests\":[{\"args\":{\"radius\":5},\"expect\":{\"result\":{\"enemies\":{\"$type\":\"array\"}}}}]}. docs/CUSTOM_TOOLS.md has recipes.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "Tool name; it becomes user_<name> (lowercase, digits, underscores)"
+     },
+     "title": {
+      "type": "string",
+      "description": "Short title (default: from the name)"
+     },
+     "description": {
+      "type": "string",
+      "description": "For language models: what it does, when to use it, key arguments, an example"
+     },
+     "category": {
+      "type": "string",
+      "description": "Permission category, e.g. scene, world, custom (default custom)"
+     },
+     "kind": {
+      "type": "string",
+      "enum": [
+       "wander",
+       "composite"
+      ],
+      "description": "Implementation (inferred: \"wander\" code or \"steps\")"
+     },
+     "input_schema": {
+      "type": "object",
+      "description": "JSON schema of the arguments ({type: object, properties, required}); property \"default\"s are filled in"
+     },
+     "output_schema": {
+      "type": "object",
+      "description": "Optional JSON schema the result must match"
+     },
+     "capabilities": {
+      "type": "object",
+      "properties": {
+       "read_scene": {
+        "type": "boolean",
+        "description": "Query entities, components and vars (default true; false runs on an empty scene)"
+       },
+       "mutate": {
+        "type": "boolean",
+        "description": "Edit the scene, directly or through mutating tools (default false; needs a human's approval)"
+       },
+       "calls": {
+        "type": "array",
+        "items": {
+         "type": "string",
+         "description": "Tool name or glob"
+        },
+        "description": "Tools it may call (call_tool / steps), e.g. [\"scene_query\", \"entity_*\"]"
+       },
+       "files": {
+        "type": "object",
+        "properties": {
+         "read": {
+          "type": "array",
+          "items": {
+           "type": "string",
+           "description": "path"
+          },
+          "description": "Project folders/files it may read (\"data/\", \"levels/*.json\")"
+         },
+         "write": {
+          "type": "array",
+          "items": {
+           "type": "string",
+           "description": "path"
+          },
+          "description": "...and write (never tools/, game.json, .skywalker/, agents/, studio/)"
+         }
+        },
+        "additionalProperties": false
+       },
+       "network": {
+        "type": "boolean",
+        "description": "External tools only"
+       }
+      },
+      "additionalProperties": false,
+      "description": "What the tool may do: an explicit allowlist (least privilege)"
+     },
+     "limits": {
+      "type": "object",
+      "properties": {
+       "instructions": {
+        "type": "integer",
+        "description": "Wander instruction budget per call (default 1000000, max 50000000)"
+       },
+       "timeout_ms": {
+        "type": "integer",
+        "description": "Wall time per call (default 5000, max 120000)"
+       },
+       "max_output_bytes": {
+        "type": "integer",
+        "description": "Largest result (default 65536, max 1048576)"
+       },
+       "max_calls": {
+        "type": "integer",
+        "description": "Nested tool calls per call (default 100)"
+       }
+      },
+      "additionalProperties": false,
+      "description": "Hard limits"
+     },
+     "wander": {
+      "type": "string",
+      "description": "kind wander: Wander code with `fn run(args) ... return {...} end` (saved to tools/<name>.wander). Builtins: call_tool, try_tool, tool_warn, tool_fail, read_file, write_file, list_files, file_exists, json_parse, json_text, tool_actor"
+     },
+     "steps": {
+      "type": "array",
+      "items": {
+       "type": "object",
+       "properties": {
+        "id": {
+         "type": "string",
+         "description": "Name for later templates ({{steps.<id>}})"
+        },
+        "tool": {
+         "type": "string",
+         "description": "Tool to call"
+        },
+        "args": {
+         "type": "object",
+         "description": "Arguments; {{args.x}}, {{steps.id.field}}, {{item}}, {{index}}, {{prev}}, {{x ?? default}}"
+        },
+        "for_each": {
+         "description": "Run once per element: a template giving an array, or a count"
+        },
+        "as": {
+         "type": "string",
+         "description": "Loop variable name (default item)"
+        },
+        "when": {
+         "description": "Template; the step is skipped when it is false/empty"
+        },
+        "continue_on_error": {
+         "type": "boolean",
+         "description": "Keep going when this step fails"
+        },
+        "note": {
+         "type": "string",
+         "description": "Comment"
+        }
+       },
+       "additionalProperties": false,
+       "required": [
+        "tool"
+       ]
+      },
+      "description": "kind composite: tool calls in order (one undo step when the tool mutates)"
+     },
+     "result": {
+      "description": "kind composite: result mapping template (default: the last step's result)"
+     },
+     "tests": {
+      "type": "array",
+      "items": {
+       "type": "object",
+       "properties": {
+        "name": {
+         "type": "string",
+         "description": "What it checks"
+        },
+        "args": {
+         "type": "object",
+         "description": "Arguments for the call"
+        },
+        "setup": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "properties": {
+           "tool": {
+            "type": "string",
+            "description": "Tool"
+           },
+           "args": {
+            "type": "object"
+           }
+          },
+          "additionalProperties": false,
+          "required": [
+           "tool"
+          ]
+         },
+         "description": "Tool calls run first (rolled back with the test)"
+        },
+        "expect": {
+         "type": "object",
+         "description": "{ok, error: code, result: subset (with $gte $lte $gt $lt $len $contains $type), contains: text, max_ms}"
+        }
+       },
+       "additionalProperties": false
+      },
+      "description": "Checks run by tool_define and tool_test as dry runs"
+     },
+     "enabled": {
+      "type": "boolean",
+      "description": "Register it (default true)"
+     },
+     "from_library": {
+      "type": "string",
+      "description": "Install a tool from the user library (tool_promote put it there)"
+     },
+     "run_tests": {
+      "type": "boolean",
+      "description": "Run the tests before saving (default true); failing tests block the save"
+     },
+     "validate_only": {
+      "type": "boolean",
+      "description": "Check and test without saving"
+     }
+    },
+    "additionalProperties": false
+   },
+   "annotations": {
+    "title": "Define a custom tool",
+    "readOnlyHint": false,
+    "destructiveHint": false,
+    "openWorldHint": false
+   },
+   "_meta": {
+    "skywalker/category": "tools"
+   }
+  },
+  {
+   "name": "tool_test",
+   "title": "Test a custom tool",
+   "description": "Run a custom tool's tests, or one call with \"args\", as a DRY RUN: scene edits are rolled back and file writes skipped, so it is safe on tools that are not approved yet. Pass \"definition\" (same fields as tool_define) to try a draft without saving it. Returns per-test pass/fail with the compared values, logs and timing. Example: {\"name\":\"user_enemies_near\",\"args\":{\"radius\":8}}",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "Custom tool name"
+     },
+     "definition": {
+      "type": "object",
+      "description": "An unsaved definition to try instead"
+     },
+     "args": {
+      "type": "object",
+      "description": "Run one call with these arguments instead of the tests"
+     },
+     "setup": {
+      "type": "array",
+      "items": {
+       "type": "object",
+       "properties": {
+        "tool": {
+         "type": "string",
+         "description": "Tool"
+        },
+        "args": {
+         "type": "object"
+        }
+       },
+       "additionalProperties": false,
+       "required": [
+        "tool"
+       ]
+      },
+      "description": "With args: tool calls run first (rolled back)"
+     },
+     "filter": {
+      "type": "string",
+      "description": "Only tests whose name contains this"
+     }
+    },
+    "additionalProperties": false
+   },
+   "annotations": {
+    "title": "Test a custom tool",
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "openWorldHint": false
+   },
+   "_meta": {
+    "skywalker/category": "tools"
+   }
+  },
+  {
+   "name": "tool_list_custom",
+   "title": "List custom tools",
+   "description": "Every custom tool of the project (and external tools hosted by connected clients) with its status — active, pending_approval, rejected, disabled, offline, invalid — kind, version, author and call counts, plus the project's policy. include_library lists your user library (tool_promote); reload rescans tools/ for hand-edited definitions.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "include_library": {
+      "type": "boolean",
+      "description": "Also list the user library (~/.skywalker/tools)"
+     },
+     "reload": {
+      "type": "boolean",
+      "description": "Rescan tools/*.tool.json first"
+     }
+    },
+    "additionalProperties": false
+   },
+   "annotations": {
+    "title": "List custom tools",
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "openWorldHint": false
+   },
+   "_meta": {
+    "skywalker/category": "tools"
+   }
+  },
+  {
+   "name": "tool_inspect",
+   "title": "Inspect a custom tool",
+   "description": "Full definition of a custom tool: code or steps, schemas, capabilities, limits, tests, status and why, approval (by whom, for which hash), stats (calls, failures, timing) and its recent calls and errors. Use it to debug a tool or before changing it.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "Custom tool name"
+     }
+    },
+    "additionalProperties": false,
+    "required": [
+     "name"
+    ]
+   },
+   "annotations": {
+    "title": "Inspect a custom tool",
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "openWorldHint": false
+   },
+   "_meta": {
+    "skywalker/category": "tools"
+   }
+  },
+  {
+   "name": "tool_remove",
+   "title": "Remove a custom tool",
+   "description": "Unregister a custom tool and delete its files (tools/<name>.tool.json and .wander) unless delete_files is false. External tools are unregistered until their client registers them again.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "Custom tool name"
+     },
+     "delete_files": {
+      "type": "boolean",
+      "description": "Delete its files (default true)"
+     }
+    },
+    "additionalProperties": false,
+    "required": [
+     "name"
+    ]
+   },
+   "annotations": {
+    "title": "Remove a custom tool",
+    "readOnlyHint": false,
+    "destructiveHint": true,
+    "openWorldHint": false
+   },
+   "_meta": {
+    "skywalker/category": "tools"
+   }
+  },
+  {
+   "name": "tool_approve",
+   "title": "Approve a custom tool (human)",
+   "description": "A HUMAN approves (or rejects with approve:false) the current definition of a custom tool that needs approval (it mutates, writes files or reaches the network, or the policy is \"ask\"). The approval is bound to the definition's hash: changing the tool needs approval again. Agents cannot approve; ask the human to use the editor's Studio > Tools panel or `skywalker call tool_approve '{\"name\":\"user_x\"}' --project DIR`.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "Custom tool name"
+     },
+     "approve": {
+      "type": "boolean",
+      "description": "true approves (default), false rejects"
+     },
+     "note": {
+      "type": "string",
+      "description": "Why (kept with the approval)"
+     }
+    },
+    "additionalProperties": false,
+    "required": [
+     "name"
+    ]
+   },
+   "annotations": {
+    "title": "Approve a custom tool (human)",
+    "readOnlyHint": false,
+    "destructiveHint": false,
+    "openWorldHint": false
+   },
+   "_meta": {
+    "skywalker/category": "tools"
+   }
+  },
+  {
+   "name": "tool_enable",
+   "title": "Enable or disable a custom tool",
+   "description": "Turn a custom tool off (it disappears from tools/list but keeps its files and approval) or back on.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "Custom tool name"
+     },
+     "enabled": {
+      "type": "boolean",
+      "description": "true or false"
+     }
+    },
+    "additionalProperties": false,
+    "required": [
+     "name",
+     "enabled"
+    ]
+   },
+   "annotations": {
+    "title": "Enable or disable a custom tool",
+    "readOnlyHint": false,
+    "destructiveHint": false,
+    "openWorldHint": false
+   },
+   "_meta": {
+    "skywalker/category": "tools"
+   }
+  },
+  {
+   "name": "tool_promote",
+   "title": "Promote a tool to the user library",
+   "description": "Copy a project's custom tool into your user library (~/.skywalker/tools) so other projects can install it with tool_define {\"from_library\": \"user_x\"} (their approval rules apply).",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "Custom tool name"
+     }
+    },
+    "additionalProperties": false,
+    "required": [
+     "name"
+    ]
+   },
+   "annotations": {
+    "title": "Promote a tool to the user library",
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "openWorldHint": false
+   },
+   "_meta": {
+    "skywalker/category": "tools"
+   }
+  },
+  {
+   "name": "tool_policy",
+   "title": "Custom tool policy",
+   "description": "Read or set who approves custom tools in this project (game.json customTools.policy): off (disabled), ask (every tool needs a human's approval), auto (default: read-only tools run at once, tools that mutate or write files need approval), trust (no approvals). Agents may only make it stricter.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "policy": {
+      "type": "string",
+      "enum": [
+       "off",
+       "ask",
+       "auto",
+       "trust"
+      ],
+      "description": "New policy (omit to read it)"
+     }
+    },
+    "additionalProperties": false
+   },
+   "annotations": {
+    "title": "Custom tool policy",
+    "readOnlyHint": false,
+    "destructiveHint": false,
+    "openWorldHint": false
+   },
+   "_meta": {
+    "skywalker/category": "tools"
+   }
+  },
+  {
    "name": "events_poll",
    "title": "Follow engine events",
    "description": "Read the engine's live event stream (the same events the editor's Activity feed shows: tool calls with their actor, studio changes such as messages, tasks, feedback, decisions and loops, play state, selection, scene loads/saves, asset changes) after a cursor, without consuming them. Pass the returned `next` as `since` on the next call; since=0 starts with everything still retained (the last 4096 events). Filter with types (\"tool\", \"studio\", \"studio.message\", \"play_state\", ...), actors (prefix match, e.g. \"mcp:sky-agents\") or exclude_actors. wait_ms > 0 long-polls until a matching event arrives (agent socket connections only; use a dedicated connection, the wait blocks that connection). Example: {since: 120, types: [\"studio.message\"], wait_ms: 20000}.",
@@ -9781,6 +10279,14 @@
         "mutates": {
          "type": "boolean",
          "description": "Changes the project or game (default false)"
+        },
+        "capabilities": {
+         "type": "object",
+         "description": "Engine tools it calls back into while serving a call: {calls: [names or globs], mutate, network} (docs/CUSTOM_TOOLS.md); callbacks pass _meta[\"skywalker/call_id\"]"
+        },
+        "limits": {
+         "type": "object",
+         "description": "{timeout_ms, max_output_bytes, max_calls}"
         }
        },
        "required": [

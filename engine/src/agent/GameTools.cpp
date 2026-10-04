@@ -19,6 +19,7 @@
 #include <thread>
 
 #include "ToolHelpers.h"
+#include "skywalker/agent/CustomTools.h"
 #include "skywalker/core/Strings.h"
 #include "skywalker/game/Packager.h"
 
@@ -138,10 +139,15 @@ void addGameTools(Engine& engine, ToolRegistry& reg) {
             object({{"operation", enumeration({"get", "set"}, "get (default) or set")},
                     {"settings", Json::object({{"type", "object"}, {"description", "Fields to merge into game.json (set only)"}})}}),
             true, false,
-            [&engine](const Json& a, ToolContext&) {
+            [&engine](const Json& a, ToolContext& ctx) {
                 const std::string dir = engine.config().projectDir;
                 if (a.get("operation").asString("get") == "set") {
                     if (!a.get("settings").isObject()) return ToolResult::error(Error::make("invalid_arguments", "set needs a \"settings\" object"));
+                    if (a.get("settings").contains("customTools") && !CustomTools::isHuman(ctx.actor)) {
+                        // The custom tool policy decides what agents may run without a human (docs/CUSTOM_TOOLS.md).
+                        return ToolResult::error(Error::make("approval_requires_human", "only a human can change customTools in game.json",
+                                                             "tool_policy lets agents make the policy stricter"));
+                    }
                     // Merge into the file as written (not the expanded defaults), so game.json stays minimal.
                     Json current = Json::object();
                     fs::path file = fs::path(dir) / "game.json";

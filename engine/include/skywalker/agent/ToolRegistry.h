@@ -9,9 +9,11 @@
 //   * the editor UI itself, which is "just another client" of these tools.
 // One surface means humans and agents always see and do exactly the same things.
 
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -63,6 +65,15 @@ struct ToolResult {
 
 struct ToolContext {
     std::string actor = "user";  // "user", "agent:Nimbus", "mcp:claude-code", ...
+    /// Set when a connected client calls back into the engine while it serves one of its own
+    /// external tools (MCP `params._meta["skywalker/call_id"]`): the call then runs with that
+    /// tool's capabilities and the original caller's identity (docs/CUSTOM_TOOLS.md).
+    std::string parentCall = {};
+    /// How deeply custom tools are nested around this call (recursion guard).
+    int depth = 0;
+    /// The id the engine gave this call when it forwards it to an external tool's host; the host
+    /// passes it back as `_meta["skywalker/call_id"]` on callbacks (becomes their parentCall).
+    std::string callId = {};
 };
 
 struct ToolDef {
@@ -80,6 +91,11 @@ struct ToolDef {
     /// Plumbing that should not show up in the activity feed or per-agent tool counts (event
     /// polling, tool-host traffic): recording it would feed the event stream back into itself.
     bool quiet = false;
+    /// Where a dynamic tool comes from: "custom" (defined by agents in the project, tools/*.tool.json)
+    /// or "external" (hosted by a connected client). Empty for the engine's own tools.
+    std::string origin = {};
+    /// Extra MCP `_meta` entries for tools/list (custom tools: kind, version, author).
+    Json meta = Json();
 };
 
 class ToolRegistry {
@@ -99,6 +115,20 @@ public:
     bool removeDynamic(std::string_view name);
     /// Snapshot of the live dynamic tools, in registration order.
     std::vector<ToolDef> dynamicTools() const;
+    /// Every tool name, built-in and dynamic.
+    std::vector<std::string> names() const;
+
+    /// Bumped whenever a dynamic tool is added, replaced or removed (MCP list_changed notifications).
+    uint64_t revision() const;
+    /// Called after every change of the dynamic tools, on the thread that made it, outside the lock.
+    int addListener(std::function<void()> listener) const;
+    void removeListener(int id) const;
+
+    /// Runs before every invocation (after schema validation). Returning a result short-circuits the
+    /// call; the gate may also rewrite the context. The custom tool manager uses it to apply an
+    /// external tool's capabilities to that tool's callbacks (ToolContext::parentCall).
+    using Gate = std::function<std::optional<ToolResult>(const ToolDef& tool, const Json& args, ToolContext& ctx)>;
+    void setGate(Gate gate);
 
     /// Validates arguments against the schema, then invokes the handler. Never throws. A tool
     /// that defers its slow half is completed inline (use invoke() to split the steps).
@@ -113,11 +143,17 @@ public:
 
 private:
     const ToolDef* findDynamic(std::string_view name) const;
+    Status insertDynamic(ToolDef def);
+    void changed() const;
 
     std::vector<ToolDef> tools_;
     mutable std::mutex dynamicMutex_;
     std::vector<std::shared_ptr<const ToolDef>> dynamic_;  // live, in registration order
     std::vector<std::shared_ptr<const ToolDef>> retired_;  // kept alive: find() may have handed them out
+    uint64_t revision_ = 1;                                // guarded by dynamicMutex_
+    mutable std::vector<std::pair<int, std::shared_ptr<std::function<void()>>>> listeners_;
+    mutable int nextListener_ = 1;
+    std::shared_ptr<const Gate> gate_;
 };
 
 /// Lightweight JSON-Schema validation covering what tool schemas use: type, required,

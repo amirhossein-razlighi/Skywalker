@@ -178,6 +178,9 @@ final class StudioStore {
     private(set) var totalUsage = TokenUsage()
     private(set) var latestPlaytest = ""
     private(set) var latestMetrics: JSON = .null
+    /// Tools agents defined (and tools hosted by connected clients), and who approves them.
+    private(set) var customTools: [CustomToolInfo] = []
+    private(set) var customToolPolicy = "auto"
     /// Bumped on every refresh (views that cache derived data can watch it).
     private(set) var revision = 0
 
@@ -242,8 +245,36 @@ final class StudioStore {
         totalUsage = TokenUsage(json: overview["usage"])
         latestPlaytest = overview["latest_playtest"].string ?? ""
         latestMetrics = overview["latest_metrics"]
+        refreshCustomTools()
         revision += 1
     }
+
+    func refreshCustomTools(reload: Bool = false) {
+        let list = call("tool_list_custom", reload ? ["reload": true] : [:])
+        let tools = list["tools"].array.map(CustomToolInfo.init(json:))
+        if tools != customTools { customTools = tools }
+        customToolPolicy = list["policy"].string ?? "auto"
+    }
+
+    func reloadCustomTools() { refreshCustomTools(reload: true) }
+
+    // Approval and the policy are the human's: these calls run as "user", not as the editor plumbing.
+    func approveCustomTool(_ name: String, approve: Bool) {
+        engine.call("tool_approve", ["name": .string(name), "approve": .bool(approve)], actor: "user")
+        refreshCustomTools()
+    }
+
+    func enableCustomTool(_ name: String, enabled: Bool) {
+        engine.call("tool_enable", ["name": .string(name), "enabled": .bool(enabled)], actor: "user")
+        refreshCustomTools()
+    }
+
+    func setCustomToolPolicy(_ policy: String) {
+        engine.call("tool_policy", ["policy": .string(policy)], actor: "user")
+        refreshCustomTools()
+    }
+
+    var pendingToolCount: Int { customTools.filter(\.needsHuman).count }
 
     @discardableResult
     func call(_ tool: String, _ args: JSON) -> JSON {

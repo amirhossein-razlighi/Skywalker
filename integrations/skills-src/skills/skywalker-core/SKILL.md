@@ -122,6 +122,7 @@ Load the specialist skill **before** the first call in its area; each has the wo
 | Fire, smoke, weather, GPU particles, hair and fur, effect cost | skywalker-vfx | `fx_*`, `groom_*` |
 | Packaging a macOS app, testing as a player, release settings | skywalker-ship | `game_settings`, `game_build`, `game_run` |
 | Team of agents, tasks, feedback, playtests, loops, token usage | skywalker-studio | `studio_*`, `playtest_*` |
+| No tool does what you need: define your own (Wander, composite, hosted) | skywalker-custom-tools | `tool_define`, `tool_test`, `tool_inspect` |
 
 Full tool catalogue by task: [references/tools-by-task.md](references/tools-by-task.md). The server also exposes the
 engine docs as MCP resources (`skywalker://docs/...`) and the tool catalogue (`skywalker://tools`).

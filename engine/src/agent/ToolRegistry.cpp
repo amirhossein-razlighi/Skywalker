@@ -69,6 +69,12 @@ const ToolDef* ToolRegistry::findDynamic(std::string_view name) const {
 }
 
 Status ToolRegistry::addDynamic(ToolDef def) {
+    Status s = insertDynamic(std::move(def));
+    if (s) changed();
+    return s;
+}
+
+Status ToolRegistry::insertDynamic(ToolDef def) {
     for (const auto& t : tools_) {
         if (t.name == def.name) return Error::make("name_taken", "'" + def.name + "' is a built-in tool", "pick another name");
     }
@@ -78,27 +84,70 @@ Status ToolRegistry::addDynamic(ToolDef def) {
                            "restart the engine, or re-register tools less often");
     }
     auto entry = std::make_shared<const ToolDef>(std::move(def));
+    bool replaced = false;
     for (auto& t : dynamic_) {
         if (t->name == entry->name) {
             retired_.push_back(std::move(t));
             t = std::move(entry);
-            return {};
+            replaced = true;
+            break;
         }
     }
-    dynamic_.push_back(std::move(entry));
+    if (!replaced) dynamic_.push_back(std::move(entry));
+    ++revision_;
     return {};
 }
 
 bool ToolRegistry::removeDynamic(std::string_view name) {
-    std::lock_guard lock(dynamicMutex_);
-    for (auto it = dynamic_.begin(); it != dynamic_.end(); ++it) {
-        if ((*it)->name == name) {
-            retired_.push_back(std::move(*it));
-            dynamic_.erase(it);
-            return true;
-        }
+    {
+        std::lock_guard lock(dynamicMutex_);
+        auto it = std::find_if(dynamic_.begin(), dynamic_.end(), [&](const auto& t) { return t->name == name; });
+        if (it == dynamic_.end()) return false;
+        retired_.push_back(std::move(*it));
+        dynamic_.erase(it);
+        ++revision_;
     }
-    return false;
+    changed();
+    return true;
+}
+
+std::vector<std::string> ToolRegistry::names() const {
+    std::vector<std::string> out;
+    for (const auto& t : tools_) out.push_back(t.name);
+    std::lock_guard lock(dynamicMutex_);
+    for (const auto& t : dynamic_) out.push_back(t->name);
+    return out;
+}
+
+uint64_t ToolRegistry::revision() const {
+    std::lock_guard lock(dynamicMutex_);
+    return revision_;
+}
+
+int ToolRegistry::addListener(std::function<void()> listener) const {
+    std::lock_guard lock(dynamicMutex_);
+    int id = nextListener_++;
+    listeners_.emplace_back(id, std::make_shared<std::function<void()>>(std::move(listener)));
+    return id;
+}
+
+void ToolRegistry::removeListener(int id) const {
+    std::lock_guard lock(dynamicMutex_);
+    std::erase_if(listeners_, [id](const auto& l) { return l.first == id; });
+}
+
+void ToolRegistry::setGate(Gate gate) {
+    std::lock_guard lock(dynamicMutex_);
+    gate_ = gate ? std::make_shared<const Gate>(std::move(gate)) : nullptr;
+}
+
+void ToolRegistry::changed() const {
+    std::vector<std::shared_ptr<std::function<void()>>> listeners;
+    {
+        std::lock_guard lock(dynamicMutex_);
+        for (const auto& [id, fn] : listeners_) listeners.push_back(fn);
+    }
+    for (const auto& fn : listeners) (*fn)();
 }
 
 std::vector<ToolDef> ToolRegistry::dynamicTools() const {
@@ -135,17 +184,22 @@ ToolResult ToolRegistry::call(std::string_view name, const Json& args, ToolConte
 ToolResult ToolRegistry::invoke(std::string_view name, const Json& args, ToolContext& ctx) const {
     const ToolDef* tool = find(name);
     if (!tool) {
-        std::vector<std::string> names;
-        for (const auto& t : tools_) names.push_back(t.name);
-        for (const auto& t : dynamicTools()) names.push_back(t.name);
-        std::string guess = str::closest(name, names, 4);
+        std::string guess = str::closest(name, names(), 4);
         return ToolResult::error(Error::make("unknown_tool", "no tool named '" + std::string(name) + "'",
                                              guess.empty() ? "call tools/list to see available tools"
                                                            : "did you mean '" + guess + "'?"));
     }
     Json normalized = args.isNull() ? Json::object() : args;
     if (Status s = validateSchema(tool->inputSchema, normalized); !s) return ToolResult::error(s.error());
+    std::shared_ptr<const Gate> gate;
+    {
+        std::lock_guard lock(dynamicMutex_);
+        gate = gate_;
+    }
     try {
+        if (gate && *gate) {
+            if (std::optional<ToolResult> stop = (*gate)(*tool, normalized, ctx)) return std::move(*stop);
+        }
         return tool->handler(normalized, ctx);
     } catch (const std::exception& e) {
         return ToolResult::error(Error::make("internal_error", std::string("tool crashed: ") + e.what()));
@@ -158,6 +212,10 @@ Json ToolRegistry::listJson() const {
     Json list = Json::array();
     const std::vector<ToolDef> dynamic = dynamicTools();
     auto describe = [&list](const ToolDef& t) {
+        // Lets clients group tools / grant permissions per category.
+        Json meta = Json::object({{"skywalker/category", t.category}});
+        if (!t.origin.empty()) meta["skywalker/origin"] = t.origin;
+        for (const auto& [k, v] : t.meta.members()) meta[k] = v;
         list.push(Json::object({{"name", t.name},
                                 {"title", t.title},
                                 {"description", t.description},
@@ -166,11 +224,10 @@ Json ToolRegistry::listJson() const {
                                                               {"readOnlyHint", !t.mutates},
                                                               {"destructiveHint", t.destructive},
                                                               {"openWorldHint", t.openWorld}})},
-                                // Lets clients group tools / grant permissions per category.
-                                {"_meta", Json::object({{"skywalker/category", t.category}})}}));
+                                {"_meta", meta}}));
     };
     for (const auto& t : tools_) describe(t);
-    for (const auto& t : dynamic) describe(t);  // tools hosted by external processes (py_*)
+    for (const auto& t : dynamic) describe(t);  // custom tools (user_*) and tools hosted by clients (py_*, ...)
     return Json::object({{"tools", list}});
 }
 

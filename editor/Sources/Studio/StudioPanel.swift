@@ -4,7 +4,7 @@ import SwiftUI
 /// with director verdicts and measured effects, loops, and message threads. Everything is
 /// the engine's studio (shared with the CLI runner and external agents).
 enum StudioTab: String, CaseIterable, Identifiable {
-    case roster = "Roster", board = "Board", feedback = "Feedback", loops = "Loops", messages = "Messages"
+    case roster = "Roster", board = "Board", feedback = "Feedback", loops = "Loops", messages = "Messages", tools = "Tools"
     var id: String { rawValue }
     var symbol: String {
         switch self {
@@ -13,6 +13,7 @@ enum StudioTab: String, CaseIterable, Identifiable {
         case .feedback: "exclamationmark.bubble"
         case .loops: "arrow.triangle.2.circlepath"
         case .messages: "bubble.left.and.bubble.right"
+        case .tools: "wrench.and.screwdriver"
         }
     }
 }
@@ -32,6 +33,7 @@ struct StudioPanel: View {
             case .feedback: FeedbackView()
             case .loops: LoopsView()
             case .messages: MessagesView()
+            case .tools: CustomToolsView()
             }
         }
     }
@@ -40,6 +42,8 @@ struct StudioPanel: View {
         switch t {
         case .feedback where studio.needsDecisionCount > 0:
             return "Feedback (\(studio.needsDecisionCount))"
+        case .tools where studio.pendingToolCount > 0:
+            return "Tools (\(studio.pendingToolCount))"
         case .board:
             let open = studio.tasks.filter { $0.status == "todo" || $0.status == "doing" || $0.status == "review" }.count
             return open > 0 ? "Board (\(open))" : "Board"

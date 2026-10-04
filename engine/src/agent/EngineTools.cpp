@@ -164,6 +164,7 @@ void addSceneTools(Engine& engine, ToolRegistry& reg) {
                  RendererInfo ri = engine.renderer().info();
                  Json cats = Json::object();
                  for (const auto& t : engine.tools().all()) cats[t.category].push(t.name);
+                 for (const auto& t : engine.tools().dynamicTools()) cats[t.category].push(t.name);  // custom and hosted tools
                  Json j = Json::object({{"engine", "Skywalker"},
                                         {"version", SKY_VERSION_STRING},
                                         {"renderer", ri.backend + " (" + ri.device + ")"},
@@ -1218,6 +1219,7 @@ void registerEngineTools(Engine& engine) {
     tools::addShadowTools(engine, reg);  // engine/src/agent/ShadowTools.cpp (point / spot light shadows)
     tools::addPrefabTools(engine, reg);  // engine/src/agent/PrefabTools.cpp (entity links, linked prefabs)
     tools::addLegalTools(engine, reg);  // engine/src/agent/LegalTools.cpp (terms, privacy, acceptance state)
+    tools::addCustomToolTools(engine, reg);  // engine/src/agent/CustomToolTools.cpp (agent-defined tools)
     tools::addAgentLinkTools(engine, reg);  // engine/src/agent/AgentLinkTools.cpp: events_poll, tool_host_*
 }
 

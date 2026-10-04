@@ -17,6 +17,7 @@
 #include <chrono>
 #include <condition_variable>
 #include <cstdint>
+#include <functional>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -31,6 +32,7 @@
 namespace sky {
 
 class ToolRegistry;
+struct ToolDef;
 struct ToolResult;
 
 class ToolHost : public std::enable_shared_from_this<ToolHost> {
@@ -42,6 +44,9 @@ public:
         Json args;
         std::string actor;  // who called it
         double queuedAt = 0;
+        /// The engine's id for this call: pass it back as `_meta["skywalker/call_id"]` on tools/call
+        /// requests made while serving it, so they run with the tool's capabilities (docs/CUSTOM_TOOLS.md).
+        std::string callId;
         Json toJson() const;
     };
     struct ToolSpec {
@@ -50,7 +55,20 @@ public:
         std::string description;
         Json inputSchema;
         bool mutates = false;
+        Json capabilities;  // optional: {calls, mutate, network} (docs/CUSTOM_TOOLS.md)
+        Json limits;        // optional: {timeout_ms, max_output_bytes, max_calls}
     };
+    /// Where the host's tools go. By default straight into the registry; the engine installs the custom
+    /// tool manager (CustomTools::hostedPublisher) so hosted tools follow the project's policy, approvals,
+    /// capabilities, limits and audit like every other dynamic tool. `publish` runs on the thread that
+    /// registers (the main thread); `withdraw` on any thread, possibly with the host lock held.
+    struct Publisher {
+        std::function<Status(ToolDef def, const ToolSpec& spec, const std::string& host, const std::string& owner,
+                             const std::string& label)>
+            publish;
+        std::function<void(const std::string& publicName)> withdraw;
+    };
+    void setPublisher(Publisher publisher);
 
     /// `registry` must outlive the host; `mainThread` is the engine thread (calls made on it cannot wait).
     explicit ToolHost(ToolRegistry& registry, std::thread::id mainThread = std::this_thread::get_id());
@@ -77,7 +95,7 @@ public:
 
     // --- the calling side ----------------------------------------------------------
     /// Queues a call for the tool's host (main thread, from the py_* handler).
-    Result<uint64_t> enqueue(const std::string& tool, const Json& args, const std::string& actor);
+    Result<uint64_t> enqueue(const std::string& tool, const Json& args, const std::string& actor, const std::string& callId = {});
     /// Waits for the reply (an MCP CallToolResult) and forgets the call. nullopt on timeout.
     std::optional<Json> waitReply(uint64_t call, std::chrono::milliseconds timeout);
     /// Fails a call (timeout, cancellation); a waiter gets the error.
@@ -116,7 +134,9 @@ private:
     void expireStaleLocked();
     void removeHostLocked(const std::string& host, const std::string& reason);
     void failLocked(Pending& p, const std::string& code, const std::string& message, const std::string& hint);
+    void withdrawLocked(const std::string& publicName);
 
+    Publisher publisher_;
     ToolRegistry& registry_;
     std::thread::id mainThread_;
     mutable std::mutex mutex_;

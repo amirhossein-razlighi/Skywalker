@@ -117,12 +117,27 @@ size_t EventLog::size() const {
 // ---------------------------------------------------------------------------
 
 Json ToolHost::Call::toJson() const {
-    return Json::object({{"call", id}, {"tool", tool}, {"args", args}, {"actor", actor}, {"queued_at", queuedAt}});
+    Json j = Json::object({{"call", id}, {"tool", tool}, {"args", args}, {"actor", actor}, {"queued_at", queuedAt}});
+    if (!callId.empty()) j["call_id"] = callId;
+    return j;
 }
 
 ToolHost::ToolHost(ToolRegistry& registry, std::thread::id mainThread) : registry_(registry), mainThread_(mainThread) {}
 
 ToolHost::~ToolHost() { shutdown(); }
+
+void ToolHost::setPublisher(Publisher publisher) {
+    std::lock_guard lock(mutex_);
+    publisher_ = std::move(publisher);
+}
+
+void ToolHost::withdrawLocked(const std::string& publicName) {
+    if (publisher_.withdraw) {
+        publisher_.withdraw(publicName);
+    } else {
+        registry_.removeDynamic(publicName);
+    }
+}
 
 double ToolHost::now() { return wallClock(); }
 
@@ -177,7 +192,7 @@ Result<std::string> ToolHost::registerTools(const std::string& hostId, const std
     // Drop tools this host no longer serves.
     for (const auto& old : host.tools) {
         if (std::find(names.begin(), names.end(), old) == names.end()) {
-            registry_.removeDynamic(old);
+            withdrawLocked(old);
             toolOwner_.erase(old);
         }
     }
@@ -203,7 +218,7 @@ Result<std::string> ToolHost::registerTools(const std::string& hostId, const std
         def.handler = [weak, pub](const Json& args, ToolContext& ctx) -> ToolResult {
             auto self = weak.lock();
             if (!self) return ToolResult::error(Error::make("unavailable", "the tool host is gone"));
-            auto queued = self->enqueue(pub, args, ctx.actor);
+            auto queued = self->enqueue(pub, args, ctx.actor, ctx.callId);
             if (!queued) return ToolResult::error(queued.error());
             uint64_t call = *queued;
             auto out = std::make_shared<Json>();
@@ -225,7 +240,9 @@ Result<std::string> ToolHost::registerTools(const std::string& hostId, const std
                 [out] { return toolResultFromMcp(*out); },
                 [self, call] { self->cancel(call, "cancelled", "the agent server is stopping"); });
         };
-        if (Status s = registry_.addDynamic(std::move(def)); !s) return s.error();
+        Status published = publisher_.publish ? publisher_.publish(std::move(def), spec, id, owner, host.label)
+                                              : registry_.addDynamic(std::move(def));
+        if (!published) return published.error();
         toolOwner_[pub] = id;
         host.tools.push_back(pub);
     }
@@ -261,7 +278,7 @@ void ToolHost::removeHostLocked(const std::string& hostId, const std::string& re
     for (const auto& pub : it->second.tools) {
         auto owner = toolOwner_.find(pub);
         if (owner != toolOwner_.end() && owner->second == hostId) {
-            registry_.removeDynamic(pub);
+            withdrawLocked(pub);
             toolOwner_.erase(owner);
         }
     }
@@ -278,7 +295,7 @@ void ToolHost::failLocked(Pending& p, const std::string& code, const std::string
     ++failed_;
 }
 
-Result<uint64_t> ToolHost::enqueue(const std::string& tool, const Json& args, const std::string& actor) {
+Result<uint64_t> ToolHost::enqueue(const std::string& tool, const Json& args, const std::string& actor, const std::string& callId) {
     std::lock_guard lock(mutex_);
     if (shuttingDown_) return Error::make("unavailable", "the engine is shutting down");
     expireStaleLocked();
@@ -290,6 +307,7 @@ Result<uint64_t> ToolHost::enqueue(const std::string& tool, const Json& args, co
     p.call.tool = tool;
     p.call.args = args;
     p.call.actor = actor;
+    p.call.callId = callId;
     p.call.queuedAt = now();
     uint64_t id = p.call.id;
     pending_.emplace(id, std::move(p));

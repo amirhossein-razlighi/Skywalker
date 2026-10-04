@@ -117,7 +117,41 @@ const char* McpSession::instructions() {
 }
 
 McpSession::McpSession(const ToolRegistry& registry, Executor executor)
-    : registry_(registry), executor_(std::move(executor)) {}
+    : registry_(registry),
+      executor_([fn = std::move(executor)](const std::string& tool, const Json& args, const ToolContext& ctx) {
+          return fn(tool, args, ctx.actor);
+      }) {
+    notifiedRevision_ = registry_.revision();
+}
+
+McpSession::McpSession(const ToolRegistry& registry, ContextExecutor executor)
+    : registry_(registry), executor_(std::move(executor)) {
+    notifiedRevision_ = registry_.revision();
+}
+
+void McpSession::setHost(std::shared_ptr<ExternalHost> host, HostHandlers handlers) {
+    host_ = std::move(host);
+    handlers_ = std::move(handlers);
+}
+
+void McpSession::closeHost() {
+    if (!host_ || hostClosed_.exchange(true)) return;
+    if (handlers_.closed) handlers_.closed(host_);
+}
+
+std::optional<std::string> McpSession::pendingNotification() {
+    if (!initialized_.load()) return std::nullopt;
+    uint64_t now = registry_.revision();
+    if (notifiedRevision_.exchange(now) == now) return std::nullopt;
+    return Json::object({{"jsonrpc", "2.0"}, {"method", "notifications/tools/list_changed"}}).dump();
+}
+
+Json McpSession::callTool(const std::string& tool, const Json& args, const std::string& parentCall) {
+    ToolContext ctx;
+    ctx.actor = "mcp:" + clientName_;
+    ctx.parentCall = parentCall;
+    return executor_(tool, args, ctx);
+}
 
 std::optional<std::string> McpSession::handle(std::string_view message) {
     auto parsed = Json::parse(message);
@@ -170,12 +204,23 @@ Json McpSession::dispatch(const Json& req) {
         }
         const Json& info = params.get("clientInfo");
         clientName_ = sanitizeActor(info.get("name").asString("mcp-client"));
+        if (host_) host_->setActor("mcp:" + clientName_);
+        Json capabilities = Json::object({{"tools", Json::object({{"listChanged", true}})},
+                                          {"resources", Json::object()},
+                                          {"prompts", Json::object()},
+                                          {"logging", Json::object()}});
+        if (host_) {
+            // Clients can host tools on this connection (docs/CUSTOM_TOOLS.md, "External tools").
+            capabilities["experimental"] = Json::object(
+                {{"skywalker/externalTools",
+                  Json::object({{"version", 1},
+                                {"methods", Json::array({"skywalker/tools/register", "skywalker/tools/unregister",
+                                                         "skywalker/tools/list"})},
+                                {"callMethod", "skywalker/tools/call"}})}});
+        }
         return rpcResult(id, Json::object({
             {"protocolVersion", protocolVersion_},
-            {"capabilities", Json::object({{"tools", Json::object({{"listChanged", false}})},
-                                           {"resources", Json::object()},
-                                           {"prompts", Json::object()},
-                                           {"logging", Json::object()}})},
+            {"capabilities", capabilities},
             {"serverInfo", Json::object({{"name", "skywalker"},
                                          {"title", "Skywalker Game Engine"},
                                          {"version", SKY_VERSION_STRING}})},
@@ -183,7 +228,10 @@ Json McpSession::dispatch(const Json& req) {
         }));
     }
     if (method == "ping") return rpcResult(id, Json::object());
-    if (method == "tools/list") return rpcResult(id, registry_.listJson());
+    if (method == "tools/list") {
+        notifiedRevision_ = registry_.revision();
+        return rpcResult(id, registry_.listJson());
+    }
     if (method == "tools/call") {
         if (!params.get("name").isString()) return rpcError(id, -32602, "tools/call requires params.name");
         const std::string& name = params.get("name").asString();
@@ -194,7 +242,21 @@ Json McpSession::dispatch(const Json& req) {
             return rpcError(id, -32602, r.content.empty() ? "Unknown tool" : r.content.front().text);
         }
         Json args = params.get("arguments").isObject() ? params.get("arguments") : Json::object();
-        return rpcResult(id, executor_(name, args, "mcp:" + clientName_));
+        // A callback made while this client serves one of its external tools.
+        const std::string& parentCall = params.get("_meta").get("skywalker/call_id").asString();
+        return rpcResult(id, callTool(name, args, parentCall));
+    }
+    if (startsWith(method, "skywalker/tools/")) {
+        if (!host_ || !handlers_.request) {
+            return rpcError(id, -32601, "Method not found: " + method + " (this connection cannot host tools)");
+        }
+        Result<Json> r = handlers_.request(method, params, host_);
+        if (!r) {
+            std::string message = "[" + r.error().code + "] " + r.error().message;
+            if (!r.error().hint.empty()) message += " (hint: " + r.error().hint + ")";
+            return rpcError(id, r.error().code == "unknown_method" ? -32601 : -32602, message);
+        }
+        return rpcResult(id, std::move(r.value()));
     }
     if (method == "resources/list") return rpcResult(id, listResources());
     if (method == "resources/templates/list") {
@@ -250,7 +312,7 @@ Json McpSession::readResource(const Json& id, const std::string& uri) {
         auto args = Json::parse(r.args);
         if (!registry_.find(r.tool) || !args) return notFound();
         bool isError = false;
-        std::string text = toolPayload(executor_(r.tool, args.value(), "mcp:" + clientName_), std::string_view(r.mime) == "application/json", isError);
+        std::string text = toolPayload(callTool(r.tool, args.value()), std::string_view(r.mime) == "application/json", isError);
         if (isError) return rpcError(id, -32603, "Reading " + uri + " failed: " + text);
         return contents(text, r.mime);
     }
@@ -311,7 +373,7 @@ Json McpSession::getPrompt(const Json& id, const std::string& name, const Json& 
     if (name == "studio_agent") {
         std::string agent = promptArgs.get("agent").asString();
         if (agent.empty()) return rpcError(id, -32602, "prompt studio_agent requires the argument 'agent'");
-        Json brief = executor_("studio_agent_brief", Json::object({{"agent", agent}, {"loop_member", true}}), "mcp:" + clientName_);
+        Json brief = callTool("studio_agent_brief", Json::object({{"agent", agent}, {"loop_member", true}}));
         bool isError = false;
         std::string text = toolPayload(brief, false, isError);
         if (isError) return rpcError(id, -32602, text);

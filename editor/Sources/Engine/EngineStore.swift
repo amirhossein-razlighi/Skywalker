@@ -417,6 +417,13 @@ final class EngineStore {
                 if notable {
                     append(ActivityItem(actor: actor, kind: "studio", text: e["summary"].string ?? kind, ok: true))
                 }
+            case "custom_tool":
+                onStudioEvent?()  // the Studio's Tools tab
+                let action = e["action"].string ?? ""
+                if action != "call" {
+                    let status = e["status"].string.map { " (\($0.replacingOccurrences(of: "_", with: " ")))" } ?? ""
+                    append(ActivityItem(actor: actor, kind: "tool", text: "\(action) \(e["tool"].string ?? "")\(status)", ok: true))
+                }
             case "asset_request":
                 append(ActivityItem(actor: e["request"]["requestedBy"].string ?? actor, kind: "asset",
                                     text: "requested \(e["request"]["kind"].string ?? "asset"): \(e["request"]["prompt"].string ?? "")", ok: true))
