@@ -276,11 +276,15 @@ def make_signs(blds, anchors):
     return signs, placed
 
 
-def run_dcc(pix, job, folder, label):
+def run_dcc(pix, job, folder, label, extra=None):
     """Runs a Blender job (only if the script or job changed since the last run) and imports every
-    model it lists; returns ({name: import result}, anchors)."""
+    model it lists; returns ({name: import result}, anchors). With `extra`, that script is run on
+    top of the kit's library part (builders, materials, signs) instead of the kit's own main."""
     with open(os.path.join(HERE, "neon_requiem_dcc.py")) as f:
         script = f.read()
+    if extra:
+        with open(os.path.join(HERE, extra)) as f:
+            script = script.split("\nB.reset_scene()\n")[0] + "\n\n" + f.read()
     blob = json.dumps(job, sort_keys=True)
     digest = hashlib.sha256((script + blob).encode()).hexdigest()[:16]
     stamp = os.path.join(pix.studio.project, folder, ".job")
@@ -294,7 +298,7 @@ def run_dcc(pix, job, folder, label):
         with open(stamp, "w") as f:
             f.write(digest)
     names = [b["name"] for b in job.get("buildings", [])] + [t["name"] for t in job.get("skyline", [])]
-    for group in ("skybridges", "monorail", "signs", "props"):
+    for group in ("skybridges", "monorail", "signs", "props", "stalls", "stools", "lanterns"):
         names += [s["name"] for s in job.get(group, [])]
     for n in names:
         if n not in imported:
@@ -358,6 +362,7 @@ def build(studio):
     signs, placed_signs = make_signs(blds, anchors)
     sign_models, _ = run_dcc(pix, dict(textures=False, signs=signs, ads=ADS), SIGNS, "signs")
     models.update(sign_models)
+    repaint_shop_cells(pix.studio.project)
 
     # bind photoscans and the window atlas to every building's material slots
     atlas = f"{KIT}/window_atlas.png"
@@ -374,7 +379,8 @@ def build(studio):
             elif pn in OTHER_SURF:
                 restyle(pix, mp, surf[OTHER_SURF[pn]], tint=0.9)
             elif pn == "windows":
-                pix.material(mp, color="#ffffff", texture=atlas, emissiveMap=atlas, emissive=[1, 1, 1, 1.5], roughness=0.06,
+                # glass: a dark, glossy surface (it mirrors the neon); the rooms behind it are the emissive atlas
+                pix.material(mp, color="#0b0c0e", texture="", emissiveMap=atlas, emissive=[1, 1, 1, 1.5], roughness=0.06,
                              metallic=0.0, ormMap="", normalMap="", triplanar=False)
     for t in towers:
         for part in models[t["name"]].get("parts", []):
@@ -430,6 +436,8 @@ def build(studio):
     cir.flush("Skyline megatowers")
     for i, (bz, bh, _) in enumerate(BRIDGES):
         ph.place(cir, models[f"skybridge_{i}"], f"Skybridge {i + 1}", (0, bh, bz), yaw=0)
+    # the avenue's terminus: a megablock closing the vista, crowned by a giant vertical screen
+    ph.place(cir, models["bld_xrn0"], "Terminus Block", (0, 0, FAR - 11.0), yaw=0)
     ph.place(cir, models["rail_track"], "Monorail Track", (0, 0, RAIL_Z), yaw=0)
     cir.flush("Skybridges and the monorail")
 
@@ -461,6 +469,16 @@ def build(studio):
         rng_ = {"shop": 9.0, "blade": 13.0, "facade": 24.0, "roof": 30.0}[s["kind"]]
         aur.light(f"Sign {k} Light", lp, col, inten, rng_, tags=["sign_light"])
         nlights += 1
+    tz = FAR - 11.0 + 0.35
+    aur.e("Ad Screen Terminus", "quad", "#000000", (0, 34, tz), scale=(13, 26, 1), emissive=[1, 1, 1, 4.0],
+          emissiveMap=f"{SIGNS}/ad_lumen_00.png", roughness=0.25, castShadows=False, tags=["ad_screen"],
+          vars={"ads": ["lumen", "synthia"], "shown": ""})
+    aur.e("Terminus Screen Frame", "cube", "#0b0c0e", (0, 34, tz - 0.25), scale=(13.8, 26.8, 0.4), metallic=0.8, roughness=0.4)
+    aur.light("Ad Screen Terminus Spill", (0, 24, tz + 8), "#7affb0", 60, 60)
+    # the far end glows through the rain: lights at the terminus fill the haze around the screen
+    for k, (x, y, col) in enumerate([(-6, 5, "#ff6a9a"), (6, 5, "#ffb070"), (-3, 18, "#6ad8ff"), (4, 46, "#c080ff")]):
+        aur.light(f"Terminus Glow {k}", (x, y, tz + 6), col, 40, 35)
+    screens.append("Ad Screen Terminus")
     aur.flush(f"{len(placed_signs)} signs")
     # shop interiors spill onto the sidewalk
     for b in blds:
@@ -521,8 +539,8 @@ end""")
     # --- Aurora: night, rain, haze --------------------------------------------------------------
     aur.call("environment_update", skyMode="gradient", skyTop="#070612", skyHorizon="#36203f", ground="#1e1624",
              sunElevation=35, sunAzimuth=200, sunIntensity=0.04, sunColor="#8fa8ff", ambient=1.0, reflections=1.0,
-             fogColor="#2a1c38", fogDensity=0.0045, fogHeight=0.02, haze=0.006, godRays=1.5,
-             exposure=1.5, autoExposure=False, tonemap="agx", bloomIntensity=0.55, bloomThreshold=1.2,
+             fogColor="#3a2448", fogDensity=0.004, fogHeight=0.006, haze=0.0035, godRays=2.2,
+             exposure=1.5, autoExposure=False, tonemap="agx", bloomIntensity=0.8, bloomThreshold=0.9,
              saturation=1.12, contrast=1.1, vignette=0.32, grain=0.06, chromaticAberration=0.15,
              look="teal_orange", lookStrength=0.45, gi=1, ssr=1, ao=1.0, windSpeed=2.0, windDirection=200, showGrid=False)
     aur.call("fx_create", effect="rain", name="Rain", position=[0, 22, -40],
@@ -532,6 +550,73 @@ end""")
     nim.flush("Game camera")
     direct_shots(nim)
     nim.call("scene_save", path="scenes/main.sky.json")
+
+
+def repaint_shop_cells(project, n=8, px=2048):
+    """Repaints the shop-window cells of the kit's window atlas (its top row) as deep, moody
+    interiors: dim colored rooms under fluorescent tubes, backlit shelves of goods, a counter, a
+    shopkeeper's silhouette and a small neon in the glass. (The kit's own shop cells were flat,
+    near-white boxes that blew out in close-ups.) Deterministic and idempotent."""
+    import numpy as np
+    from PIL import Image
+    path = os.path.join(project, KIT, "window_atlas.png")
+    img = np.asarray(Image.open(path).convert("RGB"), np.float32) / 255.0
+    lin = np.where(img <= 0.04045, img / 12.92, ((img + 0.055) / 1.055) ** 2.4)
+    S = px // n
+    rng = np.random.default_rng(2049)
+    yy, xx = np.mgrid[0:S, 0:S].astype(np.float32) / S          # yy: 0 = top of the window
+    tints = [(1.0, 0.62, 0.32), (0.55, 0.85, 1.0), (1.0, 0.45, 0.7), (0.7, 1.0, 0.8), (1.0, 0.78, 0.5), (0.6, 0.55, 1.0),
+             (1.0, 0.55, 0.4), (0.5, 1.0, 0.95)]
+    neons = [(1.0, 0.16, 0.5), (0.15, 0.85, 1.0), (1.0, 0.6, 0.1), (0.6, 0.3, 1.0)]
+    for k in range(n):
+        tint = np.array(tints[k])
+        base = 0.06 + 0.04 * rng.random()
+        depth = 0.55 + 0.45 * (1 - np.abs(xx - 0.5) * 1.6).clip(0, 1)          # side walls fall off
+        c = tint * base * (0.5 + 0.8 * (1 - yy))[..., None] * depth[..., None]
+        # fluorescent tubes near the ceiling and the glow they throw down
+        for tx in rng.uniform(0.15, 0.85, size=int(rng.integers(1, 3))):
+            tube = (np.abs(yy - 0.07) < 0.012) & (np.abs(xx - tx) < 0.18)
+            c += np.exp(-((xx - tx) ** 2) / 0.05 - (yy ** 2) / 0.08)[..., None] * tint * 0.2
+            c[tube] = np.array([0.9, 0.95, 1.0]) * 0.75
+        # shelves of goods on the back wall
+        for row in range(3):
+            y0 = 0.22 + row * 0.15
+            c[(yy > y0) & (yy < y0 + 0.01)] = 0.02
+            goods = (yy > y0 - 0.085) & (yy < y0)
+            hues = rng.random((18, 3)) * 0.8 + 0.2
+            idx = np.clip((xx * 18).astype(int), 0, 17)
+            gap = np.sin(xx * 18 * np.pi * 2) > -0.5
+            sel = goods & gap & (xx > 0.08) & (xx < 0.92)
+            c[sel] = (hues[idx] * tint * 0.13)[sel]
+        # counter and floor
+        c[yy > 0.72] *= 0.35
+        counter = (yy > 0.66) & (yy < 0.7) & (xx > 0.1) & (xx < 0.75)
+        c[counter] = tint * 0.05
+        c[(yy > 0.7) & (xx > 0.1) & (xx < 0.75)] = 0.008
+        # the shopkeeper (some shops)
+        if k % 3 != 1:
+            pxx = rng.uniform(0.25, 0.7)
+            body = ((xx - pxx) ** 2 / 0.006 + (yy - 0.6) ** 2 / 0.03) < 1
+            head = ((xx - pxx) ** 2 + (yy - 0.43) ** 2) < 0.0022
+            c[(body | head) & (yy < 0.68)] *= 0.12
+        # a small neon sign hung in the glass (a few glowing strokes)
+        if rng.random() < 0.75:
+            col = np.array(neons[int(rng.integers(0, len(neons)))])
+            nx, ny = rng.uniform(0.2, 0.6), rng.uniform(0.3, 0.45)
+            for _ in range(int(rng.integers(3, 6))):
+                a = (nx + rng.uniform(0, 0.22), ny + rng.uniform(0, 0.1))
+                b = (a[0] + rng.choice([0.0, rng.uniform(-0.1, 0.1)]), a[1] + rng.uniform(-0.06, 0.06))
+                t = np.clip(((xx - a[0]) * (b[0] - a[0]) + (yy - a[1]) * (b[1] - a[1])) /
+                            max(1e-6, (b[0] - a[0]) ** 2 + (b[1] - a[1]) ** 2), 0, 1)
+                d2 = (xx - a[0] - t * (b[0] - a[0])) ** 2 + (yy - a[1] - t * (b[1] - a[1])) ** 2
+                c += (np.exp(-d2 / 0.00002) * 1.2 + np.exp(-d2 / 0.002) * 0.08)[..., None] * col
+        # mullions, frame, rain streaks
+        frame = (xx < 0.03) | (xx > 0.97) | (yy < 0.03) | (yy > 0.97) | (np.abs(xx - 0.5) < 0.01)
+        c[frame] = 0.01
+        c *= (1 - 0.15 * (np.sin(xx * rng.uniform(150, 260)) > 0.93) * (1 - yy))[..., None]
+        lin[0:S, k * S:(k + 1) * S] = np.clip(c, 0, 1)
+    out = np.where(lin <= 0.0031308, lin * 12.92, 1.055 * np.power(lin, 1 / 2.4) - 0.055)
+    Image.fromarray((np.clip(out, 0, 1) * 255 + 0.5).astype(np.uint8)).save(path)
 
 
 def restyle(pix, path, src_mat_path, tint=1.0):
@@ -553,15 +638,15 @@ SHOTS = [
          warm=150),
     dict(name="puddle_mirror", points=[(1.0, 0.34, 4.5), (0.5, 0.3, 1.8), (0.0, 0.28, -0.9)], target=(-1.2, 3.5, -45), fov=42,
          aperture=2.8, focus=6, dur=6, warm=150),
-    dict(name="noodle_stall", points=[(-5.4, 1.5, -9.0), (-6.0, 1.45, -11.5), (-6.5, 1.4, -14.0)], target=(-8.6, 1.7, -24),
-         fov=38, aperture=2.2, focus=9.5, dur=7, warm=150),
+    dict(name="noodle_stall", points=[(-3.3, 1.65, -14.6), (-3.9, 1.6, -15.6), (-4.6, 1.55, -16.5)], target=(-8.7, 1.85, -21.6),
+         fov=42, aperture=2.2, focus=6.2, dur=7, warm=150),
     dict(name="crane_reveal", points=[(1.5, 2.0, -50), (1.0, 18, -47), (0.5, 42, -44)], target=(0, 22, -190), fov=55, dur=8,
          warm=150),
     dict(name="hologram", points=[(4.0, 23, -27), (3.0, 24, -31), (2.0, 25, -35)], target=(0, 31, -77), fov=45, dur=7,
          warm=300),
     dict(name="monorail", points=[(-10, 9, -57), (-7, 11, -59), (-4, 13, -61)], target=(6, 22, -77), fov=55, dur=6,
          warm=560),
-    dict(name="skyline", points=[(-4, 92, 80), (0, 95, 70), (4, 98, 60)], target=(0, 30, -250), fov=50, dur=8, warm=150),
+    dict(name="skyline", points=[(-6, 142, 105), (0, 150, 90), (6, 158, 75)], target=(0, 70, -400), fov=50, dur=8, warm=150),
     dict(name="blade_canyon", points=[(5.6, 1.6, -95), (5.4, 1.7, -99.5), (5.2, 1.8, -104)], target=(-9, 24, -130), fov=30,
          dur=7, warm=150),
 ]
@@ -617,19 +702,27 @@ def street_props(pix, aur, models, blds):
     # parked (covered) cars along the curbs
     for k, (x, z, yaw) in enumerate([(5.2, 16, 0), (5.2, -24, 2), (-5.2, -108, 180), (5.2, -152, -2), (-5.2, 30, 178)]):
         ph.place(pix, A["covered_car"], f"Parked Car {k}", (x, 0.0, z), yaw=yaw)
-    # the noodle stall on the left sidewalk, stools, crates, lanterns
-    stall_z = -21.0
-    ph.place(pix, models["prop_noodle_stall"], "Noodle Stall", (-FACADE + 1.75, 0.15, stall_z), yaw=90)
+    # the Ninth Street noodle stall on the left sidewalk (its own Blender pass: counter, kitchen,
+    # bowls, noren, canopy and signs), chrome stools, lanterns, crates and a warm interior
+    food = noodle_stall_kit(pix)
+    sx, sz = STALL
+    ph.place(pix, food["noodle_stall_v2"], "Noodle Stall", (sx, 0.15, sz), yaw=90, tags=["noodle_stall"])
     for i in range(4):
-        ph.place(pix, A["bar_chair_round_01"], f"Stall Stool {i}", (-FACADE + 3.0, 0.15, stall_z - 1.2 + i * 0.8), yaw=r.uniform(0, 360))
+        ph.place(pix, food["stall_stool"], f"Stall Stool {i}", (sx + 0.72, 0.15, sz - 1.2 + i * 0.8), yaw=r.uniform(0, 360))
     for i in range(3):
         ph.place(pix, A["plastic_crate_01" if i % 2 else "plastic_crate_03"], f"Stall Crate {i}",
-                 (-FACADE + 0.5, 0.15 + 0.32 * (i // 2), stall_z + 2.6 + 0.6 * (i % 2)), yaw=r.uniform(-15, 15))
-    ph.place(pix, A["propane_tank"], "Stall Propane", (-FACADE + 0.6, 0.15, stall_z - 2.2))
-    for i in range(5):
-        ph.place(pix, models["prop_lantern"], f"Lantern {i}", (-FACADE + 2.55, 2.05, stall_z - 1.6 + i * 0.8))
-    aur.light("Stall Warm Light", (-FACADE + 2.4, 2.1, stall_z), "#ffb070", 6, 7.5)
-    aur.light("Lantern Glow", (-FACADE + 2.8, 1.8, stall_z), "#ff4a2a", 5, 6)
+                 (-FACADE + 0.45, 0.15 + 0.32 * (i // 2), sz + 2.4 + 0.6 * (i % 2)), yaw=r.uniform(-15, 15))
+    ph.place(pix, A["propane_tank"], "Stall Propane", (-FACADE + 0.5, 0.15, sz - 2.3))
+    for i, (lx, lz, s) in enumerate([(sx + 0.85, sz + 1.95, 1.05), (sx + 0.85, sz - 1.95, 1.05), (sx + 0.1, sz + 2.0, 0.8),
+                                     (sx - 0.7, sz + 2.0, 0.8), (sx - 1.5, sz + 2.0, 0.8)]):
+        ph.place(pix, food["stall_lantern"], f"Lantern {i}", (lx, 2.2 if s > 1.0 else 2.28, lz), scale=s)
+    aur.light("Stall Warm Light", (sx - 0.6, 2.35, sz), "#ffb070", 4.5, 6.0, tags=["stall_light"])
+    aur.light("Stall Bar Glow", (sx + 0.6, 0.9, sz), "#ff9a50", 1.5, 2.5, tags=["stall_light"])
+    aur.light("Stall Kitchen Light", (sx - 1.2, 1.9, sz + 0.4), "#ffd0a0", 2.0, 3.0, tags=["stall_light"])
+    aur.light("Lantern Glow", (sx + 0.9, 2.1, sz + 1.95), "#ff3a1a", 2.5, 4)
+    aur.light("Lantern Glow 2", (sx + 0.9, 2.1, sz - 1.95), "#ff3a1a", 2.5, 4)
+    aur.light("Stall Sign Glow", (sx + 1.6, 3.1, sz), "#ff3a6a", 3, 6)
+    aur.light("Stall Flame Glow", (sx - 1.35, 1.05, sz + 0.2), "#4a8bff", 1.2, 1.5)
     ph.place(pix, A["CoffeeCart_01"], "Coffee Cart", (FACADE - 1.6, 0.15, -57), yaw=-90)
     aur.light("Coffee Cart Light", (FACADE - 2.4, 2.2, -57), "#ffd8a0", 5, 6)
     # dumpsters, bags and boxes by the walls
@@ -652,7 +745,7 @@ def street_props(pix, aur, models, blds):
     for k, (x, z, yaw) in enumerate([(3.6, -196, 8), (1.0, -199, -6), (-1.6, -197, 3)]):
         ph.place(pix, A["concrete_road_barrier"], f"Road Barrier {k}", (x, 0.0, z), yaw=yaw + 90)
     ph.place(pix, A["WetFloorSign_01"], "Wet Floor Sign", (8.2, 0.15, -38), yaw=30)
-    ph.place(pix, A["portable_generator"], "Generator", (-FACADE + 0.7, 0.15, stall_z + 3.6), yaw=90)
+    ph.place(pix, A["portable_generator"], "Generator", (-FACADE + 0.7, 0.15, STALL[1] + 3.7), yaw=90)
     for k, (x, z) in enumerate(MANHOLES):
         ph.place(pix, A["water_manhole_cover"], f"Manhole {k}", (x, 0.005, z), yaw=r.uniform(0, 360))
     for side in (-1, 1):
@@ -660,6 +753,22 @@ def street_props(pix, aur, models, blds):
             for i in range(4):
                 ph.place(pix, models["prop_bollard"], f"Bollard {side} {int(zz)} {i}", (side * (ROAD + 0.6 + i * 1.0), 0.15, zz))
     pix.flush("Street furniture (Poly Haven CC0) and the noodle stall")
+
+
+STALL = (-8.15, -21.0)  # noodle stall origin (x, z): counter faces the street, back against the wall
+FOOD = "generated/food"
+
+
+def noodle_stall_kit(pix):
+    """The street-food pass (Blender, cached like the kit): the stall with its neon sign and blade, and a stool."""
+    job = dict(stalls=[dict(name="noodle_stall_v2", width=3.4, depth=1.7, seed=21,
+                            signs=[dict(name="stall_sign", kind="neon_text", text="NINTH ST NOODLE", size=0.36, color="ff3a6a",
+                                        strength=4.0, max_width=3.3, tube=0.02, at=[0, -0.86, 2.98]),
+                                   dict(name="stall_blade", kind="blade", height=1.1, width=0.5, seed=4417, color="ffb43a",
+                                        strength=4.0, rim="ff3a6a", at=[1.66, 0.2, 1.85])])],
+               stools=[dict(name="stall_stool")], lanterns=[dict(name="stall_lantern", radius=0.2, height=0.46)])
+    models, _ = run_dcc(pix, job, FOOD, "street food", extra="neon_requiem_stall_dcc.py")
+    return models
 
 
 MANHOLES = [(-2.0, 12), (2.2, -14), (-1.4, -52), (1.8, -101), (-2.4, -146), (2.0, -176)]
@@ -691,21 +800,27 @@ def city_life(stra, aur, models, blds, anchors, studio):
              (-7.9, 1), (8.4, -1)]
     for k, (x, d) in enumerate(lanes):
         name = f"Walker {k}"
-        pix.op("prefab_instantiate", prefab=man["prefab"], name=name, position=[x, 0.15, r.uniform(-190, 36)],
+        z0 = r.uniform(-190, 36)
+        # nobody walks past the noodle stall during the first ~12 s (its close-up is filmed then)
+        while x < 0 and (STALL[1] - 10 < z0 < STALL[1] + 25 if d < 0 else STALL[1] - 25 < z0 < STALL[1] + 10):
+            z0 = r.uniform(-190, 36)
+        pix.op("prefab_instantiate", prefab=man["prefab"], name=name, position=[x, 0.15, z0],
                rotation=[0, 0 if d < 0 else 180, 0], scale=r.uniform(1.0, 1.1))
-        walkers.append((name, d))
+        walkers.append((name, d, x))
     pix.flush("Pedestrians")
-    for k, (name, d) in enumerate(walkers):
-        stra.call("entity_update", entity=name, vars={"dir": d, "speed": round(r.uniform(1.05, 1.35), 2)})
+    for k, (name, d, x) in enumerate(walkers):
+        stra.call("entity_update", entity=name, vars={"dir": d, "speed": round(r.uniform(1.05, 1.35), 2), "hx": x})
         set_coat(stra, name, coats[k % len(coats)])
         if k % 3 != 2:
             ph.place(stra, models["prop_umbrella_" + r.choice(["cyan", "pink", "amber"])], f"{name} Umbrella", (0.18, 1.12, -0.05),
                      parent=name)
     stra.flush("Umbrellas")
-    for name, d in walkers:
-        stra.behave(name, "Stroll", "Walk the sidewalk through the rain; wrap around at the ends of the block.", """
+    for name, d, x in walkers:
+        stra.behave(name, "Stroll", "Walk the sidewalk through the rain, stepping around the noodle stall and the coffee cart; wrap around at the "
+                    "ends of the block.", """
 var dir = -1
 var speed = 1.2
+var hx = -8
 on tick
   move self by (0, 0, dir * speed * dt)
   if self.position.z < -200 then
@@ -713,7 +828,14 @@ on tick
   elif self.position.z > 40 then
     self.position.z = -200
   end
-end""")
+  let tx = hx
+  if hx < 0 and self.position.z < STALL_Z1 and self.position.z > STALL_Z0 then
+    tx = -6.95
+  elif hx > 0 and self.position.z < -54 and self.position.z > -60 then
+    tx = 6.95
+  end
+  self.position.x = self.position.x + (tx - self.position.x) * min(1, dt * 1.6)
+end""".replace("STALL_Z1", str(STALL[1] + 4.5)).replace("STALL_Z0", str(STALL[1] - 4.5)))
     stra.flush("Pedestrians stroll")
 
     # --- drones with blinking beacons -------------------------------------------------------------
@@ -815,8 +937,9 @@ def wet_air(aur, stra, studio, models):
     for k in (0, 1, 3):
         x, z = MANHOLES[k]
         aur.call("fx_create", effect="steam_vent", name=f"Manhole Steam {k}", position=[x, 0.02, z])
-    aur.call("fx_create", effect="steam", name="Stall Steam", position=[-FACADE + 1.75 + 0.45, 1.5, -21.4],
-             overrides={"rate": 10, "sizeStart": 0.15, "sizeEnd": 0.9, "colorStart": "#e8e4e060", "colorEnd": "#e8e4e000"})
+    for k, dz in enumerate((1.05, 0.4)):  # the stock pots on the stall's burners
+        aur.call("fx_create", effect="steam", name=f"Stall Steam {k}", position=[STALL[0] - 1.36, 1.62, STALL[1] + dz],
+                 overrides={"rate": 9, "sizeStart": 0.12, "sizeEnd": 0.8, "colorStart": "#f0e6dc50", "colorEnd": "#f0e6dc00"})
     aur.call("fx_create", effect="mist", name="Street Mist", position=[0, 0.4, -60],
              overrides={"shapeSize": [2 * FACADE, 0.6, 200], "rate": 6, "colorStart": "#8a8aa82a"})
     # puddles: shallow water bodies that mirror the neon (road and sidewalks)
@@ -874,7 +997,7 @@ end""")
     stra.flush("Hologram turns")
 
 
-def render_stills(project, out_dir, width=1920, height=1080, samples=24, only=None):
+def render_stills(project, out_dir, width=1920, height=1080, samples=16, only=None):
     """Final stills of every hero shot (middle of its move) as JPEGs (quality 90)."""
     import subprocess
 
@@ -906,9 +1029,28 @@ def render_stills(project, out_dir, width=1920, height=1080, samples=24, only=No
     sky.close()
 
 
+def contact_sheet(project, out_dir="shots", cols=2, cell=(960, 540), gutter=8):
+    """All hero stills on one page (shot order), dark gutters, JPEG quality 88."""
+    from PIL import Image
+    names = [sh["name"] for sh in SHOTS if os.path.exists(os.path.join(project, out_dir, sh["name"] + ".jpg"))]
+    rows = (len(names) + cols - 1) // cols
+    W, H = cols * cell[0] + (cols + 1) * gutter, rows * cell[1] + (rows + 1) * gutter
+    sheet = Image.new("RGB", (W, H), (18, 18, 22))
+    for i, n in enumerate(names):
+        im = Image.open(os.path.join(project, out_dir, n + ".jpg")).convert("RGB").resize(cell, Image.LANCZOS)
+        sheet.paste(im, (gutter + (i % cols) * (cell[0] + gutter), gutter + (i // cols) * (cell[1] + gutter)))
+    path = os.path.join(project, out_dir, "contact_sheet.jpg")
+    sheet.save(path, quality=88)
+    print("contact sheet", os.path.getsize(path) // 1024, "KB")
+
+
 if __name__ == "__main__":
     import sys
     sys.path.insert(0, os.path.dirname(HERE))
     root = os.path.dirname(os.path.dirname(os.path.dirname(HERE)))
+    proj = os.path.join(root, "examples", "neon_requiem")
     if len(sys.argv) > 1 and sys.argv[1] == "stills":
-        render_stills(os.path.join(root, "examples", "neon_requiem"), "shots", only=sys.argv[2:] or None)
+        render_stills(proj, "shots", only=sys.argv[2:] or None)
+        contact_sheet(proj)
+    elif len(sys.argv) > 1 and sys.argv[1] == "sheet":
+        contact_sheet(proj)
