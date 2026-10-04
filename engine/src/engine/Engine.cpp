@@ -639,7 +639,7 @@ FrameData Engine::frame(const CaptureOptions& opts) {
     std::erase_if(oceans_, [&](const auto& kv) { return std::find(waterIds.begin(), waterIds.end(), kv.first) == waterIds.end(); });
     // Terrain and foliage (resolved texture paths included). Captures generate all foliage
     // in range; the live viewport streams a few chunks per frame.
-    world_->gather(*scene_, view, f, opts.samples <= 1);
+    world_->gather(*scene_, view, f, opts.samples <= 1 && !opts.offline.enabled);
     {
         std::vector<std::string> meshes;
         for (const auto& b : f.instances) {
@@ -714,10 +714,16 @@ Result<Capture> Engine::capture(const CaptureOptions& opts) {
     GpuJobLock gpuLock;
     Capture c;
     c.frame = frame(opts);
+    c.frame.resetHistory = c.frame.resetHistory || opts.resetHistory;
+    if (opts.offline.enabled) {
+        c.frame.offline = opts.offline;
+        c.frame.camera.motionBlur = 0.f;
+    }
     if (Status s = renderer_->render(c.frame); !s) return s.error();
     auto img = renderer_->readback();
     if (!img) return img.error();
     c.image = std::move(img.value());
+    if (!opts.listVisible) return c;
     c.visible = visibleEntities(*scene_, c.frame);
     world2d_->refineVisible(c.frame, c.visible, *scene_);  // real boxes for sprites, tiles, text, UI
     if (opts.annotate) annotate(c.image, c.visible);

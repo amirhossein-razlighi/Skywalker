@@ -96,6 +96,11 @@ struct CaptureOptions {
     int debugView = 0;  // see FrameData::debugView
     bool clay = false;  // every surface matte white clay (look-dev of form and light; "sketch to fill" films)
     int quality = 0;    // FrameData::quality: 0 full, 1 balanced, 2 fast
+    // Movie sub-frames (docs/MOVIE_RENDER.md): FrameData::offline; a real shutter is accumulated by the
+    // caller, so the post-process motion blur is off. resetHistory marks a cut.
+    FrameData::Offline offline;
+    bool resetHistory = false;
+    bool listVisible = true;  // compute Capture::visible (skipped by movie frames)
 };
 
 /// How the live editor viewport trades quality for responsiveness while editing. Play mode

@@ -488,7 +488,7 @@ struct Job::Impl {
 
     /// Renders the scene at movie time `tau`. `frameStart`: the first render of an output (or warmup)
     /// frame, where cuts reset temporal state.
-    Result<Image> render(double tau, int samples, int sampleOffset, float exposureDt, bool frameStart, bool readback) {
+    Result<Image> render(double tau, int samples, int sampleOffset, float exposureDt, bool frameStart) {
         advanceTo(tau);
         Scene& scene = engine.scene();
         const double tickTime = static_cast<double>(tick) * kTick;
@@ -528,18 +528,22 @@ struct Job::Impl {
         // 3. Clocks: effects at tau; CPU particles back along their velocity from the tick.
         engine.setEffectsTimeOverride(tau);
         engine.particles().setRenderTimeOffset(static_cast<float>(tau - tickTime));
-        // 4. The view.
+        // 4. The view, rendered through Engine::capture: it holds the machine-wide GPU job lock for
+        // this one sub-frame only (other processes' renders interleave between them) and the
+        // renderer commits a command buffer per sample, so no clip ever becomes one long GPU job.
         CaptureOptions co;
         co.width = o.width;
         co.height = o.height;
         co.editorOverlays = false;
         co.annotate = false;
-        // Captures with samples > 1 generate every foliage chunk in range (no streaming); the real
-        // per-render sample count is set on the frame below.
-        co.samples = std::max(2, samples);
+        co.listVisible = false;
+        co.samples = samples;
         co.debugView = o.debugView;
         co.clay = o.clay;
         co.quality = o.quality;
+        co.offline.enabled = true;
+        co.offline.sampleOffset = sampleOffset;
+        co.offline.exposureDt = exposureDt;
         View view;
         view.shot = shotIndex(cuts, tau);
         if (!o.camera.empty()) {
@@ -558,19 +562,13 @@ struct Job::Impl {
             co.useSceneCamera = true;
             view.camera = primaryCamera(scene);
         }
-        FrameData f = engine.frame(co);
-        f.samples = samples;
-        f.offline.enabled = true;
-        f.offline.sampleOffset = sampleOffset;
-        f.offline.exposureDt = exposureDt;
-        f.camera.motionBlur = 0.f;  // real shutter accumulation replaces the post-process blur
         if (frameStart) {
-            f.resetHistory = !lastView || !(*lastView == view);  // first frame, or a cut: re-meter, drop history
+            co.resetHistory = !lastView || !(*lastView == view);  // first frame, or a cut: re-meter, drop history
             lastView = view;
         }
-        if (Status s = engine.renderer().render(f); !s) return s.error();
-        if (!readback) return Image{};
-        return engine.renderer().readback();
+        auto cap = engine.capture(co);
+        if (!cap) return cap.error();
+        return std::move(cap->image);
     }
 
     // --- Work units ----------------------------------------------------------------------
@@ -580,7 +578,7 @@ struct Job::Impl {
         if (warmupLeft > 0) {  // the frames before the first one, not written: temporal state settles
             const double t = std::max(0.0, timing.frameTime(firstK - warmupLeft));
             --warmupLeft;
-            auto r = render(t, 1, 0, frameDt, true, false);
+            auto r = render(t, 1, 0, frameDt, true);
             return r ? Status{} : Status(r.error());
         }
         if (subTimes.empty()) {
@@ -591,7 +589,7 @@ struct Job::Impl {
             frameStart_ = std::chrono::steady_clock::now();
         }
         const float weight = 1.f / static_cast<float>(subTimes.size());
-        auto img = render(subTimes[sub], split.spatial, static_cast<int>(sub) * split.spatial, frameDt * weight, sub == 0, true);
+        auto img = render(subTimes[sub], split.spatial, static_cast<int>(sub) * split.spatial, frameDt * weight, sub == 0);
         if (!img) return img.error();
         acc.accumulate(*img, weight);
         if (++sub < subTimes.size()) return {};
