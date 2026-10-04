@@ -66,6 +66,7 @@ private:
 
     VehicleHost host_;
     std::map<EntityId, std::unique_ptr<Entry>> entries_;
+    std::map<EntityId, std::pair<uint64_t, uint64_t>> failed_;  // setups that could not be built: (signature, geometry)
     bool stepped_ = false;
     double lastStepMs_ = 0.0;
 };

@@ -320,7 +320,6 @@ struct VehicleSet::Entry {
     std::vector<float> visualAngle;       // per wheel: spin shown on the visual (ABS keeps it rolling)
     bool braking = false;
     std::vector<float> spin;  // per wheel: excess surface speed / ground speed (traction control)
-    bool abs = false, tractionControl = false;
     // Driver and assists.
     std::optional<VehicleInput> override;
     VehicleInput input, applied;
@@ -421,6 +420,10 @@ void VehicleSet::sync(const Scene& s) {
         auto it = entries_.find(e);
         uint64_t geometry = it != entries_.end() && stepped_ ? it->second->geometry : vehicleGeometry(s, e, *v);
         if (it != entries_.end() && it->second->signature == sig && it->second->geometry == geometry) continue;
+        if (it == entries_.end()) {  // a setup that failed (no wheels...) is retried only once it changes
+            auto f = failed_.find(e);
+            if (f != failed_.end() && f->second == std::make_pair(sig, geometry)) continue;
+        }
         std::unique_ptr<Entry> previous;
         if (it != entries_.end()) {
             host_.system->RemoveStepListener(it->second->constraint);
@@ -428,8 +431,10 @@ void VehicleSet::sync(const Scene& s) {
             previous = std::move(it->second);
             entries_.erase(it);
         }
-        create(s, e, *v, body, sig, geometry, previous.get());
+        if (create(s, e, *v, body, sig, geometry, previous.get())) failed_.erase(e);
+        else failed_[e] = {sig, geometry};
     }
+    std::erase_if(failed_, [&](const auto& f) { return !wanted.count(f.first); });
     for (auto it = entries_.begin(); it != entries_.end();) {
         auto next = std::next(it);
         if (!wanted.count(it->first)) remove(it);
@@ -813,7 +818,6 @@ void VehicleSet::preStep(const Scene& s, float dt) {
         // Anti-lock brakes (an ideal ABS): while braking, each tire brakes with its peak friction even
         // if Jolt locked the wheel, and keeps its cornering grip. Without ABS a locked tire slides at the
         // lower locked friction and barely steers (see the tire callback).
-        en.abs = v->abs;
         en.braking = brake > 0.f || in.handbrake > 0.f;
         for (size_t i = 0; i < en.wheels.size(); ++i) {
             // The handbrake locks its wheels on purpose (slides, hairpins): ABS leaves those alone.
@@ -823,7 +827,6 @@ void VehicleSet::preStep(const Scene& s, float dt) {
         }
 
         // Traction control: backs off the throttle while the driven wheels spin.
-        en.tractionControl = v->tractionControl;
         if (v->tractionControl) {
             float maxSpin = 0.f;
             for (size_t i = 0; i < en.wheels.size(); ++i) {

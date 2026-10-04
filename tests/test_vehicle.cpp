@@ -291,7 +291,7 @@ end
 TEST_CASE("vehicle: the player drive actions and the chase camera") {
     auto e = makeVehicleEngine();
     EntityId car = buildCar(*e);
-    call(*e, "vehicle_create", R"({"entity":"Car","preset":"hatchback","engine_sound":false})");
+    call(*e, "vehicle_create", R"({"entity":"Car","preset":"hatchback"})");
     EntityId cam = kNoEntity;
     for (EntityId id : e->scene().entities()) {
         if (e->scene().get<ChaseCamera>(id)) cam = id;
@@ -309,6 +309,10 @@ TEST_CASE("vehicle: the player drive actions and the chase camera") {
     CHECK(cp.y > vp.y + 1.f);
     CHECK(length(cp - vp) < 12.f);
     CHECK(e->scene().get<Camera>(cam)->fov > 60.f);  // widened with speed
+    const AudioSource* engineSound = e->scene().get<AudioSource>(car);  // the engine audio hook follows the revs
+    REQUIRE(engineSound);
+    CHECK(engineSound->clip == "audio/engine_loop.wav");
+    CHECK(engineSound->pitch > 0.7f);
     e->stop();
 }
 
