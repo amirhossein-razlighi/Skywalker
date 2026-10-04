@@ -484,6 +484,12 @@ const TypeInfo& Environment::type() {
             SKY_FIELD_RANGE(Environment, localShadowUpdates, Int,
                             "Point/spot shadow views re-rendered per frame when lights or casters move (cube light = 6, "
                             "spot = 1); later updates wait a frame. Stills render all", 1.f, 384.f),
+            SKY_FIELD_RANGE(Environment, probeBudget, Int,
+                            "Reflection probes with a slot in the probe atlas (the most important in view first; the rest "
+                            "fall back to the sky). Max 32; 0 = probes off", 0.f, 32.f),
+            SKY_FIELD_RANGE(Environment, probeUpdates, Int,
+                            "Reflection probe cube faces captured per frame (a whole probe = 6); later captures wait a "
+                            "frame. Stills capture everything", 1.f, 192.f),
         }};
     return info;
 }

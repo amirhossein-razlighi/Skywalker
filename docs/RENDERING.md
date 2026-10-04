@@ -22,7 +22,7 @@ Each frame renders one or more sub-samples:
 | 2 | Clouds | Half resolution: ray-marched volumetric cloud layer, with temporal reprojection in real time. |
 | 3 | Scene | 4× MSAA, memoryless (tile memory), with a jittered projection. Draws sky, opaque meshes (automatic LODs), CDLOD terrain, instanced foliage, strand hair, mesh particles, outlines, transparent meshes and the grid. Writes HDR color plus a G-buffer: albedo + material AO, and octahedral normal + roughness + metallic or a "no screen-space lighting" flag. Surfaces use clustered lighting. |
 | 4 | SSAO, SSGI, SSR | Half resolution. GI uses cosine-sampled screen rays with a sky fallback. Reflections are GGX-importance-sampled. Both gather the previous anti-aliased frame (light keeps bouncing) and use temporal accumulation in real time. |
-| 5 | Lighting resolve | Swaps the sky-probe indirect light of PBR surfaces for GI and reflections (bilateral upsample), and applies SSAO to indirect diffuse. |
+| 5 | Lighting resolve | Swaps the sky's indirect light on PBR surfaces for [reflection probes](#reflection-probes), then GI and screen-space reflections (bilateral upsample), and applies SSAO to the indirect diffuse. Reflection probes are captured (when needed) right after the shadows, in their own command buffers. |
 | 6 | Effects | Fluid simulation (compute), FFT water, fluid volumes, GPU particles (compute, sorted) and CPU particles over the lit scene. |
 | 7 | Volumetric light | Half resolution: shadow-mapped sun shafts and lamp cones through height-falling haze. |
 | 8 | Velocity | The [velocity buffer](#velocity-buffer-motion-vectors): camera reprojection of the depth buffer plus the object motion the scene pass wrote. |
@@ -48,7 +48,8 @@ jitter; the previous frame's model matrix per entity (for motion vectors) is in
   screen, with the sky probe for rays that leave the screen. It works best with temporal
   accumulation (real time) or `samples` of 8 or more (stills).
 - **Reflections** (`ssr`): glossy surfaces (wet streets, floors, metal, still water)
-  reflect the scene. Rough surfaces fall back to the probe.
+  reflect the scene. What is off screen, and rough surfaces, fall back to
+  [reflection probes](#reflection-probes), then to the sky.
 - **Cloud shadows:** drifting cloud shadows dim the sun on every surface.
 - **Point and spot light shadows:** every lamp casts shadows from a cached shadow atlas
   (see [Point and spot light shadows](#point-and-spot-light-shadows)).
@@ -122,7 +123,7 @@ returns every view with its color legend. Unknown names fail with a did-you-mean
 
 | View | Shows |
 |---|---|
-| `albedo`, `normals`, `material`, `gi`, `reflections`, `ao`, `depth`, `lighting` | G-buffer and lighting buffers (`material`: roughness red, metallic green; `lighting`: before screen-space GI/reflections) |
+| `albedo`, `normals`, `material`, `gi`, `reflections`, `ao`, `depth`, `lighting` | G-buffer and lighting buffers (`material`: roughness red, metallic green; `lighting`: before reflection probes and screen-space GI/reflections) |
 | `unshaded` | albedo + emission, no lights, shadows or fog |
 | `lighting_only` | the lighting on a white material: light placement, shadows and GI without textures |
 | `emission` | emissive light only |
@@ -138,6 +139,7 @@ returns every view with its color legend. Unknown names fail with a did-you-mean
 | `impostors` | the final image with foliage meshes tinted green and impostors magenta |
 | `motion` | the velocity buffer over a dimmed gray image: hue = direction, strength = speed on a log scale (faint at 0.25 px, full at 15 px per frame). Capture with `samples: 1` right after something moved (a `sim_control` step) |
 | `shadow_atlas` | the point and spot light shadow maps (4 quadrants), outlined per light: green re-rendered this frame, blue cached, orange waiting for the update budget (see [Point and spot light shadows](#point-and-spot-light-shadows)) |
+| `reflection_probes` | the final image tinted with the color of the reflection probe(s) lighting each pixel (`probe_info` `debugColor`; gray = sky only), every influence volume outlined (dashed where hidden), capture points as dots (see [Reflection probes](#reflection-probes)) |
 
 Surface views (`unshaded` … `light_complexity`) replace each lit surface's color in the
 shaders (`FrameUniforms.debug`, `shaders/Debug.metal`) and are shown without tonemapping,
@@ -208,7 +210,7 @@ label. `perf_stats {passes: true}` returns them as `profile`:
   bake runs once).
 - `groups`: milliseconds per frame by area: `shadows`, `main`, `ao`, `ssgi`, `ssr`,
   `resolve`, `effects`, `volumetrics`, `clouds`, `temporal`, `upscale`, `post`, `foliage`,
-  `particles`, `hair`, `skinning`, `environment`, `2d`, `ui`, `overlays`, `debug`.
+  `particles`, `hair`, `skinning`, `environment`, `probes`, `2d`, `ui`, `overlays`, `debug`.
 - `cpu`: CPU scopes (`SKY_PROFILE_SCOPE`): `frame.build`, `scene.buildFrame`, `world.gather`
   (terrain and foliage chunks), `particles.gather`, `2d.gather`, `render.encode`,
   `render.readback` (waits for the GPU), `render.present`, `sim.step`.
@@ -492,6 +494,97 @@ window) and `corridor.sky.json` (a stone corridor lit by a torch fire with `ligh
 pillars, barrels and side rooms behind the walls). `python3 tools/render_checks/local_shadows.py`
 renders them and checks for leaks.
 
+## Reflection probes
+
+Screen-space reflections only see what is on screen; everything else used to fall back to the sky, so a
+chrome ball in a closed room reflected blue sky and a polished floor glowed blue near the walls. A
+**reflection probe** (`reflection_probe` component) captures a cubemap of the scene around a point.
+Inside its influence volume, glossy surfaces reflect it instead of the sky and take their diffuse
+ambient light from it.
+
+Per pixel the order is: screen-space reflections where the trace found something, then the probes
+(blended front to back), then the sky for whatever weight is left. Inside an `interior` probe nothing
+is left for the sky.
+
+| Piece | What it does |
+|---|---|
+| Volume | A box (`size`, times the entity scale, rotated with the entity) or a sphere (`radius`). The probe fades out over `blendDistance` at the faces. Where volumes overlap, the higher `priority` wins; at equal priority the smaller volume wins (detail probes inside big ones). At most 8 probes blend at one pixel. |
+| Box projection | `boxProjection` (default on) parallax-corrects the reflection against the box, so reflections line up with walls and floors. `projectionSize` / `projectionOffset` project onto a different box than the influence volume. Use them for a long street split into several probes: each probe projects onto the whole street (its facades and both ends). |
+| Interior | `interior: true` is for closed rooms. The probe is renormalized to full weight everywhere inside, and up to 10 cm outside the faces, so walls on the faces count as inside. No sky light leaks in. The capture lights its walls with `ambientColor` x `ambientEnergy` instead of the sky; the sky still shows through windows. |
+| Ambient | `ambient: probe` (default) takes the diffuse ambient from the capture's roughest mip; `sky` keeps the sky's (the probe only adds reflections); `color` uses `ambientColor`. |
+| Capture | The six 90-degree faces are rendered through the regular scene pipelines from the capture point (the entity plus `captureOffset`, out to `maxDistance` (0 = automatic)). This covers the sky, opaque and transparent meshes on the probe's `cullMask` layers, and terrain. The sun shadow is fitted around the probe. Point and spot lights reaching it keep the shadows the frame gives them; a lamp without a shadow slot this frame, for example one out of view, lights the capture unshadowed. Post-processing, screen-space effects, foliage, hair, particles and water are left out. Captured surfaces are lit by the probes' previous captures (bounce light). A first capture is therefore repeated at once, lit by itself, when the face budget allows (always in stills). |
+| Filtering | The captured cube gets mips, then a compute pass GGX-prefilters 6 roughness levels (64 importance samples per texel, bounds-checked writes) into the probe's slot of the atlas. The roughest level is the diffuse ambient. |
+| Atlas | One RGBA16F cube array. Its face size is the largest `resolution` among the probes (64-512 px); smaller probes start at a lower mip. Slots grow in steps of 4 up to `Environment.probeBudget` (default 16, max 32), and the atlas never exceeds 256 MB (16 slots at 512 px). It takes 16 MB per 4 slots at 256 px and 64 MB per 4 slots at 512 px. The most important probes (in view, priority, near the camera) get slots; the others light nothing (`over_budget`), and the least recently used slot is reused. |
+| Updates | `update: once` (default): captured when first needed, cached, re-captured when the probe moves or changes, or on `probe_bake`. `on_change`: re-captured when anything in range moves or changes (meshes, lights, terrain, the sky). `realtime`: every `interval` frames. Each frame renders at most `Environment.probeUpdates` faces (default 6 = one probe; halved in the `fast` editor tier). The rest wait, and the old capture keeps shading meanwhile. Stills and movie frames capture everything they need at once. |
+| Shading | Probes are assigned to the light clusters (one bit per probe per cluster). Opaque surfaces get them in the lighting resolve (meshes, terrain, foliage and impostors), so the main pass is unchanged. Transparent meshes, hair and water shade probes themselves. Screen-space GI rays that leave the screen read the probes too. |
+
+### Seeing it (agents)
+
+- `probe_info {view}` renders a real-time frame and reports, for every probe: its slot and debug color, `ready` / `shaded` /
+  `inView`, why it does not shade (`over_budget`, `pending`, `out_of_view`, `disabled`), faces captured this frame, the
+  number of captures, the last capture's GPU time, and `stale` (something in range changed since a `once` probe was
+  captured). It also reports the atlas (resolution, slots, memory), the budgets, and warnings:
+  - overlapping probes with equal priority and similar sizes;
+  - probes with no geometry inside them;
+  - capture points inside a solid mesh, or outside the volume;
+  - a floor lying on the bottom face (it would get almost none of the probe);
+  - `blendDistance` reaching the middle of the volume;
+  - a full atlas.
+- `viewport_capture {debug_view: "reflection_probes"}` tints every pixel with the color of the probe(s) lighting it (gray =
+  sky only) and outlines every influence volume (dashed where hidden) with its capture point as a dot.
+- `viewport_capture {probe: "Hall Probe", probe_mip: 0..5}` returns the probe's captured cubemap as a horizontal cross
+  (+Y on top; -X, +Z, +X, -Z across; -Y below) at the frame's exposure.
+- `perf_stats {passes: true}`: group `probes` with the passes `Probe sun shadow`, `Probe capture`, `Probe mips` and `Probe filter`.
+  `gpu.reflectionProbes` gives the probe count, ready, shaded, slots, atlas resolution and MB, faces captured and deferred,
+  CPU planning time and the last capture's GPU time.
+- `probe_add {position, size?, interior?, ...}` creates a probe. Its default `size: "auto"` casts rays to the nearest meshes in the six
+  axis directions: the volume reaches `blend_distance` past the room's walls, and `projectionSize` is the room itself. The probe is
+  captured right away. `probe_bake {probes?}` re-captures probes now. Wander: `probe_bake()` or `probe_bake(find("Hall Probe"))`
+  re-captures over the next frames (after a door opens or the lights change).
+
+### Recipes
+
+```text
+# A closed room: one interior probe, sized to the room, captured now.
+probe_add {name: "Hall Probe", position: [0, 1.5, 0], interior: true}
+viewport_capture {view: "scene", samples: 8, debug_view: "reflection_probes"}   # the whole room tinted, no gray
+probe_info {}                                                                    # no warnings
+
+# A street: probes along it. The volumes reach under the road and into the facades;
+# each one projects onto the whole street so reflections stay aligned at the seams.
+entity_create {name: "Street Probe A", position: [0, 10, -22], components: {reflection_probe: {
+  size: [18, 28, 46], captureOffset: [0, -8.2, 0], blendDistance: 4,
+  projectionSize: [14, 30, 90], projectionOffset: [0, 5, 22]}}}
+
+# A mirror-like set piece that must follow a moving object (costly: 6 faces per frame).
+entity_update {entity: "Showroom Probe", components: {reflection_probe: {update: "realtime", resolution: 128}}}
+```
+
+Reference scenes: `examples/render_tests/reflection_probes/scenes/room.sky.json` and `street.sky.json`. The room is a
+closed room with a glossy floor, a chrome sphere, gold and steel, a lamp and a window with the sun shining in; nothing
+in it may reflect the sky. The street is a wet street between two rows of buildings, with signs and lamps, and two probes
+that project onto the whole street.
+
+### Cost (M1 Pro, 1280x720, `perf_stats {frames: 90}`, average GPU frame time)
+
+| Scene | Before probes existed | Same binary, no probes | With probes | Notes |
+|---|---|---|---|---|
+| `room` (1 interior probe) | 7.12 ms | 7.08 ms | 7.71 ms | `main` 1.69 / 1.60 / 1.70 ms (unchanged); `resolve` 0.77 -> 1.03 ms |
+| `street` (2 probes) | 8.56 ms | 8.50 ms | 9.06 ms | `resolve` 0.70 -> 0.93 ms |
+| `neon_requiem` (593 lights; 3 probes along the avenue in a copy) | 18.6-20.6 ms | 18.7 ms | 19.6 ms | `main` 4.56 -> 4.62 ms; `resolve` +0.09 ms, `ssgi` +0.08 ms |
+
+Without probes the frame costs what it did: the probe code lives in separate pipeline variants of the
+resolve and SSGI passes (and of transparent meshes), chosen only while probes shade the frame.
+
+Captures happen once per probe and are cached afterwards. A 256 px probe with its bounce pass (2 x 6 faces + 2
+filters) costs about 3.5 ms of GPU time in the room and 4-5 ms in the street. A `realtime` 256 px probe costs about 2.9 ms per frame in the room:
+- `Probe capture` 1.6 ms;
+- `Probe filter` 0.8 ms;
+- `Probe mips` 0.4 ms;
+- `Probe sun shadow` 0.05 ms.
+
+Use 128 px and an `interval` for anything realtime.
+
 ## Foliage impostors
 
 Imported trees, bushes and rocks are often 50k–3M triangles each. Drawn as meshes out to
@@ -614,8 +707,8 @@ is layer `i + 1`.
 | `cullMask` | `camera` | all (1048575) | Layers the camera draws; meshes outside it are not drawn (and cast no shadow) |
 | `cullMask` | `light` | all | Layers the light illuminates |
 
-Terrain, foliage, water, particles and hair have no `layers` field yet and count as layer 1. Decals, reflection probes and render
-targets will use the same two field names (`layers` for what something is on, `cullMask` for what it sees or affects).
+Terrain, foliage, water, particles and hair have no `layers` field yet and count as layer 1. Reflection probes use `cullMask`
+for what their captures draw; decals and render targets will use the same two field names (`layers` for what something is on, `cullMask` for what it sees or affects).
 
 Name layers in `game.json` and use the names everywhere:
 
@@ -668,8 +761,9 @@ lightmaps yet) and caster masks.
   on screen, and impostors don't cast them.
 - Toon outlines and distant hair cards write no object motion (they reproject with the camera
   only).
-- GI and reflections are screen-space: what is off screen comes from the sky probe. There
-  are no reflection probes or world-space GI yet.
+- GI is screen-space: there is no world-space GI yet. Reflection probes fill what screen-space
+  reflections miss, but their captures leave out foliage, hair, particles and water. Opaque clearcoat layers
+  still reflect the sky. Probe captures are kept in GPU memory only (re-captured after a restart).
 - Transparent meshes don't refract (water does). Particles and fluid volumes render after
   transparent meshes.
 - Fluid volumes don't cast shadows on the scene yet.

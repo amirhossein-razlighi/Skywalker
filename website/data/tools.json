@@ -880,6 +880,14 @@
       "type": "integer",
       "description": "Point/spot shadow views re-rendered per frame when lights or casters move (cube light = 6, spot = 1); later updates wait a frame. Stills render all"
      },
+     "probeBudget": {
+      "type": "integer",
+      "description": "Reflection probes with a slot in the probe atlas (the most important in view first; the rest fall back to the sky). Max 32; 0 = probes off"
+     },
+     "probeUpdates": {
+      "type": "integer",
+      "description": "Reflection probe cube faces captured per frame (a whole probe = 6); later captures wait a frame. Stills capture everything"
+     },
      "preset": {
       "type": "string",
       "enum": [
@@ -1532,7 +1540,7 @@
   {
    "name": "viewport_capture",
    "title": "Look at the scene",
-   "description": "Render the scene and return a PNG plus every visible entity with its on-screen box [x, y, w, h]. annotate=true (default) draws each entity's #id on the image so you can match what you see to ids. Choose the view: the editor camera (default), the game camera (view=\"scene\"), or any eye/target.",
+   "description": "Render the scene and return a PNG plus every visible entity with its on-screen box [x, y, w, h]. annotate=true (default) draws each entity's #id on the image so you can match what you see to ids. Choose the view: the editor camera (default), the game camera (view=\"scene\"), or any eye/target. probe=<entity> returns that reflection probe's captured cubemap instead (6 faces as a cross).",
    "inputSchema": {
     "type": "object",
     "properties": {
@@ -1635,9 +1643,10 @@
        "uv_checker",
        "texel_density",
        "motion",
-       "shadow_atlas"
+       "shadow_atlas",
+       "reflection_probes"
       ],
-      "description": "Diagnostic view instead of the final image. Buffers: albedo, normals, material (roughness red / metallic green), gi, reflections, ao, depth, lighting. Shading: unshaded, lighting_only (white material), emission, specular. Geometry: wireframe, overdraw (heat map), lod (green 0 .. red 3), uv_checker, texel_density (green = 512 texels/m). Lights: shadow_cascades (red/green/blue/yellow), light_complexity (lights per pixel heat map), shadow_atlas (point/spot shadow maps, outlined per light: green re-rendered, blue cached, orange waiting; see shadow_atlas_info). Motion: the velocity buffer (hue = direction, strength = speed). Also sketch, impostors. Full legend: viewport_debug_view {\"list\": true}"
+      "description": "Diagnostic view instead of the final image. Buffers: albedo, normals, material (roughness red / metallic green), gi, reflections, ao, depth, lighting. Shading: unshaded, lighting_only (white material), emission, specular. Geometry: wireframe, overdraw (heat map), lod (green 0 .. red 3), uv_checker, texel_density (green = 512 texels/m). Lights: shadow_cascades (red/green/blue/yellow), light_complexity (lights per pixel heat map), shadow_atlas (point/spot shadow maps, outlined per light: green re-rendered, blue cached, orange waiting; see shadow_atlas_info), reflection_probes (which probe lights each pixel, their volumes; see probe_info). Motion: the velocity buffer (hue = direction, strength = speed). Also sketch, impostors. Full legend: viewport_debug_view {\"list\": true}"
      },
      "quality": {
       "type": "string",
@@ -1663,6 +1672,17 @@
      "frame_handlers": {
       "type": "boolean",
       "description": "While playing: also run the cosmetic `on frame` Wander handlers for this image (camera shake, UI tweens); their writes are undone afterwards"
+     },
+     "probe": {
+      "type": [
+       "integer",
+       "string"
+      ],
+      "description": "Return this reflection probe's captured cubemap instead (6 faces as a horizontal cross: +Y on top; -X, +Z, +X, -Z across; -Y below)"
+     },
+     "probe_mip": {
+      "type": "integer",
+      "description": "With probe: roughness level 0 (sharp) .. 5 (the diffuse ambient)"
      }
     },
     "additionalProperties": false
@@ -1836,7 +1856,8 @@
        "uv_checker",
        "texel_density",
        "motion",
-       "shadow_atlas"
+       "shadow_atlas",
+       "reflection_probes"
       ],
       "description": "Debug view to show (final = normal image); omit to read the current one"
      },
@@ -9083,7 +9104,8 @@
        "uv_checker",
        "texel_density",
        "motion",
-       "shadow_atlas"
+       "shadow_atlas",
+       "reflection_probes"
       ],
       "description": "Buffer visualization, shading debug view (wireframe, lod, unshaded, ...) or the pencil sketch look; see viewport_capture"
      },
@@ -9373,6 +9395,185 @@
    "annotations": {
     "title": "Configure light shadows",
     "readOnlyHint": false,
+    "destructiveHint": false,
+    "openWorldHint": false
+   },
+   "_meta": {
+    "skywalker/category": "render"
+   }
+  },
+  {
+   "name": "probe_add",
+   "title": "Add a reflection probe",
+   "description": "Add a reflection probe: a captured cubemap that glossy floors, metal and glass inside its volume reflect instead of the sky (box-projected, so reflections line up with the walls), and that gives them their ambient light. Put one per room, corridor or street section, with the capture point in open space at about eye height. size \"auto\" (default) casts rays from `position` to the nearest meshes in the six axis directions and fits the box to the room (open directions get 8 m): the volume reaches blend_distance past the walls and the reflections project onto the room (projectionSize); or give [x, y, z] in meters. interior=true for closed rooms: no sky light leaks in (the probe replaces it; windows still show the sky). update: once (default, cached until it moves or probe_bake), on_change (re-captures when something in range changes), realtime (every `interval` frames, within Environment.probeUpdates faces per frame). The new probe is captured right away and its state returned (see probe_info). Example: {\"name\": \"Hall Probe\", \"position\": [0, 1.6, 0], \"interior\": true}.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "Entity name (default \"Reflection Probe\")"
+     },
+     "position": {
+      "type": "array",
+      "items": {
+       "type": "number"
+      },
+      "minItems": 3,
+      "maxItems": 3,
+      "description": "Capture point in meters (the room's open space, ~1.5 m up)"
+     },
+     "parent": {
+      "type": [
+       "integer",
+       "string"
+      ],
+      "description": "Parent entity"
+     },
+     "size": {
+      "description": "Box size [x, y, z] in meters, or \"auto\" (default): fit the room around `position`"
+     },
+     "shape": {
+      "type": "string",
+      "enum": [
+       "box",
+       "sphere"
+      ],
+      "description": "Influence volume (default box)"
+     },
+     "radius": {
+      "type": "number",
+      "description": "Sphere radius in meters"
+     },
+     "interior": {
+      "type": "boolean",
+      "description": "Closed room: no sky light inside (default false)"
+     },
+     "update": {
+      "type": "string",
+      "enum": [
+       "once",
+       "on_change",
+       "realtime"
+      ],
+      "description": "When to capture (default once)"
+     },
+     "interval": {
+      "type": "integer",
+      "description": "realtime: frames between captures (default 1)"
+     },
+     "resolution": {
+      "type": "integer",
+      "description": "Face size in px: 64, 128, 256 (default), 512"
+     },
+     "priority": {
+      "type": "integer",
+      "description": "Higher wins where volumes overlap (default 0)"
+     },
+     "blend_distance": {
+      "type": "number",
+      "description": "Meters over which the probe fades at its edges (default 1)"
+     },
+     "box_projection": {
+      "type": "boolean",
+      "description": "Parallax-correct reflections against the box (default true)"
+     },
+     "intensity": {
+      "type": "number",
+      "description": "Brightness multiplier (default 1)"
+     },
+     "ambient": {
+      "type": "string",
+      "enum": [
+       "probe",
+       "sky",
+       "color"
+      ],
+      "description": "Diffuse ambient inside the volume (default probe)"
+     },
+     "ambient_color": {
+      "type": "string",
+      "description": "Interior / color ambient \"#rrggbb\""
+     },
+     "cull_mask": {
+      "description": "Render layers the capture draws: names, numbers, \"all\" (default) or a list"
+     },
+     "render": {
+      "type": "boolean",
+      "description": "Capture it now and return its state (default true)"
+     }
+    },
+    "additionalProperties": false,
+    "required": [
+     "position"
+    ]
+   },
+   "annotations": {
+    "title": "Add a reflection probe",
+    "readOnlyHint": false,
+    "destructiveHint": false,
+    "openWorldHint": false
+   },
+   "_meta": {
+    "skywalker/category": "render"
+   }
+  },
+  {
+   "name": "probe_bake",
+   "title": "Re-capture reflection probes",
+   "description": "Re-capture reflection probes now (after moving furniture, changing lights or the sky): renders one still frame of `view`, which captures every invalidated probe in full regardless of the per-frame face budget, and returns their state (slot, captures, GPU time) plus warnings. probes: one entity, a list or \"all\" (default). render=false only marks them; they re-capture over the next frames (Wander: probe_bake()). Example: {\"probes\": [\"Hall Probe\"]}.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "probes": {
+      "description": "A probe entity, a list of them, or \"all\" (default)"
+     },
+     "view": {
+      "description": "Camera of the frame: \"editor\" (default), \"scene\", or {eye, target, fov}"
+     },
+     "render": {
+      "type": "boolean",
+      "description": "Render the frame that captures them now (default true)"
+     }
+    },
+    "additionalProperties": false
+   },
+   "annotations": {
+    "title": "Re-capture reflection probes",
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "openWorldHint": false
+   },
+   "_meta": {
+    "skywalker/category": "render"
+   }
+  },
+  {
+   "name": "probe_info",
+   "title": "Inspect reflection probes",
+   "description": "Reflection probes and their atlas: the budget (Environment.probeBudget probes, probeUpdates faces per frame), atlas resolution / slots / memory, and per probe: slot and debug color (the reflection_probes debug view draws it), whether it is captured, lighting this view, waiting for the face budget, over budget or out of view, captures so far, last capture GPU time, `stale` (something in range changed since a once probe was captured: run probe_bake), size, update mode. Warnings: overlapping volumes with equal priority, probes with no geometry in them, capture points inside a mesh, atlas exhaustion. Renders one real-time frame of `view` first. See the volumes with viewport_capture {debug_view: \"reflection_probes\"} and a probe's cubemap with viewport_capture {probe: \"Hall Probe\"}. Example: {\"entity\": \"Hall Probe\"}.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "view": {
+      "description": "Camera of the frame: \"editor\" (default), \"scene\", or {eye, target, fov}"
+     },
+     "entity": {
+      "type": [
+       "integer",
+       "string"
+      ],
+      "description": "Only report this probe"
+     },
+     "render": {
+      "type": "boolean",
+      "description": "Render a frame of `view` first (default true; false = the last frame)"
+     }
+    },
+    "additionalProperties": false
+   },
+   "annotations": {
+    "title": "Inspect reflection probes",
+    "readOnlyHint": true,
     "destructiveHint": false,
     "openWorldHint": false
    },

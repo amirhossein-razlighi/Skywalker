@@ -31,16 +31,16 @@ struct EntityDetails: View {
     @State private var schemas: JSON = .null
 
     private var selectedID: UInt64? { engine.selection.count == 1 ? engine.selection.first : nil }
-    private static let componentOrder = ["transform", "mesh", "light", "camera", "particles", "groom", "water", "terrain",
-                                         "foliage", "audio", "listener", "body", "collider", "character", "joint", "nav_agent",
-                                         "navmesh", "physics_world", "animator", "attach", "ik", "sequencer", "sprite",
-                                         "sprite_anim", "tilemap", "light2d", "parallax", "camera2d", "text", "ui_canvas", "ui",
-                                         "dialogue", "process"]
+    private static let componentOrder = ["transform", "mesh", "light", "reflection_probe", "camera", "particles", "groom",
+                                         "water", "terrain", "foliage", "audio", "listener", "body", "collider", "character",
+                                         "joint", "nav_agent", "navmesh", "physics_world", "animator", "attach", "ik", "sequencer",
+                                         "sprite", "sprite_anim", "tilemap", "light2d", "parallax", "camera2d", "text", "ui_canvas",
+                                         "ui", "dialogue", "process"]
     /// Components offered by Add Component (transform is always present).
-    private static let addable = ["mesh", "light", "camera", "particles", "groom", "water", "terrain", "foliage", "audio",
-                                  "listener", "body", "collider", "character", "joint", "nav_agent", "navmesh", "physics_world",
-                                  "animator", "attach", "ik", "sequencer", "sprite", "sprite_anim", "tilemap", "light2d",
-                                  "parallax", "camera2d", "text", "ui_canvas", "ui", "dialogue", "process"]
+    private static let addable = ["mesh", "light", "reflection_probe", "camera", "particles", "groom", "water", "terrain",
+                                  "foliage", "audio", "listener", "body", "collider", "character", "joint", "nav_agent", "navmesh",
+                                  "physics_world", "animator", "attach", "ik", "sequencer", "sprite", "sprite_anim", "tilemap",
+                                  "light2d", "parallax", "camera2d", "text", "ui_canvas", "ui", "dialogue", "process"]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -90,6 +90,7 @@ struct EntityDetails: View {
         case "transform": "move.3d"
         case "mesh": "cube"
         case "light": "lightbulb"
+        case "reflection_probe": "circle.lefthalf.filled"
         case "camera": "video"
         case "particles": "flame"
         case "groom": "comb"
@@ -138,6 +139,7 @@ struct EntityDetails: View {
         case "attach": "Bone Attachment"
         case "ik": "IK Target"
         case "process": "Process (Pause / Time)"
+        case "reflection_probe": "Reflection Probe"
         default: comp.capitalized
         }
     }

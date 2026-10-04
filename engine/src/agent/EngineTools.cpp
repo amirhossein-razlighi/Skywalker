@@ -727,7 +727,8 @@ void addViewTools(Engine& engine, ToolRegistry& reg) {
     reg.add({"viewport_capture", "Look at the scene",
              "Render the scene and return a PNG plus every visible entity with its on-screen box [x, y, w, h]. "
              "annotate=true (default) draws each entity's #id on the image so you can match what you see to ids. "
-             "Choose the view: the editor camera (default), the game camera (view=\"scene\"), or any eye/target.",
+             "Choose the view: the editor camera (default), the game camera (view=\"scene\"), or any eye/target. "
+             "probe=<entity> returns that reflection probe's captured cubemap instead (6 faces as a cross).",
              "view",
              object({{"width", integer("Image width (default 768, max 2048)")},
                      {"height", integer("Image height (default 432, max 2048)")},
@@ -751,7 +752,8 @@ void addViewTools(Engine& engine, ToolRegistry& reg) {
                                                 "material), emission, specular. Geometry: wireframe, overdraw (heat map), lod (green 0 .. red 3), "
                                                 "uv_checker, texel_density (green = 512 texels/m). Lights: shadow_cascades (red/green/blue/yellow), "
                                                 "light_complexity (lights per pixel heat map), shadow_atlas (point/spot shadow maps, outlined per light: green "
-                                                "re-rendered, blue cached, orange waiting; see shadow_atlas_info). Motion: the velocity buffer (hue = "
+                                                "re-rendered, blue cached, orange waiting; see shadow_atlas_info), reflection_probes (which probe lights each pixel, "
+                                                "their volumes; see probe_info). Motion: the velocity buffer (hue = "
                                                 "direction, strength = speed). Also sketch, impostors. Full legend: "
                                                 "viewport_debug_view {\"list\": true}")},
                      {"quality", enumeration({"full", "balanced", "fast"}, "Viewport quality tier (default full; fast/balanced preview what the editor shows while editing)")},
@@ -760,7 +762,10 @@ void addViewTools(Engine& engine, ToolRegistry& reg) {
                      {"alpha", number("While playing: render the in-between frame a real-time display shows this far between "
                                       "the last two ticks (0..1; render interpolation). Default 1 = the exact tick state")},
                      {"frame_handlers", boolean("While playing: also run the cosmetic `on frame` Wander handlers for this "
-                                                "image (camera shake, UI tweens); their writes are undone afterwards")}}),
+                                                "image (camera shake, UI tweens); their writes are undone afterwards")},
+                     {"probe", schema::entity("Return this reflection probe's captured cubemap instead (6 faces as a "
+                                              "horizontal cross: +Y on top; -X, +Z, +X, -Z across; -Y below)")},
+                     {"probe_mip", integer("With probe: roughness level 0 (sharp) .. 5 (the diffuse ambient)")}}),
              false, false, [&engine](const Json& a, ToolContext&) {
                  CaptureOptions o;
                  o.interpolationAlpha = std::clamp(a.get("alpha").asFloat(1.f), 0.f, 1.f);
@@ -798,6 +803,12 @@ void addViewTools(Engine& engine, ToolRegistry& reg) {
                  }
                  auto cap = engine.capture(o);
                  if (!cap) return ToolResult::error(cap.error());
+                 if (a.contains("probe")) {  // [reflection probes] the probe's cubemap (the frame above captured it)
+                     auto img = probeCubemapImage(engine, a.get("probe"), static_cast<int>(a.get("probe_mip").asInt(0)));
+                     if (!img) return ToolResult::error(img.error());
+                     cap->image = std::move(*img);
+                     cap->visible.clear();
+                 }
                  Json visible = Json::array();
                  std::ostringstream os;
                  os << "Rendered " << o.width << "x" << o.height << ". Visible entities (nearest first):\n";
@@ -1217,6 +1228,7 @@ void registerEngineTools(Engine& engine) {
     tools::addRenderLayerTools(engine, reg);  // engine/src/agent/RenderLayerTools.cpp (render layers, cull masks)
     tools::addProcessTools(engine, reg);  // ProcessTools.cpp: process_info, sim_teleport, sim_display
     tools::addShadowTools(engine, reg);  // engine/src/agent/ShadowTools.cpp (point / spot light shadows)
+    tools::addProbeTools(engine, reg);  // engine/src/agent/ProbeTools.cpp (reflection probes)
     tools::addPrefabTools(engine, reg);  // engine/src/agent/PrefabTools.cpp (entity links, linked prefabs)
     tools::addLegalTools(engine, reg);  // engine/src/agent/LegalTools.cpp (terms, privacy, acceptance state)
     tools::addCustomToolTools(engine, reg);  // engine/src/agent/CustomToolTools.cpp (agent-defined tools)

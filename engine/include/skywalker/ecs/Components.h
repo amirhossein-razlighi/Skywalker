@@ -340,6 +340,9 @@ struct Environment {
     int localShadowAtlas = 4096;       // shadow atlas edge in px (1024..8192; 4096 = 64 MB)
     int localShadowLights = 16;        // most shadowed point/spot lights per frame (others light without shadows)
     int localShadowUpdates = 24;       // shadow views re-rendered per frame (cube light = 6, spot = 1); stills: all
+    // Reflection probes (render/ReflectionProbes.h)
+    int probeBudget = 16;              // probes with a slot in the probe atlas (max 32; 0 = probes off)
+    int probeUpdates = 6;              // probe cube faces captured per frame (a whole probe = 6); stills: all
 
     Vec3 sunDirection() const;  // direction light travels (from sun towards ground)
     static const TypeInfo& type();
@@ -357,3 +360,4 @@ struct Environment {
 // Workstream components (kept in their own headers).
 #include "skywalker/ecs/GroomComponent.h"
 #include "skywalker/ecs/ProcessComponent.h"  // process: pause modes, run order, interpolation
+#include "skywalker/ecs/ReflectionProbeComponent.h"  // reflection_probe (render/ReflectionProbes.h)

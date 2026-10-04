@@ -3318,6 +3318,132 @@
   },
   "additionalProperties": false
  },
+ "reflection_probe": {
+  "type": "object",
+  "description": "A captured cubemap of the scene around this point. Glossy floors, metal and glass inside its influence volume reflect the room or street around them (box-projected so reflections line up with walls) instead of the sky, and take their ambient light from it. Screen-space reflections still win where they find a hit; the probe fills what is off screen; the sky fills the rest. Put one per room or street section (probe_add sizes it to the room), set `interior` for closed rooms so no sky light leaks in, and check it with probe_info and viewport_capture {debug_view: \"reflection_probes\"}.",
+  "properties": {
+   "shape": {
+    "type": "string",
+    "enum": [
+     "box",
+     "sphere"
+    ],
+    "description": "Influence volume: box (rooms, corridors, streets) or sphere"
+   },
+   "size": {
+    "type": "array",
+    "items": {
+     "type": "number"
+    },
+    "minItems": 3,
+    "maxItems": 3,
+    "description": "Box: influence extent in meters, centered on the entity (times its scale). Match the room"
+   },
+   "radius": {
+    "type": "number",
+    "minimum": 0.1,
+    "maximum": 10000,
+    "description": "Sphere: influence radius in meters (times the entity scale)"
+   },
+   "blendDistance": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1000,
+    "description": "Meters inside the volume over which the probe fades into neighbors or the sky (0 = hard edge)"
+   },
+   "boxProjection": {
+    "type": "boolean",
+    "description": "Parallax-correct reflections against the volume so they line up with its walls (rooms, corridors); off for open areas and distant scenery"
+   },
+   "projectionSize": {
+    "type": "array",
+    "items": {
+     "type": "number"
+    },
+    "minItems": 3,
+    "maxItems": 3,
+    "description": "Box (m) that reflections are projected onto when it should differ from the influence volume: a street split into several probes projects each onto the whole street (its facades and far ends). [0, 0, 0] = the volume itself"
+   },
+   "projectionOffset": {
+    "type": "array",
+    "items": {
+     "type": "number"
+    },
+    "minItems": 3,
+    "maxItems": 3,
+    "description": "Center of projectionSize's box relative to the entity (m, local axes)"
+   },
+   "intensity": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 16,
+    "description": "Brightness of the probe's reflections and ambient light"
+   },
+   "interior": {
+    "type": "boolean",
+    "description": "Closed room: no sky light inside the volume. Reflections and ambient come only from the probe, and the capture lights its walls with ambientColor instead of the sky (the sky still shows through windows)"
+   },
+   "ambient": {
+    "type": "string",
+    "enum": [
+     "probe",
+     "sky",
+     "color"
+    ],
+    "description": "Diffuse ambient inside the volume: probe (from the capture, default), sky (the probe only adds reflections), color (ambientColor x ambientEnergy)"
+   },
+   "ambientColor": {
+    "description": "Interior captures: the ambient light that replaces the sky's; ambient \"color\": the ambient inside — hex string \"#rrggbb[aa]\" or [r,g,b(,a)] in 0..1"
+   },
+   "ambientEnergy": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 100,
+    "description": "Multiplies ambientColor"
+   },
+   "update": {
+    "type": "string",
+    "enum": [
+     "once",
+     "on_change",
+     "realtime"
+    ],
+    "description": "When to capture: once (cached; re-captured when the probe changes or on probe_bake), on_change (whenever something in range moves or changes), realtime (every `interval` frames)"
+   },
+   "interval": {
+    "type": "integer",
+    "description": "realtime: frames between captures (1 = every frame, within the face budget)"
+   },
+   "resolution": {
+    "type": "integer",
+    "description": "Cubemap face size in px: 64, 128, 256 (default) or 512; rounded to a power of two"
+   },
+   "cullMask": {
+    "type": "integer",
+    "description": "Render layers the capture draws (bit i = layer i+1; 1048575 = all). Leave the player out of realtime probes"
+   },
+   "priority": {
+    "type": "integer",
+    "description": "Where volumes overlap the higher priority wins (equal: the smaller volume)"
+   },
+   "captureOffset": {
+    "type": "array",
+    "items": {
+     "type": "number"
+    },
+    "minItems": 3,
+    "maxItems": 3,
+    "description": "Capture point relative to the entity in meters (local axes); keep it inside the room, away from walls"
+   },
+   "maxDistance": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 20000,
+    "description": "Capture far plane in meters (0 = automatic from the volume)"
+   }
+  },
+  "additionalProperties": false
+ },
  "environment": {
   "type": "object",
   "description": "Scene-wide sky, sun, ambient light, fog and exposure.",
@@ -3664,6 +3790,14 @@
    "localShadowUpdates": {
     "type": "integer",
     "description": "Point/spot shadow views re-rendered per frame when lights or casters move (cube light = 6, spot = 1); later updates wait a frame. Stills render all"
+   },
+   "probeBudget": {
+    "type": "integer",
+    "description": "Reflection probes with a slot in the probe atlas (the most important in view first; the rest fall back to the sky). Max 32; 0 = probes off"
+   },
+   "probeUpdates": {
+    "type": "integer",
+    "description": "Reflection probe cube faces captured per frame (a whole probe = 6); later captures wait a frame. Stills capture everything"
    }
   },
   "additionalProperties": false

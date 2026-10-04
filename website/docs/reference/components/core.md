@@ -5,7 +5,7 @@ title: "Core"
 
 # Core
 
-Every scene is built from these: placement, surfaces, lights, cameras, process modes and the scene-wide environment.
+Every scene is built from these: placement, surfaces, lights, reflection probes, cameras, process modes and the scene-wide environment.
 
 ## `transform` { #transform }
 
@@ -114,6 +114,44 @@ A light source. Directional lights use the entity rotation; point/spot use posit
 
     ```text
     self.light.kind          -- read or write any field
+    ```
+
+## `reflection_probe` { #reflection_probe }
+
+A captured cubemap of the scene around this point. Glossy floors, metal and glass inside its influence volume reflect the room or street around them (box-projected so reflections line up with walls) instead of the sky, and take their ambient light from it. Screen-space reflections still win where they find a hit; the probe fills what is off screen; the sky fills the rest. Put one per room or street section (probe_add sizes it to the room), set `interior` for closed rooms so no sky light leaks in, and check it with probe_info and viewport_capture {debug_view: "reflection_probes"}.
+
+| Field | Type | Description | Values |
+|---|---|---|---|
+| `shape` | string | Influence volume: box (rooms, corridors, streets) or sphere | `box` `sphere` |
+| `size` | number[3] | Box: influence extent in meters, centered on the entity (times its scale). Match the room |  |
+| `radius` | number | Sphere: influence radius in meters (times the entity scale) | 0.1 .. 10000 |
+| `blendDistance` | number | Meters inside the volume over which the probe fades into neighbors or the sky (0 = hard edge) | 0 .. 1000 |
+| `boxProjection` | boolean | Parallax-correct reflections against the volume so they line up with its walls (rooms, corridors); off for open areas and distant scenery |  |
+| `projectionSize` | number[3] | Box (m) that reflections are projected onto when it should differ from the influence volume: a street split into several probes projects each onto the whole street (its facades and far ends). [0, 0, 0] = the volume itself |  |
+| `projectionOffset` | number[3] | Center of projectionSize's box relative to the entity (m, local axes) |  |
+| `intensity` | number | Brightness of the probe's reflections and ambient light | 0 .. 16 |
+| `interior` | boolean | Closed room: no sky light inside the volume. Reflections and ambient come only from the probe, and the capture lights its walls with ambientColor instead of the sky (the sky still shows through windows) |  |
+| `ambient` | string | Diffuse ambient inside the volume: probe (from the capture, default), sky (the probe only adds reflections), color (ambientColor x ambientEnergy) | `probe` `sky` `color` |
+| `ambientColor` | color | Interior captures: the ambient light that replaces the sky's; ambient "color": the ambient inside — hex string "#rrggbb[aa]" or [r,g,b(,a)] in 0..1 |  |
+| `ambientEnergy` | number | Multiplies ambientColor | 0 .. 100 |
+| `update` | string | When to capture: once (cached; re-captured when the probe changes or on probe_bake), on_change (whenever something in range moves or changes), realtime (every `interval` frames) | `once` `on_change` `realtime` |
+| `interval` | integer | realtime: frames between captures (1 = every frame, within the face budget) |  |
+| `resolution` | integer | Cubemap face size in px: 64, 128, 256 (default) or 512; rounded to a power of two |  |
+| `cullMask` | integer | Render layers the capture draws (bit i = layer i+1; 1048575 = all). Leave the player out of realtime probes |  |
+| `priority` | integer | Where volumes overlap the higher priority wins (equal: the smaller volume) |  |
+| `captureOffset` | number[3] | Capture point relative to the entity in meters (local axes); keep it inside the room, away from walls |  |
+| `maxDistance` | number | Capture far plane in meters (0 = automatic from the volume) | 0 .. 20000 |
+
+=== "Tool call"
+
+    ```tool
+    entity_update {"entity": "Crate", "components": {"reflection_probe": {}}}
+    ```
+
+=== "Wander"
+
+    ```text
+    self.reflection_probe.shape          -- read or write any field
     ```
 
 ## `camera` { #camera }
@@ -235,6 +273,8 @@ Scene-wide sky, sun, ambient light, fog and exposure.
 | `localShadowAtlas` | integer | Point/spot shadow atlas size in px: 2048 (16 MB), 4096 (64 MB, default), 8192 (256 MB) |  |
 | `localShadowLights` | integer | Most point/spot lights with shadows per frame (the most important on screen); the rest light without shadows. 0 = no local shadows |  |
 | `localShadowUpdates` | integer | Point/spot shadow views re-rendered per frame when lights or casters move (cube light = 6, spot = 1); later updates wait a frame. Stills render all |  |
+| `probeBudget` | integer | Reflection probes with a slot in the probe atlas (the most important in view first; the rest fall back to the sky). Max 32; 0 = probes off |  |
+| `probeUpdates` | integer | Reflection probe cube faces captured per frame (a whole probe = 6); later captures wait a frame. Stills capture everything |  |
 
 === "Tool call"
 

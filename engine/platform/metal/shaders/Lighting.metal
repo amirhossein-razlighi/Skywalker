@@ -140,10 +140,12 @@ static float3 hitRadiance(constant FrameUniforms& f, constant SSUniforms& u, tex
     return min(radiance.sample(linearClamp, ruv).rgb, float3(64.0));  // tame fireflies
 }
 
-fragment float4 ssgiFragment(FullscreenOut in [[stage_in]], constant FrameUniforms& f [[buffer(0)]],
-                             constant SSUniforms& u [[buffer(1)]], depth2d<float> depthTex [[texture(0)]],
-                             texture2d<float> gbufB [[texture(1)]], texture2d<float> radiance [[texture(2)]],
-                             texturecube<float> envTex [[texture(3)]]) {
+// Screen-space GI. kProbes: rays that leave the screen see the reflection probes around the point
+// (rooms stay rooms), else the sky (ssgiProbesFragment; the plain variant has no probe code).
+template <bool kProbes>
+static float4 ssgiTrace(FullscreenOut in, constant FrameUniforms& f, constant SSUniforms& u, depth2d<float> depthTex,
+                        texture2d<float> gbufB, texture2d<float> radiance, texturecube<float> envTex, constant ProbeBlock& probes,
+                        const device uint* probeClusters, texturecube_array<float> probeAtlas) {
     float2 uv = uvOf(in);
     float d = depthTex.sample(pointClamp, uv);
     float4 gb = gbufB.sample(pointClamp, uv);
@@ -157,6 +159,7 @@ fragment float4 ssgiFragment(FullscreenOut in [[stage_in]], constant FrameUnifor
                           interleavedGradientNoise(in.position.yx * 1.31 + u.params2.w * 3.1));
     float3 origin = p + N * (0.015 + dist * 0.002);
     float lod = max(f.extra.z - 1.0, 0.0);
+    const uint cluster = kProbes ? clusterOf(f, uv * f.viewport.xy, p) : 0u;
     float3 sum = 0.0;
     float hits = 0.0;
     for (int r = 0; r < rays; ++r) {
@@ -169,10 +172,29 @@ fragment float4 ssgiFragment(FullscreenOut in [[stage_in]], constant FrameUnifor
             sum += hitRadiance(f, u, radiance, depthTex, huv) * facing;
             hits += 1.0;
         } else {
-            sum += envTex.sample(cubeSampler, dir, level(lod)).rgb * f.ground.w;
+            float3 sky = envTex.sample(cubeSampler, dir, level(lod)).rgb * f.ground.w;
+            sum += kProbes ? probeRadiance(probes, probeClusters, probeAtlas, cluster, origin, dir, lod / max(f.extra.z, 1.0), sky, 1.0)
+                           : sky;
         }
     }
     return float4(sum / float(rays), 1.0 - hits / float(rays));
+}
+
+fragment float4 ssgiFragment(FullscreenOut in [[stage_in]], constant FrameUniforms& f [[buffer(0)]],
+                             constant SSUniforms& u [[buffer(1)]], depth2d<float> depthTex [[texture(0)]],
+                             texture2d<float> gbufB [[texture(1)]], texture2d<float> radiance [[texture(2)]],
+                             texturecube<float> envTex [[texture(3)]], constant ProbeBlock& probes [[buffer(10)]],
+                             const device uint* probeClusters [[buffer(11)]], texturecube_array<float> probeAtlas [[texture(33)]]) {
+    return ssgiTrace<false>(in, f, u, depthTex, gbufB, radiance, envTex, probes, probeClusters, probeAtlas);
+}
+
+fragment float4 ssgiProbesFragment(FullscreenOut in [[stage_in]], constant FrameUniforms& f [[buffer(0)]],
+                                   constant SSUniforms& u [[buffer(1)]], depth2d<float> depthTex [[texture(0)]],
+                                   texture2d<float> gbufB [[texture(1)]], texture2d<float> radiance [[texture(2)]],
+                                   texturecube<float> envTex [[texture(3)]], constant ProbeBlock& probes [[buffer(10)]],
+                                   const device uint* probeClusters [[buffer(11)]],
+                                   texturecube_array<float> probeAtlas [[texture(33)]]) {
+    return ssgiTrace<true>(in, f, u, depthTex, gbufB, radiance, envTex, probes, probeClusters, probeAtlas);
 }
 
 fragment float4 ssrFragment(FullscreenOut in [[stage_in]], constant FrameUniforms& f [[buffer(0)]],
@@ -270,13 +292,15 @@ static float4 bilateralHalf(texture2d<float> t, float2 uv, float2 halfTexel, dep
     return sum / wsum;
 }
 
-fragment float4 lightingResolveFragment(FullscreenOut in [[stage_in]], constant FrameUniforms& f [[buffer(0)]],
-                                        constant ResolveUniforms& r [[buffer(1)]],
-                                        texture2d<float> color [[texture(0)]], texture2d<float> gbufA [[texture(1)]],
-                                        texture2d<float> gbufB [[texture(2)]], depth2d<float> depthTex [[texture(3)]],
-                                        texture2d<float> aoTex [[texture(4)]], texture2d<float> giTex [[texture(5)]],
-                                        texture2d<float> ssrTex [[texture(6)]], texturecube<float> envTex [[texture(7)]],
-                                        texture2d<float> brdfLut [[texture(8)]]) {
+// The lit scene of the main pass carries the sky's image-based light. The resolve swaps it, per PBR
+// pixel of the G-buffer, for: reflection probes (kProbes: lightingResolveProbesFragment) over the sky;
+// then screen-space GI for diffuse and screen-space reflections where the trace found something, so the
+// order is SSR first, then probes, then the sky. SSAO darkens the indirect diffuse.
+template <bool kProbes>
+static float4 resolveLighting(FullscreenOut in, constant FrameUniforms& f, constant ResolveUniforms& r, texture2d<float> color,
+                              texture2d<float> gbufA, texture2d<float> gbufB, depth2d<float> depthTex, texture2d<float> aoTex,
+                              texture2d<float> giTex, texture2d<float> ssrTex, texturecube<float> envTex, texture2d<float> brdfLut,
+                              constant ProbeBlock& probes, const device uint* probeClusters, texturecube_array<float> probeAtlas) {
     float2 uv = uvOf(in);
     float4 c = color.sample(pointClamp, uv);
     float4 gb = gbufB.sample(pointClamp, uv);
@@ -298,9 +322,20 @@ fragment float4 lightingResolveFragment(FullscreenOut in [[stage_in]], constant 
     float2 ab = brdfLut.sample(linearClamp, float2(NdotV, 1.0 - rough)).rg;
     float3 Fr = F0 * ab.x + ab.y;
     float3 kd = (1.0 - Fr) * (1.0 - metal);
+    const bool ssrOn = r.params2.x > 0.5;
 
-    // Diffuse: sky probe -> screen-space GI (blended by strength), times SSAO.
-    float3 envIrr = envTex.sample(cubeSampler, N, level(maxMip)).rgb * ambientK;
+    // What the main pass added (the sky), and what replaces it (probes over the sky).
+    float3 R = reflect(-V, N);
+    float3 skyIrr = envTex.sample(cubeSampler, N, level(maxMip)).rgb * ambientK;
+    float3 skySpec = (kProbes || ssrOn) ? envTex.sample(cubeSampler, R, level(rough * maxMip)).rgb * f.sky.w * ambientK : float3(0.0);
+    float3 envIrr = skyIrr, envSpec = skySpec;
+    if (kProbes) {
+        ProbeSample ps = sampleProbes(probes, probeClusters, probeAtlas, clusterOf(f, in.position.xy, p), p, R, N, rough, true);
+        envIrr = probeOverSky(ps.irr, ps.irrW, ps.interior, skyIrr);
+        envSpec = probeOverSky(ps.spec * f.sky.w, ps.specW, ps.interior, skySpec);
+    }
+
+    // Diffuse: probe / sky light -> screen-space GI (blended by strength), times SSAO.
     float3 irr = envIrr;
     if (r.params.w > 0.5) {
         float4 gi = bilateralHalf(giTex, uv, r.texel.zw, depthTex, f, p, N, gbufB);
@@ -308,19 +343,47 @@ fragment float4 lightingResolveFragment(FullscreenOut in [[stage_in]], constant 
     }
     float ssao = r.params2.y > 0.5 ? mix(1.0, aoTex.sample(linearClamp, uv).r, saturate(r.params.z)) : 1.0;
     float3 diffuseW = albedo * kd * aoMat * fogT;
-    float3 delta = diffuseW * (irr * ssao - envIrr);
+    float3 delta = diffuseW * (irr * ssao - skyIrr);
 
-    // Specular: sky probe -> screen-space reflections where the trace found something.
-    if (r.params2.x > 0.5) {
-        float3 R = reflect(-V, N);
-        float3 prefiltered = envTex.sample(cubeSampler, R, level(rough * maxMip)).rgb * f.sky.w * ambientK;
+    // Specular: probes replace the sky; screen-space reflections replace both where the trace found something.
+    if (kProbes || ssrOn) {
         float specOcc = saturate(pow(NdotV + aoMat, exp2(-16.0 * rough - 1.0)) - 1.0 + aoMat);
-        float4 ssr = bilateralHalf(ssrTex, uv, r.texel.zw, depthTex, f, p, N, gbufB);
-        float conf = saturate(ssr.a * r.params.y);
-        float3 hit = conf > 1e-3 ? ssr.rgb / max(ssr.a, 1e-3) : prefiltered;
-        delta += Fr * specOcc * fogT * (mix(prefiltered, hit, conf) - prefiltered) * ssao;
+        float3 spec = envSpec - skySpec;
+        if (ssrOn) {
+            float4 ssr = bilateralHalf(ssrTex, uv, r.texel.zw, depthTex, f, p, N, gbufB);
+            float conf = saturate(ssr.a * r.params.y);
+            float3 hit = conf > 1e-3 ? ssr.rgb / max(ssr.a, 1e-3) : envSpec;
+            spec += (mix(envSpec, hit, conf) - envSpec) * ssao;
+        }
+        delta += Fr * specOcc * fogT * spec;
     }
     return float4(max(c.rgb + delta, 0.0), c.a);
+}
+
+fragment float4 lightingResolveFragment(FullscreenOut in [[stage_in]], constant FrameUniforms& f [[buffer(0)]],
+                                        constant ResolveUniforms& r [[buffer(1)]],
+                                        texture2d<float> color [[texture(0)]], texture2d<float> gbufA [[texture(1)]],
+                                        texture2d<float> gbufB [[texture(2)]], depth2d<float> depthTex [[texture(3)]],
+                                        texture2d<float> aoTex [[texture(4)]], texture2d<float> giTex [[texture(5)]],
+                                        texture2d<float> ssrTex [[texture(6)]], texturecube<float> envTex [[texture(7)]],
+                                        texture2d<float> brdfLut [[texture(8)]], constant ProbeBlock& probes [[buffer(10)]],
+                                        const device uint* probeClusters [[buffer(11)]],
+                                        texturecube_array<float> probeAtlas [[texture(33)]]) {
+    return resolveLighting<false>(in, f, r, color, gbufA, gbufB, depthTex, aoTex, giTex, ssrTex, envTex, brdfLut, probes, probeClusters,
+                                  probeAtlas);
+}
+
+fragment float4 lightingResolveProbesFragment(FullscreenOut in [[stage_in]], constant FrameUniforms& f [[buffer(0)]],
+                                              constant ResolveUniforms& r [[buffer(1)]],
+                                              texture2d<float> color [[texture(0)]], texture2d<float> gbufA [[texture(1)]],
+                                              texture2d<float> gbufB [[texture(2)]], depth2d<float> depthTex [[texture(3)]],
+                                              texture2d<float> aoTex [[texture(4)]], texture2d<float> giTex [[texture(5)]],
+                                              texture2d<float> ssrTex [[texture(6)]], texturecube<float> envTex [[texture(7)]],
+                                              texture2d<float> brdfLut [[texture(8)]], constant ProbeBlock& probes [[buffer(10)]],
+                                              const device uint* probeClusters [[buffer(11)]],
+                                              texturecube_array<float> probeAtlas [[texture(33)]]) {
+    return resolveLighting<true>(in, f, r, color, gbufA, gbufB, depthTex, aoTex, giTex, ssrTex, envTex, brdfLut, probes, probeClusters,
+                                 probeAtlas);
 }
 
 // Volumetric light (half resolution): march from the eye to the first surface through

@@ -1,0 +1,667 @@
+{
+ "format": "skywalker.scene",
+ "version": 1,
+ "name": "Reflection Probes: Room",
+ "seed": 7,
+ "environment": {
+  "skyMode": "atmosphere",
+  "sunAzimuth": 90,
+  "sunElevation": 24,
+  "sunIntensity": 6,
+  "ambient": 0.3,
+  "exposure": 1.0,
+  "showGrid": false,
+  "clouds": 0.25,
+  "tonemap": "agx",
+  "ao": 1.0,
+  "gi": 0.6,
+  "ssr": 1.0,
+  "bloomIntensity": 0.2
+ },
+ "entities": [
+  {
+   "id": 1,
+   "name": "Outside Ground",
+   "parent": 0,
+   "enabled": true,
+   "tags": [],
+   "vars": {},
+   "components": {
+    "transform": {
+     "position": [
+      0,
+      -0.02,
+      0
+     ],
+     "scale": [
+      80,
+      1,
+      80
+     ]
+    },
+    "mesh": {
+     "mesh": "plane",
+     "color": "#5d6b4a",
+     "roughness": 0.95
+    }
+   }
+  },
+  {
+   "id": 2,
+   "name": "Floor",
+   "parent": 0,
+   "enabled": true,
+   "tags": [],
+   "vars": {},
+   "components": {
+    "transform": {
+     "position": [
+      0,
+      -0.05,
+      0
+     ],
+     "scale": [
+      8.4,
+      0.1,
+      6.4
+     ]
+    },
+    "mesh": {
+     "mesh": "cube",
+     "color": "#24272c",
+     "roughness": 0.07,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "id": 3,
+   "name": "Ceiling",
+   "parent": 0,
+   "enabled": true,
+   "tags": [],
+   "vars": {},
+   "components": {
+    "transform": {
+     "position": [
+      0,
+      3.3,
+      0
+     ],
+     "scale": [
+      8.4,
+      0.2,
+      6.4
+     ]
+    },
+    "mesh": {
+     "mesh": "cube",
+     "color": "#d9d4cb",
+     "roughness": 0.9,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "id": 4,
+   "name": "Wall Back (red)",
+   "parent": 0,
+   "enabled": true,
+   "tags": [],
+   "vars": {},
+   "components": {
+    "transform": {
+     "position": [
+      0,
+      1.6,
+      -3.1
+     ],
+     "scale": [
+      8.4,
+      3.2,
+      0.2
+     ]
+    },
+    "mesh": {
+     "mesh": "cube",
+     "color": "#a3322b",
+     "roughness": 0.65,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "id": 5,
+   "name": "Wall Front",
+   "parent": 0,
+   "enabled": true,
+   "tags": [],
+   "vars": {},
+   "components": {
+    "transform": {
+     "position": [
+      0,
+      1.6,
+      3.1
+     ],
+     "scale": [
+      8.4,
+      3.2,
+      0.2
+     ]
+    },
+    "mesh": {
+     "mesh": "cube",
+     "color": "#d6d0c4",
+     "roughness": 0.8,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "id": 6,
+   "name": "Wall Left (blue)",
+   "parent": 0,
+   "enabled": true,
+   "tags": [],
+   "vars": {},
+   "components": {
+    "transform": {
+     "position": [
+      -4.1,
+      1.6,
+      0
+     ],
+     "scale": [
+      0.2,
+      3.2,
+      6.0
+     ]
+    },
+    "mesh": {
+     "mesh": "cube",
+     "color": "#2d4c9a",
+     "roughness": 0.65,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "id": 7,
+   "name": "Window Wall Low",
+   "parent": 0,
+   "enabled": true,
+   "tags": [],
+   "vars": {},
+   "components": {
+    "transform": {
+     "position": [
+      4.1,
+      0.5,
+      0
+     ],
+     "scale": [
+      0.2,
+      1.0,
+      6.0
+     ]
+    },
+    "mesh": {
+     "mesh": "cube",
+     "color": "#d6d0c4",
+     "roughness": 0.8,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "id": 8,
+   "name": "Window Wall High",
+   "parent": 0,
+   "enabled": true,
+   "tags": [],
+   "vars": {},
+   "components": {
+    "transform": {
+     "position": [
+      4.1,
+      2.8,
+      0
+     ],
+     "scale": [
+      0.2,
+      0.8,
+      6.0
+     ]
+    },
+    "mesh": {
+     "mesh": "cube",
+     "color": "#d6d0c4",
+     "roughness": 0.8,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "id": 9,
+   "name": "Window Wall A",
+   "parent": 0,
+   "enabled": true,
+   "tags": [],
+   "vars": {},
+   "components": {
+    "transform": {
+     "position": [
+      4.1,
+      1.7,
+      -2.0
+     ],
+     "scale": [
+      0.2,
+      1.4,
+      2.0
+     ]
+    },
+    "mesh": {
+     "mesh": "cube",
+     "color": "#d6d0c4",
+     "roughness": 0.8,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "id": 10,
+   "name": "Window Wall B",
+   "parent": 0,
+   "enabled": true,
+   "tags": [],
+   "vars": {},
+   "components": {
+    "transform": {
+     "position": [
+      4.1,
+      1.7,
+      2.0
+     ],
+     "scale": [
+      0.2,
+      1.4,
+      2.0
+     ]
+    },
+    "mesh": {
+     "mesh": "cube",
+     "color": "#d6d0c4",
+     "roughness": 0.8,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "id": 11,
+   "name": "Window Sill",
+   "parent": 0,
+   "enabled": true,
+   "tags": [],
+   "vars": {},
+   "components": {
+    "transform": {
+     "position": [
+      4.05,
+      1.0,
+      0
+     ],
+     "scale": [
+      0.34,
+      0.06,
+      2.0
+     ]
+    },
+    "mesh": {
+     "mesh": "cube",
+     "color": "#f0ece4",
+     "roughness": 0.4,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "id": 12,
+   "name": "Chrome Sphere",
+   "parent": 0,
+   "enabled": true,
+   "tags": [],
+   "vars": {},
+   "components": {
+    "transform": {
+     "position": [
+      -1.3,
+      0.55,
+      -0.9
+     ],
+     "scale": [
+      1.1,
+      1.1,
+      1.1
+     ]
+    },
+    "mesh": {
+     "mesh": "sphere",
+     "color": "#ececee",
+     "metallic": 1.0,
+     "roughness": 0.04
+    }
+   }
+  },
+  {
+   "id": 13,
+   "name": "Gold Block",
+   "parent": 0,
+   "enabled": true,
+   "tags": [],
+   "vars": {},
+   "components": {
+    "transform": {
+     "position": [
+      1.4,
+      0.4,
+      -1.4
+     ],
+     "scale": [
+      0.8,
+      0.8,
+      0.8
+     ]
+    },
+    "mesh": {
+     "mesh": "cube",
+     "color": "#f2c35a",
+     "roughness": 0.18,
+     "metallic": 1.0
+    }
+   }
+  },
+  {
+   "id": 14,
+   "name": "Steel Column",
+   "parent": 0,
+   "enabled": true,
+   "tags": [],
+   "vars": {},
+   "components": {
+    "transform": {
+     "position": [
+      0.4,
+      0.7,
+      0.9
+     ],
+     "scale": [
+      0.45,
+      1.4,
+      0.45
+     ]
+    },
+    "mesh": {
+     "mesh": "cylinder",
+     "color": "#c8ccd2",
+     "metallic": 1.0,
+     "roughness": 0.3
+    }
+   }
+  },
+  {
+   "id": 15,
+   "name": "Lacquer Cabinet",
+   "parent": 0,
+   "enabled": true,
+   "tags": [],
+   "vars": {},
+   "components": {
+    "transform": {
+     "position": [
+      -2.8,
+      0.55,
+      -2.4
+     ],
+     "scale": [
+      1.6,
+      1.1,
+      0.7
+     ]
+    },
+    "mesh": {
+     "mesh": "cube",
+     "color": "#121214",
+     "roughness": 0.12,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "id": 16,
+   "name": "Rug",
+   "parent": 0,
+   "enabled": true,
+   "tags": [],
+   "vars": {},
+   "components": {
+    "transform": {
+     "position": [
+      -0.2,
+      0.012,
+      0.2
+     ],
+     "scale": [
+      2.6,
+      0.02,
+      1.8
+     ]
+    },
+    "mesh": {
+     "mesh": "cube",
+     "color": "#c9a46a",
+     "roughness": 0.95,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "id": 17,
+   "name": "Lamp Bulb",
+   "parent": 0,
+   "enabled": true,
+   "tags": [],
+   "vars": {},
+   "components": {
+    "transform": {
+     "position": [
+      0,
+      2.95,
+      0
+     ],
+     "scale": [
+      0.16,
+      0.16,
+      0.16
+     ]
+    },
+    "mesh": {
+     "mesh": "sphere",
+     "color": "#fff3dc",
+     "emissive": [
+      1.0,
+      0.85,
+      0.6,
+      6.0
+     ],
+     "unlit": true,
+     "castShadows": false
+    }
+   }
+  },
+  {
+   "id": 18,
+   "name": "Lamp",
+   "parent": 0,
+   "enabled": true,
+   "tags": [],
+   "vars": {},
+   "components": {
+    "transform": {
+     "position": [
+      0,
+      2.75,
+      0
+     ]
+    },
+    "light": {
+     "kind": "point",
+     "color": "#ffd2a0",
+     "intensity": 7,
+     "range": 12
+    }
+   }
+  },
+  {
+   "id": 19,
+   "name": "Garden Wall",
+   "parent": 0,
+   "enabled": true,
+   "tags": [],
+   "vars": {},
+   "components": {
+    "transform": {
+     "position": [
+      11,
+      1.5,
+      0
+     ],
+     "scale": [
+      0.6,
+      3.0,
+      14
+     ]
+    },
+    "mesh": {
+     "mesh": "cube",
+     "color": "#c27a3e",
+     "roughness": 0.85,
+     "metallic": 0.0
+    }
+   }
+  },
+  {
+   "id": 20,
+   "name": "Tree Crown",
+   "parent": 0,
+   "enabled": true,
+   "tags": [],
+   "vars": {},
+   "components": {
+    "transform": {
+     "position": [
+      8,
+      3.2,
+      -3
+     ],
+     "scale": [
+      3,
+      3,
+      3
+     ]
+    },
+    "mesh": {
+     "mesh": "sphere",
+     "color": "#3f6b2e",
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "id": 21,
+   "name": "Tree Trunk",
+   "parent": 0,
+   "enabled": true,
+   "tags": [],
+   "vars": {},
+   "components": {
+    "transform": {
+     "position": [
+      8,
+      1,
+      -3
+     ],
+     "scale": [
+      0.4,
+      2,
+      0.4
+     ]
+    },
+    "mesh": {
+     "mesh": "cylinder",
+     "color": "#5a4030",
+     "roughness": 0.9
+    }
+   }
+  },
+  {
+   "id": 22,
+   "name": "Room Probe",
+   "parent": 0,
+   "enabled": true,
+   "tags": [],
+   "vars": {},
+   "components": {
+    "transform": {
+     "position": [
+      0,
+      1.6,
+      0
+     ]
+    },
+    "reflection_probe": {
+     "size": [
+      8,
+      3.2,
+      6
+     ],
+     "captureOffset": [
+      0,
+      -0.1,
+      0
+     ],
+     "interior": true,
+     "ambientColor": "#16130f",
+     "blendDistance": 0.4
+    }
+   }
+  },
+  {
+   "id": 23,
+   "name": "Inside Camera",
+   "parent": 0,
+   "enabled": true,
+   "tags": [],
+   "vars": {},
+   "components": {
+    "transform": {
+     "position": [
+      -3.4,
+      1.7,
+      2.5
+     ],
+     "rotation": [
+      -14,
+      -42,
+      0
+     ]
+    },
+    "camera": {
+     "fov": 70,
+     "primary": true
+    }
+   }
+  }
+ ]
+}

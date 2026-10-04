@@ -57,8 +57,8 @@ CATEGORIES = OrderedDict([
 ])
 
 COMPONENT_GROUPS = OrderedDict([
-    ("core", ("Core", "Every scene is built from these: placement, surfaces, lights, cameras, process modes and the "
-              "scene-wide environment.", ["transform", "mesh", "light", "camera", "process", "environment"])),
+    ("core", ("Core", "Every scene is built from these: placement, surfaces, lights, reflection probes, cameras, process modes and the "
+              "scene-wide environment.", ["transform", "mesh", "light", "reflection_probe", "camera", "process", "environment"])),
     ("world", ("World and effects", "Large-scale world building and simulated effects.",
                ["terrain", "foliage", "water", "particles", "fluid", "groom"])),
     ("2d-ui", ("2D, text and UI", "Sprites, tilemaps, 2D lights and cameras, world text, UI canvases and dialogue.",

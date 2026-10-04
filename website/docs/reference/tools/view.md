@@ -25,7 +25,7 @@ See the scene: captures with entity boxes, debug views, multi-view sheets, selec
 
 **Look at the scene** <span class="sky-badge sky-badge--ro" title="Never changes the scene">read-only</span>
 
-Render the scene and return a PNG plus every visible entity with its on-screen box [x, y, w, h]. annotate=true (default) draws each entity's #id on the image so you can match what you see to ids. Choose the view: the editor camera (default), the game camera (view="scene"), or any eye/target.
+Render the scene and return a PNG plus every visible entity with its on-screen box [x, y, w, h]. annotate=true (default) draws each entity's #id on the image so you can match what you see to ids. Choose the view: the editor camera (default), the game camera (view="scene"), or any eye/target. probe=<entity> returns that reflection probe's captured cubemap instead (6 faces as a cross).
 
 | Argument | Type | Required | Description | Values |
 |---|---|---|---|---|
@@ -43,12 +43,14 @@ Render the scene and return a PNG plus every visible entity with its on-screen b
 | `overlays` | boolean |  | Editor grid & selection highlight (default true) |  |
 | `samples` | integer |  | Supersampling: jittered sub-frames accumulated (default 4; 1 = fastest preview, 16-32 = final-quality stills with noise-free GI and reflections) |  |
 | `clay` | boolean |  | Render every surface as matte white clay (judge form and light; film 'sketch to fill' beats) |  |
-| `debug_view` | string |  | Diagnostic view instead of the final image. Buffers: albedo, normals, material (roughness red / metallic green), gi, reflections, ao, depth, lighting. Shading: unshaded, lighting_only (white material), emission, specular. Geometry: wireframe, overdraw (heat map), lod (green 0 .. red 3), uv_checker, texel_density (green = 512 texels/m). Lights: shadow_cascades (red/green/blue/yellow), light_complexity (lights per pixel heat map), shadow_atlas (point/spot shadow maps, outlined per light: green re-rendered, blue cached, orange waiting; see shadow_atlas_info). Motion: the velocity buffer (hue = direction, strength = speed). Also sketch, impostors. Full legend: viewport_debug_view {"list": true} | `final` `albedo` `normals` `material` `gi` `reflections` `ao` `depth` `lighting` `sketch` `impostors` `wireframe` `overdraw` `unshaded` `lighting_only` `shadow_cascades` `light_complexity` `lod` `emission` `specular` `uv_checker` `texel_density` `motion` `shadow_atlas` |
+| `debug_view` | string |  | Diagnostic view instead of the final image. Buffers: albedo, normals, material (roughness red / metallic green), gi, reflections, ao, depth, lighting. Shading: unshaded, lighting_only (white material), emission, specular. Geometry: wireframe, overdraw (heat map), lod (green 0 .. red 3), uv_checker, texel_density (green = 512 texels/m). Lights: shadow_cascades (red/green/blue/yellow), light_complexity (lights per pixel heat map), shadow_atlas (point/spot shadow maps, outlined per light: green re-rendered, blue cached, orange waiting; see shadow_atlas_info), reflection_probes (which probe lights each pixel, their volumes; see probe_info). Motion: the velocity buffer (hue = direction, strength = speed). Also sketch, impostors. Full legend: viewport_debug_view {"list": true} | `final` `albedo` `normals` `material` `gi` `reflections` `ao` `depth` `lighting` `sketch` `impostors` `wireframe` `overdraw` `unshaded` `lighting_only` `shadow_cascades` `light_complexity` `lod` `emission` `specular` `uv_checker` `texel_density` `motion` `shadow_atlas` `reflection_probes` |
 | `quality` | string |  | Viewport quality tier (default full; fast/balanced preview what the editor shows while editing) | `full` `balanced` `fast` |
 | `include_image` | boolean |  | Return the image (default true); false = only the entity list |  |
 | `save_path` | string |  | Also write the PNG to this project-relative path |  |
 | `alpha` | number |  | While playing: render the in-between frame a real-time display shows this far between the last two ticks (0..1; render interpolation). Default 1 = the exact tick state |  |
 | `frame_handlers` | boolean |  | While playing: also run the cosmetic `on frame` Wander handlers for this image (camera shake, UI tweens); their writes are undone afterwards |  |
+| `probe` | integer \| string |  | Return this reflection probe's captured cubemap instead (6 faces as a horizontal cross: +Y on top; -X, +Z, +X, -Z across; -Y below) |  |
+| `probe_mip` | integer |  | With probe: roughness level 0 (sharp) .. 5 (the diffuse ambient) |  |
 
 === "Tool call"
 
@@ -215,7 +217,7 @@ Show a debug visualization in the live editor viewport (the human sees it too), 
 
 | Argument | Type | Required | Description | Values |
 |---|---|---|---|---|
-| `view` | string |  | Debug view to show (final = normal image); omit to read the current one | `final` `albedo` `normals` `material` `gi` `reflections` `ao` `depth` `lighting` `sketch` `impostors` `wireframe` `overdraw` `unshaded` `lighting_only` `shadow_cascades` `light_complexity` `lod` `emission` `specular` `uv_checker` `texel_density` `motion` `shadow_atlas` |
+| `view` | string |  | Debug view to show (final = normal image); omit to read the current one | `final` `albedo` `normals` `material` `gi` `reflections` `ao` `depth` `lighting` `sketch` `impostors` `wireframe` `overdraw` `unshaded` `lighting_only` `shadow_cascades` `light_complexity` `lod` `emission` `specular` `uv_checker` `texel_density` `motion` `shadow_atlas` `reflection_probes` |
 | `list` | boolean |  | Return every view with its kind and color legend |  |
 
 === "Tool call"

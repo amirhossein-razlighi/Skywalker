@@ -65,6 +65,9 @@ void addProcessTools(Engine& engine, ToolRegistry& reg);  // ProcessTools.cpp: p
 /// Reads a property path ("transform.position", "vars.score", "name", "enabled") for traces (WorldTools.cpp).
 Json readPropertyPath(const Scene& s, EntityId id, const std::string& path);
 void addShadowTools(Engine& engine, ToolRegistry& reg);  // ShadowTools.cpp: shadow_atlas_info, light_shadows
+void addProbeTools(Engine& engine, ToolRegistry& reg);  // ProbeTools.cpp: probe_add, probe_bake, probe_info
+/// viewport_capture {probe}: a reflection probe's cubemap as a horizontal cross (ProbeTools.cpp).
+Result<Image> probeCubemapImage(Engine& engine, const Json& probe, int mip);
 void addPrefabTools(Engine& engine, ToolRegistry& reg);  // PrefabTools.cpp: entity_refs, copy/paste, prefab_overrides...
 void addLegalTools(Engine& engine, ToolRegistry& reg);  // LegalTools.cpp: legal_info (docs/legal/)
 void addCustomToolTools(Engine& engine, ToolRegistry& reg);  // CustomToolTools.cpp: tool_define, tool_test, ... (docs/CUSTOM_TOOLS.md)

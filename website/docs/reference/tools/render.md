@@ -7,7 +7,7 @@ title: "Render tools"
 
 Environment, effects, hair, shaders, render layers, impostors, benchmarks and the movie renderer.
 
-17 tools in the `render` category. Badges: **read-only** tools never change the project; **mutating** tools are undoable and attributed; **open-world** tools reach outside the engine and MCP clients ask before running them.
+20 tools in the `render` category. Badges: **read-only** tools never change the project; **mutating** tools are undoable and attributed; **open-world** tools reach outside the engine and MCP clients ask before running them.
 
 | Tool | Summary |
 |---|---|
@@ -28,6 +28,9 @@ Environment, effects, hair, shaders, render layers, impostors, benchmarks and th
 | [`render_layers`](#render_layers) | Render layers (20): MeshRenderer.layers says which layers a mesh is on; Camera.cullMask and Light.cullMask say which layers a camera draws and a light illuminates (a mesh is drawn / lit when they share a layer). |
 | [`shadow_atlas_info`](#shadow_atlas_info) | Which point and spot lights cast shadows this frame and how: projection (spot view, cube = 6 views, dual_paraboloid = 2 views), atlas slot and resolution, whether it was re-rendered this frame or reused from the static cache, and why a light has no shadow (disabled, out_of_view, beyond_max_distance, over_light_budget, atlas_full, pending). |
 | [`light_shadows`](#light_shadows) | Turn shadows of point/spot lights on or off and tune them, for one light, a list, or every light ("all", optionally only one kind). |
+| [`probe_add`](#probe_add) | Add a reflection probe: a captured cubemap that glossy floors, metal and glass inside its volume reflect instead of the sky (box-projected, so reflections line up with the walls), and that gives them their ambient light. |
+| [`probe_bake`](#probe_bake) | Re-capture reflection probes now (after moving furniture, changing lights or the sky): renders one still frame of `view`, which captures every invalidated probe in full regardless of the per-frame face budget, and returns their state (slot, captures, GPU time) plus warnings. |
+| [`probe_info`](#probe_info) | Reflection probes and their atlas: the budget (Environment.probeBudget probes, probeUpdates faces per frame), atlas resolution / slots / memory, and per probe: slot and debug color (the reflection_probes debug view draws it), whether it is captured, lighting this view, waiting for the face budget, over budget or out of view, captures so far, last capture GPU time, `stale` (something in range changed since a once probe was captured: run probe_bake), size, update mode. |
 
 ### `environment_get` { #environment_get }
 
@@ -131,6 +134,8 @@ Edit scene lighting/atmosphere: sun (azimuth, elevation, color, intensity), sky 
 | `localShadowAtlas` | integer |  | Point/spot shadow atlas size in px: 2048 (16 MB), 4096 (64 MB, default), 8192 (256 MB) |  |
 | `localShadowLights` | integer |  | Most point/spot lights with shadows per frame (the most important on screen); the rest light without shadows. 0 = no local shadows |  |
 | `localShadowUpdates` | integer |  | Point/spot shadow views re-rendered per frame when lights or casters move (cube light = 6, spot = 1); later updates wait a frame. Stills render all |  |
+| `probeBudget` | integer |  | Reflection probes with a slot in the probe atlas (the most important in view first; the rest fall back to the sky). Max 32; 0 = probes off |  |
+| `probeUpdates` | integer |  | Reflection probe cube faces captured per frame (a whole probe = 6); later captures wait a frame. Stills capture everything |  |
 | `preset` | string |  | Lighting preset | `noon` `sunset` `night` `overcast` `studio` |
 | `align_sun_to_hdri` | boolean |  | Point the sun (direction of light and shadows) at the brightest spot of the hdri panorama |  |
 
@@ -673,7 +678,7 @@ Render a cinematic to video or a PNG sequence, offline and deterministically (th
 | `shutter_timing` | string |  | Shutter interval relative to the frame time (default center) | `center` `open` `close` |
 | `quality` | string |  | Render quality tier (default full; fast for previews) | `full` `balanced` `fast` |
 | `clay` | boolean |  | Matte clay look (same move, for sketch -&gt; clay -&gt; final transitions) |  |
-| `debug_view` | string |  | Buffer visualization, shading debug view (wireframe, lod, unshaded, ...) or the pencil sketch look; see viewport_capture | `final` `albedo` `normals` `material` `gi` `reflections` `ao` `depth` `lighting` `sketch` `impostors` `wireframe` `overdraw` `unshaded` `lighting_only` `shadow_cascades` `light_complexity` `lod` `emission` `specular` `uv_checker` `texel_density` `motion` `shadow_atlas` |
+| `debug_view` | string |  | Buffer visualization, shading debug view (wireframe, lod, unshaded, ...) or the pencil sketch look; see viewport_capture | `final` `albedo` `normals` `material` `gi` `reflections` `ao` `depth` `lighting` `sketch` `impostors` `wireframe` `overdraw` `unshaded` `lighting_only` `shadow_cascades` `light_complexity` `lod` `emission` `specular` `uv_checker` `texel_density` `motion` `shadow_atlas` `reflection_probes` |
 | `warmup` | integer |  | Frames rendered before the first one so temporal effects settle (default 4) |  |
 | `output` | string |  | Output path: .mp4 (H.264), .mov (ProRes 422 HQ), or a folder / name_####.png (PNG sequence); default renders/&lt;name&gt;.mp4 |  |
 | `outputs` | any[] |  | Several outputs from one render, e.g. ["renders/a.mp4", {"path": "renders/a.mov", "codec": "prores"}] |  |
@@ -851,6 +856,149 @@ Turn shadows of point/spot lights on or off and tune them, for one light, a list
           "kind": "point",
           "enabled": true,
           "max_distance": 40
+        }
+      }
+    }
+    ```
+
+### `probe_add` { #probe_add }
+
+**Add a reflection probe** <span class="sky-badge sky-badge--mut" title="Changes the project; undoable and attributed">mutating</span>
+
+Add a reflection probe: a captured cubemap that glossy floors, metal and glass inside its volume reflect instead of the sky (box-projected, so reflections line up with the walls), and that gives them their ambient light. Put one per room, corridor or street section, with the capture point in open space at about eye height. size "auto" (default) casts rays from `position` to the nearest meshes in the six axis directions and fits the box to the room (open directions get 8 m): the volume reaches blend_distance past the walls and the reflections project onto the room (projectionSize); or give [x, y, z] in meters. interior=true for closed rooms: no sky light leaks in (the probe replaces it; windows still show the sky). update: once (default, cached until it moves or probe_bake), on_change (re-captures when something in range changes), realtime (every `interval` frames, within Environment.probeUpdates faces per frame). The new probe is captured right away and its state returned (see probe_info). Example: {"name": "Hall Probe", "position": [0, 1.6, 0], "interior": true}.
+
+| Argument | Type | Required | Description | Values |
+|---|---|---|---|---|
+| `name` | string |  | Entity name (default "Reflection Probe") |  |
+| `position` | number[3] | yes | Capture point in meters (the room's open space, ~1.5 m up) |  |
+| `parent` | integer \| string |  | Parent entity |  |
+| `size` | any |  | Box size [x, y, z] in meters, or "auto" (default): fit the room around `position` |  |
+| `shape` | string |  | Influence volume (default box) | `box` `sphere` |
+| `radius` | number |  | Sphere radius in meters |  |
+| `interior` | boolean |  | Closed room: no sky light inside (default false) |  |
+| `update` | string |  | When to capture (default once) | `once` `on_change` `realtime` |
+| `interval` | integer |  | realtime: frames between captures (default 1) |  |
+| `resolution` | integer |  | Face size in px: 64, 128, 256 (default), 512 |  |
+| `priority` | integer |  | Higher wins where volumes overlap (default 0) |  |
+| `blend_distance` | number |  | Meters over which the probe fades at its edges (default 1) |  |
+| `box_projection` | boolean |  | Parallax-correct reflections against the box (default true) |  |
+| `intensity` | number |  | Brightness multiplier (default 1) |  |
+| `ambient` | string |  | Diffuse ambient inside the volume (default probe) | `probe` `sky` `color` |
+| `ambient_color` | string |  | Interior / color ambient "#rrggbb" |  |
+| `cull_mask` | any |  | Render layers the capture draws: names, numbers, "all" (default) or a list |  |
+| `render` | boolean |  | Capture it now and return its state (default true) |  |
+
+=== "Tool call"
+
+    ```tool
+    probe_add {"name": "Hall Probe", "position": [0, 1.6, 0], "interior": true}
+    ```
+
+=== "CLI"
+
+    ```bash
+    skywalker call probe_add '{"name": "Hall Probe", "position": [0, 1.6, 0], "interior": true}' --project my_game
+    ```
+
+=== "MCP request"
+
+    ```json
+    {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "method": "tools/call",
+      "params": {
+        "name": "probe_add",
+        "arguments": {
+          "name": "Hall Probe",
+          "position": [
+            0,
+            1.6,
+            0
+          ],
+          "interior": true
+        }
+      }
+    }
+    ```
+
+### `probe_bake` { #probe_bake }
+
+**Re-capture reflection probes** <span class="sky-badge sky-badge--ro" title="Never changes the scene">read-only</span>
+
+Re-capture reflection probes now (after moving furniture, changing lights or the sky): renders one still frame of `view`, which captures every invalidated probe in full regardless of the per-frame face budget, and returns their state (slot, captures, GPU time) plus warnings. probes: one entity, a list or "all" (default). render=false only marks them; they re-capture over the next frames (Wander: probe_bake()). Example: {"probes": ["Hall Probe"]}.
+
+| Argument | Type | Required | Description | Values |
+|---|---|---|---|---|
+| `probes` | any |  | A probe entity, a list of them, or "all" (default) |  |
+| `view` | any |  | Camera of the frame: "editor" (default), "scene", or {eye, target, fov} |  |
+| `render` | boolean |  | Render the frame that captures them now (default true) |  |
+
+=== "Tool call"
+
+    ```tool
+    probe_bake {"probes": ["Hall Probe"]}
+    ```
+
+=== "CLI"
+
+    ```bash
+    skywalker call probe_bake '{"probes": ["Hall Probe"]}' --project my_game
+    ```
+
+=== "MCP request"
+
+    ```json
+    {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "method": "tools/call",
+      "params": {
+        "name": "probe_bake",
+        "arguments": {
+          "probes": [
+            "Hall Probe"
+          ]
+        }
+      }
+    }
+    ```
+
+### `probe_info` { #probe_info }
+
+**Inspect reflection probes** <span class="sky-badge sky-badge--ro" title="Never changes the scene">read-only</span>
+
+Reflection probes and their atlas: the budget (Environment.probeBudget probes, probeUpdates faces per frame), atlas resolution / slots / memory, and per probe: slot and debug color (the reflection_probes debug view draws it), whether it is captured, lighting this view, waiting for the face budget, over budget or out of view, captures so far, last capture GPU time, `stale` (something in range changed since a once probe was captured: run probe_bake), size, update mode. Warnings: overlapping volumes with equal priority, probes with no geometry in them, capture points inside a mesh, atlas exhaustion. Renders one real-time frame of `view` first. See the volumes with viewport_capture {debug_view: "reflection_probes"} and a probe's cubemap with viewport_capture {probe: "Hall Probe"}. Example: {"entity": "Hall Probe"}.
+
+| Argument | Type | Required | Description | Values |
+|---|---|---|---|---|
+| `view` | any |  | Camera of the frame: "editor" (default), "scene", or {eye, target, fov} |  |
+| `entity` | integer \| string |  | Only report this probe |  |
+| `render` | boolean |  | Render a frame of `view` first (default true; false = the last frame) |  |
+
+=== "Tool call"
+
+    ```tool
+    probe_info {"entity": "Hall Probe"}
+    ```
+
+=== "CLI"
+
+    ```bash
+    skywalker call probe_info '{"entity": "Hall Probe"}' --project my_game
+    ```
+
+=== "MCP request"
+
+    ```json
+    {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "method": "tools/call",
+      "params": {
+        "name": "probe_info",
+        "arguments": {
+          "entity": "Hall Probe"
         }
       }
     }

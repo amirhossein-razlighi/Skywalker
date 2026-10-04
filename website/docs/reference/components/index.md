@@ -5,7 +5,7 @@ title: "Components"
 
 # Components
 
-Every component is a plain struct with a reflected field table. The same table drives JSON scene files, the JSON Schema agents read (`component_schema`), the editor's property grid and Wander access (`self.light.intensity`). There are **34 components** plus the scene-wide environment.
+Every component is a plain struct with a reflected field table. The same table drives JSON scene files, the JSON Schema agents read (`component_schema`), the editor's property grid and Wander access (`self.light.intensity`). There are **35 components** plus the scene-wide environment.
 
 Set them with `entity_create` / `entity_update` (component objects are merged field by field), from the editor's Details panel, or from Wander. Unknown fields fail with a *did you mean …?* hint.
 
@@ -14,6 +14,7 @@ Set them with `entity_create` / `entity_update` (component objects are merged fi
 | [`transform`](core.md#transform) | Core | Position, rotation (Euler degrees) and scale relative to the parent entity. |
 | [`mesh`](core.md#mesh) | Core | Renders a mesh with a simple physically based material. |
 | [`light`](core.md#light) | Core | A light source. Directional lights use the entity rotation; point/spot use position. |
+| [`reflection_probe`](core.md#reflection_probe) | Core | A captured cubemap of the scene around this point. Glossy floors, metal and glass inside its influence volume reflect the room or street around them (box-projected so reflections line up with walls) instead of the sky, and take their ambient light from it. Screen-space reflections still win where they find a hit; the probe fills what is off screen; the sky fills the rest. Put one per room or street section (probe_add sizes it to the room), set `interior` for closed rooms so no sky light leaks in, and check it with probe_info and viewport_capture {debug_view: "reflection_probes"}. |
 | [`camera`](core.md#camera) | Core | A camera. The first primary camera is used when the game runs. |
 | [`process`](core.md#process) | Core | How this entity and its children run while the game is paused (pause_game) or slowed down (time_scale), the order their behaviors run in, and whether their motion is smoothed between 60 Hz ticks on fast displays. A pause menu canvas runs `always` (UI canvases do by default); enemies stay `pausable`. |
 | [`environment`](core.md#environment) | Core | Scene-wide sky, sun, ambient light, fog and exposure. |

@@ -70,13 +70,11 @@ static float3 triplanarNormal(texture2d<float> tex, Triplanar t, float3 N, float
     return normalize(nx.zyx * t.w.x + ny.xzy * t.w.y + nz.xyz * t.w.z);
 }
 
-// Direct (sun + punctual lights) and image-based lighting of a PBR / toon surface, before
-// emission and fog. Shared by meshes, instanced foliage and terrain.
-static float3 shadeSurface(SurfaceData s, float3 Ngeo, float3 worldPos, float2 fragXY, float3 V, bool toon, float rim,
-                           constant FrameUniforms& f, const device GPULight* lights, const device uint2* clusterCells,
-                           const device uint* clusterIndices, depth2d<float> shadowAtlas, texturecube<float> envTex,
-                           texture2d<float> brdfLut, texture3d<float> cloudShape, depth2d_array<float> localShadows,
-                           uint layers = 1u) {
+// Direct light (sun + punctual lights) on a PBR / toon surface; `cluster` receives its light cluster.
+static float3 directSurfaceLight(SurfaceData s, float3 Ngeo, float3 worldPos, float2 fragXY, float3 V, bool toon,
+                                 constant FrameUniforms& f, const device GPULight* lights, const device uint2* clusterCells,
+                                 const device uint* clusterIndices, depth2d<float> shadowAtlas, texture3d<float> cloudShape,
+                                 depth2d_array<float> localShadows, uint layers, thread uint& cluster) {
     // Sun
     float3 L = -f.sunDir.xyz;
     float sunVisible = L.y > -0.08 ? shadowFactor(worldPos, Ngeo, fragXY, f, shadowAtlas) : 0.0;
@@ -86,7 +84,8 @@ static float3 shadeSurface(SurfaceData s, float3 Ngeo, float3 worldPos, float2 f
 
     // Punctual lights: directional ones everywhere, point/spot lights from this pixel's cluster.
     int dirCount = int(f.cluster2.y);
-    uint2 cell = clusterCells[clusterOf(f, fragXY, worldPos)];
+    cluster = clusterOf(f, fragXY, worldPos);
+    uint2 cell = clusterCells[cluster];
     int total = dirCount + int(cell.y);
     const float shadowNoise = ditherNoise(fragXY, f.temporal);  // PCF rotation, new every frame / sub-sample
     for (int k = 0; k < total; ++k) {
@@ -102,44 +101,80 @@ static float3 shadeSurface(SurfaceData s, float3 Ngeo, float3 worldPos, float2 f
         }
         color += toon ? toonLight(s, V, Ll, rad, l.params.x) : directLight(s, V, Ll, rad, l.params.x);
     }
-    color = max(color, 0.0);  // negative lights darken, never below black
+    return max(color, 0.0);  // negative lights darken, never below black
+}
 
-    // Image-based lighting (sky cubemap). `ambient` scales how much sky light reaches the
-    // scene (interiors, caves, night); `reflections` scales the specular part.
+// Image-based light of a surface from its environment light (EnvLight: sky cube or reflection probes)
+// and the clearcoat's sharp reflection `ccEnv`, plus the stylized rim light.
+static float3 indirectSurfaceLight(SurfaceData s, float3 V, bool toon, float rim, constant FrameUniforms& f, EnvLight env,
+                                   float3 ccEnv, texture2d<float> brdfLut) {
     float ambientK = f.ground.w * 2.0;
-    float maxMip = f.extra.z;
     float NdotV = max(dot(s.N, V), 1e-4);
-    float3 irradiance = envTex.sample(cubeSampler, s.N, level(maxMip)).rgb;
     float3 indirect;
     if (toon) {
         float up = s.N.y * 0.5 + 0.5;
         float3 hemi = mix(f.ground.rgb, mix(f.skyHorizon.rgb, f.skyTop.rgb, 0.6), up);
-        indirect = (hemi * 0.6 + irradiance * 0.4) * s.albedo * ambientK * 0.5;
+        indirect = (hemi * 0.6 * ambientK * 0.5 + env.irr * 0.4) * s.albedo;
     } else {
         float3 F0 = mix(float3(0.04), s.albedo, s.metallic);
-        float3 R = reflect(-V, s.N);
-        float3 prefiltered = envTex.sample(cubeSampler, R, level(s.roughness * maxMip)).rgb;
         float2 ab = brdfLut.sample(linearClamp, float2(NdotV, 1.0 - s.roughness)).rg;
         float3 Fr = F0 * ab.x + ab.y;
         float3 kd = (1.0 - Fr) * (1.0 - s.metallic);
-        float3 diffuse = irradiance * s.albedo * kd;
+        float3 diffuse = env.irr * s.albedo * kd;
         float specOcclusion = saturate(pow(NdotV + s.ao, exp2(-16.0 * s.roughness - 1.0)) - 1.0 + s.ao);
-        float3 specular = prefiltered * Fr * f.sky.w * specOcclusion;
+        float3 specular = env.spec * Fr * specOcclusion;
         if (s.clearcoat > 0.0) {
             float Fc = 0.04 + 0.96 * pow(1.0 - NdotV, 5.0);
-            float3 ccEnv = envTex.sample(cubeSampler, reflect(-V, Ngeo), level(0.06 * maxMip)).rgb;
-            specular = specular * (1.0 - Fc * s.clearcoat) + ccEnv * Fc * s.clearcoat * f.sky.w;
+            specular = specular * (1.0 - Fc * s.clearcoat) + ccEnv * Fc * s.clearcoat;
             diffuse *= 1.0 - Fc * s.clearcoat;
         }
-        indirect = (diffuse * s.ao + specular) * ambientK * 0.5;
+        indirect = diffuse * s.ao + specular;
     }
     // Rim light (stylized sheen along silhouettes, tinted by the sky)
-        if (rim > 0.0) {
+    if (rim > 0.0) {
         float r = pow(1.0 - NdotV, 3.0) * rim;
         if (toon) r = smoothstep(0.35, 0.4, r);
         indirect += r * (mix(f.skyHorizon.rgb, f.sunColor.rgb, 0.5) + s.albedo * 0.3) * 0.6;
     }
-    return color + indirect;
+    return indirect;
+}
+
+// Direct and image-based lighting of a PBR / toon surface, before emission and fog, with the sky's
+// image-based light. Shared by meshes, instanced foliage and terrain: their reflection probes are
+// applied by the lighting resolve (Lighting.metal), so this hot path carries no probe code.
+static float3 shadeSurface(SurfaceData s, float3 Ngeo, float3 worldPos, float2 fragXY, float3 V, bool toon, float rim,
+                           constant FrameUniforms& f, const device GPULight* lights, const device uint2* clusterCells,
+                           const device uint* clusterIndices, depth2d<float> shadowAtlas, texturecube<float> envTex,
+                           texture2d<float> brdfLut, texture3d<float> cloudShape, depth2d_array<float> localShadows,
+                           uint layers = 1u) {
+    uint cluster;
+    float3 color = directSurfaceLight(s, Ngeo, worldPos, fragXY, V, toon, f, lights, clusterCells, clusterIndices, shadowAtlas,
+                                      cloudShape, localShadows, layers, cluster);
+    float3 ccEnv = 0.0;
+    if (s.clearcoat > 0.0) ccEnv = envTex.sample(cubeSampler, reflect(-V, Ngeo), level(0.06 * f.extra.z)).rgb * f.sky.w * f.ground.w;
+    EnvLight env = skyEnvLight(f, envTex, s.N, reflect(-V, s.N), s.roughness);
+    return color + indirectSurfaceLight(s, V, toon, rim, f, env, ccEnv, brdfLut);
+}
+
+// The same with reflection probes in the main pass: transparent meshes (no G-buffer for the resolve)
+// and reflection probe captures (surfaces lit by the probes' previous captures: bounce light).
+static float3 shadeSurfaceProbes(SurfaceData s, float3 Ngeo, float3 worldPos, float2 fragXY, float3 V, bool toon, float rim,
+                                 constant FrameUniforms& f, const device GPULight* lights, const device uint2* clusterCells,
+                                 const device uint* clusterIndices, depth2d<float> shadowAtlas, texturecube<float> envTex,
+                                 texture2d<float> brdfLut, texture3d<float> cloudShape, depth2d_array<float> localShadows,
+                                 constant ProbeBlock& probes, const device uint* probeClusters, texturecube_array<float> probeAtlas,
+                                 uint layers) {
+    uint cluster;
+    float3 color = directSurfaceLight(s, Ngeo, worldPos, fragXY, V, toon, f, lights, clusterCells, clusterIndices, shadowAtlas,
+                                      cloudShape, localShadows, layers, cluster);
+    float3 ccEnv = 0.0;
+    if (s.clearcoat > 0.0) {
+        float3 Rc = reflect(-V, Ngeo);
+        ccEnv = probeRadiance(probes, probeClusters, probeAtlas, cluster, worldPos, Rc, 0.06,
+                              envTex.sample(cubeSampler, Rc, level(0.06 * f.extra.z)).rgb * f.sky.w * f.ground.w, f.sky.w);
+    }
+    EnvLight env = environmentLight(f, probes, probeClusters, probeAtlas, envTex, cluster, worldPos, s.N, reflect(-V, s.N), s.roughness);
+    return color + indirectSurfaceLight(s, V, toon, rim, f, env, ccEnv, brdfLut);
 }
 
 // Height fog with a warm in-scatter toward the sun.
@@ -217,22 +252,15 @@ static MaterialSample evaluateMaterial(float3 worldPos, float3 normal, float2 uv
     return m;
 }
 
-fragment MainOut meshFragment(MeshOut in [[stage_in]],
-                              bool frontFacing [[front_facing]],
-                              constant DrawUniforms& d [[buffer(0)]],
-                              constant FrameUniforms& f [[buffer(1)]],
-                              const device GPULight* lights [[buffer(2)]],
-                              const device uint2* clusterCells [[buffer(3)]],
-                              const device uint* clusterIndices [[buffer(4)]],
-                              texture2d<float> albedoTex [[texture(0)]],
-                              depth2d<float> shadowAtlas [[texture(1)]],
-                              texture2d<float> normalTex [[texture(2)]],
-                              texture2d<float> ormTex [[texture(3)]],
-                              texture2d<float> emissiveTex [[texture(4)]],
-                              texturecube<float> envTex [[texture(5)]],
-                              texture2d<float> brdfLut [[texture(6)]],
-                              texture3d<float> cloudShape [[texture(7)]],
-                              depth2d_array<float> localShadows [[texture(32)]]) {
+// Lit meshes. kProbes: reflection probes in the main pass (meshFragmentProbes: transparent meshes and
+// probe captures); without, opaque meshes get them from the lighting resolve and the hot path stays lean.
+template <bool kProbes>
+static MainOut meshShade(MeshOut in, bool frontFacing, constant DrawUniforms& d, constant FrameUniforms& f,
+                         const device GPULight* lights, const device uint2* clusterCells, const device uint* clusterIndices,
+                         texture2d<float> albedoTex, depth2d<float> shadowAtlas, texture2d<float> normalTex, texture2d<float> ormTex,
+                         texture2d<float> emissiveTex, texturecube<float> envTex, texture2d<float> brdfLut, texture3d<float> cloudShape,
+                         depth2d_array<float> localShadows, constant ProbeBlock& probes, const device uint* probeClusters,
+                         texturecube_array<float> probeAtlas) {
     // Foliage crossfading into its impostor: complementary dither (the impostor keeps the rest).
     if (in.fade > 0.0 && ditherNoise(in.position.xy, f.temporal) < in.fade) discard_fragment();
     float3 V = normalize(f.cameraPos.xyz - in.worldPos);
@@ -307,8 +335,12 @@ fragment MainOut meshFragment(MeshOut in [[stage_in]],
 
     // Render layers of this draw (DrawUniforms.motion.y; 0 = unset, e.g. mesh particles: layer 1).
     const uint layers = d.motion.y > 0.5 ? uint(d.motion.y) : 1u;
-    float3 color = shadeSurface(s, Ngeo, in.worldPos, in.position.xy, V, toon, d.material3.z, f, lights, clusterCells,
-                                clusterIndices, shadowAtlas, envTex, brdfLut, cloudShape, localShadows, layers) + emissive;
+    float3 color = (kProbes ? shadeSurfaceProbes(s, Ngeo, in.worldPos, in.position.xy, V, toon, d.material3.z, f, lights,
+                                                 clusterCells, clusterIndices, shadowAtlas, envTex, brdfLut, cloudShape, localShadows,
+                                                 probes, probeClusters, probeAtlas, layers)
+                            : shadeSurface(s, Ngeo, in.worldPos, in.position.xy, V, toon, d.material3.z, f, lights, clusterCells,
+                                           clusterIndices, shadowAtlas, envTex, brdfLut, cloudShape, localShadows, layers)) +
+                   emissive;
     color = applyFog(color, in.worldPos, V, f);
 
 
@@ -317,6 +349,53 @@ fragment MainOut meshFragment(MeshOut in [[stage_in]],
     MainOut o = mainOut(float4(color, s.alpha), s.albedo, s.ao, s.N, s.roughness, screenSpace ? s.metallic : kGbufNoLighting);
     o.velocity = objectMotion(f, in.worldPos, in.prevWorldPos);
     return o;
+}
+
+fragment MainOut meshFragment(MeshOut in [[stage_in]],
+                              bool frontFacing [[front_facing]],
+                              constant DrawUniforms& d [[buffer(0)]],
+                              constant FrameUniforms& f [[buffer(1)]],
+                              const device GPULight* lights [[buffer(2)]],
+                              const device uint2* clusterCells [[buffer(3)]],
+                              const device uint* clusterIndices [[buffer(4)]],
+                              texture2d<float> albedoTex [[texture(0)]],
+                              depth2d<float> shadowAtlas [[texture(1)]],
+                              texture2d<float> normalTex [[texture(2)]],
+                              texture2d<float> ormTex [[texture(3)]],
+                              texture2d<float> emissiveTex [[texture(4)]],
+                              texturecube<float> envTex [[texture(5)]],
+                              texture2d<float> brdfLut [[texture(6)]],
+                              texture3d<float> cloudShape [[texture(7)]],
+                              depth2d_array<float> localShadows [[texture(32)]],
+                              constant ProbeBlock& probes [[buffer(10)]],
+                              const device uint* probeClusters [[buffer(11)]],
+                              texturecube_array<float> probeAtlas [[texture(33)]]) {
+    return meshShade<false>(in, frontFacing, d, f, lights, clusterCells, clusterIndices, albedoTex, shadowAtlas, normalTex,
+                            ormTex, emissiveTex, envTex, brdfLut, cloudShape, localShadows, probes, probeClusters, probeAtlas);
+}
+
+// Transparent meshes and reflection probe captures: probes in the main pass.
+fragment MainOut meshFragmentProbes(MeshOut in [[stage_in]],
+                                    bool frontFacing [[front_facing]],
+                                    constant DrawUniforms& d [[buffer(0)]],
+                                    constant FrameUniforms& f [[buffer(1)]],
+                                    const device GPULight* lights [[buffer(2)]],
+                                    const device uint2* clusterCells [[buffer(3)]],
+                                    const device uint* clusterIndices [[buffer(4)]],
+                                    texture2d<float> albedoTex [[texture(0)]],
+                                    depth2d<float> shadowAtlas [[texture(1)]],
+                                    texture2d<float> normalTex [[texture(2)]],
+                                    texture2d<float> ormTex [[texture(3)]],
+                                    texture2d<float> emissiveTex [[texture(4)]],
+                                    texturecube<float> envTex [[texture(5)]],
+                                    texture2d<float> brdfLut [[texture(6)]],
+                                    texture3d<float> cloudShape [[texture(7)]],
+                                    depth2d_array<float> localShadows [[texture(32)]],
+                                    constant ProbeBlock& probes [[buffer(10)]],
+                                    const device uint* probeClusters [[buffer(11)]],
+                                    texturecube_array<float> probeAtlas [[texture(33)]]) {
+    return meshShade<true>(in, frontFacing, d, f, lights, clusterCells, clusterIndices, albedoTex, shadowAtlas, normalTex,
+                           ormTex, emissiveTex, envTex, brdfLut, cloudShape, localShadows, probes, probeClusters, probeAtlas);
 }
 
 // ---------------------------------------------------------------------------

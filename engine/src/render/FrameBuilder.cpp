@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cmath>
 
+#include "skywalker/render/ReflectionProbes.h"
 #include "skywalker/render/RenderLayers.h"
 #include "skywalker/render/Renderer.h"
 
@@ -278,6 +279,7 @@ FrameData buildFrame(const Scene& scene, const ViewCamera& camera, int width, in
             li.shadowMaxDistance = l->shadowMaxDistance;
             f.lights.push_back(li);
         }
+        if (const ReflectionProbe* rp = scene.get<ReflectionProbe>(e)) f.probes.push_back(probes::makeItem(e, world, *rp));
     }
     prioritizeLights(f);
     return f;

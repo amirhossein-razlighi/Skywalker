@@ -15,7 +15,7 @@ const std::vector<DebugViewInfo>& debugViews() {
         {kReflections, "reflections", "gbuffer", "screen-space reflections only"},
         {kAo, "ao", "gbuffer", "ambient occlusion (white = open, black = occluded)"},
         {kDepth, "depth", "gbuffer", "scene depth (near bright, far dark)"},
-        {kLighting, "lighting", "gbuffer", "lit color before screen-space GI and reflections"},
+        {kLighting, "lighting", "gbuffer", "lit color before reflection probes, screen-space GI and reflections"},
         {kSketch, "sketch", "style", "pencil contours and cross-hatching"},
         {kImpostors, "impostors", "final", "final image with foliage meshes tinted green and distant impostors magenta"},
         {kWireframe, "wireframe", "final", "dark flat-shaded surfaces with every mesh triangle edge drawn in cyan (depth-tested)"},
@@ -48,6 +48,10 @@ const std::vector<DebugViewInfo>& debugViews() {
         {kShadowAtlas, "shadow_atlas", "final",
          "the local (point / spot) shadow atlas: 4 quadrants of shadow maps (near white, far dark), one outline per "
          "light view: green re-rendered this frame, blue cached, orange waiting for the update budget (shadow_atlas_info)"},
+        {kReflectionProbes, "reflection_probes", "final",
+         "which reflection probe lights each pixel: the scene tinted with each probe's color (probe_info debugColor; blends "
+         "mix their colors, gray = sky only), every influence volume outlined in its color (dashed where hidden), capture "
+         "points as dots"},
     };
     return kViews;
 }

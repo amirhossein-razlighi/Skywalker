@@ -5,7 +5,7 @@ title: "Tools"
 
 # Tools
 
-Skywalker exposes **196 tools** (engine 0.1.0). The editor, its in-app agents, the CLI and every MCP client call the same tools with the same JSON arguments, so anything you read here works everywhere. 119 tools change the project; every such change is undoable and attributed to whoever made it.
+Skywalker exposes **199 tools** (engine 0.1.0). The editor, its in-app agents, the CLI and every MCP client call the same tools with the same JSON arguments, so anything you read here works everywhere. 120 tools change the project; every such change is undoable and attributed to whoever made it.
 
 Arguments are validated before a tool runs: unknown keys, wrong types and bad enum values fail with a *did you mean …?* hint. Each tool page shows the arguments, the annotations MCP clients use for approvals, and the same call as a tool call, a CLI command and a raw MCP request.
 
@@ -15,7 +15,7 @@ Arguments are validated before a tool runs: unknown keys, wrong types and bad en
 | [Entity](entity.md) | 10 | Create, read, change, move, duplicate and delete entities; read component schemas. |
 | [History](history.md) | 1 | Undo, redo and the attributed edit history. |
 | [View](view.md) | 9 | See the scene: captures with entity boxes, debug views, multi-view sheets, selection and the editor camera. |
-| [Render](render.md) | 17 | Environment, effects, hair, shaders, render layers, impostors, benchmarks and the movie renderer. |
+| [Render](render.md) | 20 | Environment, effects, hair, shaders, render layers, impostors, benchmarks and the movie renderer. |
 | [World](world.md) | 15 | Terrain, foliage, water queries and spatial placement on real geometry. |
 | [Asset](asset.md) | 27 | The asset database, import and download, materials, textures, prefabs, audio generation and previews. |
 | [Wander](wander.md) | 9 | Write, check, test, graph and inspect Wander behaviors. |
@@ -76,6 +76,9 @@ Arguments are validated before a tool runs: unknown keys, wrong types and bad en
 | [`light_shadows`](render.md#light_shadows) | Render | Turn shadows of point/spot lights on or off and tune them, for one light, a list, or every light ("all", optionally only one kind). |
 | [`movie_render`](render.md#movie_render) | Render | Render a cinematic to video or a PNG sequence, offline and deterministically (the movie renderer). |
 | [`perf_stats`](render.md#perf_stats) | Render | Frame cost and scene complexity: GPU and CPU frame time, draw calls, lights, terrain nodes, foliage instances, entities, behaviors and assets. |
+| [`probe_add`](render.md#probe_add) | Render | Add a reflection probe: a captured cubemap that glossy floors, metal and glass inside its volume reflect instead of the sky (box-projected, so reflections line up with the walls), and that gives them their ambient light. |
+| [`probe_bake`](render.md#probe_bake) | Render | Re-capture reflection probes now (after moving furniture, changing lights or the sky): renders one still frame of `view`, which captures every invalidated probe in full regardless of the per-frame face budget, and returns their state (slot, captures, GPU time) plus warnings. |
+| [`probe_info`](render.md#probe_info) | Render | Reflection probes and their atlas: the budget (Environment.probeBudget probes, probeUpdates faces per frame), atlas resolution / slots / memory, and per probe: slot and debug color (the reflection_probes debug view draws it), whether it is captured, lighting this view, waiting for the face budget, over budget or out of view, captures so far, last capture GPU time, `stale` (something in range changed since a once probe was captured: run probe_bake), size, update mode. |
 | [`render_layers`](render.md#render_layers) | Render | Render layers (20): MeshRenderer.layers says which layers a mesh is on; Camera.cullMask and Light.cullMask say which layers a camera draws and a light illuminates (a mesh is drawn / lit when they share a layer). |
 | [`shader_get`](render.md#shader_get) | Render | The renderer's current shader source (Metal Shading Language). |
 | [`shader_set`](render.md#shader_set) | Render | Replace the renderer's shader source at runtime. |

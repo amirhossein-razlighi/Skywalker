@@ -5,7 +5,7 @@ title: "Wander builtins"
 
 # Wander builtins
 
-Every function a Wander script can call lives in one registry: name, typed parameters, return type, category, documentation and an example. The compiler checks calls against it (arity, types, did-you-mean), and this page is generated from it. **136 builtins** in 19 categories.
+Every function a Wander script can call lives in one registry: name, typed parameters, return type, category, documentation and an example. The compiler checks calls against it (arity, types, did-you-mean), and this page is generated from it. **137 builtins** in 19 categories.
 
 Agents get the same information from `wander_reference` (the guide) and `wander_reference {topic}` (structured entries for a category or a function). For the language itself, read the [Wander manual](../manual/wander/index.md).
 
@@ -25,7 +25,7 @@ Agents get the same information from `wander_reference` (the guide) and `wander_
 | [navigation](#navigation) | [`arrived`](#navigation-arrived), [`navigate`](#navigation-navigate), [`path_length`](#navigation-path_length), [`stop_navigation`](#navigation-stop_navigation) |
 | [physics](#physics) | [`impulse`](#physics-impulse), [`overlap_sphere`](#physics-overlap_sphere), [`push`](#physics-push), [`raycast`](#physics-raycast), [`torque`](#physics-torque), [`velocity`](#physics-velocity) |
 | [random](#random) | [`chance`](#random-chance), [`pick`](#random-pick), [`random`](#random-random), [`random_int`](#random-random_int), [`shuffle`](#random-shuffle) |
-| [render](#render) | [`layer_mask`](#render-layer_mask) |
+| [render](#render) | [`layer_mask`](#render-layer_mask), [`probe_bake`](#render-probe_bake) |
 | [scene](#scene) | [`add_tag`](#scene-add_tag), [`children`](#scene-children), [`count`](#scene-count), [`exists`](#scene-exists), [`find`](#scene-find), [`find_all`](#scene-find_all), [`has`](#scene-has), [`nearest`](#scene-nearest), [`remove_tag`](#scene-remove_tag), [`set_parent`](#scene-set_parent), [`spawn`](#scene-spawn), [`tagged`](#scene-tagged) |
 | [text](#text) | [`num`](#text-num), [`str`](#text-str), [`type_of`](#text-type_of), [`ends_with`](#text-ends_with), [`lower`](#text-lower), [`replace`](#text-replace), [`split`](#text-split), [`starts_with`](#text-starts_with), [`trim`](#text-trim), [`upper`](#text-upper) |
 | [time](#time) | [`is_paused`](#time-is_paused), [`pause_game`](#time-pause_game), [`resume_game`](#time-resume_game), [`teleport`](#time-teleport), [`time_scale`](#time-time_scale), [`unscaled_dt`](#time-unscaled_dt), [`unscaled_time`](#time-unscaled_time) |
@@ -1811,6 +1811,24 @@ Returns: `number`
 find("Eyes").camera.cullMask = layer_mask("world", "fx")
 ```
 
+### `probe_bake` { #render-probe_bake }
+
+```text
+probe_bake(probe: entity?)
+```
+
+Re-captures a reflection probe (or every probe without an argument) over the next rendered frames: after opening a door, switching the room's lights or rearranging furniture, so `once` probes reflect the new state. Rendering only; the simulation is unaffected.
+
+| Parameter | Type | |
+|---|---|---|
+| `probe` | entity | optional |
+
+Returns: `none`
+
+```text
+probe_bake(find("Hall Probe"))
+```
+
 ## scene { #scene }
 
 ### `add_tag` { #scene-add_tag }
@@ -2743,6 +2761,7 @@ world_position(self)
         shuffle(items: list) -> list — A shuffled copy of a list.
       [render]
         layer_mask(layers: number|string|list, ...) -> number — Render layer bitmask from layer names (game.json render.layers), layer numbers as strings ("3"), "all" / "none", or a list of names / layer numbers; several arguments are combined. Set it on mesh.layers, camera.cullMask or light.cullMask, e.g. hide the player's own body from the first-person camera.
+        probe_bake(probe: entity?) — Re-captures a reflection probe (or every probe without an argument) over the next rendered frames: after opening a door, switching the room's lights or rearranging furniture, so `once` probes reflect the new state. Rendering only; the simulation is unaffected.
       [scene]
         add_tag(e: entity, tag: string) — Adds a tag to an entity.
         children(e: entity) -> list — Direct children of an entity, in order.

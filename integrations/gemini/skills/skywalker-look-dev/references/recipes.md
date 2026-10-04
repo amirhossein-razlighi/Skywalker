@@ -54,10 +54,15 @@ fx_create {effect:"mist", position:[0,0.5,-4]}
 environment_update {preset:"studio", ambient:0.2, reflections:0.3, ao:1.3, aoRadius:0.8, gi:0.7, godRays:1, haze:0.02,
   sunElevation:35, sunAzimuth:120, sunIntensity:3, tonemap:"agx", autoExposure:true, adaptationSpeed:1.5}
 entity_create {name:"Lamp", components:{light:{kind:"point", color:"#ffb36b", intensity:14, range:10}, transform:{position:[0,2.2,0]}}}
+probe_add {name:"Room Probe", position:[0,1.5,0], interior:true}
+viewport_capture {view:"scene", samples:8, debug_view:"reflection_probes", overlays:false, annotate:false}
 ```
 
 Windows are the key light: put the sun so it enters through them and let `godRays` show the shafts. Keep sky-derived `ambient` low so
 the room is lit by the sun, bounce (`gi`) and lamps. Use warm lamps (2700 K feel, `#ffb36b`) against cool daylight for contrast.
+The interior reflection probe makes polished floors, metal and glass reflect the room instead of the sky and gives the room its own
+ambient light; after rearranging the room run `probe_bake {}`. Check `probe_info {}` for warnings (a capture point inside a mesh,
+a floor on the volume's bottom face) and look at the capture with `viewport_capture {probe:"Room Probe"}`.
 
 ## Midday clear (starting point)
 
