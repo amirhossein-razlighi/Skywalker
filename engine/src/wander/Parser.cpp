@@ -961,7 +961,9 @@ private:
         optionalWord({"then"});
         Block body = block({"elif", "else", "end"});
         s->branches.emplace_back(std::move(cond), std::move(body));
-        while (isWord("elif") || (isWord("else") && isWord("if", 1))) {
+        // `else if` on one line is an alias of `elif`; an `if` on the line after `else` opens a nested
+        // statement inside the else block (it needs its own `end`).
+        while (isWord("elif") || (isWord("else") && isWord("if", 1) && peek(1).loc.line == peek().loc.line)) {
             if (isWord("else")) next();
             next();
             auto c = expression();
