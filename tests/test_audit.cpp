@@ -311,7 +311,7 @@ TEST_CASE("mounts: game.json mounts resolve kit/ paths, scan, import and package
         REQUIRE(settings);
         auto files = game::collectGameFiles(project.string(), *settings);
         REQUIRE(files);
-        CHECK(files->files.count("kit/props/lamp.prefab.json") == 0);  // not referenced by the scene's entities (instantiated)
+        CHECK(files->files.count("kit/props/lamp.prefab.json") == 1);  // the placed instance stays linked to its prefab
         CHECK(files->files.count("kit/materials/brass.mat.json") == 1);
         CHECK(files->mounted.count("kit/materials/brass.mat.json") == 1);
         CHECK(files->missing.empty());
