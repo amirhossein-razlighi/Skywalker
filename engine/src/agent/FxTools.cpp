@@ -68,7 +68,13 @@ void addFxTools(Engine& engine, ToolRegistry& reg) {
                      Scene& s = engine.scene();
                      root = s.create(name, parent);
                      if (a.contains("position")) {
-                         if (Status r = s.patchComponent(root, "transform", Json::object({{"position", a.get("position")}})); !r) return r;
+                         // `position` is a world position: under a parent, store it in the parent's local space.
+                         Json pos = a.get("position");
+                         Vec3 world;
+                         if (parent && reflect::jsonToVec3(pos, world)) {
+                             pos = reflect::vec3ToJson(s.worldMatrix(parent).inverse().transformPoint(world));
+                         }
+                         if (Status r = s.patchComponent(root, "transform", Json::object({{"position", pos}})); !r) return r;
                      }
                      auto withOverrides = [&](Json patch) {
                          for (const auto& [k, v] : overrides.members()) patch[k] = v;
