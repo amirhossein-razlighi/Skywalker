@@ -680,7 +680,9 @@ void MetalFoliage::trackFrame(id<MTLCommandBuffer> cmd) {
     std::shared_ptr<Counters> counters = counters_;
     // Every frame's indirect arguments are checked against what they may contain; a violation
     // switches culling to the CPU path for the following frames.
-    auto checks = std::make_shared<std::vector<ArgCheck>>(gpuCull_ ? frameChecks_ : std::vector<ArgCheck>{});
+    auto checks = std::make_shared<std::vector<ArgCheck>>(frameChecks_);  // (the CPU path is checked too)
+    const char* dumpEnv = std::getenv("SKY_FOLIAGE_DUMP");
+    const bool dump = dumpEnv && *dumpEnv == '1';
     [cmd addCompletedHandler:^(id<MTLCommandBuffer>) {
         const auto* s = static_cast<const uint32_t*>(stats.contents);
         counters->meshInstances = s[0];
@@ -704,9 +706,29 @@ void MetalFoliage::trackFrame(id<MTLCommandBuffer> cmd) {
                 ok = ok && (x[0] == 4 || x[0] == 0) && x[1] <= c.instances && x[2] == 0 && static_cast<uint64_t>(x[3]) + x[1] <= c.listStride;
                 if (!ok) {
                     counters->gpuInvalid = true;
+                    std::fprintf(stderr, "[foliage] invalid indirect arguments (chunk args @%lu, view %u)\n",
+                                 static_cast<unsigned long>(c.argsOffset), v);
                     return;
                 }
             }
+        }
+        if (dump) {  // SKY_FOLIAGE_DUMP=1: summary of the validated arguments
+            uint32_t maxInst = 0, maxIdx = 0, draws = 0;
+            for (const ArgCheck& c : *checks) {
+                for (uint32_t v = 0; v < c.views; ++v) {
+                    const uint8_t* view = base + c.argsOffset + v * c.viewArgs;
+                    for (uint32_t part = 0; part < c.parts; ++part) {
+                        for (int band = 0; band < kBands; ++band) {
+                            const auto* x = reinterpret_cast<const uint32_t*>(view + meshArgsOffset(part, band));
+                            maxInst = std::max(maxInst, x[1]), maxIdx = std::max(maxIdx, x[0]), draws += x[1] ? 1 : 0;
+                        }
+                    }
+                    const auto* x = reinterpret_cast<const uint32_t*>(view + impostorArgsOffset(c.parts));
+                    maxInst = std::max(maxInst, x[1]), draws += x[1] ? 1 : 0;
+                }
+            }
+            std::fprintf(stderr, "[foliage] args ok: %zu chunks, %u non-empty draws, max instanceCount %u, max indexCount %u; stats %u %u %u %u %u\n",
+                         checks->size(), draws, maxInst, maxIdx, s[0], s[1], s[2], s[3], s[4]);
         }
     }];
 }
