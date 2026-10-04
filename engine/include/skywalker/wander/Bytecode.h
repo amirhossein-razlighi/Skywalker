@@ -122,6 +122,14 @@ struct Proto {
     std::vector<Ins> code;
     std::vector<SourceLoc> locs;  // per instruction
     std::string file;             // module path for module functions; empty = main source
+    /// Debug info (the Wander debugger): named locals and parameters, live in [startPc, endPc).
+    struct LocalVar {
+        std::string name;
+        int reg = 0;
+        size_t startPc = 0;
+        size_t endPc = 0;
+    };
+    std::vector<LocalVar> locals;
 };
 
 /// Property names resolved at compile time.
