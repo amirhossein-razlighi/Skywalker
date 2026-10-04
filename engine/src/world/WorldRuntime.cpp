@@ -48,7 +48,7 @@ std::string WorldRuntime::sourceKey(const Scene& scene, EntityId e) const {
         if (m >= 0) return "file:" + abs + "@" + std::to_string(m);
     }
     return "gen:" + std::to_string(t->resolution) + ":" + std::to_string(t->size) + ":" + t->generator.dump() + ":" +
-           t->layers.dump();
+           t->layers.dump() + ":" + t->edits.dump();
 }
 
 std::shared_ptr<TerrainData> WorldRuntime::terrain(const Scene& scene, EntityId e) {
@@ -72,6 +72,7 @@ std::shared_ptr<TerrainData> WorldRuntime::terrain(const Scene& scene, EntityId 
         TerrainGenParams p = genParamsFromJson(t->generator);
         generate(*data, p);
         autoPaint(*data, t->layers, p.seed);
+        applyEdits(*data, t->edits, t->layers, p.seed);
         // The data file is a cache of the (deterministic) generator: rebuild a missing one, with
         // its physics heightmap, so projects can leave large terrain binaries out of git.
         if (!t->data.empty() && hooks_.resolvePath) {

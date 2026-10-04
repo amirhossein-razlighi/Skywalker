@@ -107,5 +107,14 @@ enum class SculptMode { Raise, Lower, Flatten, Smooth, Noise, Set };
 void sculpt(TerrainData& t, Vec2 center, float radius, float strength, SculptMode mode, float target = 0.f,
             float falloff = 0.5f, uint32_t seed = 1);
 void paint(TerrainData& t, Vec2 center, float radius, int layer, float strength, float falloff = 0.5f);
+SculptMode sculptModeFromString(const std::string& mode);
+
+/// Applies one recorded hand edit (the terrain component's `edits` entries, local coordinates):
+/// {op: "sculpt", strokes: [{x, z, radius, strength, mode, target, falloff}]},
+/// {op: "paint", layer, strokes: [{x, z, radius, strength, falloff}]} or {op: "autopaint"}.
+void applyEdit(TerrainData& t, const Json& edit, const Json& layers, uint32_t seed);
+/// Replays every recorded edit in order, so a terrain cache rebuilt from its generator keeps its
+/// sculpting and painting.
+void applyEdits(TerrainData& t, const Json& edits, const Json& layers, uint32_t seed);
 
 }  // namespace sky::world

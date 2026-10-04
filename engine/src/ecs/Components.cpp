@@ -295,6 +295,11 @@ const TypeInfo& Terrain::type() {
                            "Material layers, base first. Each: {name, texture, normalMap, ormMap, color, roughness, tiling (m), "
                            "heightMin, heightMax, slopeMin, slopeMax, noise, sharpness}. Rules auto-paint the weights.",
                            R"({"type":"array","items":{"type":"object"}})"),
+            SKY_FIELD_JSON(Terrain, edits,
+                           "Recorded hand edits in terrain-local meters, replayed in order over the generator when the terrain "
+                           "cache is rebuilt: {op: sculpt|paint|autopaint, strokes, layer}. Written by terrain_sculpt, "
+                           "terrain_paint and terrain_layers; cleared by terrain_generate.",
+                           R"({"type":"array","items":{"type":"object"}})"),
             SKY_FIELD(Terrain, waterLevel, Float, "World height of the water line (wet sand/soil just above it)"),
             SKY_FIELD_RANGE(Terrain, wetBand, Float, "Meters above the water line that stay damp", 0.f, 20.f),
             SKY_FIELD_RANGE(Terrain, detail, Float, "Level-of-detail quality multiplier", 0.25f, 4.f),

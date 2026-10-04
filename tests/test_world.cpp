@@ -107,8 +107,29 @@ TEST_CASE("world: terrain and foliage tools, frame items and raycasts") {
     float y = 0;
     REQUIRE(e.world().terrainHeight(e.scene(), 0, 0, y));
     CHECK(y > before + 3.f);
-    r = e.callTool("terrain_undo", Json::parse(R"({"entity":"Terrain"})").value(), "agent:test");
+    // Edits are recorded on the component: a cache rebuilt from the generator keeps them.
+    REQUIRE(e.scene().get<Terrain>(terrain)->edits.size() == 1);
+    r = e.callTool("terrain_paint", Json::parse(R"({"entity":"Terrain","layer":"rock","strokes":[{"x":0,"z":0,"radius":6,"strength":1}]})").value(),
+                   "agent:test");
     REQUIRE(!r.isError);
+    CHECK(e.scene().get<Terrain>(terrain)->edits.size() == 2);
+    {
+        std::string file = e.resolvePath(e.scene().get<Terrain>(terrain)->data);
+        fs::remove(file);
+        fs::remove(fs::path(file).replace_extension(".r16"));
+        float rebuilt = 0;
+        REQUIRE(e.world().terrainHeight(e.scene(), 0, 0, rebuilt));
+        CHECK(rebuilt == doctest::Approx(y).epsilon(0.001));
+        CHECK(fs::exists(file));
+        r = e.callTool("terrain_query", Json::parse(R"({"points":[[0,0]]})").value(), "agent:test");
+        CHECK(r.structured.get("points")[size_t{0}].get("layer").asString() == "rock");
+    }
+    r = e.callTool("terrain_undo", Json::parse(R"({"entity":"Terrain"})").value(), "agent:test");  // the paint
+    REQUIRE(!r.isError);
+    CHECK(e.scene().get<Terrain>(terrain)->edits.size() == 1);
+    r = e.callTool("terrain_undo", Json::parse(R"({"entity":"Terrain"})").value(), "agent:test");  // the sculpt
+    REQUIRE(!r.isError);
+    CHECK(e.scene().get<Terrain>(terrain)->edits.size() == 0);
     REQUIRE(e.world().terrainHeight(e.scene(), 0, 0, y));
     CHECK(y == doctest::Approx(before).epsilon(0.05));
 

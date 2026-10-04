@@ -1,0 +1,270 @@
+{
+  "format": "skywalker.sequence",
+  "version": 1,
+  "name": "Tidebreak — campfire",
+  "duration": 7,
+  "tracks": [
+    {
+      "type": "property",
+      "property": "environment.sunElevation",
+      "keys": [
+        {
+          "t": 0,
+          "value": 2.6,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.sunAzimuth",
+      "keys": [
+        {
+          "t": 0,
+          "value": 18,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.sunIntensity",
+      "keys": [
+        {
+          "t": 0,
+          "value": 2.4,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.sunColor",
+      "keys": [
+        {
+          "t": 0,
+          "value": "#ffb884",
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.ambient",
+      "keys": [
+        {
+          "t": 0,
+          "value": 0.5,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.clouds",
+      "keys": [
+        {
+          "t": 0,
+          "value": 0.5,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.cloudDensity",
+      "keys": [
+        {
+          "t": 0,
+          "value": 1,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.fogColor",
+      "keys": [
+        {
+          "t": 0,
+          "value": "#a6a2b0",
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.fogDensity",
+      "keys": [
+        {
+          "t": 0,
+          "value": 6e-04,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.godRays",
+      "keys": [
+        {
+          "t": 0,
+          "value": 1.1,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.haze",
+      "keys": [
+        {
+          "t": 0,
+          "value": 0.004,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.exposureCompensation",
+      "keys": [
+        {
+          "t": 0,
+          "value": 0.1,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.look",
+      "keys": [
+        {
+          "t": 0,
+          "value": "teal_orange",
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.lookStrength",
+      "keys": [
+        {
+          "t": 0,
+          "value": 0.3,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.saturation",
+      "keys": [
+        {
+          "t": 0,
+          "value": 1,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.contrast",
+      "keys": [
+        {
+          "t": 0,
+          "value": 1.08,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.bloomIntensity",
+      "keys": [
+        {
+          "t": 0,
+          "value": 0.3,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.vignette",
+      "keys": [
+        {
+          "t": 0,
+          "value": 0.22,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.shadowSoftness",
+      "keys": [
+        {
+          "t": 0,
+          "value": 1.1,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "shot",
+      "camera": "Cam campfire",
+      "keys": [
+        {
+          "t": 0,
+          "shot": "path",
+          "duration": 7,
+          "target": [
+            -43.837,
+            2.24,
+            172.121
+          ],
+          "points": [
+            [
+              -42.595,
+              2.79,
+              167.485
+            ],
+            [
+              -43.419,
+              2.79,
+              167.339
+            ],
+            [
+              -44.255,
+              2.79,
+              167.339
+            ],
+            [
+              -45.079,
+              2.79,
+              167.485
+            ],
+            [
+              -45.866,
+              2.79,
+              167.771
+            ]
+          ],
+          "fov": 46
+        }
+      ]
+    },
+    {
+      "type": "camera",
+      "keys": [
+        {
+          "t": 0,
+          "camera": "Cam campfire"
+        }
+      ]
+    }
+  ]
+}

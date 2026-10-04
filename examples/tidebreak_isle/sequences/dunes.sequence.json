@@ -1,0 +1,260 @@
+{
+  "format": "skywalker.sequence",
+  "version": 1,
+  "name": "Tidebreak — dunes",
+  "duration": 6,
+  "tracks": [
+    {
+      "type": "property",
+      "property": "environment.sunElevation",
+      "keys": [
+        {
+          "t": 0,
+          "value": 58,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.sunAzimuth",
+      "keys": [
+        {
+          "t": 0,
+          "value": 150,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.sunIntensity",
+      "keys": [
+        {
+          "t": 0,
+          "value": 3,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.sunColor",
+      "keys": [
+        {
+          "t": 0,
+          "value": "#fff4e6",
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.ambient",
+      "keys": [
+        {
+          "t": 0,
+          "value": 0.6,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.clouds",
+      "keys": [
+        {
+          "t": 0,
+          "value": 0.32,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.cloudDensity",
+      "keys": [
+        {
+          "t": 0,
+          "value": 0.8,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.fogColor",
+      "keys": [
+        {
+          "t": 0,
+          "value": "#bcd6ee",
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.fogDensity",
+      "keys": [
+        {
+          "t": 0,
+          "value": 5e-04,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.godRays",
+      "keys": [
+        {
+          "t": 0,
+          "value": 0.25,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.haze",
+      "keys": [
+        {
+          "t": 0,
+          "value": 0.0012,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.exposureCompensation",
+      "keys": [
+        {
+          "t": 0,
+          "value": 0,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.look",
+      "keys": [
+        {
+          "t": 0,
+          "value": "vivid",
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.lookStrength",
+      "keys": [
+        {
+          "t": 0,
+          "value": 0.2,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.saturation",
+      "keys": [
+        {
+          "t": 0,
+          "value": 1.1,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.contrast",
+      "keys": [
+        {
+          "t": 0,
+          "value": 1.06,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.bloomIntensity",
+      "keys": [
+        {
+          "t": 0,
+          "value": 0.2,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.vignette",
+      "keys": [
+        {
+          "t": 0,
+          "value": 0.15,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.shadowSoftness",
+      "keys": [
+        {
+          "t": 0,
+          "value": 1.4,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "shot",
+      "camera": "Cam dunes",
+      "keys": [
+        {
+          "t": 0,
+          "shot": "path",
+          "duration": 6,
+          "target": [
+            26,
+            2.5,
+            262
+          ],
+          "points": [
+            [
+              16,
+              6.49,
+              140
+            ],
+            [
+              14,
+              4.83,
+              147
+            ],
+            [
+              12,
+              3.93,
+              154
+            ]
+          ],
+          "fov": 44
+        }
+      ]
+    },
+    {
+      "type": "camera",
+      "keys": [
+        {
+          "t": 0,
+          "camera": "Cam dunes"
+        }
+      ]
+    }
+  ]
+}
