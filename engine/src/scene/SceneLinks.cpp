@@ -92,12 +92,12 @@ EntityId Scene::findNear(std::string_view wanted, EntityId from) const {
         // 1. Inside the same prefab instance (so each copy of a prefab links to its own parts).
         EntityId inst = records_.at(from).prefab.linked() ? records_.at(from).prefab.instance : kNoEntity;
         if (inst && exists(inst)) {
-            if (EntityId e = searchWhere([&](EntityId e) { return records_.at(e).prefab.instance == inst; })) return e;
+            if (EntityId e = searchWhere([&](EntityId c) { return records_.at(c).prefab.instance == inst; })) return e;
         }
         // 2. Its own subtree, then 3. its parent's subtree (siblings and cousins).
-        if (EntityId e = searchWhere([&](EntityId e) { return isUnder(e, from); })) return e;
+        if (EntityId e = searchWhere([&](EntityId c) { return isUnder(c, from); })) return e;
         if (EntityId p = records_.at(from).parent) {
-            if (EntityId e = searchWhere([&](EntityId e) { return isUnder(e, p); })) return e;
+            if (EntityId e = searchWhere([&](EntityId c) { return isUnder(c, p); })) return e;
         }
     }
     return find(wanted);
