@@ -950,8 +950,13 @@ fragment ImpostorBakeTargets impostorBakeFragment(ImpostorBakeOut in [[stage_in]
                                                   texture2d<float> ormTex [[texture(3)]],
                                                   texture2d<float> emissiveTex [[texture(4)]]) {
     (void)sampleId;  // per-sample shading: the alpha test resolves to coverage
+    // Near-full-resolution maps: a frame texel spans many material texels, and the box-filtered
+    // alpha of coarse mips falls under the cutoff on leaf cards (the leaves vanish, leaving bare
+    // twigs). Point-like samples of the fine alpha average, over the MSAA samples and the atlas's
+    // coverage-preserving mips, to the true leaf coverage.
+    constexpr float kBakeMipBias = -6.0;
     MaterialSample m = evaluateMaterial(in.modelPos, in.normal, in.uv, in.color, frontFacing, d, albedoTex, normalTex, ormTex,
-                                        emissiveTex, true);
+                                        emissiveTex, true, kBakeMipBias);
     float depth = dot(in.modelPos - b.center.xyz, b.forward.xyz) / b.center.w;
     ImpostorBakeTargets o;
     o.albedo = float4(m.s.albedo, 1.0);

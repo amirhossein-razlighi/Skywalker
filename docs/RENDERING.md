@@ -630,6 +630,9 @@ a few triangles per tree.
   (default 12×12). Each view is an orthographic render of the bounding sphere, using
   `evaluateMaterial`, the same material code as the meshes (textures, ORM, normal maps,
   alpha test). The alpha test runs per MSAA sample, so leaf edges resolve to true coverage.
+  Material maps are sampled near full resolution (a mip bias of -6): an atlas texel spans
+  many leaf texels, and the box-filtered alpha of coarse mips falls under the cutoff, which
+  would bake bare twigs instead of foliage.
 - Two RGBA8 atlases: albedo + coverage, and model-space normal (octahedral) + depth +
   subsurface. The model's mean roughness is stored alongside.
 - CPU post-process (`render/Impostor.h`):
