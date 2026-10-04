@@ -117,6 +117,27 @@ TEST_CASE("text: layout widths, wrapping and alignment") {
     CHECK(blank.lines[1].height > 0.f);
 }
 
+TEST_CASE("text: a box sized to the text's own width never wraps it (any scale, letter spacing)") {
+    // UI 'fit' measures text at canvas scale 1 and draws it at the screen scale into a box of the
+    // measured width; float rounding must not push the last word onto a new line.
+    FontLibrary lib;
+    for (float spacing : {0.f, 0.08f, 0.16f, 0.22f}) {
+        for (const char* s : {"LANTERN OIL", "A / D  move     Space  jump     E  talk", "LIGHT MOTES", "Bellwether's Rest"}) {
+            LayoutParams p;
+            p.style.size = 14;
+            p.letterSpacing = spacing;
+            TextLayout natural = layoutText(lib, s, p);
+            for (float scale : {0.5f, 0.6666667f, 0.75f, 1.f, 1.3333333f, 2.f}) {
+                LayoutParams q = p;
+                q.style.size = 14 * scale;
+                q.maxWidth = natural.width * scale;
+                INFO(s, " spacing ", spacing, " scale ", scale);
+                CHECK(layoutText(lib, s, q).lines.size() == 1);
+            }
+        }
+    }
+}
+
 TEST_CASE("text: justify fills wrapped lines") {
     FontLibrary lib;
     LayoutParams p;
