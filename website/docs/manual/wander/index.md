@@ -237,6 +237,27 @@ guard.wander:1:1: error: unknown trigger 'foobar' [unknown_trigger]
   hint: triggers: start, tick, event "name", key "name", click (and enter/exit in states)
 ```
 
+## Debugging Wander
+
+A running game can stop *inside* a handler, before a statement, with the world frozen mid-tick. Agents drive the debugger through tools: set a breakpoint by script and line (with an optional condition, hit count, entity filter, or a log message that never stops), step the game, then read the stack and evaluate expressions while it waits.
+
+```tool
+wander_break_set {"script": "Guard", "line": 12, "condition": "hp <= 0"}
+sim_control {"action": "step", "ticks": 120}
+wander_debug_state {}
+wander_stack {}
+wander_eval {"expression": "distance(self, target)"}
+wander_set_var {"name": "hp", "value": 10}
+wander_step {"mode": "over"}
+wander_continue {}
+wander_break_clear {}
+```
+
+- `wander_break_set {"on_error": true}` stops at a runtime error with the failing frame intact; `wander_pause` stops at the next statement any behavior runs.
+- While a tick is held, nothing advances: no ticks, timers, physics or play time, and tools that change the world answer `paused_in_debugger` while reading tools keep working. Resuming continues the same statement of the same tick, so a run that stopped at breakpoints ends in exactly the state of one that did not; save games and scene changes requested in that tick still happen at its end.
+- `sim_control {"action": "stop"}` while paused abandons the tick and restores the edited scene.
+- With no breakpoints, stepping or break-on-error, the debugger costs nothing measurable.
+
 ## Pitfalls
 
 - Events sent with `emit` arrive on the **next** tick, and `destroy` takes effect at the end of the tick. Tests wait

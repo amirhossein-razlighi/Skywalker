@@ -5,7 +5,7 @@ title: "Tools"
 
 # Tools
 
-Skywalker exposes **222 tools** (engine 0.1.0). The editor, its in-app agents, the CLI and every MCP client call the same tools with the same JSON arguments, so anything you read here works everywhere. 132 tools change the project; every such change is undoable and attributed to whoever made it.
+Skywalker exposes **232 tools** (engine 0.1.0). The editor, its in-app agents, the CLI and every MCP client call the same tools with the same JSON arguments, so anything you read here works everywhere. 133 tools change the project; every such change is undoable and attributed to whoever made it.
 
 Arguments are validated before a tool runs: unknown keys, wrong types and bad enum values fail with a *did you mean …?* hint. Each tool page shows the arguments, the annotations MCP clients use for approvals, and the same call as a tool call, a CLI command and a raw MCP request.
 
@@ -18,7 +18,7 @@ Arguments are validated before a tool runs: unknown keys, wrong types and bad en
 | [Render](render.md) | 27 | Environment, effects, hair, shaders, render layers, impostors, benchmarks and the movie renderer. |
 | [World](world.md) | 15 | Terrain, foliage, water queries and spatial placement on real geometry. |
 | [Asset](asset.md) | 27 | The asset database, import and download, materials, textures, prefabs, audio generation and previews. |
-| [Wander](wander.md) | 9 | Write, check, test, graph and inspect Wander behaviors. |
+| [Wander](wander.md) | 19 | Write, check, test, graph and inspect Wander behaviors. |
 | [Code](code.md) | 4 | Native code: ahead-of-time compiled behaviors and C++ modules (trusted local code; clients ask first). |
 | [Simulation](sim.md) | 14 | Play, pause, step and stop; inject input; trace and inspect what runs. |
 | [Physics](physics.md) | 12 | Rigid bodies, characters, queries, settling and navigation meshes. |
@@ -141,9 +141,19 @@ Arguments are validated before a tool runs: unknown keys, wrong types and bad en
 | [`behavior_remove`](wander.md#behavior_remove) | Wander | Remove a named behavior from an entity. |
 | [`behavior_set`](wander.md#behavior_set) | Wander | Create or replace a named behavior on an entity: its natural-language `intent` (the human source of truth), an optional structured `spec` derived from the intent ({summary, rules: [{text, tests: [test names]}]}), and the Wander `source`. |
 | [`behavior_spec`](wander.md#behavior_spec) | Wander | The intent -&gt; spec -&gt; code view of a behavior: its intent, the stored spec (rules an agent derived from the intent, each naming the tests that verify it), what the code declares (triggers, states, tunable params with ranges and current per-entity values, vars, functions, tests), and coverage (rules without tests, tests without rules). |
+| [`wander_break_clear`](wander.md#wander_break_clear) | Wander | Removes breakpoints: one by id, every breakpoint of a script, or all (no arguments). |
+| [`wander_break_list`](wander.md#wander_break_list) | Wander | Breakpoints and logpoints with their script, line (and the line asked for when it moved), condition, hit condition, hits so far, whether a compiled script has code there, plus break-on-error. |
+| [`wander_break_set`](wander.md#wander_break_set) | Wander | Stops the running game at a line of a behavior script so you can inspect it (wander_stack, wander_eval). |
 | [`wander_check`](wander.md#wander_check) | Wander | Compile Wander source without attaching it, exactly as the engine would run it (components, builtins, `use`d modules from the project). |
+| [`wander_continue`](wander.md#wander_continue) | Wander | Resumes a game paused in the Wander debugger. |
+| [`wander_debug_state`](wander.md#wander_debug_state) | Wander | Whether the game is paused in the Wander debugger, why (breakpoint, step, pause, error with its message) and where (script, line, function, entity, state), plus the breakpoints. |
+| [`wander_eval`](wander.md#wander_eval) | Wander | Evaluates a Wander expression in a paused frame (0 = innermost): its locals, arguments, the behavior's vars, `self` and every read-only builtin are available ("distance(self, target)", "items.length"). |
 | [`wander_inspect`](wander.md#wander_inspect) | Wander | While playing: the runtime state of an entity's behaviors — current state of each state machine and how long it has been active, handlers waiting in `wait` (and for how long), plus the entity's vars. |
+| [`wander_pause`](wander.md#wander_pause) | Wander | Stops at the next statement any behavior runs (the game is frozen mid-tick there; resume with wander_continue). |
 | [`wander_reference`](wander.md#wander_reference) | Wander | The Wander 2 guide for writing behaviors: syntax, triggers, statements, idioms, and every builtin function with its signature (generated from the builtin registry, including subsystem and native-module builtins). |
+| [`wander_set_var`](wander.md#wander_set_var) | Wander | Changes a local, an argument or one of the entity's vars in a paused frame, then the behavior continues with it (test a fix without restarting). |
+| [`wander_stack`](wander.md#wander_stack) | Wander | The paused behavior's call stack, innermost first: function, script, line and column, entity, behavior and state, each frame's arguments and locals (value and display text), the entity's vars, and globals (time, frame, dt). |
+| [`wander_step`](wander.md#wander_step) | Wander | Steps a paused behavior: over (the next statement of this function; calls run through), into (the next statement anywhere, entering called functions), out (back in the caller). |
 | [`wander_test`](wander.md#wander_test) | Wander | Run the `test "..."` blocks of a behavior in a sandbox simulation (the real scene is never touched): each test gets a fresh world, ticks once (on start ran), then runs with self = the entity under test; `wait` advances the simulation at 1/60 s, `emit`/`press`/`hold`/`release`/`click` inject input, and `expect` reports failures with the compared values. |
 | [`native_build`](code.md#native_build) | Code | Compile the project's native C++ module (native/*.cpp against skywalker/native/sdk.h, plus flags, include dirs, libraries, frameworks and pkg-config packages from native/module.json) into a library with the system clang++, then load it: its builtins become callable from every behavior (they appear in wander_reference) and its systems run every tick while playing. |
 | [`native_list`](code.md#native_list) | Code | Status of the project's native code: whether native sources exist, the C++ compiler, the last build and its diagnostics, the loaded module with its builtins (signatures) and systems, and behaviors running as AOT-compiled native code. |

@@ -7,7 +7,7 @@ title: "Wander tools"
 
 Write, check, test, graph and inspect Wander behaviors.
 
-9 tools in the `wander` category. Badges: **read-only** tools never change the project; **mutating** tools are undoable and attributed; **open-world** tools reach outside the engine and MCP clients ask before running them.
+19 tools in the `wander` category. Badges: **read-only** tools never change the project; **mutating** tools are undoable and attributed; **open-world** tools reach outside the engine and MCP clients ask before running them.
 
 | Tool | Summary |
 |---|---|
@@ -20,6 +20,16 @@ Write, check, test, graph and inspect Wander behaviors.
 | [`behavior_graph`](#behavior_graph) | Visual node graph of a behavior (or raw `source`): bodies (handlers, fns, tests, state handlers) with an entry node, exec-flow statement nodes wired by exec pins (if: then/elif/else; loops: body), expression nodes wired into data pins, and literals/names inline on pins (`value`). |
 | [`behavior_from_graph`](#behavior_from_graph) | Turn a node graph (from behavior_graph, possibly edited) back into Wander source. |
 | [`wander_inspect`](#wander_inspect) | While playing: the runtime state of an entity's behaviors — current state of each state machine and how long it has been active, handlers waiting in `wait` (and for how long), plus the entity's vars. |
+| [`wander_break_set`](#wander_break_set) | Stops the running game at a line of a behavior script so you can inspect it (wander_stack, wander_eval). |
+| [`wander_break_clear`](#wander_break_clear) | Removes breakpoints: one by id, every breakpoint of a script, or all (no arguments). |
+| [`wander_break_list`](#wander_break_list) | Breakpoints and logpoints with their script, line (and the line asked for when it moved), condition, hit condition, hits so far, whether a compiled script has code there, plus break-on-error. |
+| [`wander_debug_state`](#wander_debug_state) | Whether the game is paused in the Wander debugger, why (breakpoint, step, pause, error with its message) and where (script, line, function, entity, state), plus the breakpoints. |
+| [`wander_continue`](#wander_continue) | Resumes a game paused in the Wander debugger. |
+| [`wander_step`](#wander_step) | Steps a paused behavior: over (the next statement of this function; calls run through), into (the next statement anywhere, entering called functions), out (back in the caller). |
+| [`wander_pause`](#wander_pause) | Stops at the next statement any behavior runs (the game is frozen mid-tick there; resume with wander_continue). |
+| [`wander_stack`](#wander_stack) | The paused behavior's call stack, innermost first: function, script, line and column, entity, behavior and state, each frame's arguments and locals (value and display text), the entity's vars, and globals (time, frame, dt). |
+| [`wander_eval`](#wander_eval) | Evaluates a Wander expression in a paused frame (0 = innermost): its locals, arguments, the behavior's vars, `self` and every read-only builtin are available ("distance(self, target)", "items.length"). |
+| [`wander_set_var`](#wander_set_var) | Changes a local, an argument or one of the entity's vars in a paused frame, then the behavior continues with it (test a fix without restarting). |
 
 ### `wander_reference` { #wander_reference }
 
@@ -396,6 +406,398 @@ While playing: the runtime state of an entity's behaviors — current state of e
         "name": "wander_inspect",
         "arguments": {
           "entity": "Guard"
+        }
+      }
+    }
+    ```
+
+### `wander_break_set` { #wander_break_set }
+
+**Set a Wander breakpoint** <span class="sky-badge sky-badge--ro" title="Never changes the scene">read-only</span>
+
+Stops the running game at a line of a behavior script so you can inspect it (wander_stack, wander_eval). `script` is the behavior's script name as in behavior_set (or a used module path, "scripts/ai.wander"); omit it to stop in any script at that line. The breakpoint moves to the first line with code. Options: condition (a Wander expression over the frame's locals and vars: "hp < 3"), hit_count ("5" = the 5th hit, ">=5", "%10"), log (a logpoint: logs "hp={hp}" instead of stopping), entity (only that entity). on_error: true stops at any runtime error instead (line not needed). Costs nothing until set. Example: {"script": "Guard", "line": 12, "condition": "hp <= 0"}.
+
+| Argument | Type | Required | Description | Values |
+|---|---|---|---|---|
+| `script` | string |  | Behavior script name (behavior_set name) or module path; omit for any script |  |
+| `line` | integer |  | 1-based line |  |
+| `condition` | string |  | Stop only when this Wander expression is true |  |
+| `hit_count` | string |  | "N" (the Nth hit), "&gt;=N", "%N" |  |
+| `log` | string |  | Logpoint message with {expressions}; never stops |  |
+| `entity` | integer \| string |  | Only stop for this entity |  |
+| `on_error` | boolean |  | Stop at runtime errors (true) or not (false) |  |
+
+=== "Tool call"
+
+    ```tool
+    wander_break_set {"script": "Guard", "line": 12, "condition": "hp <= 0"}
+    ```
+
+=== "CLI"
+
+    ```bash
+    skywalker call wander_break_set '{"script": "Guard", "line": 12, "condition": "hp <= 0"}' --project my_game
+    ```
+
+=== "MCP request"
+
+    ```json
+    {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "method": "tools/call",
+      "params": {
+        "name": "wander_break_set",
+        "arguments": {
+          "script": "Guard",
+          "line": 12,
+          "condition": "hp <= 0"
+        }
+      }
+    }
+    ```
+
+### `wander_break_clear` { #wander_break_clear }
+
+**Clear Wander breakpoints** <span class="sky-badge sky-badge--ro" title="Never changes the scene">read-only</span>
+
+Removes breakpoints: one by id, every breakpoint of a script, or all (no arguments). on_error: false also stops breaking on errors. With no breakpoints left the debugger costs nothing again. Example: {"id": 2}.
+
+| Argument | Type | Required | Description | Values |
+|---|---|---|---|---|
+| `id` | integer |  | Breakpoint id (wander_break_list) |  |
+| `script` | string |  | Every breakpoint of this script |  |
+| `on_error` | boolean |  | false: stop breaking on runtime errors |  |
+
+=== "Tool call"
+
+    ```tool
+    wander_break_clear {"id": 2}
+    ```
+
+=== "CLI"
+
+    ```bash
+    skywalker call wander_break_clear '{"id": 2}' --project my_game
+    ```
+
+=== "MCP request"
+
+    ```json
+    {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "method": "tools/call",
+      "params": {
+        "name": "wander_break_clear",
+        "arguments": {
+          "id": 2
+        }
+      }
+    }
+    ```
+
+### `wander_break_list` { #wander_break_list }
+
+**List Wander breakpoints** <span class="sky-badge sky-badge--ro" title="Never changes the scene">read-only</span>
+
+Breakpoints and logpoints with their script, line (and the line asked for when it moved), condition, hit condition, hits so far, whether a compiled script has code there, plus break-on-error.
+
+Takes no arguments.
+
+=== "Tool call"
+
+    ```tool
+    wander_break_list {}
+    ```
+
+=== "CLI"
+
+    ```bash
+    skywalker call wander_break_list '{}' --project my_game
+    ```
+
+=== "MCP request"
+
+    ```json
+    {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "method": "tools/call",
+      "params": {
+        "name": "wander_break_list",
+        "arguments": {}
+      }
+    }
+    ```
+
+### `wander_debug_state` { #wander_debug_state }
+
+**Wander debugger state** <span class="sky-badge sky-badge--ro" title="Never changes the scene">read-only</span>
+
+Whether the game is paused in the Wander debugger, why (breakpoint, step, pause, error with its message) and where (script, line, function, entity, state), plus the breakpoints. wait_ms waits for the next stop when running (agent connections; the game must be playing). Example: {"wait_ms": 5000}.
+
+| Argument | Type | Required | Description | Values |
+|---|---|---|---|---|
+| `wait_ms` | integer |  | Wait up to this long for the next stop (0 = answer now) |  |
+
+=== "Tool call"
+
+    ```tool
+    wander_debug_state {"wait_ms": 5000}
+    ```
+
+=== "CLI"
+
+    ```bash
+    skywalker call wander_debug_state '{"wait_ms": 5000}' --project my_game
+    ```
+
+=== "MCP request"
+
+    ```json
+    {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "method": "tools/call",
+      "params": {
+        "name": "wander_debug_state",
+        "arguments": {
+          "wait_ms": 5000
+        }
+      }
+    }
+    ```
+
+### `wander_continue` { #wander_continue }
+
+**Continue (Wander debugger)** <span class="sky-badge sky-badge--ro" title="Never changes the scene">read-only</span>
+
+Resumes a game paused in the Wander debugger. It runs until the next stop or the end of the ticks in progress, then answers with the debugger state; wait_ms keeps waiting for the next stop on agent connections. Example: {"wait_ms": 2000}.
+
+| Argument | Type | Required | Description | Values |
+|---|---|---|---|---|
+| `wait_ms` | integer |  | Then wait up to this long for the next stop |  |
+
+=== "Tool call"
+
+    ```tool
+    wander_continue {"wait_ms": 2000}
+    ```
+
+=== "CLI"
+
+    ```bash
+    skywalker call wander_continue '{"wait_ms": 2000}' --project my_game
+    ```
+
+=== "MCP request"
+
+    ```json
+    {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "method": "tools/call",
+      "params": {
+        "name": "wander_continue",
+        "arguments": {
+          "wait_ms": 2000
+        }
+      }
+    }
+    ```
+
+### `wander_step` { #wander_step }
+
+**Step (Wander debugger)** <span class="sky-badge sky-badge--ro" title="Never changes the scene">read-only</span>
+
+Steps a paused behavior: over (the next statement of this function; calls run through), into (the next statement anywhere, entering called functions), out (back in the caller). When the handler ends, the step stops at the next statement any behavior runs. Answers with where it stopped. Example: {"mode": "into"}.
+
+| Argument | Type | Required | Description | Values |
+|---|---|---|---|---|
+| `mode` | string |  | over (default), into or out | `over` `into` `out` |
+| `wait_ms` | integer |  | Wait up to this long for the stop |  |
+
+=== "Tool call"
+
+    ```tool
+    wander_step {"mode": "into"}
+    ```
+
+=== "CLI"
+
+    ```bash
+    skywalker call wander_step '{"mode": "into"}' --project my_game
+    ```
+
+=== "MCP request"
+
+    ```json
+    {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "method": "tools/call",
+      "params": {
+        "name": "wander_step",
+        "arguments": {
+          "mode": "into"
+        }
+      }
+    }
+    ```
+
+### `wander_pause` { #wander_pause }
+
+**Pause behaviors (Wander debugger)** <span class="sky-badge sky-badge--ro" title="Never changes the scene">read-only</span>
+
+Stops at the next statement any behavior runs (the game is frozen mid-tick there; resume with wander_continue). Unlike sim_control pause it stops inside the code, so wander_stack shows where each behavior is. wait_ms waits for the stop on agent connections. Example: {"wait_ms": 1000}.
+
+| Argument | Type | Required | Description | Values |
+|---|---|---|---|---|
+| `wait_ms` | integer |  | Wait up to this long for the stop |  |
+
+=== "Tool call"
+
+    ```tool
+    wander_pause {"wait_ms": 1000}
+    ```
+
+=== "CLI"
+
+    ```bash
+    skywalker call wander_pause '{"wait_ms": 1000}' --project my_game
+    ```
+
+=== "MCP request"
+
+    ```json
+    {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "method": "tools/call",
+      "params": {
+        "name": "wander_pause",
+        "arguments": {
+          "wait_ms": 1000
+        }
+      }
+    }
+    ```
+
+### `wander_stack` { #wander_stack }
+
+**Wander call stack** <span class="sky-badge sky-badge--ro" title="Never changes the scene">read-only</span>
+
+The paused behavior's call stack, innermost first: function, script, line and column, entity, behavior and state, each frame's arguments and locals (value and display text), the entity's vars, and globals (time, frame, dt). Example: {"vars": true}.
+
+| Argument | Type | Required | Description | Values |
+|---|---|---|---|---|
+| `vars` | boolean |  | Include args, locals and vars (default true) |  |
+
+=== "Tool call"
+
+    ```tool
+    wander_stack {"vars": true}
+    ```
+
+=== "CLI"
+
+    ```bash
+    skywalker call wander_stack '{"vars": true}' --project my_game
+    ```
+
+=== "MCP request"
+
+    ```json
+    {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "method": "tools/call",
+      "params": {
+        "name": "wander_stack",
+        "arguments": {
+          "vars": true
+        }
+      }
+    }
+    ```
+
+### `wander_eval` { #wander_eval }
+
+**Evaluate in a paused frame** <span class="sky-badge sky-badge--ro" title="Never changes the scene">read-only</span>
+
+Evaluates a Wander expression in a paused frame (0 = innermost): its locals, arguments, the behavior's vars, `self` and every read-only builtin are available ("distance(self, target)", "items.length"). Watch expressions: call it at each stop. Read-only: assignments to the scene fail (use wander_set_var). Example: {"expression": "hp * 2 + bonus", "frame": 0}.
+
+| Argument | Type | Required | Description | Values |
+|---|---|---|---|---|
+| `expression` | string | yes | Wander expression |  |
+| `frame` | integer |  | Frame index (0 = innermost) |  |
+
+=== "Tool call"
+
+    ```tool
+    wander_eval {"expression": "hp * 2 + bonus", "frame": 0}
+    ```
+
+=== "CLI"
+
+    ```bash
+    skywalker call wander_eval '{"expression": "hp * 2 + bonus", "frame": 0}' --project my_game
+    ```
+
+=== "MCP request"
+
+    ```json
+    {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "method": "tools/call",
+      "params": {
+        "name": "wander_eval",
+        "arguments": {
+          "expression": "hp * 2 + bonus",
+          "frame": 0
+        }
+      }
+    }
+    ```
+
+### `wander_set_var` { #wander_set_var }
+
+**Set a variable while paused** <span class="sky-badge sky-badge--mut" title="Changes the project; undoable and attributed">mutating</span>
+
+Changes a local, an argument or one of the entity's vars in a paused frame, then the behavior continues with it (test a fix without restarting). The value is JSON ([x, y, z] is a vector). Example: {"name": "hp", "value": 10}.
+
+| Argument | Type | Required | Description | Values |
+|---|---|---|---|---|
+| `name` | string | yes | Variable name |  |
+| `value` | any | yes | New value (JSON) |  |
+| `frame` | integer |  | Frame index (0 = innermost) |  |
+
+=== "Tool call"
+
+    ```tool
+    wander_set_var {"name": "hp", "value": 10}
+    ```
+
+=== "CLI"
+
+    ```bash
+    skywalker call wander_set_var '{"name": "hp", "value": 10}' --project my_game
+    ```
+
+=== "MCP request"
+
+    ```json
+    {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "method": "tools/call",
+      "params": {
+        "name": "wander_set_var",
+        "arguments": {
+          "name": "hp",
+          "value": 10
         }
       }
     }
