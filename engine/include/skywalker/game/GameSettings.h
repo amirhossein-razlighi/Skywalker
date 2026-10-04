@@ -55,6 +55,10 @@ struct GameSettings {
     Json saves;
     // Localization: "localization": {"source": "en", "locale": "fr", "useSystemLocale": true} (locale/Localization.h)
     Json localization;
+    // Runtime scene flow (game/SceneFlow.h): "scenes": {"menu": "scenes/menu.sky.json"} aliases and
+    // "sceneFlow": {"persistent": [...], "loadingScene": "loading", "transition": {"kind": "fade", "duration": 0.4}}
+    Json scenes;
+    Json sceneFlow;
 
     bool fromFile = false;  // a game.json was found
 

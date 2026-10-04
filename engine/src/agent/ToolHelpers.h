@@ -81,5 +81,6 @@ void addCharacterTools(Engine& engine, ToolRegistry& reg);  // CharacterTools.cp
 Json characterPerfStats(Engine& engine, double groomRenderMs = -1.0);
 void addSaveTools(Engine& engine, ToolRegistry& reg);    // SaveTools.cpp: save_game, load_game, save_list, save_inspect, save_delete
 void addLocaleTools(Engine& engine, ToolRegistry& reg);  // LocaleTools.cpp: locale_list, locale_set, locale_check, locale_extract, locale_pseudo
+void addSceneFlowTools(Engine& engine, ToolRegistry& reg);  // SceneFlowTools.cpp: scene_flow_info, scene_change, scene_additive_*
 
 }  // namespace sky::tools

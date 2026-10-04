@@ -104,6 +104,7 @@ void Scene::registerKinds() {
     kinds_.push_back(makeReflectedKind<Particles2D>());  // pixel-art 2D particles (ecs/Particles2D.h)
     kinds_.push_back(makeReflectedKind<CharacterIk>());  // foot / hand IK, turn in place (docs/CHARACTERS.md)
     kinds_.push_back(makeReflectedKind<Persist>());  // save games (game/SaveGame.h)
+    kinds_.push_back(makeReflectedKind<Persistent>());  // runtime scene changes (game/SceneFlow.h)
 }
 
 const ComponentKind* Scene::componentKind(std::string_view n) const {

@@ -11,6 +11,7 @@
 #include "skywalker/ecs/Components.h"
 #include "skywalker/game/SaveGame.h"
 #include "skywalker/locale/Localization.h"
+#include "skywalker/game/SceneFlow.h"
 
 namespace sky::game {
 
@@ -153,7 +154,7 @@ Result<GameSettings> GameSettings::fromJson(const Json& j) {
     static const std::vector<std::string> keys{"id", "title", "genre", "mood", "pitch", "assets", "startScene", "window", "quality",
                                                "renderScale", "quitOnEscape", "pauseOnFocusLoss", "icon", "bundleId",
                                                "version", "copyright", "include", "exclude", "render", "mounts",
-                                               "saves", "localization"};
+                                               "saves", "localization", "scenes", "sceneFlow"};
     if (Status s = checkKeys(j, "game.json", keys); !s) return s.error();
     for (auto [key, out] : std::initializer_list<std::pair<const char*, std::string*>>{
              {"id", &g.id}, {"title", &g.title}, {"genre", &g.genre}, {"mood", &g.mood}, {"pitch", &g.pitch}, {"assets", &g.assets},
@@ -224,6 +225,12 @@ Result<GameSettings> GameSettings::fromJson(const Json& j) {
         if (!settings) return settings.error();
         g.localization = *lo;
     }
+    if (j.contains("scenes") || j.contains("sceneFlow")) {  // runtime scene flow: validated by SceneFlowSettings
+        auto flow = SceneFlowSettings::fromJson(j.get("scenes"), j.get("sceneFlow"));
+        if (!flow) return flow.error();
+        g.scenes = j.get("scenes");
+        g.sceneFlow = j.get("sceneFlow");
+    }
 
     if (!validVersion(g.version)) {
         return Error::make("invalid_game_json", "version '" + g.version + "' must be digits separated by dots", "e.g. \"1.0.0\"");
@@ -293,6 +300,8 @@ Json GameSettings::toJson() const {
     }
     if (Json layers = renderLayers.toJson(); !layers.members().empty()) j["render"] = Json::object({{"layers", layers}});
     if (!localization.isNull()) j["localization"] = localization;
+    if (!scenes.isNull()) j["scenes"] = scenes;
+    if (!sceneFlow.isNull()) j["sceneFlow"] = sceneFlow;
     return j;
 }
 

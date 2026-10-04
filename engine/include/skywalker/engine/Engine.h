@@ -59,6 +59,7 @@ class Job;
 }
 namespace game {
 class SaveSystem;
+class SceneFlow;
 }
 
 /// Registers the engine's Wander builtins (effects, water, and every subsystem's) in the
@@ -344,6 +345,11 @@ public:
 
     // --- Save games (docs/SAVE_GAMES.md) ------------------------------------------------
     game::SaveSystem& saves() { return *saves_; }
+    // --- Runtime scene flow (docs/SCENE_FLOW.md) ----------------------------------------
+    game::SceneFlow& sceneFlow() { return *sceneFlow_; }
+    /// Loads a mesh for a scene about to appear: through the background streaming when real-time frames
+    /// stream meshes, otherwise now. True once it is ready.
+    bool preloadMesh(const std::string& meshKey);
 
     // --- Movie renderer (docs/MOVIE_RENDER.md) ------------------------------------------
     /// Renders a movie to completion on this thread; `progress` (and "movie_progress" events) report each frame.
@@ -519,6 +525,7 @@ private:
     std::shared_ptr<ToolHost> toolHost_ = std::make_shared<ToolHost>(tools_);
     std::unique_ptr<CustomTools> customTools_;  // custom & external tools (agent/CustomTools.h)
     std::unique_ptr<game::SaveSystem> saves_;   // save games (game/SaveGame.h)
+    std::unique_ptr<game::SceneFlow> sceneFlow_;  // runtime scene changes (game/SceneFlow.h)
 };
 
 void registerEngineTools(Engine& engine);

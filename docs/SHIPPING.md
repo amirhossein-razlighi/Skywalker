@@ -85,6 +85,7 @@ typo never silently ships the wrong thing.
 | `mounts` | none | `{"kit": "../_kit"}`: shared folders outside the project, addressed as `kit/...` ([ASSETS](ASSETS.md#shared-kits-mounts-in-gamejson)). Names are letters, digits, `_` and `-`. |
 | `saves` | version 1, 20 slots | `{"version": 2, "maxSlots": 20, "compress": false, "migrate": "scripts/save_migrate.wander"}`: save games ([SAVE_GAMES](SAVE_GAMES.md)). A shipped app keeps its saves in `~/Library/Application Support/<id>/saves`. |
 | `localization` | source `en` | `{"source": "en", "locale": "fr", "useSystemLocale": true, "maxLengthRatio": 1.3}`: the game's language and whether a shipped game follows the player's system locale ([LOCALIZATION](LOCALIZATION.md)). |
+| `scenes`, `sceneFlow` | none | `"scenes": {"menu": "scenes/menu.sky.json"}` names scenes for `change_scene`; `"sceneFlow": {"persistent": [...], "loadingScene": "...", "transition": {"kind": "fade", "duration": 0.4}}` ([SCENE_FLOW](SCENE_FLOW.md)). |
 
 Command-line flags of the player and `skywalker build` override the file.
 

@@ -1239,6 +1239,7 @@ void registerEngineTools(Engine& engine) {
     tools::addCharacterTools(engine, reg);  // engine/src/agent/CharacterTools.cpp: character_inspect, character_ik, animation_retarget
     tools::addSaveTools(engine, reg);    // engine/src/agent/SaveTools.cpp (save games, docs/SAVE_GAMES.md)
     tools::addLocaleTools(engine, reg);  // engine/src/agent/LocaleTools.cpp (localization, docs/LOCALIZATION.md)
+    tools::addSceneFlowTools(engine, reg);  // engine/src/agent/SceneFlowTools.cpp (runtime scene changes, docs/SCENE_FLOW.md)
 }
 
 }  // namespace sky

@@ -18,6 +18,7 @@ void registerVehicleBuiltins(wander::BuiltinRegistry& reg);      // VehicleBuilt
 void registerCharacterBuiltins(wander::BuiltinRegistry& reg);  // CharacterBuiltins.cpp: hand_ik, foot_ik, turn_in_place, look_at
 void registerSaveBuiltins(wander::BuiltinRegistry& reg);  // game/SaveBuiltins.cpp: save_game, load_game, game_var
 void registerLocaleBuiltins(wander::BuiltinRegistry& reg);  // locale/LocaleBuiltins.cpp: tr, set_locale, locale, locales
+void registerSceneFlowBuiltins(wander::BuiltinRegistry& reg);  // game/SceneFlowBuiltins.cpp: change_scene, load_additive...
 
 namespace {
 
@@ -174,6 +175,7 @@ void registerEngineBuiltins() {
         registerCharacterBuiltins(reg);  // character IK and turning (CharacterBuiltins.cpp)
         registerSaveBuiltins(reg);  // save games (game/SaveBuiltins.cpp)
         registerLocaleBuiltins(reg);  // localization (locale/LocaleBuiltins.cpp)
+        registerSceneFlowBuiltins(reg);  // runtime scene flow (game/SceneFlowBuiltins.cpp)
     });
 }
 

@@ -365,3 +365,4 @@ struct Environment {
 #include "skywalker/ecs/Particles2D.h"  // particles2d: pixel-art 2D particles (weather, leaves, fireflies)
 #include "skywalker/ecs/CharacterComponents.h"  // characterIk: foot planting, hand targets, turn in place
 #include "skywalker/ecs/PersistComponent.h"  // persist: what save games keep (docs/SAVE_GAMES.md)
+#include "skywalker/ecs/PersistentComponent.h"  // persistent: survives runtime scene changes (docs/SCENE_FLOW.md)

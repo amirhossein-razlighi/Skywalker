@@ -147,6 +147,25 @@ Also `has_save(slot)`, `list_saves()`, `delete_save(slot)`, `on saved`, `on even
 `load_game {slot:"t"}`, then `save_inspect {slot:"t"}`: every persisted entity must read `same`; `differs` rows name the fields that did not restore. `save_list` shows slots and
 damaged files. When the shape of saved data changes, bump `game.json` `saves.version` and add `fn migrate(from, data)` (`saves.migrate`).
 
+## Moving between scenes (menus, levels, rooms)
+
+Engine doc: `skywalker://docs/SCENE_FLOW`. `change_scene("level2", {transition: "fade", duration: 0.5, spawn_at: "Door_West"})` (a game.json `scenes` alias or a `.sky.json` path)
+replaces the world at the end of the tick; entities with a `persistent` component (`{id: "gm"}`, `spawn: true` for the player) carry over with their behaviors still running, and
+the next scene's copy of the same manager gives way. Sub-scenes: `let room = load_additive("rooms/cellar", {offset: (40, 0, 0)})`, `unload_scene(room)` (removes exactly what it
+loaded). `current_scene()`, `loading_progress()` (for a loading scene's bar), `on scene_unloading` (data.to) / `on scene_loaded` (data.id). New scenes get fresh entity ids.
+
+```text
+sim_control {action:"play"}
+scene_change {scene:"level1", transition:"fade", spawn_at:"Spawn"}
+sim_control {action:"step", ticks:60}
+scene_flow_info {}
+scene_additive_load {scene:"rooms/cellar", offset:[40, 0, 0]}
+scene_additive_unload {handle:"cellar"}
+sim_control {action:"stop"}
+```
+
+Stopping play always returns the editor to the scene that was open when play started.
+
 ## Graph view and specs
 
 `behavior_graph {entity, name, palette:true}` returns a visual node graph (`format: wander-graph`): bodies for each handler/fn/test/state, exec-flow nodes wired by exec pins, data nodes for expressions, inline literal pins, saved layout.

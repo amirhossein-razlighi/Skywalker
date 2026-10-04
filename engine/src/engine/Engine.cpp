@@ -2,6 +2,7 @@
 #include "CharacterHooks.h"  // character tech
 #include "skywalker/game/GameSettings.h"
 #include "skywalker/game/SaveGame.h"
+#include "skywalker/game/SceneFlow.h"
 
 #include <algorithm>
 #include <atomic>
@@ -207,6 +208,7 @@ Engine::Engine(EngineConfig config)
     physics_->setNavigation(nav_.get());
     runtime_->physics = physics_.get();
     saves_ = std::make_unique<game::SaveSystem>(*this);
+    sceneFlow_ = std::make_unique<game::SceneFlow>(*this);
     registerEngineTools(*this);
     mainThread_ = std::this_thread::get_id();
     customTools_ = std::make_unique<CustomTools>(*this);  // after the built-in tools: custom ones never shadow them
@@ -345,6 +347,7 @@ void Engine::play() {
         nav_->beginPlay();
         resetFrameFlow();  // render interpolation history, pacing stats
         saves_->beginPlay();  // game variables, play time, the persisted entities tombstones refer to
+        sceneFlow_->beginPlay();  // the scene play started in; later changes are undone by stop()
     }
     playState_ = PlayState::Playing;
     emitEvent(Json::object({{"type", "play_state"}, {"state", "playing"}}));
@@ -372,6 +375,7 @@ void Engine::stop() {
     nav_->endPlay();
     resetFrameFlow();
     saves_->endPlay();
+    sceneFlow_->endPlay();
     input_ = {};
     cursorLocked_ = false;
     audio_->stopAll();
@@ -400,6 +404,7 @@ void Engine::step(int ticks) {
         stepPhysics();  // nav steering, bodies, characters, contacts (holds while the game is paused)
         particles_.update(*scene_, static_cast<float>(kFixedDt), &gate);
         saves_->endTick();  // saves and loads scripts asked for during the tick
+        sceneFlow_->endTick();  // scene changes and sub-scenes: never while scripts run
         input_.endTick();
     }
     if (ticks > 0) {
@@ -507,6 +512,11 @@ struct Engine::MeshStream {
     };
     std::vector<Done> done;
 };
+
+bool Engine::preloadMesh(const std::string& meshKey) {
+    ensureMeshUploaded(meshKey);
+    return !pendingMeshes_.count(meshKey);
+}
 
 void Engine::requestMeshAsync(const std::string& key) {
     if (!pendingMeshes_.insert(key).second) return;
@@ -662,6 +672,7 @@ FrameData Engine::buildFrameData(const CaptureOptions& opts) {
     {
         SKY_PROFILE_SCOPE("2d.gather");
         world2d_->gather(*scene_, f, bo.editorOverlays ? selection_ : std::vector<EntityId>{}, bo.time, texelSnap);  // 2D + UI
+        if (playState_ != PlayState::Editing) f.fade = sceneFlow_->fade();  // scene transition overlay (SCENE_FLOW.md)
     }
     // Effects: simulated particles (+ the light fires cast) and FFT water.
     {

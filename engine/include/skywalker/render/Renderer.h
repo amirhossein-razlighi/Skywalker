@@ -301,6 +301,14 @@ struct FrameData {
     bool drawGrid = true;
     float time = 0;
     Frame2D render2d;  // sprites, tilemaps, world text, 2D lights and UI (see Render2D.h)
+    /// Scene transition over the whole picture, UI included (docs/SCENE_FLOW.md): blend toward `color` by
+    /// `alpha` (fades); `crossfade` > 0 blends the last frame of the previous scene over this one by that amount
+    /// (backends that keep their last frame; the CPU renderer cuts).
+    struct ScreenFade {
+        Vec4 color{0.f, 0.f, 0.f, 1.f};
+        float alpha = 0.f;
+        float crossfade = 0.f;
+    } fade;
     /// Jittered sub-samples accumulated into this frame (stills and cinematics: supersampling,
     /// noise-free GI). 1 = real-time (temporal anti-aliasing across frames).
     int samples = 1;

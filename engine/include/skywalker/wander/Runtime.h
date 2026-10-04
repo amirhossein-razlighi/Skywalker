@@ -263,6 +263,10 @@ public:
     /// Instances of the saved entities are replaced; an instance whose script changed since the save starts
     /// fresh (reported in `warnings`), so a game update never resumes old bytecode.
     Status loadState(const Json& state, std::vector<std::string>& warnings);
+    // --- Runtime scene changes (RuntimeScenes.cpp; docs/SCENE_FLOW.md) ------------------------
+    /// Drops the instances, vars, queued events and contacts of entities that no longer exist (a scene
+    /// change or an additive unload removed them between ticks). Entities that still exist keep running.
+    void forgetMissingEntities();
 
     /// Execution budget per handler run, in instructions (loops charge their length per
     /// iteration, calls the callee's length).
