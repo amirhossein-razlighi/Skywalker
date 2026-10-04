@@ -134,7 +134,8 @@ void addGameTools(Engine& engine, ToolRegistry& reg) {
             "bundleId (reverse-DNS), version, copyright, plus include/exclude globs for packaging, and the description fields "
             "(id, title, genre, mood, pitch), and mounts: shared folders outside the project addressed by a top-level name, e.g. "
             "{\"mounts\": {\"kit\": \"../_kit\"}} makes kit/characters/guard.prefab.json resolve into ../_kit (assets, prefabs, materials "
-            "and animations load from it; game_build copies what the game uses). `get` returns the effective settings, the resolved start scene and validation "
+            "and animations load from it; game_build copies what the game uses), and saves {version, maxSlots, compress, migrate} "
+            "for save games (docs/SAVE_GAMES.md). `get` returns the effective settings, the resolved start scene and validation "
             "problems. `set` merges the given fields (null removes one) and validates them. Example: {\"operation\":\"set\","
             "\"settings\":{\"title\":\"Sky Dash\",\"startScene\":\"scenes/main.sky.json\",\"window\":{\"width\":1280,\"height\":720}}}",
             "files",

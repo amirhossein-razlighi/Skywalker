@@ -103,6 +103,7 @@ void Scene::registerKinds() {
     kinds_.push_back(makeReflectedKind<ChaseCamera>());  // chase camera for vehicles
     kinds_.push_back(makeReflectedKind<Particles2D>());  // pixel-art 2D particles (ecs/Particles2D.h)
     kinds_.push_back(makeReflectedKind<CharacterIk>());  // foot / hand IK, turn in place (docs/CHARACTERS.md)
+    kinds_.push_back(makeReflectedKind<Persist>());  // save games (game/SaveGame.h)
 }
 
 const ComponentKind* Scene::componentKind(std::string_view n) const {
@@ -136,6 +137,11 @@ EntityId Scene::create(std::string entityName, EntityId parent, EntityId forcedI
         order_.push_back(id);
     }
     return id;
+}
+
+void Scene::setNextEntityId(EntityId next) {
+    for (const auto& [id, rec] : records_) next = std::max(next, id + 1);
+    nextId_ = std::max<EntityId>(next, 1);
 }
 
 size_t Scene::destroy(EntityId id) {

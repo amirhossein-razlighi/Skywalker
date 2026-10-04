@@ -79,5 +79,6 @@ void addCharacterTools(Engine& engine, ToolRegistry& reg);  // CharacterTools.cp
 /// perf_stats "characters": skinning, groom simulation and groom rendering cost (CharacterTools.cpp).
 /// `groomRenderMs` < 0 = not measured (perf_stats measures it by benchmarking with grooms hidden).
 Json characterPerfStats(Engine& engine, double groomRenderMs = -1.0);
+void addSaveTools(Engine& engine, ToolRegistry& reg);    // SaveTools.cpp: save_game, load_game, save_list, save_inspect, save_delete
 
 }  // namespace sky::tools

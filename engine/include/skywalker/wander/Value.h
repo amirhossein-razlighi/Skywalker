@@ -222,6 +222,11 @@ std::string toDisplayString(const Value& v);
 /// {"$entity": id}; vectors [x, y, z]; colors "#rrggbb(aa)".
 Json toJson(const Value& v);
 Value fromJson(const Json& j);
+/// Exact JSON form for saved state (RuntimeState.cpp): plain JSON where unambiguous, tags where toJson()
+/// would lose the type: {"$vec": [x,y,z]}, {"$color": [r,g,b,a]}, {"$entity": id}, {"$num": "nan"}, and
+/// {"$map": {...}} for maps with a key starting with '$'. Lists stay arrays, maps objects.
+Json toTaggedJson(const Value& v);
+Value fromTaggedJson(const Json& j);
 
 // ---------------------------------------------------------------------------
 // Static types: a type is the *set* of runtime types an expression may produce.

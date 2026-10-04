@@ -57,6 +57,9 @@ namespace movie {
 struct Options;
 class Job;
 }
+namespace game {
+class SaveSystem;
+}
 
 /// Registers the engine's Wander builtins (effects, water, and every subsystem's) in the
 /// global registry. Idempotent; the Engine constructor calls it.
@@ -339,6 +342,9 @@ public:
     physics::PhysicsSystem& physics() { return *physics_; }
     nav::NavSystem& navigation() { return *nav_; }
 
+    // --- Save games (docs/SAVE_GAMES.md) ------------------------------------------------
+    game::SaveSystem& saves() { return *saves_; }
+
     // --- Movie renderer (docs/MOVIE_RENDER.md) ------------------------------------------
     /// Renders a movie to completion on this thread; `progress` (and "movie_progress" events) report each frame.
     Result<Json> renderMovie(const movie::Options& options, const std::function<void(const Json&)>& progress = {});
@@ -512,6 +518,7 @@ private:
     std::shared_ptr<EventLog> eventLog_ = std::make_shared<EventLog>(4096);
     std::shared_ptr<ToolHost> toolHost_ = std::make_shared<ToolHost>(tools_);
     std::unique_ptr<CustomTools> customTools_;  // custom & external tools (agent/CustomTools.h)
+    std::unique_ptr<game::SaveSystem> saves_;   // save games (game/SaveGame.h)
 };
 
 void registerEngineTools(Engine& engine);

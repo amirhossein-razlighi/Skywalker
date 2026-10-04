@@ -16,6 +16,7 @@ void registerRenderLayerBuiltins(wander::BuiltinRegistry& reg);  // RenderBuilti
 void registerProbeBuiltins(wander::BuiltinRegistry& reg);  // ProbeBuiltins.cpp: probe_bake
 void registerVehicleBuiltins(wander::BuiltinRegistry& reg);      // VehicleBuiltins.cpp: vehicle_*
 void registerCharacterBuiltins(wander::BuiltinRegistry& reg);  // CharacterBuiltins.cpp: hand_ik, foot_ik, turn_in_place, look_at
+void registerSaveBuiltins(wander::BuiltinRegistry& reg);  // game/SaveBuiltins.cpp: save_game, load_game, game_var
 
 namespace {
 
@@ -170,6 +171,7 @@ void registerEngineBuiltins() {
         registerProbeBuiltins(reg);  // reflection probes (ProbeBuiltins.cpp)
         registerVehicleBuiltins(reg);      // vehicles (VehicleBuiltins.cpp)
         registerCharacterBuiltins(reg);  // character IK and turning (CharacterBuiltins.cpp)
+        registerSaveBuiltins(reg);  // save games (game/SaveBuiltins.cpp)
     });
 }
 

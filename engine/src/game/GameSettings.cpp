@@ -9,6 +9,7 @@
 
 #include "skywalker/core/Strings.h"
 #include "skywalker/ecs/Components.h"
+#include "skywalker/game/SaveGame.h"
 
 namespace sky::game {
 
@@ -150,7 +151,8 @@ Result<GameSettings> GameSettings::fromJson(const Json& j) {
     GameSettings g;
     static const std::vector<std::string> keys{"id", "title", "genre", "mood", "pitch", "assets", "startScene", "window", "quality",
                                                "renderScale", "quitOnEscape", "pauseOnFocusLoss", "icon", "bundleId",
-                                               "version", "copyright", "include", "exclude", "render", "mounts"};
+                                               "version", "copyright", "include", "exclude", "render", "mounts",
+                                               "saves"};
     if (Status s = checkKeys(j, "game.json", keys); !s) return s.error();
     for (auto [key, out] : std::initializer_list<std::pair<const char*, std::string*>>{
              {"id", &g.id}, {"title", &g.title}, {"genre", &g.genre}, {"mood", &g.mood}, {"pitch", &g.pitch}, {"assets", &g.assets},
@@ -209,6 +211,12 @@ Result<GameSettings> GameSettings::fromJson(const Json& j) {
             if (!folder.isString() || folder.asString().empty()) return typeError("mounts." + name, "a folder path", folder);
             g.mounts.emplace_back(name, folder.asString());
         }
+    }
+
+    if (const Json* sv = j.find("saves"); sv && !sv->isNull()) {  // save games: validated by SaveSettings
+        auto saves = SaveSettings::fromJson(*sv);
+        if (!saves) return saves.error();
+        g.saves = *sv;
     }
 
     if (!validVersion(g.version)) {
@@ -273,6 +281,9 @@ Json GameSettings::toJson() const {
         Json m = Json::object();
         for (const auto& [name, folder] : mounts) m[name] = folder;
         j["mounts"] = std::move(m);
+    }
+    if (!saves.isNull()) {
+        j["saves"] = saves;
     }
     if (Json layers = renderLayers.toJson(); !layers.members().empty()) j["render"] = Json::object({{"layers", layers}});
     return j;

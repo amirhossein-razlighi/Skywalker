@@ -1237,6 +1237,7 @@ void registerEngineTools(Engine& engine) {
     tools::addVehicleTools(engine, reg);  // engine/src/agent/VehicleTools.cpp: vehicle_create, vehicle_tune, vehicle_info, vehicle_test_drive
     tools::addParticles2DTools(engine, reg);  // engine/src/agent/Particles2DTools.cpp (pixel-art weather, fireflies)
     tools::addCharacterTools(engine, reg);  // engine/src/agent/CharacterTools.cpp: character_inspect, character_ik, animation_retarget
+    tools::addSaveTools(engine, reg);    // engine/src/agent/SaveTools.cpp (save games, docs/SAVE_GAMES.md)
 }
 
 }  // namespace sky

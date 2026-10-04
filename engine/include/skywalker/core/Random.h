@@ -31,6 +31,12 @@ public:
     float range(float lo, float hi) { return lo + (hi - lo) * nextFloat(); }
 
     uint64_t state() const { return state_; }
+    uint64_t increment() const { return inc_; }
+    /// Puts the generator back exactly where state() / increment() were read (save games).
+    void restore(uint64_t state, uint64_t inc) {
+        state_ = state;
+        inc_ = inc | 1u;
+    }
 
 private:
     uint64_t state_ = 0;

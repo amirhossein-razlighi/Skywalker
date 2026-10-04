@@ -254,6 +254,16 @@ public:
     void setRecordSceneWrites(bool on) { recordSceneWrites_ = on; }
     bool recordSceneWrites() const { return recordSceneWrites_; }
 
+    // --- Save games (RuntimeState.cpp; docs/SAVE_GAMES.md) ------------------------------------
+    /// The exact play state between two ticks: clocks, the random generator, queued events and, for every
+    /// instance whose entity `include` accepts, its state machines, timers and waiting handlers. Values are
+    /// type-tagged, so a list of three numbers stays a list and replays exactly.
+    Json saveState(const std::function<bool(EntityId)>& include) const;
+    /// Restores saveState() output into the running game (call between ticks, after the scene is restored).
+    /// Instances of the saved entities are replaced; an instance whose script changed since the save starts
+    /// fresh (reported in `warnings`), so a game update never resumes old bytecode.
+    Status loadState(const Json& state, std::vector<std::string>& warnings);
+
     /// Execution budget per handler run, in instructions (loops charge their length per
     /// iteration, calls the callee's length).
     static constexpr int64_t kBudget = 1'000'000;

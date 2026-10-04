@@ -44,6 +44,7 @@ ALLOW = {
     "studio_agent", "studio_overview", "studio_roster", "studio_board", "studio_feedback", "studio_loops", "ask_for_approval",
     "tool_warn", "tool_fail", "tool_actor",  # Wander builtins inside custom tools
     "vehicle_drive", "vehicle_shift", "vehicle_speed", "vehicle_state", "vehicle_wheel",  # Wander vehicle builtins
+    "game_var",  # Wander builtin (save games: global game variables)
 }
 # Tool-name prefixes that mark a backticked token as a tool reference (every live tool's prefix is added too).
 FAMILIES = {

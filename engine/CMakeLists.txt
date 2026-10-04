@@ -197,6 +197,13 @@ set(SKY_ENGINE_SOURCES
     src/anim/BodyColliders.cpp
     src/engine/CharacterBuiltins.cpp
     src/agent/CharacterTools.cpp
+    # Save games: persist component, slots, migrations, exact Wander state (docs/SAVE_GAMES.md)
+    src/ecs/PersistComponent.cpp
+    src/wander/RuntimeState.cpp
+    src/game/SaveGame.cpp
+    src/game/SaveSystem.cpp
+    src/game/SaveBuiltins.cpp
+    src/agent/SaveTools.cpp
 )
 
 # DCC bridge: the Python helper library and the Blender add-on are embedded so the engine can
