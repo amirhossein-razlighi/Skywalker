@@ -1,0 +1,44 @@
+{
+  "format": "skywalker.prefab",
+  "version": 1,
+  "name": "flag_pole",
+  "root": {
+    "name": "flag_pole",
+    "enabled": true,
+    "components": {
+      "transform": {}
+    },
+    "children": [
+      {
+        "name": "pole_wood_110806",
+        "enabled": true,
+        "components": {
+          "mesh": {
+            "mesh": "asset:generated/minis/flag_pole.glb#0",
+            "material": "generated/minis/flag_pole_pole_wood_110806.mat.json"
+          }
+        }
+      },
+      {
+        "name": "brass_342815",
+        "enabled": true,
+        "components": {
+          "mesh": {
+            "mesh": "asset:generated/minis/flag_pole.glb#1",
+            "material": "generated/minis/flag_pole_brass_342815.mat.json"
+          }
+        }
+      },
+      {
+        "name": "brass_201709",
+        "enabled": true,
+        "components": {
+          "mesh": {
+            "mesh": "asset:generated/minis/flag_pole.glb#2",
+            "material": "generated/minis/flag_pole_brass_201709.mat.json"
+          }
+        }
+      }
+    ]
+  }
+}

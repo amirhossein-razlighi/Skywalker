@@ -1,0 +1,14 @@
+{
+  "guid": "35e4680317b1cd50a24fd37b2b17cfc1",
+  "type": "mesh",
+  "tags": [],
+  "description": "",
+  "source": {},
+  "import": {
+    "normalize": false,
+    "zUp": false,
+    "vertexColors": false,
+    "material": "generated/minis/tree_conifer_bark_110806.mat.json",
+    "prefab": "generated/minis/tree_conifer.prefab.json"
+  }
+}

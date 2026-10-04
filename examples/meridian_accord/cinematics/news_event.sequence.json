@@ -1,0 +1,127 @@
+{
+  "format": "skywalker.sequence",
+  "version": 1,
+  "name": "news_event",
+  "duration": 7,
+  "tracks": [
+    {
+      "type": "shot",
+      "camera": "Cam news_event",
+      "keys": [
+        {
+          "t": 0,
+          "shot": "path",
+          "duration": 7,
+          "target": [
+            -420,
+            0,
+            0
+          ],
+          "points": [
+            [
+              -300,
+              1250,
+              900
+            ],
+            [
+              -320,
+              1200,
+              860
+            ],
+            [
+              -340,
+              1150,
+              820
+            ]
+          ],
+          "fov": 38
+        }
+      ]
+    },
+    {
+      "type": "camera",
+      "keys": [
+        {
+          "t": 0,
+          "camera": "Cam news_event"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "entity": "Cursor",
+      "property": "ui.visible",
+      "keys": [
+        {
+          "t": 0,
+          "value": true,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "entity": "Cursor",
+      "property": "ui.position",
+      "keys": [
+        {
+          "t": 0,
+          "value": [
+            1300,
+            980
+          ],
+          "ease": "smooth"
+        },
+        {
+          "t": 3.6,
+          "value": [
+            900,
+            784
+          ],
+          "ease": "smooth"
+        },
+        {
+          "t": 5,
+          "value": [
+            905,
+            786
+          ],
+          "ease": "smooth"
+        },
+        {
+          "t": 7,
+          "value": [
+            910,
+            788
+          ],
+          "ease": "smooth"
+        }
+      ]
+    },
+    {
+      "type": "event",
+      "keys": [
+        {
+          "t": 0,
+          "event": "hud_show",
+          "target": "Campaign"
+        },
+        {
+          "t": 0.005,
+          "event": "freeze",
+          "target": "Campaign"
+        },
+        {
+          "t": 0.01,
+          "event": "stage_2",
+          "target": "Campaign"
+        },
+        {
+          "t": 0.8,
+          "event": "event_show",
+          "target": "Campaign"
+        }
+      ]
+    }
+  ]
+}

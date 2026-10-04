@@ -1,0 +1,81 @@
+{
+  "format": "skywalker.sequence",
+  "version": 1,
+  "name": "front_line",
+  "duration": 7,
+  "tracks": [
+    {
+      "type": "shot",
+      "camera": "Cam front_line",
+      "keys": [
+        {
+          "t": 0,
+          "shot": "path",
+          "duration": 7,
+          "target": [
+            -470,
+            32,
+            110
+          ],
+          "points": [
+            [
+              -270,
+              108,
+              262
+            ],
+            [
+              -290,
+              102,
+              238
+            ],
+            [
+              -310,
+              98,
+              214
+            ]
+          ],
+          "fov": 36
+        }
+      ]
+    },
+    {
+      "type": "camera",
+      "keys": [
+        {
+          "t": 0,
+          "camera": "Cam front_line"
+        }
+      ]
+    },
+    {
+      "type": "event",
+      "keys": [
+        {
+          "t": 0,
+          "event": "hud_hide",
+          "target": "Campaign"
+        },
+        {
+          "t": 0.005,
+          "event": "freeze",
+          "target": "Campaign"
+        },
+        {
+          "t": 0.01,
+          "event": "labels_near",
+          "target": "Campaign"
+        },
+        {
+          "t": 0.015,
+          "event": "stage_1",
+          "target": "Campaign"
+        },
+        {
+          "t": 1.2,
+          "event": "stage_2",
+          "target": "Campaign"
+        }
+      ]
+    }
+  ]
+}

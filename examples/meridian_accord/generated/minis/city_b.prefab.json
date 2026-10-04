@@ -1,0 +1,274 @@
+{
+  "format": "skywalker.prefab",
+  "version": 1,
+  "name": "city_b",
+  "root": {
+    "name": "city_b",
+    "enabled": true,
+    "components": {
+      "transform": {}
+    },
+    "children": [
+      {
+        "name": "stone_302824",
+        "enabled": true,
+        "components": {
+          "mesh": {
+            "mesh": "asset:generated/minis/city_b.glb#0",
+            "material": "generated/minis/city_b_stone_302824.mat.json"
+          }
+        }
+      },
+      {
+        "name": "roof_tile_121315",
+        "enabled": true,
+        "components": {
+          "mesh": {
+            "mesh": "asset:generated/minis/city_b.glb#1",
+            "material": "generated/minis/city_b_roof_tile_121315.mat.json"
+          }
+        }
+      },
+      {
+        "name": "roof_tile_040505",
+        "enabled": true,
+        "components": {
+          "mesh": {
+            "mesh": "asset:generated/minis/city_b.glb#2",
+            "material": "generated/minis/city_b_roof_tile_040505.mat.json"
+          }
+        }
+      },
+      {
+        "name": "stone_292723",
+        "enabled": true,
+        "components": {
+          "mesh": {
+            "mesh": "asset:generated/minis/city_b.glb#3",
+            "material": "generated/minis/city_b_stone_292723.mat.json"
+          }
+        }
+      },
+      {
+        "name": "stone_282622",
+        "enabled": true,
+        "components": {
+          "mesh": {
+            "mesh": "asset:generated/minis/city_b.glb#4",
+            "material": "generated/minis/city_b_stone_282622.mat.json"
+          }
+        }
+      },
+      {
+        "name": "roof_tile_241208",
+        "enabled": true,
+        "components": {
+          "mesh": {
+            "mesh": "asset:generated/minis/city_b.glb#5",
+            "material": "generated/minis/city_b_roof_tile_241208.mat.json"
+          }
+        }
+      },
+      {
+        "name": "plaster_312822",
+        "enabled": true,
+        "components": {
+          "mesh": {
+            "mesh": "asset:generated/minis/city_b.glb#6",
+            "material": "generated/minis/city_b_plaster_312822.mat.json"
+          }
+        }
+      },
+      {
+        "name": "roof_tile_191008",
+        "enabled": true,
+        "components": {
+          "mesh": {
+            "mesh": "asset:generated/minis/city_b.glb#7",
+            "material": "generated/minis/city_b_roof_tile_191008.mat.json"
+          }
+        }
+      },
+      {
+        "name": "roof_tile_281610",
+        "enabled": true,
+        "components": {
+          "mesh": {
+            "mesh": "asset:generated/minis/city_b.glb#8",
+            "material": "generated/minis/city_b_roof_tile_281610.mat.json"
+          }
+        }
+      },
+      {
+        "name": "roof_tile_100504",
+        "enabled": true,
+        "components": {
+          "mesh": {
+            "mesh": "asset:generated/minis/city_b.glb#9",
+            "material": "generated/minis/city_b_roof_tile_100504.mat.json"
+          }
+        }
+      },
+      {
+        "name": "plaster_322924",
+        "enabled": true,
+        "components": {
+          "mesh": {
+            "mesh": "asset:generated/minis/city_b.glb#10",
+            "material": "generated/minis/city_b_plaster_322924.mat.json"
+          }
+        }
+      },
+      {
+        "name": "roof_tile_070403",
+        "enabled": true,
+        "components": {
+          "mesh": {
+            "mesh": "asset:generated/minis/city_b.glb#11",
+            "material": "generated/minis/city_b_roof_tile_070403.mat.json"
+          }
+        }
+      },
+      {
+        "name": "plaster_343126",
+        "enabled": true,
+        "components": {
+          "mesh": {
+            "mesh": "asset:generated/minis/city_b.glb#12",
+            "material": "generated/minis/city_b_plaster_343126.mat.json"
+          }
+        }
+      },
+      {
+        "name": "roof_tile_241108",
+        "enabled": true,
+        "components": {
+          "mesh": {
+            "mesh": "asset:generated/minis/city_b.glb#13",
+            "material": "generated/minis/city_b_roof_tile_241108.mat.json"
+          }
+        }
+      },
+      {
+        "name": "roof_tile_080403",
+        "enabled": true,
+        "components": {
+          "mesh": {
+            "mesh": "asset:generated/minis/city_b.glb#14",
+            "material": "generated/minis/city_b_roof_tile_080403.mat.json"
+          }
+        }
+      },
+      {
+        "name": "roof_tile_210907",
+        "enabled": true,
+        "components": {
+          "mesh": {
+            "mesh": "asset:generated/minis/city_b.glb#15",
+            "material": "generated/minis/city_b_roof_tile_210907.mat.json"
+          }
+        }
+      },
+      {
+        "name": "roof_tile_070302",
+        "enabled": true,
+        "components": {
+          "mesh": {
+            "mesh": "asset:generated/minis/city_b.glb#16",
+            "material": "generated/minis/city_b_roof_tile_070302.mat.json"
+          }
+        }
+      },
+      {
+        "name": "roof_tile_261309",
+        "enabled": true,
+        "components": {
+          "mesh": {
+            "mesh": "asset:generated/minis/city_b.glb#17",
+            "material": "generated/minis/city_b_roof_tile_261309.mat.json"
+          }
+        }
+      },
+      {
+        "name": "plaster_353327",
+        "enabled": true,
+        "components": {
+          "mesh": {
+            "mesh": "asset:generated/minis/city_b.glb#18",
+            "material": "generated/minis/city_b_plaster_353327.mat.json"
+          }
+        }
+      },
+      {
+        "name": "plaster_353431",
+        "enabled": true,
+        "components": {
+          "mesh": {
+            "mesh": "asset:generated/minis/city_b.glb#19",
+            "material": "generated/minis/city_b_plaster_353431.mat.json"
+          }
+        }
+      },
+      {
+        "name": "plaster_373532",
+        "enabled": true,
+        "components": {
+          "mesh": {
+            "mesh": "asset:generated/minis/city_b.glb#20",
+            "material": "generated/minis/city_b_plaster_373532.mat.json"
+          }
+        }
+      },
+      {
+        "name": "roof_tile_090503",
+        "enabled": true,
+        "components": {
+          "mesh": {
+            "mesh": "asset:generated/minis/city_b.glb#21",
+            "material": "generated/minis/city_b_roof_tile_090503.mat.json"
+          }
+        }
+      },
+      {
+        "name": "plaster_383735",
+        "enabled": true,
+        "components": {
+          "mesh": {
+            "mesh": "asset:generated/minis/city_b.glb#22",
+            "material": "generated/minis/city_b_plaster_383735.mat.json"
+          }
+        }
+      },
+      {
+        "name": "leaf_120906",
+        "enabled": true,
+        "components": {
+          "mesh": {
+            "mesh": "asset:generated/minis/city_b.glb#23",
+            "material": "generated/minis/city_b_leaf_120906.mat.json"
+          }
+        }
+      },
+      {
+        "name": "leaf_121708",
+        "enabled": true,
+        "components": {
+          "mesh": {
+            "mesh": "asset:generated/minis/city_b.glb#24",
+            "material": "generated/minis/city_b_leaf_121708.mat.json"
+          }
+        }
+      },
+      {
+        "name": "leaf_091306",
+        "enabled": true,
+        "components": {
+          "mesh": {
+            "mesh": "asset:generated/minis/city_b.glb#25",
+            "material": "generated/minis/city_b_leaf_091306.mat.json"
+          }
+        }
+      }
+    ]
+  }
+}

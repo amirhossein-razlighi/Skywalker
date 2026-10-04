@@ -1,0 +1,13 @@
+{
+  "guid": "d2196f19ad2036bbfad7f9fdeec5e6aa",
+  "type": "mesh",
+  "tags": [],
+  "description": "",
+  "source": {},
+  "import": {
+    "normalize": false,
+    "zUp": false,
+    "vertexColors": false,
+    "material": "generated/minis/unit_block.mat.json"
+  }
+}

@@ -1,0 +1,87 @@
+{
+  "format": "skywalker.sequence",
+  "version": 1,
+  "name": "war_table",
+  "duration": 7,
+  "tracks": [
+    {
+      "type": "shot",
+      "camera": "Cam war_table",
+      "keys": [
+        {
+          "t": 0,
+          "shot": "path",
+          "duration": 7,
+          "target": [
+            -520,
+            26,
+            160
+          ],
+          "points": [
+            [
+              -340,
+              130,
+              400
+            ],
+            [
+              -368,
+              122,
+              372
+            ],
+            [
+              -396,
+              116,
+              344
+            ]
+          ],
+          "fov": 34
+        }
+      ]
+    },
+    {
+      "type": "camera",
+      "keys": [
+        {
+          "t": 0,
+          "camera": "Cam war_table"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.exposure",
+      "keys": [
+        {
+          "t": 0,
+          "value": 0.78,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "event",
+      "keys": [
+        {
+          "t": 0,
+          "event": "hud_hide",
+          "target": "Campaign"
+        },
+        {
+          "t": 0.005,
+          "event": "freeze",
+          "target": "Campaign"
+        },
+        {
+          "t": 0.01,
+          "event": "stage_3",
+          "target": "Campaign"
+        },
+        {
+          "t": 0.015,
+          "event": "mode_paper",
+          "target": "Campaign"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "guid": "df0f9b57b3bf0dcc186a234e292a20a1",
+  "type": "mesh",
+  "tags": [],
+  "description": "",
+  "source": {},
+  "import": {
+    "normalize": false,
+    "zUp": false,
+    "vertexColors": false,
+    "material": "generated/minis/tree_broadleaf_bark_110806.mat.json",
+    "prefab": "generated/minis/tree_broadleaf.prefab.json"
+  }
+}

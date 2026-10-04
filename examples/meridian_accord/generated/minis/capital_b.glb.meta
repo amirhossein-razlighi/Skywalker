@@ -1,0 +1,14 @@
+{
+  "guid": "6d18cb35ce0f8e3e3371c31f37588f07",
+  "type": "mesh",
+  "tags": [],
+  "description": "",
+  "source": {},
+  "import": {
+    "normalize": false,
+    "zUp": false,
+    "vertexColors": false,
+    "material": "generated/minis/capital_b_stone_313028.mat.json",
+    "prefab": "generated/minis/capital_b.prefab.json"
+  }
+}
