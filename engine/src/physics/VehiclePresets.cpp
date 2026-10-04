@@ -156,7 +156,7 @@ Result<Json> vehiclePreset(const std::string& presetName, const std::string& han
                           {"drive", "rwd"},
                           {"limitedSlip", 1.05},
                           {"differentialRatio", 5.3},
-                          {"maxTorque", 34},
+                          {"maxTorque", 42},
                           {"minRpm", 2000},
                           {"maxRpm", 9500},
                           {"engineInertia", 0.05},

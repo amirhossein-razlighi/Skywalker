@@ -1,6 +1,6 @@
 ---
 name: skywalker-physics
-description: "Physics and navigation in Skywalker - Jolt rigid bodies, colliders, character controllers, triggers and joints, collision queries, settling props into natural poses, debug views, and Recast navmesh pathfinding with nav agents. Use for falling crates, a walking/jumping player, doors and platforms, pickups and checkpoints, projectiles, patrolling or chasing AI, and \"is the level traversable?\"."
+description: "Physics and navigation in Skywalker - Jolt rigid bodies, colliders, character controllers, triggers and joints, wheeled vehicles (cars, trucks, karts with suspension, gearbox, assists, drifting, test drives), collision queries, settling props into natural poses, debug views, and Recast navmesh pathfinding with nav agents. Use for falling crates, a walking/jumping player, doors and platforms, pickups and checkpoints, projectiles, drivable cars and racing games, patrolling or chasing AI, and \"is the level traversable?\"."
 ---
 
 # Physics and navigation
@@ -100,6 +100,46 @@ Tag the player `player` and goals/hazards so `playtest_run` can measure the game
 - **Pickups / checkpoints**: invisible box + `trigger_zone` + `on trigger_enter "player"`.
 - **Launch**: `impulse(self, forward(self) * 8 + (0, 4, 0))`; explosions: `overlap_sphere` + `impulse` away from the center.
 - **2D side-scroller**: bodies with `lockPosition:"z"` and `lockRotation:"xy"`; colliders from `tilemap_inspect` rects (see skywalker-2d-ui).
+
+## Vehicles (cars, trucks, karts)
+
+A `vehicle` on a dynamic `body` is a Jolt wheeled vehicle: suspension, tire friction curves, engine torque curve, auto/manual gearbox, FWD/RWD/AWD limited-slip
+differentials, anti-roll bars, downforce and drag. Wheels are the chassis' **children named `wheel*`** (radius, width and position measured from their meshes);
+they spin, steer and follow the suspension while playing. Forward is **-Z**. Build one with `vehicle_create`, measure it with `vehicle_test_drive`, adjust with `vehicle_tune`:
+
+```text
+vehicle_create {entity:"Coupe", preset:"sports"}                       # sports | hatchback | truck | kart; handling arcade (assists) | sim
+vehicle_test_drive {entity:"Coupe", maneuver:"all"}                    # 0-100 km/h, braking distance, fastest clean slalom, skidpad g
+vehicle_tune {entity:"Coupe", set:{maxTorque:600, lateralGrip:1.2}, test:"accel"}   # before/after numbers; typos get a did-you-mean
+vehicle_tune {entity:"Coupe", wheels:{rear:{lateralGrip:1.0}}}         # per axle or wheel (front_left, rear_right...)
+vehicle_test_drive {entity:"Coupe", maneuver:"skidpad", overrides:{antiRollRear:900}}   # try a change without editing
+vehicle_info {entity:"Coupe", capture:true}                            # telemetry + the "vehicles" debug view (suspension, contacts, tire forces)
+input_map {operation:"add_preset", preset:"drive"}                     # throttle/brake/steer/handbrake/shift actions (vehicle_create adds them)
+```
+
+- `vehicle_create` adds the body (chassis mass), a box collider above the wheels, the preset, a chase camera on the scene camera (`chase_camera`: spring arm,
+  look-ahead, FOV widening with speed), a looping engine sound pitched by rpm, and the drive actions. Model the wheels as separate child meshes: a single mesh
+  with the wheels baked in cannot spin them and its collider would touch the ground.
+- Inputs are live fields (`throttle`, `brake`, `steer` -1 left..1 right, `handbrake`). `control:"player"` reads the drive actions every tick; Wander overrides
+  them with `vehicle_drive(self, throttle, steer, brake?, handbrake?)`; `control:"script"` leaves them to scripts and tools. Holding brake at a standstill reverses.
+- Assists (live, no rebuild): `tractionControl` (trims the throttle when wheelspin makes the car slide), `abs` (peak-friction braking, steering while braking),
+  `driftAssist` 0..1 (easier, held slides: rear lightens on power, counter-steer only past ~30 degrees), `steerSpeed`, `speedSensitiveSteering`. Pulling the handbrake
+  declutches and locks the rear wheels: the way into a drift (flick, then power and a little counter-steer).
+- Telemetry is written back each tick (`speed` km/h, `rpm`, `gear`, `wheelsOnGround`, `skid` 0..1). Per wheel in Wander: `vehicle_wheel(self, "rear_left")` has
+  `point`, `skid`, `slip_ratio`, `slip_angle`, `load`, `surface`; `vehicle_state(self).skidding` lists sliding contact points: burst tire smoke and spawn skid marks there.
+- Tuning by numbers: grip ~ skidpad g (`lateralGrip` 0.9 hatchback, 1.1 sports); stiffer rear anti-roll (`antiRollRear`) = more oversteer; `centerOfMass` lower = less roll;
+  `drag` sets top speed; `differentialRatio` and `gearRatios` trade acceleration for top speed. Surfaces with friction < 0.5 (ice 0.05, mud 0.25) scale tire grip.
+
+```wander
+behavior TireSmoke
+  on tick
+    let w = vehicle_wheel(self, "rear_left")
+    if w and w.skid > 0.3 then
+      burst(find("Smoke RL"), 2)                -- a particles child at the wheel, worldSpace on
+    end
+  end
+end
+```
 
 ## Navigation (Recast/Detour)
 

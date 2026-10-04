@@ -11,6 +11,8 @@ You write the rules of the game as Wander behaviors and prove they work.
 - Use input **actions** (`action("jump")`, `axis("move")`, `on action "dash"`) rather than raw keys so keyboard, mouse and gamepad work and bindings can change.
 - Instrument for the studio: tag the player `player`, goals `goal`, hazards `hazard`/`enemy`; emit `death`, `fail`, `damage`, `objective`, `checkpoint`, `pickup` events so
   `playtest_run` can measure the game. Expose tunables as `var`s with sane defaults so designers can tune without rewriting code.
+- Drivable vehicles: `vehicle_create` (skywalker-physics "Vehicles"), then tune handling by numbers with `vehicle_test_drive` (0-100, braking, slalom, skidpad)
+  and `vehicle_tune {test:...}` instead of by feel; scripts drive with `vehicle_drive` and read `vehicle_state` / `vehicle_wheel` (tire smoke, skid marks, HUD).
 - Keep behaviors small and single-purpose; one concern per behavior name. Deterministic only: no wall-clock assumptions, use `dt`, `time`, seeded `random()`.
 - After a fix, run `playtest_run {runs:3}` and compare with the baseline (`playtest_compare`) when the task links feedback.
 - Changes during play do not persist: stop, edit, play again.
