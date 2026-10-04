@@ -222,6 +222,36 @@ TEST_CASE("vehicle: wheel visuals spin, steer and follow the suspension") {
     CHECK(e->scene().get<Vehicle>(car)->speed == 0.f);
 }
 
+TEST_CASE("vehicle: caliper and hub children of a wheel steer and ride along but do not spin") {
+    auto e = makeVehicleEngine();
+    EntityId car = buildCar(*e);
+    EntityId fl = e->scene().find("wheel_fl");
+    // A caliper at the top of the front-left wheel (wheel-local: the cylinder's axis is local Y).
+    EntityId caliper = make(*e, R"({"name":"caliper_fl","components":{"transform":{"position":[0.6,0,0]},"mesh":{"mesh":"cube"}}})", fl);
+    call(*e, "vehicle_create", R"({"entity":"Car","preset":"sports","overrides":{"control":"script"},"engine_sound":false,"input_actions":false})");
+    auto offset = [&](EntityId part) {
+        Mat4 toCar = e->scene().worldMatrix(car).inverse();
+        return toCar.transformPoint(e->scene().worldMatrix(part).translation()) -
+               toCar.transformPoint(e->scene().worldMatrix(fl).translation());
+    };
+    Vec3 rest = offset(caliper);
+    CHECK(rest.y > 0.3f);  // above the axle
+    e->play();
+    e->step(30);
+    drive(*e, car, 1.f, 0.f, 0.f, 50);  // the wheel turns several times
+    CHECK(e->scene().get<Vehicle>(car)->speed > 10.f);
+    Vec3 rolling = offset(caliper);
+    CHECK(rolling.x == doctest::Approx(rest.x).epsilon(0.02));
+    CHECK(rolling.y == doctest::Approx(rest.y).epsilon(0.02));
+    CHECK(rolling.z == doctest::Approx(rest.z).epsilon(0.02));
+    // Steering swings it around the wheel's vertical axis: still on top, the same distance away.
+    drive(*e, car, 0.f, 1.f, 0.f, 30);
+    Vec3 steered = offset(caliper);
+    CHECK(steered.y == doctest::Approx(rest.y).epsilon(0.05));
+    e->stop();
+    CHECK(e->scene().get<Transform>(caliper)->position.x == doctest::Approx(0.6));
+}
+
 TEST_CASE("vehicle: the simulation replays identically and resets on stop") {
     auto e = makeVehicleEngine();
     EntityId car = createScripted(*e);

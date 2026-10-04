@@ -2627,6 +2627,24 @@
       "maximum": 1,
       "description": "Alpha-tested cutout threshold (foliage, sails, fences); 0 = off"
      },
+     "clearcoatRoughness": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Roughness of the clearcoat layer (0.02 mirror lacquer .. 0.3 satin; default 0.06)"
+     },
+     "flakes": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Metallic flakes in the base layer (car paint sparkle): share of the base reflection, 0 = none, 0.3-0.6 = metallic paint"
+     },
+     "flakeSize": {
+      "type": "number",
+      "minimum": 5e-05,
+      "maximum": 0.05,
+      "description": "Flake size in meters in the mesh's own space (default 0.0015; real flakes are smaller, a little larger reads better on screen)"
+     },
      "path": {
       "type": "string",
       "description": "Project-relative path ending in .mat.json, e.g. materials/stone.mat.json"
@@ -2794,6 +2812,24 @@
       "minimum": 0,
       "maximum": 1,
       "description": "Alpha-tested cutout threshold (foliage, sails, fences); 0 = off"
+     },
+     "clearcoatRoughness": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Roughness of the clearcoat layer (0.02 mirror lacquer .. 0.3 satin; default 0.06)"
+     },
+     "flakes": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Metallic flakes in the base layer (car paint sparkle): share of the base reflection, 0 = none, 0.3-0.6 = metallic paint"
+     },
+     "flakeSize": {
+      "type": "number",
+      "minimum": 5e-05,
+      "maximum": 0.05,
+      "description": "Flake size in meters in the mesh's own space (default 0.0015; real flakes are smaller, a little larger reads better on screen)"
      },
      "path": {
       "type": "string",
