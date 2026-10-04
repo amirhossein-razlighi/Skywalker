@@ -655,8 +655,8 @@ void addViewTools(Engine& engine, ToolRegistry& reg) {
                  if (reflect::jsonToVec3(a.get("eye"), eye)) {
                      o.hasCustomView = true;
                      o.customView = engine.camera().toView();
-                     o.customView.eye = eye;
-                     if (reflect::jsonToVec3(a.get("target"), target)) o.customView.target = target;
+                     if (!reflect::jsonToVec3(a.get("target"), target)) target = o.customView.target;
+                     o.customView.lookFrom(eye, target);
                      if (a.contains("fov")) o.customView.fovDeg = std::clamp(a.get("fov").asFloat(), 5.f, 150.f);
                      o.customView.aperture = std::max(0.f, a.get("aperture").asFloat(0.f));
                      o.customView.focusDistance = std::max(0.f, a.get("focus_distance").asFloat(0.f));

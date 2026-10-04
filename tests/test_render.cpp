@@ -156,3 +156,15 @@ TEST_CASE("renderer: null backend produces an image of the requested size") {
     const uint8_t* center = img->at(32, 24);
     CHECK(center[0] > center[2]);  // red box in the middle
 }
+
+TEST_CASE("render: custom views clip for close-ups and kilometer vistas alike") {
+    ViewCamera v;  // e.g. inherited from an orbit camera close to a small scene
+    v.nearPlane = 2.5f;
+    v.farPlane = 1000.f;
+    v.lookFrom({150, 320, 700}, {-120, 60, -150});
+    CHECK(v.farPlane >= 40000.f);  // far ranges several kilometers away stay visible
+    CHECK(v.nearPlane <= 0.25f);
+    v.lookFrom({0, 1, 0.3f}, {0, 1, 0});
+    CHECK(v.nearPlane < 0.03f);  // macro close-up
+    CHECK(v.eye.z == doctest::Approx(0.3f));
+}
