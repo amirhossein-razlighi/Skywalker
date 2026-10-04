@@ -44,9 +44,10 @@ async def director_critic(
     task: str,
     rounds: int = 3,
     approve_word: str = "APPROVED",
-    capture: bool = True,
+    capture: bool | dict[str, Any] = True,
 ) -> dict[str, Any]:
-    """The maker works; the critic reviews (seeing a viewport capture) and either approves or lists fixes."""
+    """The maker works; the critic reviews (seeing a viewport capture; ``capture`` may hold viewport_capture
+    arguments) and either approves or lists fixes."""
     history: list[dict[str, Any]] = []
     feedback = ""
     for r in range(1, rounds + 1):
@@ -54,7 +55,8 @@ async def director_critic(
         made = await ctx.agent(maker).run(prompt)
         images: list[bytes] = []
         if capture and ctx.engine is not None:
-            shot = await ctx.engine.call("viewport_capture", {"width": 768, "height": 432, "annotate": False})
+            args = {"width": 768, "height": 432, "annotate": False, **(capture if isinstance(capture, dict) else {})}
+            shot = await ctx.engine.call("viewport_capture", args)
             images = shot.images[:1]
         review = await ctx.agent(critic).run(
             f"Review this work against the brief. Brief: {task}\n\nThe maker's report:\n{made.text}\n\n"

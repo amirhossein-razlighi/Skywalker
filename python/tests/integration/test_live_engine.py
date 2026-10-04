@@ -68,8 +68,11 @@ async def test_python_tools_served_to_every_agent(live: AsyncEngine) -> None:
     try:
         names = {s.name for s in await live.list_tools(refresh=True)}
         assert {"py_memory_remember", "py_memory_recall"} <= names
-        r = await live.as_agent("aurora").call("py_memory_remember", {
-            "text": "Sunsets should stay warm orange", "kind": "fact", "scope": "agent"}, check=True)
+        r = await live.as_agent("aurora").call(
+            "py_memory_remember",
+            {"text": "Sunsets should stay warm orange", "kind": "fact", "scope": "agent"},
+            check=True,
+        )
         assert r.data["owner"] == "aurora"  # the caller's identity reached the Python tool
         mine = await live.as_agent("aurora").call("py_memory_recall", {"query": "sunset"}, check=True)
         theirs = await live.as_agent("stratus").call("py_memory_recall", {"query": "sunset"}, check=True)
@@ -83,10 +86,21 @@ async def test_python_tools_served_to_every_agent(live: AsyncEngine) -> None:
 
 
 async def test_agent_edits_are_attributed_and_the_studio_sees_it(live: AsyncEngine) -> None:
-    provider = ScriptedProvider(agents={"stratus": [
-        {"tool_calls": [{"name": "entity_create", "input": {"name": "Agent Pillar", "mesh": "cube",
-                                                             "position": [2, 1, 0]}}]},
-        {"text": "Placed the pillar."}]})
+    provider = ScriptedProvider(
+        agents={
+            "stratus": [
+                {
+                    "tool_calls": [
+                        {
+                            "name": "entity_create",
+                            "input": {"name": "Agent Pillar", "mesh": "cube", "position": [2, 1, 0]},
+                        }
+                    ]
+                },
+                {"text": "Placed the pillar."},
+            ]
+        }
+    )
     stream = live.events(types=["tool", "studio.agent", "studio.usage"])
     await stream.poll(wait_ms=0)
     result = await Agent("stratus", engine=live, provider=provider).run("Place a pillar")
@@ -116,8 +130,7 @@ async def test_agents_talk_through_studio_threads(live: AsyncEngine) -> None:
         await bus.reply(env, "stratus", "Done: 3 m wide", data={"width": 3})
 
     task = asyncio.create_task(stratus())
-    reply = await bus.request("nimbus", "stratus", "How wide is the bridge now?", data={"task": "bridge"},
-                              timeout=15)
+    reply = await bus.request("nimbus", "stratus", "How wide is the bridge now?", data={"task": "bridge"}, timeout=15)
     await task
     assert reply is not None and reply.data == {"width": 3}
     thread = await bus.thread(reply.root)
@@ -126,14 +139,22 @@ async def test_agents_talk_through_studio_threads(live: AsyncEngine) -> None:
 
 
 async def test_engine_studio_loop_driven_by_python_agents(live: AsyncEngine) -> None:
-    provider = ScriptedProvider(agents={"aurora": [{"text": "Painted the sky"}],
-                                        "nimbus": [{"text": "SIGNOFF the sky reads well"}]})
-    out = await run_studio_loop(live, "sky_pass", lambda aid: Agent(aid, engine=live, provider=provider,
-                                                                     loop_member=True),
-                                define={"goal": "a readable sky", "stages": [
-                                    {"id": "paint", "assignees": ["aurora"], "instruction": "Paint: {{goal}}"},
-                                    {"id": "review", "assignees": ["nimbus"], "instruction": "Review {{inputs}}"}],
-                                    "stop": {"max_iterations": 2, "director_signoff": True}})
+    provider = ScriptedProvider(
+        agents={"aurora": [{"text": "Painted the sky"}], "nimbus": [{"text": "SIGNOFF the sky reads well"}]}
+    )
+    out = await run_studio_loop(
+        live,
+        "sky_pass",
+        lambda aid: Agent(aid, engine=live, provider=provider, loop_member=True),
+        define={
+            "goal": "a readable sky",
+            "stages": [
+                {"id": "paint", "assignees": ["aurora"], "instruction": "Paint: {{goal}}"},
+                {"id": "review", "assignees": ["nimbus"], "instruction": "Review {{inputs}}"},
+            ],
+            "stop": {"max_iterations": 2, "director_signoff": True},
+        },
+    )
     assert out["status"] == "done", out
     assert [r["report"] for r in out["reports"]] == ["Painted the sky", "SIGNOFF the sky reads well"]
     status = await live.call("studio_loop_status", {"loop": "sky_pass"}, check=True)

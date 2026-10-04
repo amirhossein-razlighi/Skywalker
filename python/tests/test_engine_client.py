@@ -17,9 +17,15 @@ from skywalker_agents.errors import EngineConnectionError, ProtocolError
 
 
 def test_tool_result_parses_engine_errors() -> None:
-    r = ToolResult.from_mcp("entity_update", {
-        "content": [{"type": "text", "text": "error [not_found]: no entity 'Lava'\nhint: did you mean 'Lava Pit'?"}],
-        "isError": True})
+    r = ToolResult.from_mcp(
+        "entity_update",
+        {
+            "content": [
+                {"type": "text", "text": "error [not_found]: no entity 'Lava'\nhint: did you mean 'Lava Pit'?"}
+            ],
+            "isError": True,
+        },
+    )
     assert r.is_error
     assert r.error_code == "not_found"
     assert r.error_message == "no entity 'Lava'"
@@ -97,16 +103,32 @@ def test_codegen_types_and_keywords() -> None:
     assert py_type({"type": "string", "enum": ["a", "b"]}) == "Literal['a', 'b']"
     assert py_type({"type": ["integer", "string"]}) == "int | str"
     assert py_type({"type": "array", "items": {"type": "number"}}) == "list[float]"
-    src = generate([{"name": "demo_tool", "description": "Demo.", "inputSchema": {
-        "type": "object", "properties": {"as": {"type": "string"}, "count": {"type": "integer"},
-                                         "timeout": {"type": "number"}}, "required": ["count"]}}], "test")
+    src = generate(
+        [
+            {
+                "name": "demo_tool",
+                "description": "Demo.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "as": {"type": "string"},
+                        "count": {"type": "integer"},
+                        "timeout": {"type": "number"},
+                    },
+                    "required": ["count"],
+                },
+            }
+        ],
+        "test",
+    )
     ns: dict[str, Any] = {"__name__": "skywalker_agents.engine._gen_test", "__package__": "skywalker_agents.engine"}
-    exec(compile(src, "_generated", "exec"), ns)  # noqa: S102 - testing generated code
+    exec(compile(src, "_generated", "exec"), ns)
     calls: list[tuple[str, dict[str, Any]]] = []
 
     class Caller:
-        def call(self, tool: str, args: dict[str, Any] | None = None, /, *, check: bool = False,
-                 timeout: float | None = None) -> ToolResult:
+        def call(
+            self, tool: str, args: dict[str, Any] | None = None, /, *, check: bool = False, timeout: float | None = None
+        ) -> ToolResult:
             calls.append((tool, args or {}))
             return ToolResult.ok("ok")
 
@@ -126,8 +148,18 @@ async def test_json_rpc_connection_over_a_socket() -> None:
             if msg["method"] == "initialize":
                 result: Any = {"serverInfo": {"name": "stub"}, "instructions": "hi"}
             elif msg["method"] == "tools/call" and msg["params"]["name"] == "boom":
-                writer.write((json.dumps({"jsonrpc": "2.0", "id": msg["id"],
-                                          "error": {"code": -32602, "message": "no tool named 'boom'"}}) + "\n").encode())
+                writer.write(
+                    (
+                        json.dumps(
+                            {
+                                "jsonrpc": "2.0",
+                                "id": msg["id"],
+                                "error": {"code": -32602, "message": "no tool named 'boom'"},
+                            }
+                        )
+                        + "\n"
+                    ).encode()
+                )
                 continue
             else:
                 result = {"content": [{"type": "text", "text": msg["params"]["name"]}], "isError": False}

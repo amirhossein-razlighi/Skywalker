@@ -1,0 +1,39 @@
+# The same loop as run.py, declaratively:
+#   sky-agents run examples/playtest_triage_fix/workflow.yaml --project /path/to/sky_dash_copy
+#   sky-agents run ... --script examples/playtest_triage_fix/script.json      (scripted models, no API key)
+name: playtest_triage_fix
+budget: {max_cost_usd: 5, max_seconds: 1800}
+defaults: {effort: high}
+inputs:
+  playtest: {policy: goal_seeker, runs: 2, seconds: 30, screenshots: false}
+steps:
+  - id: setup
+    tool: studio_team_template          # nimbus (director) + stratus (programmer) + aurora (artist)
+    args: {template: indie_trio}
+    when: "iteration == 1"
+  - id: playtest
+    playtest: "{{ inputs.playtest }}"
+    after: [setup]
+  - id: triage
+    agent: nimbus
+    after: [playtest]
+    when: "steps.playtest.data.metrics.completion_rate < 1"
+    prompt: |
+      Playtest {{ steps.playtest.data.id }}: metrics {{ steps.playtest.data.metrics }},
+      warnings {{ steps.playtest.data.warnings }}, findings {{ steps.playtest.data.findings }}.
+      Target: every run reaches the goal. File one feedback item per real problem (studio_feedback_submit),
+      then decide each with studio_decide: act with a small task for @stratus, or drop it with a rationale.
+  - id: fix
+    agent: stratus
+    after: [triage]
+    when: "steps.triage"
+    prompt: |
+      Claim your open tasks, fix each in the scene, verify, mark them done (studio_task_update) and remember
+      the lesson (memory_remember, scope project, kind fact).
+  - id: verify
+    playtest: "{{ inputs.playtest }}"
+    after: [fix]
+    when: "steps.fix"
+repeat:
+  max_iterations: 3
+  until: "(steps.verify.data.metrics.completion_rate or steps.playtest.data.metrics.completion_rate) >= 1"

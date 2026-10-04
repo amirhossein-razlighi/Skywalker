@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 import shutil
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import AsyncIterator
 from pathlib import Path
 
 import pytest
@@ -38,8 +38,12 @@ def project(tmp_path: Path) -> Path:
 
 
 def skywalker_binary() -> str | None:
-    for cand in (os.environ.get("SKYWALKER_BIN"), str(REPO / "build" / "release" / "bin" / "skywalker"),
-                 str(REPO / "build" / "headless" / "bin" / "skywalker"), shutil.which("skywalker")):
+    for cand in (
+        os.environ.get("SKYWALKER_BIN"),
+        str(REPO / "build" / "release" / "bin" / "skywalker"),
+        str(REPO / "build" / "headless" / "bin" / "skywalker"),
+        shutil.which("skywalker"),
+    ):
         if cand and os.path.isfile(cand) and os.access(cand, os.X_OK):
             return cand
     return None
@@ -54,9 +58,9 @@ def binary() -> str:
 
 
 @pytest.fixture
-def sky_dash(tmp_path: Path) -> Iterator[Path]:
+def sky_dash(tmp_path: Path) -> Path:
     """A throwaway copy of examples/sky_dash (agents write studio files into the project)."""
     src = REPO / "examples" / "sky_dash"
     dst = tmp_path / "sky_dash"
     shutil.copytree(src, dst, ignore=shutil.ignore_patterns("* 2.*", "studio"))
-    yield dst
+    return dst

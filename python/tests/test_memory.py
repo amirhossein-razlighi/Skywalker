@@ -90,8 +90,9 @@ async def test_consolidation_and_decay() -> None:
 async def test_memory_tools_follow_the_callers_identity() -> None:
     mem = Memory(SQLiteMemoryStore())
     tools = {t.name: t for t in memory_tools(mem)}
-    r = await tools["memory_remember"].run({"text": "I hide keys under rocks", "scope": "agent"},
-                                           ToolContext(agent_id="mira"))
+    r = await tools["memory_remember"].run(
+        {"text": "I hide keys under rocks", "scope": "agent"}, ToolContext(agent_id="mira")
+    )
     assert not r.is_error and r.data["owner"] == "mira"
     mine = await tools["memory_recall"].run({"query": "keys rocks"}, ToolContext(agent_id="mira"))
     theirs = await tools["memory_recall"].run({"query": "keys rocks"}, ToolContext(agent_id="ash"))

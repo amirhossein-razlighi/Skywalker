@@ -64,8 +64,21 @@ def _ident(name: str) -> str:
     ident = re.sub(r"\W", "_", name)
     # Keywords, our own parameters, pydantic internals, and names the annotations use (a field called
     # `list` would shadow the builtin inside the model's namespace).
-    reserved = ("self", "check", "timeout", "model_config", "list", "dict", "str", "int", "float", "bool", "Any",
-                "Literal", "Field")
+    reserved = (
+        "self",
+        "check",
+        "timeout",
+        "model_config",
+        "list",
+        "dict",
+        "str",
+        "int",
+        "float",
+        "bool",
+        "Any",
+        "Literal",
+        "Field",
+    )
     if keyword.iskeyword(ident) or ident in reserved or ident.startswith("model_"):
         ident += "_"
     if ident[0].isdigit():

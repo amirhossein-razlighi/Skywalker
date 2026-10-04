@@ -33,8 +33,9 @@ class _Block(SimpleNamespace):
 
 
 def _message(content: list[_Block], stop: str = "end_turn", **extra: Any) -> SimpleNamespace:
-    usage = SimpleNamespace(input_tokens=10, output_tokens=5, cache_read_input_tokens=100,
-                            cache_creation_input_tokens=7)
+    usage = SimpleNamespace(
+        input_tokens=10, output_tokens=5, cache_read_input_tokens=100, cache_creation_input_tokens=7
+    )
     return SimpleNamespace(content=content, stop_reason=stop, usage=usage, model="claude-opus-5-5", **extra)
 
 
@@ -72,15 +73,31 @@ class _FakeAnthropic:
 
 
 def _request(model: str = "claude-opus-5-5") -> LLMRequest:
-    raw_assistant = [{"type": "thinking", "thinking": "", "signature": "sig"},
-                     {"type": "tool_use", "id": "tu1", "name": "scene_overview", "input": {}}]
-    return LLMRequest(model=model, system="You are Mira.", tools=[ToolSpecParam(name="scene_overview")], messages=[
-        ChatMessage.user("Look at the scene"),
-        ChatMessage(role="assistant", provider="anthropic", raw=raw_assistant,
-                    content=[ToolCall(id="tu1", name="scene_overview")]),
-        ChatMessage(role="user", content=[ToolResultBlock(tool_call_id="tu1", content=[
-            TextBlock(text="#1 Cube"), ImageBlock(data="AAAA")]), TextBlock(text="go on")]),
-    ])
+    raw_assistant = [
+        {"type": "thinking", "thinking": "", "signature": "sig"},
+        {"type": "tool_use", "id": "tu1", "name": "scene_overview", "input": {}},
+    ]
+    return LLMRequest(
+        model=model,
+        system="You are Mira.",
+        tools=[ToolSpecParam(name="scene_overview")],
+        messages=[
+            ChatMessage.user("Look at the scene"),
+            ChatMessage(
+                role="assistant",
+                provider="anthropic",
+                raw=raw_assistant,
+                content=[ToolCall(id="tu1", name="scene_overview")],
+            ),
+            ChatMessage(
+                role="user",
+                content=[
+                    ToolResultBlock(tool_call_id="tu1", content=[TextBlock(text="#1 Cube"), ImageBlock(data="AAAA")]),
+                    TextBlock(text="go on"),
+                ],
+            ),
+        ],
+    )
 
 
 def test_anthropic_request_follows_current_guidance() -> None:
@@ -111,8 +128,14 @@ def test_anthropic_older_models_and_proxies() -> None:
 
 
 async def test_anthropic_parse_tool_use_refusal_and_json_retry() -> None:
-    msg = _message([_Block(type="thinking", thinking="", signature="s"), _Block(type="text", text="Looking."),
-                    _Block(type="tool_use", id="t1", name="scene_overview", input={"a": 1})], stop="tool_use")
+    msg = _message(
+        [
+            _Block(type="thinking", thinking="", signature="s"),
+            _Block(type="text", text="Looking."),
+            _Block(type="tool_use", id="t1", name="scene_overview", input={"a": 1}),
+        ],
+        stop="tool_use",
+    )
     client = _FakeAnthropic(msg, fail=[ValueError("bad partial json")])
     resp = await AnthropicProvider(client=client).complete(_request())
     assert len(client.calls) == 2  # unparseable eager tool input: re-issued once
@@ -120,8 +143,10 @@ async def test_anthropic_parse_tool_use_refusal_and_json_retry() -> None:
     assert resp.tool_calls[0].input == {"a": 1}
     assert resp.raw is not None and resp.raw[0]["type"] == "thinking"
     assert resp.usage.cache_read_tokens == 100 and resp.usage.cache_write_tokens == 7
-    refused = AnthropicProvider.parse(_message([_Block(type="text", text="partial")], stop="refusal",
-                                               stop_details=SimpleNamespace(category="cyber")), "claude-opus-5-5")
+    refused = AnthropicProvider.parse(
+        _message([_Block(type="text", text="partial")], stop="refusal", stop_details=SimpleNamespace(category="cyber")),
+        "claude-opus-5-5",
+    )
     assert refused.content == [] and refused.raw is None and refused.refusal_category == "cyber"
 
 
@@ -137,8 +162,9 @@ async def test_anthropic_bad_request_is_not_retryable() -> None:
 
 
 def test_openai_compatible_request_and_parse() -> None:
-    p = OpenAICompatibleProvider("ollama", client=SimpleNamespace(base_url="http://localhost:11434/v1"),
-                                 default_model="qwen3")
+    p = OpenAICompatibleProvider(
+        "ollama", client=SimpleNamespace(base_url="http://localhost:11434/v1"), default_model="qwen3"
+    )
     req = _request("")
     params = p.build_params(req)
     assert params["model"] == "qwen3" and params["max_tokens"] == 8192
@@ -147,14 +173,24 @@ def test_openai_compatible_request_and_parse() -> None:
     assert params["messages"][2]["tool_calls"][0]["function"]["name"] == "scene_overview"
     # The screenshot from the tool result follows as an image user message.
     assert any(part.get("type") == "image_url" for part in params["messages"][4]["content"])
-    msg = SimpleNamespace(content=None, tool_calls=[SimpleNamespace(id="c1", function=SimpleNamespace(
-        name="entity_create", arguments='{"name": "A"')),
-        SimpleNamespace(id="c2", function=SimpleNamespace(name="scene_overview", arguments="{}"))],
-        model_dump=lambda **_: {"role": "assistant", "content": None, "tool_calls": []})
-    resp = p.parse(SimpleNamespace(choices=[SimpleNamespace(message=msg, finish_reason="tool_calls")],
-                                   usage=SimpleNamespace(prompt_tokens=50, completion_tokens=9,
-                                                         prompt_tokens_details=SimpleNamespace(cached_tokens=20)),
-                                   model="qwen3"), "qwen3")
+    msg = SimpleNamespace(
+        content=None,
+        tool_calls=[
+            SimpleNamespace(id="c1", function=SimpleNamespace(name="entity_create", arguments='{"name": "A"')),
+            SimpleNamespace(id="c2", function=SimpleNamespace(name="scene_overview", arguments="{}")),
+        ],
+        model_dump=lambda **_: {"role": "assistant", "content": None, "tool_calls": []},
+    )
+    resp = p.parse(
+        SimpleNamespace(
+            choices=[SimpleNamespace(message=msg, finish_reason="tool_calls")],
+            usage=SimpleNamespace(
+                prompt_tokens=50, completion_tokens=9, prompt_tokens_details=SimpleNamespace(cached_tokens=20)
+            ),
+            model="qwen3",
+        ),
+        "qwen3",
+    )
     assert resp.stop_reason == "tool_use"
     assert resp.tool_calls[0].invalid_json and resp.tool_calls[0].raw_input == '{"name": "A"'
     assert resp.usage.input_tokens == 30 and resp.usage.cache_read_tokens == 20

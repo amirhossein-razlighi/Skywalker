@@ -187,15 +187,22 @@ class AsyncEngine:
             self._main = await self._connect(self.client_name)
         return self._main
 
-    async def connection(self, purpose: str) -> Connection:
-        """A connection of its own named ``<client>/<purpose>`` (stdio: the shared one)."""
+    async def connection(self, purpose: str, *, lane: str = "") -> Connection:
+        """A connection of its own named ``<client>/<purpose>`` (stdio: the shared one).
+
+        ``lane`` opens a parallel connection with the same identity (client ``<client>-<lane>/<purpose>``):
+        the engine answers one request per connection at a time, so work done *while* a call on the main
+        lane waits (a Python tool serving that call) must not queue behind it.
+        """
         if not self.supports_sessions:
             return await self._session()
+        key = f"{lane}:{purpose}"
         async with self._lock:
-            conn = self._conns.get(purpose)
+            conn = self._conns.get(key)
             if conn is None or conn.closed:
-                conn = await self._connect(f"{self.client_name}/{purpose}")
-                self._conns[purpose] = conn
+                prefix = f"{self.client_name}-{lane}" if lane else self.client_name
+                conn = await self._connect(f"{prefix}/{purpose}")
+                self._conns[key] = conn
             return conn
 
     async def new_connection(self, purpose: str) -> Connection:
@@ -204,9 +211,10 @@ class AsyncEngine:
             return await self._session()
         return await self._connect(f"{self.client_name}/{purpose}")
 
-    def as_agent(self, agent_id: str) -> AgentSession:
-        """Calls attributed to a roster member: ``mcp:sky-agents/<id>`` in the Activity feed."""
-        return AgentSession(self, agent_id)
+    def as_agent(self, agent_id: str, *, lane: str = "") -> AgentSession:
+        """Calls attributed to a roster member: ``mcp:sky-agents/<id>`` in the Activity feed (``lane``: a
+        parallel connection with the same identity, see :meth:`connection`)."""
+        return AgentSession(self, agent_id, lane=lane)
 
     # ------------------------------------------------------------------ calls
     async def call(
@@ -310,13 +318,15 @@ class AsyncEngine:
 class AgentSession:
     """An engine handle attributed to one roster member (its own connection; ``as`` on stdio)."""
 
-    def __init__(self, engine: AsyncEngine, agent_id: str) -> None:
+    def __init__(self, engine: AsyncEngine, agent_id: str, *, lane: str = "") -> None:
         self.engine = engine
         self.agent_id = agent_id
+        self.lane = lane
 
     @property
     def actor(self) -> str:
-        return f"mcp:{self.engine.client_name}/{self.agent_id}"
+        prefix = f"{self.engine.client_name}-{self.lane}" if self.lane else self.engine.client_name
+        return f"mcp:{prefix}/{self.agent_id}"
 
     async def call(
         self,
@@ -333,7 +343,7 @@ class AgentSession:
             spec = await self.engine.tool_spec(tool)
             if spec is not None and spec.accepts("as"):
                 merged["as"] = self.agent_id
-        conn = await self.engine.connection(self.agent_id)
+        conn = await self.engine.connection(self.agent_id, lane=self.lane)
         result = await conn.call_tool(tool, merged, timeout=timeout)
         return result.raise_for_error() if check else result
 

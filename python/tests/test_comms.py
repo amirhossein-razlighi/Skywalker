@@ -29,7 +29,7 @@ async def test_local_bus_direct_topics_threads_and_request_reply(tmp_path: Path)
     assert reply is not None and reply.text == "done" and reply.kind == "result"
     thread = await bus.thread(reply.thread)
     assert [m.text for m in thread] == ["status?", "done"]
-    assert len((await bus.inbox("stratus"))) == 2 and await bus.inbox("stratus") == []
+    assert len(await bus.inbox("stratus")) == 2 and await bus.inbox("stratus") == []
     reloaded = LocalBus(tmp_path / "bus.jsonl")
     assert len(reloaded.messages) == len(bus.messages)
     assert await bus.request("nimbus", "aurora", "anyone?", timeout=0.1) is None
@@ -57,8 +57,9 @@ async def test_studio_bus_rides_on_engine_messages(engine: AsyncEngine, fake: Fa
     assert reply is not None and reply.text == "on it"
     assert [m.text for m in await bus.thread(reply.root)] == ["ETA?", "on it"]
     board = Blackboard(engine)
-    handoff = await bus.handoff("nimbus", "aurora", "Light the canyon", context={"mood": "warm"}, board=board,
-                                acceptance=["sunset reads warm"])
+    handoff = await bus.handoff(
+        "nimbus", "aurora", "Light the canyon", context={"mood": "warm"}, board=board, acceptance=["sunset reads warm"]
+    )
     assert handoff.kind == HANDOFF and handoff.refs["task"] == "T-1"
     task_ = (await board.tasks(assignee="aurora"))[0]
     assert task_["title"] == "Light the canyon"
@@ -70,19 +71,42 @@ async def test_studio_bus_rides_on_engine_messages(engine: AsyncEngine, fake: Fa
 
 
 def test_envelope_round_trip() -> None:
-    env = Envelope(sender="a", to=["b"], text="hi", kind="request", data={"x": 1}, reply_to="M-1", topic="art",
-                   refs={"task": "T-2"})
+    env = Envelope(
+        sender="a",
+        to=["b"],
+        text="hi",
+        kind="request",
+        data={"x": 1},
+        reply_to="M-1",
+        topic="art",
+        refs={"task": "T-2"},
+    )
     args = env.to_studio_args()
-    assert args == {"text": "hi", "to": ["b"], "channel": "art", "reply_to": "M-1", "kind": "request",
-                    "data": {"x": 1}, "task": "T-2"}
+    assert args == {
+        "text": "hi",
+        "to": ["b"],
+        "channel": "art",
+        "reply_to": "M-1",
+        "kind": "request",
+        "data": {"x": 1},
+        "task": "T-2",
+    }
     back = Envelope.from_studio({"id": "M-2", "from": "a", "text": "hi", "thread": "M-1", "kind": "result"})
     assert back.root == "M-1" and back.kind == "result"
 
 
 def test_agent_cards(project: Path) -> None:
-    (project / "agents" / "mira.agent.json").write_text(json.dumps(
-        {"name": "Mira", "role": "level_designer", "discipline": "design", "focus": "secret areas",
-         "focus_tags": ["secrets"]}))
+    (project / "agents" / "mira.agent.json").write_text(
+        json.dumps(
+            {
+                "name": "Mira",
+                "role": "level_designer",
+                "discipline": "design",
+                "focus": "secret areas",
+                "focus_tags": ["secrets"],
+            }
+        )
+    )
     profiles = load_profiles(project)
     card = agent_card(profiles[0], base_url="https://studio.example")
     assert card["url"] == "https://studio.example/agents/mira" and card["skills"][0]["tags"][-1] == "secrets"

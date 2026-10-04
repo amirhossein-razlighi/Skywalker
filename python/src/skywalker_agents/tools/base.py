@@ -191,7 +191,7 @@ def _type_hints(fn: ToolFn) -> dict[str, Any]:
     for pname, ann in getattr(fn, "__annotations__", {}).items():
         if isinstance(ann, str):
             try:
-                ann = eval(ann, glb)  # noqa: S307 - evaluating the function's own annotation
+                ann = eval(ann, glb)
             except Exception:
                 ann = ToolContext if ann.endswith("ToolContext") else Any
         out[pname] = ann

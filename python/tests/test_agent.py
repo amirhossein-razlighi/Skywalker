@@ -72,12 +72,17 @@ async def test_tool_decorator_schema_docstring_and_context() -> None:
 
 
 # ---------------------------------------------------------------------- agent loop
-async def test_agent_runs_engine_tools_attributed_and_reports_to_the_studio(engine: AsyncEngine,
-                                                                             fake: FakeEngine) -> None:
-    provider = ScriptedProvider(agents={"stratus": [
-        {"text": "Creating it.", "tool_calls": [call("entity_create", name="Bridge"), call("scene_overview")]},
-        {"text": "Built the bridge."},
-    ]})
+async def test_agent_runs_engine_tools_attributed_and_reports_to_the_studio(
+    engine: AsyncEngine, fake: FakeEngine
+) -> None:
+    provider = ScriptedProvider(
+        agents={
+            "stratus": [
+                {"text": "Creating it.", "tool_calls": [call("entity_create", name="Bridge"), call("scene_overview")]},
+                {"text": "Built the bridge."},
+            ]
+        }
+    )
     tracer = Tracer([sink := MemorySink()])
     agent = Agent("stratus", engine=engine, provider=provider, tracer=tracer)
     result = await agent.run("Build a bridge")
@@ -103,15 +108,20 @@ async def test_agent_runs_engine_tools_attributed_and_reports_to_the_studio(engi
 
 async def test_unknown_tools_invalid_json_and_max_tokens(engine: AsyncEngine) -> None:
     def cut_off(req: LLMRequest) -> LLMResponse:
-        return LLMResponse(content=[ToolCall(id="c9", name="entity_create", input={"na": "trunc"})],
-                           stop_reason="max_tokens", usage=Usage(requests=1))
+        return LLMResponse(
+            content=[ToolCall(id="c9", name="entity_create", input={"na": "trunc"})],
+            stop_reason="max_tokens",
+            usage=Usage(requests=1),
+        )
 
     def bad_json(req: LLMRequest) -> LLMResponse:
-        return LLMResponse(content=[ToolCall(id="c1", name="entity_create", invalid_json=True, raw_input="{oops")],
-                           stop_reason="tool_use", usage=Usage(requests=1))
+        return LLMResponse(
+            content=[ToolCall(id="c1", name="entity_create", invalid_json=True, raw_input="{oops")],
+            stop_reason="tool_use",
+            usage=Usage(requests=1),
+        )
 
-    provider = ScriptedProvider([
-        {"tool_calls": [call("does_not_exist")]}, bad_json, cut_off, {"text": "ok"}])
+    provider = ScriptedProvider([{"tool_calls": [call("does_not_exist")]}, bad_json, cut_off, {"text": "ok"}])
     agent = Agent(Role.adhoc("solo"), engine=engine, provider=provider, engine_tools=["entity_create"])
     result = await agent.run("go")
     assert result.ok and result.text == "ok"
@@ -156,17 +166,32 @@ async def test_approvals_and_autonomy(engine: AsyncEngine, fake: FakeEngine) -> 
 
 async def test_budgets_stop_the_loop(engine: AsyncEngine) -> None:
     looping = ScriptedProvider([{"tool_calls": [call("scene_overview")]} for _ in range(10)])
-    res = await Agent(Role.adhoc("b"), engine=engine, provider=looping, budget=Budget(max_tool_calls=3),
-                      engine_tools=["scene_overview"]).run("loop")
+    res = await Agent(
+        Role.adhoc("b"),
+        engine=engine,
+        provider=looping,
+        budget=Budget(max_tool_calls=3),
+        engine_tools=["scene_overview"],
+    ).run("loop")
     assert res.stop_reason == "budget" and "tool_calls" in res.error
-    res = await Agent(Role.adhoc("t"), engine=engine, provider=ScriptedProvider(
-        [{"tool_calls": [call("scene_overview")]} for _ in range(10)]), max_turns=2,
-        engine_tools=["scene_overview"]).run("loop")
+    res = await Agent(
+        Role.adhoc("t"),
+        engine=engine,
+        provider=ScriptedProvider([{"tool_calls": [call("scene_overview")]} for _ in range(10)]),
+        max_turns=2,
+        engine_tools=["scene_overview"],
+    ).run("loop")
     assert res.stop_reason == "max_turns"
-    expensive = ScriptedProvider([{"tool_calls": [call("scene_overview")],
-                                   "usage": {"input_tokens": 600, "output_tokens": 0}}] * 5)
-    res = await Agent(Role.adhoc("c"), engine=engine, provider=expensive, budget=Budget(max_tokens=1000),
-                      engine_tools=["scene_overview"]).run("loop")
+    expensive = ScriptedProvider(
+        [{"tool_calls": [call("scene_overview")], "usage": {"input_tokens": 600, "output_tokens": 0}}] * 5
+    )
+    res = await Agent(
+        Role.adhoc("c"),
+        engine=engine,
+        provider=expensive,
+        budget=Budget(max_tokens=1000),
+        engine_tools=["scene_overview"],
+    ).run("loop")
     assert res.stop_reason == "budget"
 
 
@@ -182,21 +207,27 @@ async def test_middleware_redaction_guardrail_cache_and_custom(engine: AsyncEngi
             order.append("llm")
             return await call_next(request)
 
-    provider = ScriptedProvider([
-        {"tool_calls": [call("scene_overview"), call("scene_overview"), call("entity_create", name="X")]},
-        {"tool_calls": [call("entity_update", entity="X")]},
-        {"text": "done"},
-    ])
+    provider = ScriptedProvider(
+        [
+            {"tool_calls": [call("scene_overview"), call("scene_overview"), call("entity_create", name="X")]},
+            {"tool_calls": [call("entity_update", entity="X")]},
+            {"text": "done"},
+        ]
+    )
     cache = CacheMiddleware()
     redact = RedactionMiddleware()
-    agent = Agent(Role.adhoc("m"), engine=engine, provider=provider,
-                  middleware=[Spy(), redact, GuardrailMiddleware(deny=["entity_update"]), cache],
-                  engine_tools=["scene_overview", "entity_create", "entity_update"])
+    agent = Agent(
+        Role.adhoc("m"),
+        engine=engine,
+        provider=provider,
+        middleware=[Spy(), redact, GuardrailMiddleware(deny=["entity_update"]), cache],
+        engine_tools=["scene_overview", "entity_create", "entity_update"],
+    )
     res = await agent.run("my key is sk-ant-abcdefghijklmnopqrstuvwxyz, careful")
     assert res.ok
     assert "sk-ant-" not in provider.requests[0].messages[0].text and redact.redactions >= 1
     assert order[0] == "llm" and "tool:scene_overview" in order
-    blocked = [c for c in res.tool_calls if c.name == "entity_update"][0]
+    blocked = next(c for c in res.tool_calls if c.name == "entity_update")
     assert blocked.is_error and "guardrail" in blocked.summary
     assert sum(1 for t, *_ in fake.calls if t == "scene_overview") <= 2
 
@@ -204,9 +235,14 @@ async def test_middleware_redaction_guardrail_cache_and_custom(engine: AsyncEngi
 async def test_memory_context_tools_and_episodes(engine: AsyncEngine) -> None:
     mem = Memory.open()
     await mem.for_agent("stratus").remember("The lava bridge must stay 3 m wide", kind="fact", scope="project")
-    provider = ScriptedProvider(agents={"stratus": [
-        {"tool_calls": [call("memory_remember", text="Players jump at x=12", kind="fact", scope="agent")]},
-        {"text": "noted"}]})
+    provider = ScriptedProvider(
+        agents={
+            "stratus": [
+                {"tool_calls": [call("memory_remember", text="Players jump at x=12", kind="fact", scope="agent")]},
+                {"text": "noted"},
+            ]
+        }
+    )
     agent = Agent("stratus", engine=engine, provider=provider, memory=mem)
     res = await agent.run("How wide should the lava bridge be?")
     assert res.ok
@@ -231,7 +267,8 @@ async def test_chat_keeps_history(engine: AsyncEngine) -> None:
 async def test_roles_from_files(project: Any) -> None:
     (project / "agents" / "mira.agent.json").write_text(
         '{"format": "skywalker.agent", "version": 2, "id": "mira", "name": "Mira", "role": "level_designer",'
-        ' "focus": "secret areas", "autonomy": "ask", "memory": ["likes ramps"]}')
+        ' "focus": "secret areas", "autonomy": "ask", "memory": ["likes ramps"]}'
+    )
     role = Role.load(project, "mira")
     assert role.default_model == "claude-opus-5-5" and role.autonomy == "ask"
     assert "secret areas" in role.local_system_prompt() and "likes ramps" in role.local_system_prompt()

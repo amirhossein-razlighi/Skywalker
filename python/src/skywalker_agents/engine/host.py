@@ -115,7 +115,8 @@ class ToolHostServer:
                     actor=actor,
                     call_id=str(call.get("call")),
                     engine=self.engine,
-                    session=self.engine.as_agent(agent_id) if agent_id else None,
+                    # A lane of its own: the caller's connection is busy waiting for this very call.
+                    session=self.engine.as_agent(agent_id or "tools", lane="host"),
                 )
                 result = await tool.run(dict(call.get("args") or {}), ctx)
                 reply = {"text": result.text, "is_error": result.is_error}

@@ -143,8 +143,9 @@ def test_expressions_and_templates() -> None:
             evaluate(bad, ns)
 
 
-async def test_declarative_workflow_with_agents_tools_approval_and_patterns(engine: AsyncEngine,
-                                                                            tmp_path: Path) -> None:
+async def test_declarative_workflow_with_agents_tools_approval_and_patterns(
+    engine: AsyncEngine, tmp_path: Path
+) -> None:
     spec = {
         "name": "lighting",
         "inputs": {"goal": "warm sunset"},
@@ -153,37 +154,68 @@ async def test_declarative_workflow_with_agents_tools_approval_and_patterns(engi
             {"id": "shot", "tool": "viewport_capture", "args": {"width": 32, "height": 16}, "after": ["build"]},
             {"id": "review", "agent": "critic", "after": ["shot"], "prompt": "Review: {{ steps.build.text }}"},
             {"id": "ship", "approval": "Keep it?", "after": ["review"], "when": "'APPROVED' in steps.review.text"},
-            {"id": "notes", "agent": "aurora", "after": ["review"], "map_over": "['sky', 'sun']",
-             "prompt": "Note about {{ item }}"},
+            {
+                "id": "notes",
+                "agent": "aurora",
+                "after": ["review"],
+                "map_over": "['sky', 'sun']",
+                "prompt": "Note about {{ item }}",
+            },
         ],
         "repeat": {"max_iterations": 2, "until": "'APPROVED' in steps.review.text"},
     }
     wf, _ = load_workflow(spec)
-    provider = ScriptedProvider(agents={
-        "aurora": [{"text": "lit v1"}, {"text": "sky note"}, {"text": "sun note"}, {"text": "lit v2"},
-                   {"text": "sky 2"}, {"text": "sun 2"}],
-        "critic": [{"text": "Too cold."}, {"text": "APPROVED"}]})
-    res = await wf.run(engine, inputs=spec["inputs"], provider=provider, approver=AutoApprove(),
-                       run_dir=tmp_path / "run")
+    provider = ScriptedProvider(
+        agents={
+            "aurora": [
+                {"text": "lit v1"},
+                {"text": "sky note"},
+                {"text": "sun note"},
+                {"text": "lit v2"},
+                {"text": "sky 2"},
+                {"text": "sun 2"},
+            ],
+            "critic": [{"text": "Too cold."}, {"text": "APPROVED"}],
+        }
+    )
+    res = await wf.run(
+        engine, inputs=spec["inputs"], provider=provider, approver=AutoApprove(), run_dir=tmp_path / "run"
+    )
     assert res.ok, res.error
     assert res.iterations == 2 and res.results["ship"]["approved"] is True
     assert res.results["shot"]["images"] == 1
     assert [r["text"] for r in res.results["notes"]] == ["sky 2", "sun 2"]
     assert "lit v1" in provider.requests[1].messages[0].text or any(
-        "lit v1" in r.messages[0].text for r in provider.requests)
+        "lit v1" in r.messages[0].text for r in provider.requests
+    )
     denied = await load_workflow({"name": "gate", "steps": [{"id": "g", "approval": "ok?"}]})[0].run(
-        engine, approver=AutoDeny(), run_dir=tmp_path / "gate")
+        engine, approver=AutoDeny(), run_dir=tmp_path / "gate"
+    )
     assert denied.status == "failed" and "not approved" in denied.error
 
 
 async def test_engine_loop_json_runs_as_a_studio_loop(engine: AsyncEngine, tmp_path: Path) -> None:
     path = tmp_path / "art.loop.json"
-    path.write_text(json.dumps({"name": "art", "goal": "warm canyon", "stop": {"max_iterations": 2}, "stages": [
-        {"id": "build", "assignees": ["aurora"], "instruction": "Work on {{goal}}"},
-        {"id": "review", "assignees": ["critic"], "instruction": "Review {{inputs}}"}]}))
+    path.write_text(
+        json.dumps(
+            {
+                "name": "art",
+                "goal": "warm canyon",
+                "stop": {"max_iterations": 2},
+                "stages": [
+                    {"id": "build", "assignees": ["aurora"], "instruction": "Work on {{goal}}"},
+                    {"id": "review", "assignees": ["critic"], "instruction": "Review {{inputs}}"},
+                ],
+            }
+        )
+    )
     wf, _ = load_workflow(path)
-    provider = ScriptedProvider(agents={"aurora": [{"text": "v1"}, {"text": "v2"}],
-                                        "critic": [{"text": "more red"}, {"text": "SIGNOFF looks great"}]})
+    provider = ScriptedProvider(
+        agents={
+            "aurora": [{"text": "v1"}, {"text": "v2"}],
+            "critic": [{"text": "more red"}, {"text": "SIGNOFF looks great"}],
+        }
+    )
     res = await wf.run(engine, provider=provider, run_dir=tmp_path / "r")
     assert res.ok, res.error
     loop = res.results["loop"]
@@ -192,11 +224,20 @@ async def test_engine_loop_json_runs_as_a_studio_loop(engine: AsyncEngine, tmp_p
 
 
 async def test_studio_loop_driver_parallel_and_approval(fake: FakeEngine, engine: AsyncEngine) -> None:
-    await engine.call("studio_loop_define", {"name": "duo", "stages": [
-        {"id": "both", "assignees": ["aurora", "stratus"], "instruction": "go"}], "stop": {"max_iterations": 1}})
+    await engine.call(
+        "studio_loop_define",
+        {
+            "name": "duo",
+            "stages": [{"id": "both", "assignees": ["aurora", "stratus"], "instruction": "go"}],
+            "stop": {"max_iterations": 1},
+        },
+    )
     provider = ScriptedProvider([{"text": "a"}, {"text": "b"}])
-    out = await run_studio_loop(engine, "duo", lambda aid: __import__("skywalker_agents").Agent(
-        aid, engine=engine, provider=provider, loop_member=True))
+    out = await run_studio_loop(
+        engine,
+        "duo",
+        lambda aid: __import__("skywalker_agents").Agent(aid, engine=engine, provider=provider, loop_member=True),
+    )
     assert out["status"] == "done" and sorted(r["report"] for r in out["reports"]) == ["a", "b"]
 
 
@@ -210,15 +251,22 @@ async def test_record_and_replay_are_deterministic(engine: AsyncEngine, fake: Fa
 
         return wf
 
-    script = {"stratus": [{"tool_calls": [{"name": "entity_create", "input": {"name": "Pillar"}}]},
-                          {"text": "made it"}]}
+    script = {
+        "stratus": [{"tool_calls": [{"name": "entity_create", "input": {"name": "Pillar"}}]}, {"text": "made it"}]
+    }
     cassette = tmp_path / "golden.jsonl"
-    live = await build().run(engine, provider=ScriptedProvider(agents=script), middleware=[Recorder(cassette)],
-                             run_dir=tmp_path / "live", announce=False)
+    live = await build().run(
+        engine,
+        provider=ScriptedProvider(agents=script),
+        middleware=[Recorder(cassette)],
+        run_dir=tmp_path / "live",
+        announce=False,
+    )
     created = len([c for c in fake.calls if c[0] == "entity_create"])
     rep = Replayer(cassette)
-    again = await build().run(engine, provider=rep.provider(), middleware=[rep], run_dir=tmp_path / "replay",
-                              announce=False)
+    again = await build().run(
+        engine, provider=rep.provider(), middleware=[rep], run_dir=tmp_path / "replay", announce=False
+    )
     assert again.results["work"]["text"] == live.results["work"]["text"] == "made it"
     assert len([c for c in fake.calls if c[0] == "entity_create"]) == created  # tools were replayed, not re-run
     assert rep.served >= 3 and not rep.misses
@@ -242,19 +290,27 @@ async def test_patterns(engine: AsyncEngine, fake: FakeEngine, tmp_path: Path) -
     @wf.step()
     async def run_all(ctx: RunContext) -> None:
         out["dc"] = await director_critic(ctx, maker="aurora", critic="critic", task="warm canyon", rounds=3)
-        out["debate"] = await debate(ctx, agents=["nimbus", "stratus"], question="Jump height?", rounds=1,
-                                     judge="critic")
-        out["mr"] = await map_reduce(ctx, items=["a", "b"], mapper="stratus", reducer="nimbus",
-                                     prompt="Describe {item}")
+        out["debate"] = await debate(
+            ctx, agents=["nimbus", "stratus"], question="Jump height?", rounds=1, judge="critic"
+        )
+        out["mr"] = await map_reduce(
+            ctx, items=["a", "b"], mapper="stratus", reducer="nimbus", prompt="Describe {item}"
+        )
         out["plan"] = await plan_and_execute(ctx, planner="nimbus", executors=["stratus"], goal="add coins")
 
-    provider = ScriptedProvider(agents={
-        "aurora": [{"text": "v1"}, {"text": "v2"}],
-        "critic": [{"text": "too cold"}, {"text": "APPROVED"}, {"text": "Decision: 2 m"}],
-        "nimbus": [{"text": "2 m"}, {"text": "combined"},
-                   {"text": '```json\n[{"title": "Place coins", "assignee": "stratus", "instructions": "5 coins"}]```'},
-                   {"text": "DONE"}],
-        "stratus": [{"text": "3 m"}, {"text": "A!"}, {"text": "B!"}, {"text": "placed"}]})
+    provider = ScriptedProvider(
+        agents={
+            "aurora": [{"text": "v1"}, {"text": "v2"}],
+            "critic": [{"text": "too cold"}, {"text": "APPROVED"}, {"text": "Decision: 2 m"}],
+            "nimbus": [
+                {"text": "2 m"},
+                {"text": "combined"},
+                {"text": '```json\n[{"title": "Place coins", "assignee": "stratus", "instructions": "5 coins"}]```'},
+                {"text": "DONE"},
+            ],
+            "stratus": [{"text": "3 m"}, {"text": "A!"}, {"text": "B!"}, {"text": "placed"}],
+        }
+    )
     res = await wf.run(engine, provider=provider, run_dir=tmp_path / "p")
     assert res.ok, res.error
     assert out["dc"]["approved"] and len(out["dc"]["rounds"]) == 2
@@ -268,15 +324,34 @@ async def test_playtest_triage_fix_verify(engine: AsyncEngine, fake: FakeEngine,
 
     @wf.step()
     async def loop(ctx: RunContext) -> Any:
-        return await playtest_triage_fix_verify(ctx, director="nimbus", fixers=["stratus"],
-                                                targets={"deaths": {"max": 1}}, iterations=3)
+        return await playtest_triage_fix_verify(
+            ctx, director="nimbus", fixers=["stratus"], targets={"deaths": {"max": 1}}, iterations=3
+        )
 
-    provider = ScriptedProvider(agents={
-        "nimbus": [{"tool_calls": [{"name": "studio_decide", "input": {
-            "feedback": "F-1", "verdict": "act", "rationale": "unfair",
-            "tasks": [{"title": "Widen the bridge", "assignee": "stratus"}]}}]}, {"text": "triaged"}],
-        "stratus": [{"tool_calls": [{"name": "studio_task_update", "input": {"task": "T-1", "status": "done"}}]},
-                    {"text": "widened"}]})
+    provider = ScriptedProvider(
+        agents={
+            "nimbus": [
+                {
+                    "tool_calls": [
+                        {
+                            "name": "studio_decide",
+                            "input": {
+                                "feedback": "F-1",
+                                "verdict": "act",
+                                "rationale": "unfair",
+                                "tasks": [{"title": "Widen the bridge", "assignee": "stratus"}],
+                            },
+                        }
+                    ]
+                },
+                {"text": "triaged"},
+            ],
+            "stratus": [
+                {"tool_calls": [{"name": "studio_task_update", "input": {"task": "T-1", "status": "done"}}]},
+                {"text": "widened"},
+            ],
+        }
+    )
     res = await wf.run(engine, provider=provider, run_dir=tmp_path / "x")
     assert res.ok, res.error
     final = res.results["loop"]
@@ -288,10 +363,17 @@ async def test_evals(engine: AsyncEngine, tmp_path: Path) -> None:
         await ctx.engine.call("entity_create", {"name": sc.inputs["name"]})
         return {"status": "completed"}
 
-    scenarios = [Scenario("pillar", inputs={"name": "Pillar"}, checks=[
-        tool_check("exists", "scene_overview", expect="'Pillar' in text"),
-        text_check("completed", "output.status == 'completed'"),
-        metric_check("deaths", max=5)])]
+    scenarios = [
+        Scenario(
+            "pillar",
+            inputs={"name": "Pillar"},
+            checks=[
+                tool_check("exists", "scene_overview", expect="'Pillar' in text"),
+                text_check("completed", "output.status == 'completed'"),
+                metric_check("deaths", max=5),
+            ],
+        )
+    ]
     report = await run_eval(subject, scenarios, engine_factory=lambda: _fake_engine(), out=tmp_path / "r.json")
     assert report.passed == 1 and report.score == 1.0, report.summary()
     assert (tmp_path / "r.json").exists()
@@ -328,10 +410,19 @@ def test_runs_listing_and_stats(tmp_path: Path) -> None:
     run = tmp_path / "studio" / "runs" / "r1"
     run.mkdir(parents=True)
     (run / "report.json").write_text(json.dumps({"workflow": "w", "status": "completed", "cost": {"total_usd": 0.5}}))
-    (run / "trace.jsonl").write_text(json.dumps({"name": "chat m", "kind": "llm", "span_id": "1", "parent_id": None,
-                                                 "duration": 1.0, "attributes": {
-                                                     "gen_ai.agent.id": "mira", "gen_ai.usage.input_tokens": 10,
-                                                     "skywalker.cost_usd": 0.01}}) + "\n")
+    (run / "trace.jsonl").write_text(
+        json.dumps(
+            {
+                "name": "chat m",
+                "kind": "llm",
+                "span_id": "1",
+                "parent_id": None,
+                "duration": 1.0,
+                "attributes": {"gen_ai.agent.id": "mira", "gen_ai.usage.input_tokens": 10, "skywalker.cost_usd": 0.01},
+            }
+        )
+        + "\n"
+    )
     runs = list_runs(tmp_path)
     assert runs[0]["run_id"] == "r1" and runs[0]["cost_usd"] == 0.5
     assert "mira" in render_stats(load_trace(run / "trace.jsonl"))

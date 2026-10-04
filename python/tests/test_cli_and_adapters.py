@@ -18,11 +18,31 @@ from skywalker_agents.tools import Tool, ToolContext, tool
 
 
 def test_cli_memory_round_trip(project: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    assert main(["memory", "add", "Bridges", "stay", "3", "m", "wide", "--project", str(project), "--kind", "fact",
-                 "--scope", "project", "--tags", "level"]) == 0
+    assert (
+        main(
+            [
+                "memory",
+                "add",
+                "Bridges",
+                "stay",
+                "3",
+                "m",
+                "wide",
+                "--project",
+                str(project),
+                "--kind",
+                "fact",
+                "--scope",
+                "project",
+                "--tags",
+                "level",
+            ]
+        )
+        == 0
+    )
     assert main(["memory", "search", "bridge", "width", "--project", str(project), "--json"]) == 0
     out = capsys.readouterr().out
-    hits = json.loads(out[out.index("["):])
+    hits = json.loads(out[out.index("[") :])
     assert hits[0]["text"] == "Bridges stay 3 m wide"
     assert main(["memory", "export", "--project", str(project)]) == 0
     exported = capsys.readouterr().out.strip().splitlines()
@@ -33,13 +53,27 @@ def test_cli_memory_round_trip(project: Path, capsys: pytest.CaptureFixture[str]
 
 def test_cli_run_trace_and_cards(project: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     wf = tmp_path / "hello.yaml"
-    wf.write_text("name: hello\ninputs: {who: world}\nsteps:\n"
-                  "  - {id: look, tool: scene_overview}\n"
-                  "  - {id: greet, agent: nimbus, after: [look], prompt: 'Say hi to {{ inputs.who }}'}\n")
+    wf.write_text(
+        "name: hello\ninputs: {who: world}\nsteps:\n"
+        "  - {id: look, tool: scene_overview}\n"
+        "  - {id: greet, agent: nimbus, after: [look], prompt: 'Say hi to {{ inputs.who }}'}\n"
+    )
     script = tmp_path / "script.json"
     script.write_text(json.dumps({"agents": {"nimbus": [{"text": "hi world"}]}}))
-    code = main(["run", str(wf), "--fake", "--project", str(project), "--script", str(script), "--no-memory",
-                 "--input", "who=everyone"])
+    code = main(
+        [
+            "run",
+            str(wf),
+            "--fake",
+            "--project",
+            str(project),
+            "--script",
+            str(script),
+            "--no-memory",
+            "--input",
+            "who=everyone",
+        ]
+    )
     out = capsys.readouterr().out
     assert code == 0, out
     assert "completed" in out and "hi world" in out
@@ -131,8 +165,12 @@ async def test_mcp_server_lists_and_calls_memory_tools() -> None:
     listed = await server.request_handlers[types.ListToolsRequest](types.ListToolsRequest(method="tools/list"))
     names = [t.name for t in listed.root.tools]
     assert names == ["memory_remember", "memory_recall", "memory_forget", "memory_summarize"]
-    req = types.CallToolRequest(method="tools/call", params=types.CallToolRequestParams(
-        name="memory_remember", arguments={"text": "Claude Code was here", "scope": "agent"}))
+    req = types.CallToolRequest(
+        method="tools/call",
+        params=types.CallToolRequestParams(
+            name="memory_remember", arguments={"text": "Claude Code was here", "scope": "agent"}
+        ),
+    )
     res = (await server.request_handlers[types.CallToolRequest](req)).root
     assert not res.isError and res.structuredContent["owner"] == "claude-code"
 
@@ -149,8 +187,10 @@ def test_otel_export(tmp_path: Path) -> None:
     provider = TracerProvider()
     provider.add_span_processor(SimpleSpanProcessor(exporter))
     tracer = Tracer([OTelSink(provider), JsonlSink(tmp_path / "t.jsonl")])
-    with tracer.span("invoke_agent mira", "agent", **{"gen_ai.agent.id": "mira"}), tracer.span(
-            "chat claude-opus-5-5", "llm", **{"gen_ai.usage.input_tokens": 5, "skywalker.prompt": "secret"}):
+    with (
+        tracer.span("invoke_agent mira", "agent", **{"gen_ai.agent.id": "mira"}),
+        tracer.span("chat claude-opus-5-5", "llm", **{"gen_ai.usage.input_tokens": 5, "skywalker.prompt": "secret"}),
+    ):
         pass
     spans = {s.name: s for s in exporter.get_finished_spans()}
     chat = spans["chat claude-opus-5-5"]
@@ -161,8 +201,9 @@ def test_otel_export(tmp_path: Path) -> None:
 
 
 def test_cli_entry_point_installed() -> None:
-    out = subprocess.run([sys.executable, "-m", "skywalker_agents.cli.main", "--version"], capture_output=True,
-                         text=True, check=True)
+    out = subprocess.run(
+        [sys.executable, "-m", "skywalker_agents.cli.main", "--version"], capture_output=True, text=True, check=True
+    )
     assert out.stdout.startswith("sky-agents")
 
 
