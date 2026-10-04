@@ -349,6 +349,28 @@ void addStudioTools(Engine& engine, ToolRegistry& reg) {
                  return ToolResult::json(s.usage().at(*id).toJson(), "recorded usage for @" + *id);
              }});
 
+    reg.add({"studio_presence", "Set presence",
+             "Show what a roster member is doing right now in the editor's Studio panel (live status and activity next to "
+             "its avatar): working with a one-line activity when you start something, idle when you finish. External "
+             "harnesses (the Python agent layer, scripts, Claude Code subagents) call it so their agents appear live like "
+             "the editor's crew. Example: {status: \"working\", activity: \"T-4 widen the lava bridge\", as: \"mira\"}.",
+             "studio",
+             object({{"status", enumeration({"working", "idle", "waiting", "blocked"}, "Status")},
+                     {"activity", string("One line: what you are doing (empty when idle)")},
+                     {"agent", string("Whose presence (default: you)")},
+                     {"as", asArg()}},
+                    {"status"}),
+             true, false, [&engine](const Json& a, ToolContext& ctx) {
+                 auto actor = actorFor(engine, a, ctx);
+                 if (!actor) return err(actor.error());
+                 auto id = memberFor(engine, a, *actor, true);
+                 if (!id) return err(id.error());
+                 Studio& s = S(engine);
+                 std::string status = a.get("status").asString();
+                 s.setPresence(*id, status, status == "idle" ? "" : shortText(a.get("activity").asString(), 160));
+                 return ToolResult::json(Json::object({{"agent", *id}, {"presence", s.presence(*id)}}), "@" + *id + " is " + status);
+             }});
+
     // ---------------------------------------------------------------- board
     reg.add({"studio_task_create", "Create task",
              "Put a task on the studio board. Good tasks are small and checkable: a clear title, acceptance criteria "
@@ -737,6 +759,9 @@ void addStudioTools(Engine& engine, ToolRegistry& reg) {
                      {"reply_to", string("Message id to reply to (threads)")},
                      {"task", string("Related task id")},
                      {"feedback", string("Related feedback id")},
+                     {"kind", string("Structured message kind for agent harnesses (default chat): request, inform, "
+                                     "handoff, result, approval_request, approval_answer, ...")},
+                     {"data", objectArg("Structured payload for agent harnesses (the text stays the human-readable summary)")},
                      {"as", asArg()}},
                     {"text"}),
              true, false, [&engine](const Json& a, ToolContext& ctx) {
@@ -757,6 +782,8 @@ void addStudioTools(Engine& engine, ToolRegistry& reg) {
              object({{"agent", string("Whose inbox (default: you)")},
                      {"unread_only", boolean("Only unread (default true)")},
                      {"channel", string("Read this channel instead (\"*\" = every channel)")},
+                     {"thread", string("Read a whole thread instead (root message id); never marks read")},
+                     {"after", string("With channel or thread: only messages newer than this id")},
                      {"limit", integer("Max messages (default 30)")},
                      {"as", asArg()}}),
              false, false, [&engine](const Json& a, ToolContext& ctx) {
@@ -769,12 +796,26 @@ void addStudioTools(Engine& engine, ToolRegistry& reg) {
                  auto line = [](const studio::Message& m) {
                      return m.id + " " + m.at.substr(11, 5) + " #" + m.channel + " @" + m.from + ": " + m.text + "\n";
                  };
+                 int after = studio::idNumber(a.get("after").asString());
+                 if (a.contains("thread")) {
+                     std::string root = a.get("thread").asString();
+                     std::vector<const studio::Message*> msgs;
+                     for (const auto& m : s.messages()) {
+                         if ((m.id == root || m.thread == root) && studio::idNumber(m.id) > after) msgs.push_back(&m);
+                     }
+                     size_t start = msgs.size() > limit ? msgs.size() - limit : 0;
+                     for (size_t i = start; i < msgs.size(); ++i) {
+                         out.push(msgs[i]->toJson());
+                         text += line(*msgs[i]);
+                     }
+                     return ToolResult::json(Json::object({{"thread", root}, {"messages", out}}), text.empty() ? "(empty)" : text);
+                 }
                  if (a.contains("channel")) {
                      std::string ch = a.get("channel").asString();
                      if (!ch.empty() && ch[0] == '#') ch = ch.substr(1);
                      std::vector<const studio::Message*> msgs;
                      for (const auto& m : s.messages()) {
-                         if (ch == "*" || m.channel == studio::slugify(ch)) msgs.push_back(&m);
+                         if ((ch == "*" || m.channel == studio::slugify(ch)) && studio::idNumber(m.id) > after) msgs.push_back(&m);
                      }
                      size_t start = msgs.size() > limit ? msgs.size() - limit : 0;
                      for (size_t i = start; i < msgs.size(); ++i) {

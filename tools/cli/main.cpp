@@ -13,6 +13,7 @@
 //   skywalker studio status|agents|board|feedback|loops|run --project DIR ...   (StudioCommand.cpp)
 //   skywalker build --project DIR --out DIR [--name N --icon F --release --all-assets]   package a macOS app (BuildCommand.cpp)
 //   skywalker movie SCENE [JSON] -o out.mp4 [...]    render a cinematic to video / PNG frames (MovieCommand.cpp)
+//   skywalker serve [--project DIR] [--socket PATH]  headless engine serving the agent socket (ServeCommand.cpp)
 //   skywalker version
 
 #include <sys/socket.h>
@@ -43,6 +44,7 @@ int runStudio(const std::vector<std::string>& raw);  // StudioCommand.cpp
 int runSetup(const std::vector<std::string>& raw);   // SetupCommand.cpp
 int runBuild(const std::vector<std::string>& raw);   // BuildCommand.cpp
 int runMovie(const std::vector<std::string>& raw);   // MovieCommand.cpp
+int runServe(const std::vector<std::string>& raw);   // ServeCommand.cpp
 
 namespace {
 
@@ -94,6 +96,8 @@ int usage() {
                  "  skywalker mcp [--project DIR] [--scene FILE]   MCP server on stdio\n"
                  "  skywalker mcp --attach [SOCKET]                bridge to a running editor\n"
                  "  skywalker mcp --auto [--project DIR]           bridge to the editor if it runs, else headless\n"
+                 "  skywalker serve [--project DIR] [--scene FILE] [--socket PATH] [--lifeline]\n"
+                 "                                                 headless engine serving the agent socket (like the editor)\n"
                  "  skywalker setup <claude|codex|gemini|cursor|all> [--project DIR] [--global] [--dry-run] [--print] [--no-skills]\n"
                  "                                                 install the MCP server entry, skills, subagents and commands\n"
                  "  skywalker render SCENE -o out.png [--width W] [--height H] [--annotate] [--scene-camera] [--samples N]\n"
@@ -383,6 +387,7 @@ int main(int argc, char** argv) {
     if (cmd == "setup") return runSetup(args.raw);
     if (cmd == "build") return runBuild(args.raw);
     if (cmd == "movie") return runMovie(args.raw);
+    if (cmd == "serve") return runServe(args.raw);
     if (cmd == "version" || cmd == "--version") {
         std::printf("skywalker %s\n", SKY_VERSION_STRING);
         return 0;

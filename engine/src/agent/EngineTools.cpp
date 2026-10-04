@@ -1057,6 +1057,7 @@ void registerEngineTools(Engine& engine) {
     tools::addImpostorTools(engine, reg);
     tools::addGameTools(engine, reg);  // engine/src/agent/GameTools.cpp
     tools::addMovieTools(engine, reg);  // engine/src/agent/MovieTools.cpp (movie render queue)
+    tools::addAgentLinkTools(engine, reg);  // engine/src/agent/AgentLinkTools.cpp: events_poll, tool_host_*
 }
 
 }  // namespace sky

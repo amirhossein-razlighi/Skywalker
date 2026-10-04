@@ -138,6 +138,9 @@ set(SKY_ENGINE_SOURCES
     src/render/MovieWriter.cpp
     src/engine/Movie.cpp
     src/agent/MovieTools.cpp
+    # Agent link: followable events and tools served by external processes (docs/PYTHON_AGENTS.md)
+    src/agent/AgentLink.cpp
+    src/agent/AgentLinkTools.cpp
 )
 
 # DCC bridge: the Python helper library and the Blender add-on are embedded so the engine can

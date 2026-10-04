@@ -209,6 +209,8 @@ Engine::~Engine() {
         shuttingDown_ = true;
         failQueuedJobsLocked("the engine is shutting down");
     }
+    toolHost_->shutdown();  // agent-link waits (py_* calls, polls) return before the threads are joined
+    eventLog_->wakeAll();
     stopAgentServer();
 }
 
@@ -247,6 +249,7 @@ ToolResult Engine::finishTool(PendingCall& call) {
 
 void Engine::recordToolEvent(std::string_view name, const ToolResult& result, const std::string& actor) {
     const ToolDef* def = tools_.find(name);
+    if (def && def->quiet) return;  // plumbing (event polls, tool-host traffic) would feed back into the feed
     if (studio_) studio_->noteToolCall(actor, name, !result.isError);  // per-agent tool usage
     std::string summary = result.content.empty() ? "" : result.content.front().text.substr(0, 160);
     emitEvent(Json::object({{"type", "tool"},
@@ -1655,6 +1658,7 @@ studio::Studio& Engine::studio() {
 // ---------------------------------------------------------------------------
 
 void Engine::emitEvent(Json event) {
+    eventLog_->append(event);  // followable copy for external agents (events_poll)
     events_.push_back(std::move(event));
     while (events_.size() > 2000) events_.pop_front();  // bounded: never grows without a reader
 }
