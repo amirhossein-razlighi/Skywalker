@@ -1,0 +1,3551 @@
+{
+ "transform": {
+  "type": "object",
+  "description": "Position, rotation (Euler degrees) and scale relative to the parent entity.",
+  "properties": {
+   "position": {
+    "type": "array",
+    "items": {
+     "type": "number"
+    },
+    "minItems": 3,
+    "maxItems": 3,
+    "description": "Position in meters relative to parent; +Y is up"
+   },
+   "rotation": {
+    "type": "array",
+    "items": {
+     "type": "number"
+    },
+    "minItems": 3,
+    "maxItems": 3,
+    "description": "Euler angles in degrees [pitch(X), yaw(Y), roll(Z)]"
+   },
+   "scale": {
+    "type": "array",
+    "items": {
+     "type": "number"
+    },
+    "minItems": 3,
+    "maxItems": 3,
+    "description": "Scale factor per axis"
+   }
+  },
+  "additionalProperties": false
+ },
+ "mesh": {
+  "type": "object",
+  "description": "Renders a mesh with a simple physically based material.",
+  "properties": {
+   "mesh": {
+    "type": "string",
+    "description": "Primitive (cube, sphere, plane, cylinder, cone, quad, capsule, torus) or \"asset:<path>\" (.obj/.glb/.gltf)"
+   },
+   "color": {
+    "description": "Base color — hex string \"#rrggbb[aa]\" or [r,g,b(,a)] in 0..1"
+   },
+   "metallic": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1,
+    "description": "0 = dielectric, 1 = metal"
+   },
+   "roughness": {
+    "type": "number",
+    "minimum": 0.02,
+    "maximum": 1,
+    "description": "0 = mirror, 1 = matte"
+   },
+   "emissive": {
+    "description": "Emitted light color; alpha is strength — hex string \"#rrggbb[aa]\" or [r,g,b(,a)] in 0..1"
+   },
+   "texture": {
+    "type": "string",
+    "description": "Optional albedo texture path (png/jpg), relative to project"
+   },
+   "visible": {
+    "type": "boolean",
+    "description": "Whether the mesh is drawn"
+   },
+   "billboard": {
+    "type": "boolean",
+    "description": "Always face the camera (useful for 2D sprites)"
+   },
+   "material": {
+    "type": "string",
+    "description": "Material asset path (*.mat.json); when set it overrides color/metallic/roughness/emissive/texture"
+   },
+   "unlit": {
+    "type": "boolean",
+    "description": "Flat color/texture without lighting (2D, UI, stylized)"
+   },
+   "shading": {
+    "type": "string",
+    "enum": [
+     "pbr",
+     "toon",
+     "unlit",
+     "water"
+    ],
+    "description": "pbr = physically based, toon = cel bands + crisp highlights, unlit = flat, water = animated waves (use on a large plane; color = deep water tint)"
+   },
+   "normalMap": {
+    "type": "string",
+    "description": "Normal map (png), project-relative; adds surface detail"
+   },
+   "ormMap": {
+    "type": "string",
+    "description": "Occlusion/roughness/metallic map (R/G/B, glTF convention)"
+   },
+   "emissiveMap": {
+    "type": "string",
+    "description": "Emission mask/color map, multiplied with emissive"
+   },
+   "normalStrength": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 4,
+    "description": "Normal map strength"
+   },
+   "tiling": {
+    "type": "number",
+    "minimum": 0.01,
+    "maximum": 1000,
+    "description": "Texture repeats (per meter when triplanar)"
+   },
+   "triplanar": {
+    "type": "boolean",
+    "description": "Project textures in world space: no stretching on scaled shapes"
+   },
+   "clearcoat": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1,
+    "description": "Glossy lacquer layer on top (car paint, varnish)"
+   },
+   "subsurface": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1,
+    "description": "Light bleeding through (skin, leaves, wax, snow)"
+   },
+   "rim": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 4,
+    "description": "Stylized rim light along silhouettes"
+   },
+   "outline": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 12,
+    "description": "Cartoon outline width in pixels (0 = none)"
+   },
+   "outlineColor": {
+    "description": "Outline color — hex string \"#rrggbb[aa]\" or [r,g,b(,a)] in 0..1"
+   },
+   "doubleSided": {
+    "type": "boolean",
+    "description": "Render both faces (leaves, cloth, cards)"
+   },
+   "castShadows": {
+    "type": "boolean",
+    "description": "Cast sun shadows"
+   },
+   "alphaCutoff": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1,
+    "description": "Alpha-tested cutout: texture alpha below this is cut (foliage, fences, sails); 0 = off"
+   },
+   "layers": {
+    "type": "integer",
+    "description": "Render layers bitmask (bit 0 = layer 1 .. bit 19 = layer 20; default 1). A camera draws the mesh when its cullMask shares a bit; a light lights it when the light's cullMask does. Name layers in game.json and set them by name with render_layers"
+   }
+  },
+  "additionalProperties": false
+ },
+ "light": {
+  "type": "object",
+  "description": "A light source. Directional lights use the entity rotation; point/spot use position.",
+  "properties": {
+   "kind": {
+    "type": "string",
+    "enum": [
+     "directional",
+     "point",
+     "spot"
+    ],
+    "description": "Light type"
+   },
+   "color": {
+    "description": "Light color — hex string \"#rrggbb[aa]\" or [r,g,b(,a)] in 0..1"
+   },
+   "intensity": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1000,
+    "description": "Brightness multiplier"
+   },
+   "range": {
+    "type": "number",
+    "minimum": 0.01,
+    "maximum": 10000,
+    "description": "Falloff distance in meters (point/spot)"
+   },
+   "spotAngle": {
+    "type": "number",
+    "minimum": 1,
+    "maximum": 89,
+    "description": "Cone half-angle in degrees (spot)"
+   },
+   "cullMask": {
+    "type": "integer",
+    "description": "Render layers this light illuminates (bitmask, bit 0 = layer 1; default all 20). E.g. a rim light that only lights the hero: put the hero on layer 2 and set cullMask 2"
+   },
+   "specular": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 16,
+    "description": "Specular highlight strength (0 = diffuse only)"
+   },
+   "indirect": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 16,
+    "description": "Contribution to world-space GI (reserved for GI probes / lightmaps)"
+   },
+   "volumetric": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 16,
+    "description": "Strength in volumetric light / god rays (environment godRays)"
+   },
+   "temperature": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 40000,
+    "description": "Color temperature in Kelvin, multiplied with color (1900 candle, 2700 tungsten, 4000 fluorescent, 5500 noon, 6500 white, 9000 overcast sky); 0 = off"
+   },
+   "innerAngle": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 89,
+    "description": "Spot: half-angle of the full-intensity inner cone in degrees (0 = automatic); smaller = softer edge"
+   },
+   "negative": {
+    "type": "boolean",
+    "description": "Subtract light instead of adding it (stylized darkening)"
+   },
+   "distanceFade": {
+    "type": "boolean",
+    "description": "Fade the light out with distance from the camera (cheap crowds of small lights)"
+   },
+   "fadeBegin": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 100000,
+    "description": "Distance fade: meters from the camera where fading starts"
+   },
+   "fadeLength": {
+    "type": "number",
+    "minimum": 0.01,
+    "maximum": 100000,
+    "description": "Distance fade: meters over which the light fades out"
+   },
+   "attenuation": {
+    "type": "string",
+    "enum": [
+     "smooth",
+     "inverse_square"
+    ],
+    "description": "Falloff: smooth = soft artist-friendly curve that reaches 0 at range; inverse_square = physical 1/d^2 (brighter near the source, uses size), still windowed to range"
+   },
+   "size": {
+    "type": "number",
+    "minimum": 0.001,
+    "maximum": 100,
+    "description": "Emitter radius in meters (inverse_square falloff peak)"
+   }
+  },
+  "additionalProperties": false
+ },
+ "camera": {
+  "type": "object",
+  "description": "A camera. The first primary camera is used when the game runs.",
+  "properties": {
+   "fov": {
+    "type": "number",
+    "minimum": 5,
+    "maximum": 170,
+    "description": "Vertical field of view in degrees"
+   },
+   "nearPlane": {
+    "type": "number",
+    "minimum": 0.001,
+    "maximum": 100,
+    "description": "Near clip distance"
+   },
+   "farPlane": {
+    "type": "number",
+    "minimum": 1,
+    "maximum": 100000,
+    "description": "Far clip distance"
+   },
+   "orthographic": {
+    "type": "boolean",
+    "description": "Orthographic projection (2D games)"
+   },
+   "orthoSize": {
+    "type": "number",
+    "minimum": 0.01,
+    "maximum": 10000,
+    "description": "Half the visible height in orthographic mode"
+   },
+   "primary": {
+    "type": "boolean",
+    "description": "Use this camera for gameplay"
+   },
+   "aperture": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 64,
+    "description": "Depth of field f-stop: 1.4 very shallow .. 16 deep (0 = off)"
+   },
+   "focusDistance": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 100000,
+    "description": "Focus distance in meters (0 = autofocus on the frame center)"
+   },
+   "motionBlur": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1,
+    "description": "Motion blur shutter (0.5 = film-like 180 degrees, 0 = off)"
+   },
+   "tiltShift": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1,
+    "description": "Tilt-shift miniature look: blur above and below a sharp band across the middle of the frame (0 = off, 1 = strong)"
+   },
+   "cullMask": {
+    "type": "integer",
+    "description": "Render layers this camera draws (bitmask, bit 0 = layer 1; default all 20). E.g. hide first-person arms from a security camera, or editor-only helpers from the game camera"
+   }
+  },
+  "additionalProperties": false
+ },
+ "particles": {
+  "type": "object",
+  "description": "Particle emitter: fire, smoke, embers, sparks, rain, snow, mist, magic. Simulated by the engine and drawn as soft HDR particles. Easiest start: fx_create with a preset, then tweak fields.",
+  "properties": {
+   "preset": {
+    "type": "string",
+    "description": "Preset it was made from (informational)"
+   },
+   "emitting": {
+    "type": "boolean",
+    "description": "Emit new particles (existing ones finish their life)"
+   },
+   "look": {
+    "type": "string",
+    "enum": [
+     "glow",
+     "flame",
+     "smoke",
+     "spark",
+     "rain",
+     "snow",
+     "mist",
+     "sprite"
+    ],
+    "description": "glow = soft light points; flame = animated fire tongues; smoke = lit billowing volume; spark = glowing streaks; rain = lit falling streaks; snow = soft flakes; mist = drifting fog; sprite = textured / flipbook sheet (`texture`, gpu only)"
+   },
+   "rate": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 4000000,
+    "description": "Particles per second"
+   },
+   "burst": {
+    "type": "integer",
+    "description": "Particles emitted at once when it starts (explosions); Wander burst(n) emits more"
+   },
+   "maxParticles": {
+    "type": "integer",
+    "description": "Upper bound of live particles (cpu: up to 50000; gpu: up to 4000000)"
+   },
+   "lifetime": {
+    "type": "number",
+    "minimum": 0.01,
+    "maximum": 120,
+    "description": "Seconds each particle lives"
+   },
+   "lifetimeJitter": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1,
+    "description": "Random lifetime variation (fraction)"
+   },
+   "shape": {
+    "type": "string",
+    "enum": [
+     "point",
+     "sphere",
+     "box",
+     "disc",
+     "cone"
+    ],
+    "description": "Where particles are born (scaled by shapeSize)"
+   },
+   "shapeSize": {
+    "type": "array",
+    "items": {
+     "type": "number"
+    },
+    "minItems": 3,
+    "maxItems": 3,
+    "description": "Size of the emission shape (m)"
+   },
+   "direction": {
+    "type": "array",
+    "items": {
+     "type": "number"
+    },
+    "minItems": 3,
+    "maxItems": 3,
+    "description": "Emission direction in the entity's space"
+   },
+   "speed": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 500,
+    "description": "Initial speed (m/s)"
+   },
+   "speedJitter": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1,
+    "description": "Random speed variation (fraction)"
+   },
+   "spread": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 180,
+    "description": "Cone half-angle around direction (degrees)"
+   },
+   "gravity": {
+    "type": "number",
+    "minimum": -50,
+    "maximum": 50,
+    "description": "Downward acceleration (m/s^2); negative = rises like hot gas"
+   },
+   "drag": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 20,
+    "description": "Air resistance (per second)"
+   },
+   "turbulence": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 50,
+    "description": "Curl-noise swirl strength (m/s)"
+   },
+   "turbulenceScale": {
+    "type": "number",
+    "minimum": 0.01,
+    "maximum": 100,
+    "description": "Swirl size (m)"
+   },
+   "wind": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 5,
+    "description": "How strongly the environment wind carries particles"
+   },
+   "sizeStart": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 100,
+    "description": "Size at birth (m)"
+   },
+   "sizeEnd": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 100,
+    "description": "Size at death (m)"
+   },
+   "sizeJitter": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1,
+    "description": "Random size variation (fraction)"
+   },
+   "colorStart": {
+    "description": "Color at birth (alpha = opacity) — hex string \"#rrggbb[aa]\" or [r,g,b(,a)] in 0..1"
+   },
+   "colorEnd": {
+    "description": "Color at death (alpha = opacity) — hex string \"#rrggbb[aa]\" or [r,g,b(,a)] in 0..1"
+   },
+   "intensity": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 200,
+    "description": "HDR brightness (glows with bloom above ~1)"
+   },
+   "stretch": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1,
+    "description": "Streak length along velocity (seconds of motion)"
+   },
+   "spin": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1440,
+    "description": "Random rotation speed (degrees/s)"
+   },
+   "softness": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 10,
+    "description": "Fade where particles meet geometry (m)"
+   },
+   "worldSpace": {
+    "type": "boolean",
+    "description": "Particles stay behind when the emitter moves (trails)"
+   },
+   "collide": {
+    "type": "boolean",
+    "description": "Collide with the floor plane at floorHeight"
+   },
+   "floorHeight": {
+    "type": "number",
+    "description": "World height of the collision floor"
+   },
+   "bounce": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1,
+    "description": "Bounciness on impact (0 = die)"
+   },
+   "splash": {
+    "type": "integer",
+    "description": "Droplets spawned per impact (rain splashes)"
+   },
+   "light": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 100,
+    "description": "Light cast on the scene (flickers with the particles)"
+   },
+   "lightColor": {
+    "description": "Color of the cast light — hex string \"#rrggbb[aa]\" or [r,g,b(,a)] in 0..1"
+   },
+   "lightRange": {
+    "type": "number",
+    "minimum": 0.1,
+    "maximum": 200,
+    "description": "Reach of the cast light (m)"
+   },
+   "prewarm": {
+    "type": "boolean",
+    "description": "Start fully developed instead of from nothing"
+   },
+   "seed": {
+    "type": "integer",
+    "description": "Random seed (variations of the same effect)"
+   },
+   "simulation": {
+    "type": "string",
+    "enum": [
+     "cpu",
+     "gpu"
+    ],
+    "description": "cpu = deterministic engine simulation (gameplay, countable); gpu = compute shaders, millions of particles, depth collisions, sub-emitters, ribbons, mesh particles (visuals only)"
+   },
+   "facing": {
+    "type": "string",
+    "enum": [
+     "camera",
+     "velocity",
+     "horizontal",
+     "ribbon",
+     "mesh"
+    ],
+    "description": "gpu: camera = billboards; velocity = stretched along motion (`stretch`); horizontal = flat on the ground plane (ripples, decals); ribbon = trails (`trailLength`); mesh = instanced lit meshes (`mesh`)"
+   },
+   "mesh": {
+    "type": "string",
+    "description": "gpu facing mesh: primitive (cube, sphere...), \"asset:<path>\", or built-in fx:leaf, fx:shard, fx:pebble"
+   },
+   "roughness": {
+    "type": "number",
+    "minimum": 0.02,
+    "maximum": 1,
+    "description": "gpu mesh particles: surface roughness"
+   },
+   "metallic": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1,
+    "description": "gpu mesh particles: metalness"
+   },
+   "texture": {
+    "type": "string",
+    "description": "gpu look sprite: sprite or flipbook sheet (png/jpg), project-relative"
+   },
+   "flipbookColumns": {
+    "type": "integer",
+    "description": "Flipbook sheet columns"
+   },
+   "flipbookRows": {
+    "type": "integer",
+    "description": "Flipbook sheet rows"
+   },
+   "flipbookFps": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 240,
+    "description": "Flipbook frames per second (0 = once over each life; frames cross-fade)"
+   },
+   "colorGradient": {
+    "type": "string",
+    "description": "gpu: color over life, e.g. \"#fff6d0@0 #ffa030@0.2 #a01800@0.7 #20000000@1\" (overrides colorStart/End)"
+   },
+   "sizeCurve": {
+    "type": "string",
+    "description": "gpu: size multiplier over life, e.g. \"0@0 1@0.1 0.3@1\""
+   },
+   "opacityCurve": {
+    "type": "string",
+    "description": "gpu: opacity multiplier over life, e.g. \"0@0 1@0.2 0@1\""
+   },
+   "shapeMesh": {
+    "type": "string",
+    "description": "gpu shape mesh: emit from this mesh's surface (\"\" = this entity's mesh)"
+   },
+   "field": {
+    "type": "string",
+    "enum": [
+     "none",
+     "vortex",
+     "attractor",
+     "texture"
+    ],
+    "description": "gpu force field: vortex = swirl around fieldAxis (tornado, magic); attractor = pull toward fieldCenter; texture = vector field from fieldTexture (.fga)"
+   },
+   "fieldStrength": {
+    "type": "number",
+    "minimum": -1000,
+    "maximum": 1000,
+    "description": "Force field strength (m/s; attractor m/s^2)"
+   },
+   "fieldRadius": {
+    "type": "number",
+    "minimum": 0.01,
+    "maximum": 1000,
+    "description": "Force field radius (m)"
+   },
+   "fieldCenter": {
+    "type": "array",
+    "items": {
+     "type": "number"
+    },
+    "minItems": 3,
+    "maxItems": 3,
+    "description": "Force field center (local offset)"
+   },
+   "fieldAxis": {
+    "type": "array",
+    "items": {
+     "type": "number"
+    },
+    "minItems": 3,
+    "maxItems": 3,
+    "description": "Vortex axis (local)"
+   },
+   "fieldPull": {
+    "type": "number",
+    "minimum": -100,
+    "maximum": 100,
+    "description": "Vortex inward pull (m/s)"
+   },
+   "fieldLift": {
+    "type": "number",
+    "minimum": -100,
+    "maximum": 100,
+    "description": "Vortex lift along its axis (m/s)"
+   },
+   "fieldTexture": {
+    "type": "string",
+    "description": "Vector field file (.fga from Houdini or EmberGen)"
+   },
+   "fieldSize": {
+    "type": "array",
+    "items": {
+     "type": "number"
+    },
+    "minItems": 3,
+    "maxItems": 3,
+    "description": "Box covered by the vector field (m, centered on fieldCenter)"
+   },
+   "depthCollision": {
+    "type": "boolean",
+    "description": "gpu: collide with everything visible on screen (scene depth + normals): sparks bouncing off props, rain splashing on roofs"
+   },
+   "stick": {
+    "type": "boolean",
+    "description": "gpu: particles stick where they collide (paint, snow, blood)"
+   },
+   "friction": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1,
+    "description": "gpu: tangential slow-down on bounce"
+   },
+   "colliders": {
+    "type": "string",
+    "description": "gpu: comma-separated entity names: sphere meshes collide as spheres, planes/quads as planes, other meshes as bounding spheres"
+   },
+   "subEmitter": {
+    "type": "string",
+    "description": "gpu: name of another gpu particles entity spawned where these particles die/hit (sparks -> embers, rockets -> fireworks)"
+   },
+   "subEmitOn": {
+    "type": "string",
+    "enum": [
+     "death",
+     "collision",
+     "both"
+    ],
+    "description": "When sub-emitter particles spawn"
+   },
+   "subEmitCount": {
+    "type": "integer",
+    "description": "Sub-emitter particles per event"
+   },
+   "subEmitInherit": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 2,
+    "description": "Fraction of the parent's velocity inherited"
+   },
+   "trailLength": {
+    "type": "number",
+    "minimum": 0.01,
+    "maximum": 10,
+    "description": "Ribbon trail length (seconds of history)"
+   },
+   "trailSegments": {
+    "type": "integer",
+    "description": "Ribbon history samples"
+   },
+   "sort": {
+    "type": "boolean",
+    "description": "gpu blended looks: sort back to front on the GPU (off = faster)"
+   },
+   "hueVariation": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1,
+    "description": "gpu: random hue rotation per particle; sub-emitted particles share their event's hue (fireworks)"
+   }
+  },
+  "additionalProperties": false
+ },
+ "water": {
+  "type": "object",
+  "description": "Water surface with a spectral (FFT) ocean simulation: wind waves, choppy crests, foam, refraction, depth color and reflections. Entity y = water level. Query wave heights with water_query / Wander water_height().",
+  "properties": {
+   "windSpeed": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 40,
+    "description": "Wind speed (m/s): 2 calm lake, 8 breezy sea, 18 storm"
+   },
+   "windDirection": {
+    "type": "number",
+    "description": "Direction the waves travel (degrees, 0 = +Z)"
+   },
+   "choppiness": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 3,
+    "description": "Sharpness of crests (0 = rolling swell)"
+   },
+   "waveScale": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 5,
+    "description": "Wave amplitude multiplier"
+   },
+   "patchSize": {
+    "type": "number",
+    "minimum": 10,
+    "maximum": 2000,
+    "description": "Longest simulated wavelength (m)"
+   },
+   "size": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 100000,
+    "description": "Square extent in meters (0 = endless ocean)"
+   },
+   "depth": {
+    "type": "number",
+    "minimum": 0.5,
+    "maximum": 5000,
+    "description": "Water depth for wave physics (shallow water slows waves)"
+   },
+   "deepColor": {
+    "description": "Light scattered inside deep water — hex string \"#rrggbb[aa]\" or [r,g,b(,a)] in 0..1"
+   },
+   "shallowColor": {
+    "description": "Tint of what you see through shallow water — hex string \"#rrggbb[aa]\" or [r,g,b(,a)] in 0..1"
+   },
+   "clarity": {
+    "type": "number",
+    "minimum": 0.1,
+    "maximum": 100,
+    "description": "How far you can see into the water (m)"
+   },
+   "foam": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 4,
+    "description": "Whitecaps and shoreline foam"
+   },
+   "reflections": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 2,
+    "description": "Reflection strength"
+   },
+   "refraction": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 4,
+    "description": "Refraction distortion"
+   },
+   "roughness": {
+    "type": "number",
+    "minimum": 0.005,
+    "maximum": 0.5,
+    "description": "Micro roughness (sun glint size)"
+   },
+   "seed": {
+    "type": "integer",
+    "description": "Random seed of the wave field"
+   }
+  },
+  "additionalProperties": false
+ },
+ "terrain": {
+  "type": "object",
+  "description": "Large heightfield terrain (islands, beaches, mountains, canyons, dunes) with erosion, up to 8 blended material layers and wet shorelines. Rendered with continuous LOD. Use terrain_create, terrain_sculpt, terrain_paint and terrain_layers; heights are relative to the entity.",
+  "properties": {
+   "data": {
+    "type": "string",
+    "description": "Project-relative .terrain file with heights and layer weights"
+   },
+   "size": {
+    "type": "number",
+    "minimum": 8,
+    "maximum": 32768,
+    "description": "Square extent in meters"
+   },
+   "resolution": {
+    "type": "integer",
+    "description": "Height samples per side (2^n+1: 257, 513, 1025, 2049)"
+   },
+   "generator": {
+    "type": "object",
+    "x-sky-json": true,
+    "description": "Generation parameters (shape, seed, minHeight, maxHeight, featureSize, ridges, warp, erosion, thermal, terraces, beachWidth, seaLevel; shape heightmap: heightmap image, detailNoise)"
+   },
+   "layers": {
+    "type": "array",
+    "items": {
+     "type": "object"
+    },
+    "x-sky-json": true,
+    "description": "Material layers, base first. Each: {name, texture, normalMap, ormMap, color, roughness, tiling (m), heightMin, heightMax, slopeMin, slopeMax, noise, sharpness}. Rules auto-paint the weights."
+   },
+   "edits": {
+    "type": "array",
+    "items": {
+     "type": "object"
+    },
+    "x-sky-json": true,
+    "description": "Recorded hand edits in terrain-local meters, replayed in order over the generator when the terrain cache is rebuilt: {op: sculpt|paint|autopaint, strokes, layer}. Written by terrain_sculpt, terrain_paint and terrain_layers; cleared by terrain_generate."
+   },
+   "waterLevel": {
+    "type": "number",
+    "description": "World height of the water line (wet sand/soil just above it)"
+   },
+   "wetBand": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 20,
+    "description": "Meters above the water line that stay damp"
+   },
+   "detail": {
+    "type": "number",
+    "minimum": 0.25,
+    "maximum": 4,
+    "description": "Level-of-detail quality multiplier"
+   },
+   "macroVariation": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1,
+    "description": "Large-scale tone and hue variation over the whole landscape (0 = off, 0.5 natural)"
+   },
+   "castShadows": {
+    "type": "boolean",
+    "description": "Cast sun shadows"
+   },
+   "overlay": {
+    "type": "string",
+    "description": "Image draped over the whole terrain (row 0 = -Z edge): political/region maps, borders, paper maps. Alpha masks it; swap it at run time for map modes"
+   },
+   "overlayOpacity": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1,
+    "description": "Overlay strength (times the image alpha)"
+   },
+   "overlayBlend": {
+    "type": "string",
+    "enum": [
+     "mix",
+     "multiply",
+     "glow"
+    ],
+    "description": "mix paints over the ground (matte, keeps the relief shading), multiply tints it, glow adds the color unlit (highlights, borders that read at night)"
+   }
+  },
+  "additionalProperties": false
+ },
+ "foliage": {
+  "type": "object",
+  "description": "GPU-instanced scattering of grass, flowers, ferns, pebbles, shells, rocks and trees over a terrain (this entity or its parent) or over scene meshes inside `area`. Wind-animated, deterministic. Use foliage_add with presets.",
+  "properties": {
+   "layers": {
+    "type": "array",
+    "items": {
+     "type": "object",
+     "properties": {
+      "impostors": {
+       "type": "boolean",
+       "description": "Draw far instances as baked octahedral impostors (default true; used when the mesh has 300+ triangles)"
+      },
+      "impostorDistance": {
+       "type": "number",
+       "description": "Camera distance in meters where instances become impostors: 0 = automatic from on-screen size, -1 = never"
+      },
+      "impostorResolution": {
+       "type": "integer",
+       "description": "Impostor atlas edge in pixels: 0 = automatic, 512-2048 by model size"
+      },
+      "impostorFrames": {
+       "type": "integer",
+       "description": "Capture directions per atlas side, 4-32 (default 12)"
+      }
+     }
+    },
+    "x-sky-json": true,
+    "description": "Layers: [{preset, mesh | prefab, color, density (/m²), scaleMin, scaleMax, slopeMin, slopeMax, heightMin, heightMax, terrainLayer, wind, cullDistance, castShadows, clumping, alignToNormal, impostors, impostorDistance, impostorResolution, impostorFrames}]. Distant instances of heavy meshes draw as octahedral impostors (see impostor_bake)."
+   },
+   "seed": {
+    "type": "integer",
+    "description": "Random seed of the placement"
+   },
+   "density": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 4,
+    "description": "Density multiplier for every layer"
+   },
+   "surface": {
+    "type": "string",
+    "enum": [
+     "terrain",
+     "scene"
+    ],
+    "description": "What to grow on"
+   },
+   "area": {
+    "type": "array",
+    "items": {
+     "type": "number"
+    },
+    "minItems": 3,
+    "maxItems": 3,
+    "description": "Scene mode: extent in meters around the entity"
+   },
+   "visible": {
+    "type": "boolean",
+    "description": "Draw the foliage"
+   }
+  },
+  "additionalProperties": false
+ },
+ "fluid": {
+  "type": "object",
+  "description": "Volumetric fluid simulation for fire, smoke, steam and explosions (GPU 3D solver, ray-marched): fuel burns into heat and soot, hot gas rises and swirls. The box sits on the entity (bottom center). Start with fx_create (volume_fire, volume_smoke, steam_vent, explosion_volume...).",
+  "properties": {
+   "preset": {
+    "type": "string",
+    "description": "Preset it was made from (informational)"
+   },
+   "emitting": {
+    "type": "boolean",
+    "description": "Feed the source (off: the fire dies down)"
+   },
+   "size": {
+    "type": "array",
+    "items": {
+     "type": "number"
+    },
+    "minItems": 3,
+    "maxItems": 3,
+    "description": "Simulation box in meters (fire lives inside it)"
+   },
+   "resolution": {
+    "type": "integer",
+    "description": "Cells along the longest side (detail vs. cost)"
+   },
+   "sourceOffset": {
+    "type": "array",
+    "items": {
+     "type": "number"
+    },
+    "minItems": 3,
+    "maxItems": 3,
+    "description": "Source position from the box's bottom center (m)"
+   },
+   "sourceRadius": {
+    "type": "number",
+    "minimum": 0.01,
+    "maximum": 50,
+    "description": "Source radius (m)"
+   },
+   "fuel": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 20,
+    "description": "Fuel fed per second (0 = smoke/steam only)"
+   },
+   "heat": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 20,
+    "description": "Heat released (drives flames and lift)"
+   },
+   "smoke": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 20,
+    "description": "Soot / vapour produced"
+   },
+   "buoyancy": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 20,
+    "description": "How fast hot gas rises"
+   },
+   "vorticity": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 5,
+    "description": "Swirl: licking flames, curling smoke"
+   },
+   "turbulence": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 5,
+    "description": "Noise injected at the source"
+   },
+   "burnRate": {
+    "type": "number",
+    "minimum": 0.05,
+    "maximum": 20,
+    "description": "How fast fuel burns (lower = taller flames)"
+   },
+   "cooling": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 20,
+    "description": "How fast heat fades"
+   },
+   "smokeFade": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 20,
+    "description": "How fast smoke thins out"
+   },
+   "speed": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 50,
+    "description": "Upward speed at the source (m/s)"
+   },
+   "wind": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 5,
+    "description": "Environment wind influence"
+   },
+   "flameIntensity": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 50,
+    "description": "Fire brightness"
+   },
+   "flameTemperature": {
+    "type": "number",
+    "minimum": 800,
+    "maximum": 6000,
+    "description": "Flame color temperature in Kelvin (blackbody)"
+   },
+   "smokeColor": {
+    "description": "Smoke albedo (dark soot .. white steam) — hex string \"#rrggbb[aa]\" or [r,g,b(,a)] in 0..1"
+   },
+   "smokeDensity": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 20,
+    "description": "Smoke opacity"
+   },
+   "light": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 200,
+    "description": "Light the fire casts on the scene"
+   },
+   "lightColor": {
+    "description": "Color of the cast light — hex string \"#rrggbb[aa]\" or [r,g,b(,a)] in 0..1"
+   },
+   "lightRange": {
+    "type": "number",
+    "minimum": 0.1,
+    "maximum": 300,
+    "description": "Reach of the cast light (m)"
+   },
+   "burst": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 10,
+    "description": "Seconds of heavy fuel at start (explosions, fireballs)"
+   },
+   "seed": {
+    "type": "integer",
+    "description": "Random seed (variation)"
+   }
+  },
+  "additionalProperties": false
+ },
+ "sprite": {
+  "type": "object",
+  "description": "A textured quad on the entity's XY plane (2D characters, props, backgrounds, pixel art, 2.5D billboards). Painter's order: sortingLayer, then order, then depth.",
+  "properties": {
+   "texture": {
+    "type": "string",
+    "description": "Image (png/jpg) or atlas (*.atlas.json), project-relative"
+   },
+   "frame": {
+    "type": "string",
+    "description": "Atlas frame name or frame index (\"3\"); empty = first frame / whole image"
+   },
+   "columns": {
+    "type": "integer",
+    "description": "Grid sheet columns (frames left->right, top->bottom)"
+   },
+   "rows": {
+    "type": "integer",
+    "description": "Grid sheet rows"
+   },
+   "region": {
+    "type": "array",
+    "items": {
+     "type": "number"
+    },
+    "minItems": 1,
+    "maxItems": 4,
+    "description": "Explicit pixel rect [x, y, w, h] in the image (overrides frame)"
+   },
+   "pivot": {
+    "type": "array",
+    "items": {
+     "type": "number"
+    },
+    "minItems": 2,
+    "maxItems": 2,
+    "description": "Origin within the frame: [0.5, 0.5] center, [0.5, 0] feet, [0, 0] bottom-left"
+   },
+   "size": {
+    "type": "array",
+    "items": {
+     "type": "number"
+    },
+    "minItems": 2,
+    "maxItems": 2,
+    "description": "World size [w, h]; 0 = pixels / pixelsPerUnit (one 0 keeps the aspect)"
+   },
+   "pixelsPerUnit": {
+    "type": "number",
+    "minimum": 0.01,
+    "maximum": 100000,
+    "description": "Texture pixels per world unit (pixel art: 16 or 32)"
+   },
+   "color": {
+    "description": "Tint and opacity — hex string \"#rrggbb[aa]\" or [r,g,b(,a)] in 0..1"
+   },
+   "flipX": {
+    "type": "boolean",
+    "description": "Mirror horizontally (face left)"
+   },
+   "flipY": {
+    "type": "boolean",
+    "description": "Mirror vertically"
+   },
+   "sortingLayer": {
+    "type": "string",
+    "enum": [
+     "background",
+     "midground",
+     "default",
+     "foreground",
+     "overlay"
+    ],
+    "description": "Draw layer (back to front)"
+   },
+   "order": {
+    "type": "integer",
+    "description": "Order within the layer (higher = in front)"
+   },
+   "filter": {
+    "type": "string",
+    "enum": [
+     "linear",
+     "nearest"
+    ],
+    "description": "Texture sampling: linear (painted art) or nearest (pixel art)"
+   },
+   "normalMap": {
+    "type": "string",
+    "description": "Normal map for 2D lighting (optional)"
+   },
+   "emissive": {
+    "description": "Glow color, alpha = strength (blooms) — hex string \"#rrggbb[aa]\" or [r,g,b(,a)] in 0..1"
+   },
+   "billboard": {
+    "type": "string",
+    "enum": [
+     "none",
+     "y",
+     "full"
+    ],
+    "description": "Face the camera: none, y (upright, turns around Y) or full"
+   },
+   "lit": {
+    "type": "boolean",
+    "description": "Lit by 2D lights when the scene has any (else full bright)"
+   },
+   "castShadows": {
+    "type": "boolean",
+    "description": "Blocks shadow-casting 2D lights"
+   },
+   "alphaCutoff": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1,
+    "description": "Hard cutout below this alpha (0 = soft edges)"
+   },
+   "visible": {
+    "type": "boolean",
+    "description": "Whether the sprite is drawn"
+   }
+  },
+  "additionalProperties": false
+ },
+ "sprite_anim": {
+  "type": "object",
+  "description": "Flipbook animation for the entity's sprite. clips: {\"run\": {\"frames\": \"4-11\", \"fps\": 12, \"loop\": true, \"events\": {\"3\": \"footstep\"}}}. frames: index ranges (\"0-3,6\"), lists ([0, 1, 2] or [\"run_0\", ...]) or an atlas name pattern (\"run_*\"); a clip may switch sheets with \"texture\", \"columns\", \"rows\". Frame events reach the entity's behaviors as `on anim \"footstep\"`; non-looping clips send `on anim \"finished\"`.",
+  "properties": {
+   "clips": {
+    "type": "object",
+    "x-sky-json": true,
+    "description": "Clip name -> {frames, fps, loop, events, texture?, columns?, rows?}"
+   },
+   "clip": {
+    "type": "string",
+    "description": "Clip playing now (Wander: play_anim(self, \"run\"))"
+   },
+   "playing": {
+    "type": "boolean",
+    "description": "Advance frames"
+   },
+   "speed": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 100,
+    "description": "Playback speed multiplier"
+   }
+  },
+  "additionalProperties": false
+ },
+ "tilemap": {
+  "type": "object",
+  "description": "A grid of tiles in layers. Cell (0, 0) is the top-left at the entity position; cells go right (+x) and down (-y) in world space. Tile ids: 0 = empty, n = the n-th tile of the tileset (1-based, left->right, top->bottom). Edit with tilemap_paint / tilemap_from_ascii; layer data is compact text (\"rle:...\" or \"b64z:...\").",
+  "properties": {
+   "tileset": {
+    "type": "string",
+    "description": "Tileset image (grid of tiles) or *.tileset.json"
+   },
+   "tileSize": {
+    "type": "integer",
+    "description": "Tile size in tileset pixels"
+   },
+   "cellSize": {
+    "type": "number",
+    "minimum": 0.001,
+    "maximum": 1000,
+    "description": "World units per cell"
+   },
+   "width": {
+    "type": "integer",
+    "description": "Columns"
+   },
+   "height": {
+    "type": "integer",
+    "description": "Rows"
+   },
+   "layers": {
+    "type": "array",
+    "items": {
+     "type": "object"
+    },
+    "x-sky-json": true,
+    "description": "[{name, data, solid (true | \"tiles\"), visible, z, tint, sortingLayer, order}] bottom to top"
+   },
+   "solidTiles": {
+    "type": "array",
+    "x-sky-json": true,
+    "description": "Tile ids that collide in layers with solid: \"tiles\" ([3, \"10-20\"])"
+   },
+   "autotile": {
+    "type": "object",
+    "x-sky-json": true,
+    "description": "Terrains for auto-tiling: {\"wall\": {\"mode\": \"blob47\" | \"wang16\", \"first\": 33}} or \"tiles\": [ids]"
+   },
+   "color": {
+    "description": "Tint — hex string \"#rrggbb[aa]\" or [r,g,b(,a)] in 0..1"
+   },
+   "sortingLayer": {
+    "type": "string",
+    "enum": [
+     "background",
+     "midground",
+     "default",
+     "foreground",
+     "overlay"
+    ],
+    "description": "Draw layer of all tile layers (unless a layer overrides it)"
+   },
+   "order": {
+    "type": "integer",
+    "description": "Order within the sorting layer (each tile layer adds its index)"
+   },
+   "filter": {
+    "type": "string",
+    "enum": [
+     "nearest",
+     "linear"
+    ],
+    "description": "Texture sampling"
+   },
+   "lit": {
+    "type": "boolean",
+    "description": "Lit by 2D lights"
+   },
+   "castShadows": {
+    "type": "boolean",
+    "description": "Solid tiles block shadow-casting 2D lights"
+   }
+  },
+  "additionalProperties": false
+ },
+ "light2d": {
+  "type": "object",
+  "description": "A 2D light: point, spot (cone along the entity's local +Y) or global (ambient for the whole 2D scene). With any 2D light in the scene, lit sprites are dark except where light falls; normal maps add relief.",
+  "properties": {
+   "kind": {
+    "type": "string",
+    "enum": [
+     "point",
+     "spot",
+     "global"
+    ],
+    "description": "point | spot | global (ambient)"
+   },
+   "color": {
+    "description": "Light color — hex string \"#rrggbb[aa]\" or [r,g,b(,a)] in 0..1"
+   },
+   "intensity": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1000,
+    "description": "Brightness (HDR: > 1 blooms)"
+   },
+   "radius": {
+    "type": "number",
+    "minimum": 0.01,
+    "maximum": 100000,
+    "description": "Reach in world units"
+   },
+   "falloff": {
+    "type": "number",
+    "minimum": 0.1,
+    "maximum": 16,
+    "description": "Attenuation exponent: 1 linear, 2 soft, 4 tight"
+   },
+   "innerAngle": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 180,
+    "description": "Spot: full-intensity half-angle (degrees)"
+   },
+   "outerAngle": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 180,
+    "description": "Spot: cutoff half-angle (degrees)"
+   },
+   "height": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 100,
+    "description": "Height above the sprite plane (normal-map relief)"
+   },
+   "shadows": {
+    "type": "boolean",
+    "description": "Cast shadows from castShadows sprites and solid tiles"
+   },
+   "shadowSoftness": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1,
+    "description": "Penumbra softness"
+   },
+   "halo": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 10,
+    "description": "Visible glow in the air around the light"
+   },
+   "flicker": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1,
+    "description": "Candle/torch flicker amount"
+   }
+  },
+  "additionalProperties": false
+ },
+ "parallax": {
+  "type": "object",
+  "description": "Parallax scrolling for this entity and its children (2D, orthographic cameras): they move at `factor` of the camera's motion. 0 = fixed to the camera (sky), 0.1-0.6 = far layers, 1 = normal, > 1 = near foreground.",
+  "properties": {
+   "factor": {
+    "type": "array",
+    "items": {
+     "type": "number"
+    },
+    "minItems": 2,
+    "maxItems": 2,
+    "description": "Motion relative to the camera per axis"
+   },
+   "origin": {
+    "type": "array",
+    "items": {
+     "type": "number"
+    },
+    "minItems": 2,
+    "maxItems": 2,
+    "description": "Camera position at which the layer is at its authored position"
+   },
+   "repeatX": {
+    "type": "boolean",
+    "description": "Repeat sprites horizontally to fill the view (endless backgrounds)"
+   },
+   "repeatY": {
+    "type": "boolean",
+    "description": "Repeat sprites vertically"
+   },
+   "spacing": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1000000,
+    "description": "Repeat period in world units (0 = sprite size)"
+   }
+  },
+  "additionalProperties": false
+ },
+ "camera2d": {
+  "type": "object",
+  "description": "2D camera behavior (put it on the camera entity): orthographic, pixel-perfect integer scaling, texel snapping, smooth target following with a dead zone, and level bounds.",
+  "properties": {
+   "pixelsPerUnit": {
+    "type": "number",
+    "minimum": 0.01,
+    "maximum": 100000,
+    "description": "Art texels per world unit (match the sprites)"
+   },
+   "referenceHeight": {
+    "type": "integer",
+    "description": "Game pixels tall (e.g. 180 or 270): integer upscaling for crisp pixel art; 0 = camera.orthoSize"
+   },
+   "pixelSnap": {
+    "type": "boolean",
+    "description": "Snap the view to the texel grid (no shimmering)"
+   },
+   "zoom": {
+    "type": "number",
+    "minimum": 0.01,
+    "maximum": 100,
+    "description": "Zoom factor (> 1 = closer)"
+   },
+   "follow": {
+    "type": "string",
+    "description": "Entity to follow (name)"
+   },
+   "smoothing": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 10,
+    "description": "Follow lag in seconds (0 = rigid)"
+   },
+   "deadZone": {
+    "type": "array",
+    "items": {
+     "type": "number"
+    },
+    "minItems": 2,
+    "maxItems": 2,
+    "description": "Half-size of the box the target moves in without moving the camera"
+   },
+   "offset": {
+    "type": "array",
+    "items": {
+     "type": "number"
+    },
+    "minItems": 2,
+    "maxItems": 2,
+    "description": "Framing offset from the target"
+   },
+   "bounds": {
+    "type": "array",
+    "items": {
+     "type": "number"
+    },
+    "minItems": 1,
+    "maxItems": 4,
+    "description": "[minX, minY, maxX, maxY] the view stays inside (all 0 = unbounded)"
+   }
+  },
+  "additionalProperties": false
+ },
+ "text": {
+  "type": "object",
+  "description": "Text in the world (signs, labels, damage numbers, speech bubbles). SDF-rendered: crisp at any zoom. Supports rich text: <b> <i> <u> <s> <color=#f80> <size=150%> <font=serif> <br>.",
+  "properties": {
+   "text": {
+    "type": "string",
+    "description": "The text (rich text tags allowed)"
+   },
+   "font": {
+    "type": "string",
+    "description": "Inter (default), EB Garamond (serif), JetBrains Mono (mono), or a .ttf path"
+   },
+   "size": {
+    "type": "number",
+    "minimum": 0.001,
+    "maximum": 10000,
+    "description": "Em size in world units"
+   },
+   "color": {
+    "description": "Text color — hex string \"#rrggbb[aa]\" or [r,g,b(,a)] in 0..1"
+   },
+   "align": {
+    "type": "string",
+    "enum": [
+     "left",
+     "center",
+     "right",
+     "justify"
+    ],
+    "description": "Horizontal alignment around the entity"
+   },
+   "valign": {
+    "type": "string",
+    "enum": [
+     "top",
+     "middle",
+     "bottom"
+    ],
+    "description": "Vertical alignment around the entity"
+   },
+   "maxWidth": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1000000,
+    "description": "Wrap width in world units (0 = no wrap)"
+   },
+   "lineSpacing": {
+    "type": "number",
+    "minimum": 0.1,
+    "maximum": 10,
+    "description": "Line height multiplier"
+   },
+   "outline": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 0.15,
+    "description": "Outline width in em"
+   },
+   "outlineColor": {
+    "description": "Outline color — hex string \"#rrggbb[aa]\" or [r,g,b(,a)] in 0..1"
+   },
+   "shadowColor": {
+    "description": "Drop shadow color (alpha 0 = none) — hex string \"#rrggbb[aa]\" or [r,g,b(,a)] in 0..1"
+   },
+   "shadowOffset": {
+    "type": "array",
+    "items": {
+     "type": "number"
+    },
+    "minItems": 2,
+    "maxItems": 2,
+    "description": "Drop shadow offset in world units"
+   },
+   "emissive": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 100,
+    "description": "Glow strength (neon signs bloom)"
+   },
+   "billboard": {
+    "type": "string",
+    "enum": [
+     "none",
+     "y",
+     "full"
+    ],
+    "description": "Face the camera"
+   },
+   "sortingLayer": {
+    "type": "string",
+    "enum": [
+     "background",
+     "midground",
+     "default",
+     "foreground",
+     "overlay"
+    ],
+    "description": "Draw layer"
+   },
+   "order": {
+    "type": "integer",
+    "description": "Order within the layer"
+   },
+   "visible": {
+    "type": "boolean",
+    "description": "Whether the text is drawn"
+   }
+  },
+  "additionalProperties": false
+ },
+ "ui_canvas": {
+  "type": "object",
+  "description": "Root of a user interface. Children with a `ui` component are laid out in canvas pixels (origin top-left, y down). screen = overlay scaled from referenceResolution; world = a panel in the scene. Build whole UIs with ui_create; restyle with ui_style.",
+  "properties": {
+   "mode": {
+    "type": "string",
+    "enum": [
+     "screen",
+     "world"
+    ],
+    "description": "screen overlay or world-space panel"
+   },
+   "referenceResolution": {
+    "type": "array",
+    "items": {
+     "type": "number"
+    },
+    "minItems": 2,
+    "maxItems": 2,
+    "description": "Design resolution [w, h] in pixels"
+   },
+   "scaleMode": {
+    "type": "string",
+    "enum": [
+     "scale_with_screen",
+     "constant"
+    ],
+    "description": "scale_with_screen (resolution independent) or constant (1 px = 1 px)"
+   },
+   "match": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1,
+    "description": "Scaling: 0 = match width, 1 = match height"
+   },
+   "sortOrder": {
+    "type": "integer",
+    "description": "Canvases draw in ascending order"
+   },
+   "theme": {
+    "type": "string",
+    "enum": [
+     "dark",
+     "light",
+     "parchment",
+     "glass",
+     "pixel"
+    ],
+    "description": "Built-in look"
+   },
+   "styleSheet": {
+    "type": "string",
+    "description": "Style sheet (*.uistyle.json) layered over the theme"
+   },
+   "worldScale": {
+    "type": "number",
+    "minimum": 1e-05,
+    "maximum": 100,
+    "description": "World mode: world units per canvas pixel"
+   },
+   "interactable": {
+    "type": "boolean",
+    "description": "Receives mouse/keyboard input"
+   }
+  },
+  "additionalProperties": false
+ },
+ "ui": {
+  "type": "object",
+  "description": "A UI element under a ui_canvas. Rect: anchor preset + position (offset, y down) + size, or stretch with margin. A layout (row/column/grid) arranges children with gap/padding/align/justify; fit sizes to content. Look comes from the theme/style sheet by widget kind and `style` classes, plus styleOverrides. Activating a button/toggle/slider sends Wander `on ui \"<name>\"` (and `on click` to the element).",
+  "properties": {
+   "widget": {
+    "type": "string",
+    "enum": [
+     "panel",
+     "image",
+     "text",
+     "button",
+     "toggle",
+     "slider",
+     "progress",
+     "scroll",
+     "input",
+     "spacer"
+    ],
+    "description": "What it is"
+   },
+   "anchor": {
+    "type": "string",
+    "enum": [
+     "top_left",
+     "top",
+     "top_right",
+     "left",
+     "center",
+     "right",
+     "bottom_left",
+     "bottom",
+     "bottom_right",
+     "fill",
+     "top_stretch",
+     "middle_stretch",
+     "bottom_stretch",
+     "left_stretch",
+     "center_stretch",
+     "right_stretch",
+     "custom"
+    ],
+    "description": "Where it attaches in its parent: corners/edges/center, fill, or *_stretch bands; custom uses anchorMin/anchorMax/pivot"
+   },
+   "anchorMin": {
+    "type": "array",
+    "items": {
+     "type": "number"
+    },
+    "minItems": 2,
+    "maxItems": 2,
+    "description": "custom anchor: parent fraction [x, y] (0,0 = top-left)"
+   },
+   "anchorMax": {
+    "type": "array",
+    "items": {
+     "type": "number"
+    },
+    "minItems": 2,
+    "maxItems": 2,
+    "description": "custom anchor: parent fraction [x, y]; differs from anchorMin = stretch"
+   },
+   "pivot": {
+    "type": "array",
+    "items": {
+     "type": "number"
+    },
+    "minItems": 2,
+    "maxItems": 2,
+    "description": "custom anchor: the element's own reference point [x, y] (0,0 = top-left)"
+   },
+   "position": {
+    "type": "array",
+    "items": {
+     "type": "number"
+    },
+    "minItems": 2,
+    "maxItems": 2,
+    "description": "Offset from the anchor in pixels [x, y] (y down)"
+   },
+   "size": {
+    "type": "array",
+    "items": {
+     "type": "number"
+    },
+    "minItems": 2,
+    "maxItems": 2,
+    "description": "Size in pixels [w, h] (ignored on stretched axes)"
+   },
+   "margin": {
+    "type": "array",
+    "items": {
+     "type": "number"
+    },
+    "minItems": 1,
+    "maxItems": 4,
+    "description": "Insets on stretched axes [top, right, bottom, left]"
+   },
+   "layout": {
+    "type": "string",
+    "enum": [
+     "none",
+     "row",
+     "column",
+     "grid"
+    ],
+    "description": "Arrange children"
+   },
+   "gap": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 100000,
+    "description": "Space between children (pixels)"
+   },
+   "padding": {
+    "type": "array",
+    "items": {
+     "type": "number"
+    },
+    "minItems": 1,
+    "maxItems": 4,
+    "description": "Inner padding [top, right, bottom, left] (CSS shorthand ok: 12 or [8, 16])"
+   },
+   "align": {
+    "type": "string",
+    "enum": [
+     "start",
+     "center",
+     "end",
+     "stretch"
+    ],
+    "description": "Children on the cross axis"
+   },
+   "justify": {
+    "type": "string",
+    "enum": [
+     "start",
+     "center",
+     "end",
+     "space_between"
+    ],
+    "description": "Children on the main axis"
+   },
+   "columns": {
+    "type": "integer",
+    "description": "Grid columns"
+   },
+   "fit": {
+    "type": "string",
+    "enum": [
+     "none",
+     "width",
+     "height",
+     "both"
+    ],
+    "description": "Size to content (children or text)"
+   },
+   "flex": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1000,
+    "description": "Share of leftover space in a row/column (0 = fixed size)"
+   },
+   "ignoreLayout": {
+    "type": "boolean",
+    "description": "Placed by its own anchor even inside a layout"
+   },
+   "text": {
+    "type": "string",
+    "description": "Label or content (rich text)"
+   },
+   "image": {
+    "type": "string",
+    "description": "Image path or atlas frame (\"ui.atlas.json#heart\")"
+   },
+   "value": {
+    "type": "number",
+    "description": "Slider/progress value; toggle: 0 or 1"
+   },
+   "minValue": {
+    "type": "number",
+    "description": "Slider/progress minimum"
+   },
+   "maxValue": {
+    "type": "number",
+    "description": "Slider/progress maximum"
+   },
+   "placeholder": {
+    "type": "string",
+    "description": "Input: hint shown when empty"
+   },
+   "style": {
+    "type": "string",
+    "description": "Style classes, space separated (\"primary large\")"
+   },
+   "styleOverrides": {
+    "type": "object",
+    "x-sky-json": true,
+    "description": "Inline style properties ({\"background\": \"#223\", \"radius\": 12})"
+   },
+   "event": {
+    "type": "string",
+    "description": "Extra event sent when activated (in addition to ui:<name>)"
+   },
+   "interactable": {
+    "type": "boolean",
+    "description": "Receives input (disabled look when false)"
+   },
+   "visible": {
+    "type": "boolean",
+    "description": "Shown (hidden elements and their children take no space)"
+   },
+   "scroll": {
+    "type": "number",
+    "description": "Scroll views: content offset in pixels"
+   }
+  },
+  "additionalProperties": false
+ },
+ "dialogue": {
+  "type": "object",
+  "description": "Runs a .dialogue script (Yarn-style: nodes, `Speaker: line #tags`, `-> choices`, <<set>>, <<if>>, <<jump>>, custom <<commands>> sent to Wander as `on dialogue \"name\"`) with a built-in, restylable dialogue box. Start it with Wander start_dialogue(\"Node\"); lint with dialogue_check; simulate with dialogue_preview.",
+  "properties": {
+   "script": {
+    "type": "string",
+    "description": "Dialogue file (*.dialogue), project-relative"
+   },
+   "source": {
+    "type": "string",
+    "description": "Inline script (used when script is empty)"
+   },
+   "startNode": {
+    "type": "string",
+    "description": "Node to start at"
+   },
+   "autoStart": {
+    "type": "boolean",
+    "description": "Start when play begins"
+   },
+   "ui": {
+    "type": "string",
+    "enum": [
+     "default",
+     "none"
+    ],
+    "description": "default = built-in dialogue box; none = drive your own UI"
+   },
+   "typewriter": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 10000,
+    "description": "Characters per second (0 = instant)"
+   },
+   "portraits": {
+    "type": "string",
+    "description": "Folder for #portrait:<name> tags (<name>.png)"
+   },
+   "running": {
+    "type": "boolean",
+    "description": "State: a conversation is in progress"
+   },
+   "node": {
+    "type": "string",
+    "description": "State: current node"
+   },
+   "speaker": {
+    "type": "string",
+    "description": "State: speaker of the current line"
+   },
+   "line": {
+    "type": "string",
+    "description": "State: current line text"
+   },
+   "choices": {
+    "type": "array",
+    "items": {
+     "type": "string"
+    },
+    "x-sky-json": true,
+    "description": "State: current choices (array of strings)"
+   },
+   "tags": {
+    "type": "object",
+    "x-sky-json": true,
+    "description": "State: tags of the current line ({\"mood\": \"angry\"})"
+   }
+  },
+  "additionalProperties": false
+ },
+ "audio": {
+  "type": "object",
+  "description": "Plays a sound clip from this entity: music, ambience, sound effects. Spatial by default (louder when near, panned left/right). Plays only while the game runs. Generate clips with the audio_generate tool, then set `clip`. One-shots are easier from Wander: play_sound(\"audio/hit.wav\").",
+  "properties": {
+   "clip": {
+    "type": "string",
+    "description": "Audio file in the project (wav, mp3 or flac), e.g. audio/wind_loop.wav"
+   },
+   "volume": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 4,
+    "description": "Linear gain (1 = unchanged)"
+   },
+   "pitch": {
+    "type": "number",
+    "minimum": 0.1,
+    "maximum": 4,
+    "description": "Playback speed multiplier; also shifts pitch"
+   },
+   "loop": {
+    "type": "boolean",
+    "description": "Repeat the clip forever (ambience, music, engines)"
+   },
+   "playOnStart": {
+    "type": "boolean",
+    "description": "Start automatically when the game starts"
+   },
+   "spatial": {
+    "type": "boolean",
+    "description": "3D sound: distance attenuation and panning; false = plain stereo (music, UI)"
+   },
+   "minDistance": {
+    "type": "number",
+    "minimum": 0.01,
+    "maximum": 10000,
+    "description": "Full volume within this distance (m)"
+   },
+   "maxDistance": {
+    "type": "number",
+    "minimum": 0.1,
+    "maximum": 100000,
+    "description": "Distance where attenuation stops (inverse/exponential) or reaches silence (linear)"
+   },
+   "rolloff": {
+    "type": "string",
+    "enum": [
+     "inverse",
+     "linear",
+     "exponential",
+     "none"
+    ],
+    "description": "Distance falloff curve (inverse is physically natural; linear fades to silence at maxDistance)"
+   },
+   "rolloffFactor": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 20,
+    "description": "Falloff steepness (1 = natural)"
+   },
+   "bus": {
+    "type": "string",
+    "enum": [
+     "master",
+     "music",
+     "sfx",
+     "ambience",
+     "voice",
+     "ui"
+    ],
+    "description": "Mixer bus whose volume/mute applies (see the audio_mix tool)"
+   },
+   "doppler": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 5,
+    "description": "Doppler effect strength for moving emitters (0 = off, 1 = realistic)"
+   }
+  },
+  "additionalProperties": false
+ },
+ "listener": {
+  "type": "object",
+  "description": "The ears of the game. Optional: by default sound is heard from the active scene camera. Put this on another entity (the player character) to hear from there.",
+  "properties": {
+   "enabled": {
+    "type": "boolean",
+    "description": "Use this entity as the listener"
+   },
+   "volume": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 4,
+    "description": "Overall gain heard by this listener"
+   }
+  },
+  "additionalProperties": false
+ },
+ "body": {
+  "type": "object",
+  "description": "Simulated rigid body (Jolt). dynamic = moved by forces and collisions, kinematic = moved by its transform (platforms, doors) and pushes dynamic bodies, static = never moves. Needs no collider: the shape is fitted to the mesh. Child entities with a collider (and no body of their own) become parts of this body.",
+  "properties": {
+   "motion": {
+    "type": "string",
+    "enum": [
+     "dynamic",
+     "static",
+     "kinematic"
+    ],
+    "description": "How the body moves"
+   },
+   "mass": {
+    "type": "number",
+    "minimum": 0.001,
+    "maximum": 10000000,
+    "description": "Mass in kg (crate 20, person 70, car 1200)"
+   },
+   "friction": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 10,
+    "description": "Surface friction (ice 0.05, wood 0.5, rubber 1)"
+   },
+   "restitution": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1,
+    "description": "Bounciness: 0 = no bounce, 1 = perfectly elastic"
+   },
+   "linearDamping": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 100,
+    "description": "Air drag on movement"
+   },
+   "angularDamping": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 100,
+    "description": "Drag on spinning"
+   },
+   "gravityScale": {
+    "type": "number",
+    "minimum": -100,
+    "maximum": 100,
+    "description": "Gravity multiplier (0 = floats, -1 = falls up)"
+   },
+   "lockPosition": {
+    "type": "string",
+    "enum": [
+     "none",
+     "x",
+     "y",
+     "z",
+     "xy",
+     "xz",
+     "yz",
+     "xyz"
+    ],
+    "description": "World axes along which the body cannot move (\"z\" for 2D games)"
+   },
+   "lockRotation": {
+    "type": "string",
+    "enum": [
+     "none",
+     "x",
+     "y",
+     "z",
+     "xy",
+     "xz",
+     "yz",
+     "xyz"
+    ],
+    "description": "World axes around which the body cannot rotate (\"xz\" stays upright)"
+   },
+   "ccd": {
+    "type": "boolean",
+    "description": "Continuous collision detection: fast objects never tunnel through walls"
+   },
+   "startAwake": {
+    "type": "boolean",
+    "description": "Simulate from the start (false = sleep until touched)"
+   },
+   "velocity": {
+    "type": "array",
+    "items": {
+     "type": "number"
+    },
+    "minItems": 3,
+    "maxItems": 3,
+    "description": "Linear velocity m/s (initial; live while playing, writable)"
+   },
+   "angularVelocity": {
+    "type": "array",
+    "items": {
+     "type": "number"
+    },
+    "minItems": 3,
+    "maxItems": 3,
+    "description": "Angular velocity in degrees/s (initial; live while playing)"
+   },
+   "layer": {
+    "type": "string",
+    "enum": [
+     "default",
+     "static",
+     "player",
+     "enemy",
+     "projectile",
+     "trigger",
+     "debris"
+    ],
+    "description": "Collision layer (which layers collide: physics_world.ignorePairs)"
+   }
+  },
+  "additionalProperties": false
+ },
+ "collider": {
+  "type": "object",
+  "description": "Collision shape. Alone it makes static geometry (walls, floors); with a body it shapes the body. auto fits the mesh (box/sphere/capsule/cylinder for primitives, convex hull for dynamic models, triangle mesh for static models). mesh = exact triangles (static/kinematic only); convex = hull of the mesh; heightfield = terrain. isTrigger makes a sensor zone that fires `on trigger_enter` / `on trigger_exit` instead of blocking.",
+  "properties": {
+   "shape": {
+    "type": "string",
+    "enum": [
+     "auto",
+     "box",
+     "sphere",
+     "capsule",
+     "cylinder",
+     "convex",
+     "mesh",
+     "heightfield"
+    ],
+    "description": "Shape type"
+   },
+   "size": {
+    "type": "array",
+    "items": {
+     "type": "number"
+    },
+    "minItems": 3,
+    "maxItems": 3,
+    "description": "Box: full size (local units); heightfield: x/z extent, y = max height"
+   },
+   "radius": {
+    "type": "number",
+    "minimum": 0.001,
+    "maximum": 100000,
+    "description": "Sphere/capsule/cylinder radius (local units)"
+   },
+   "height": {
+    "type": "number",
+    "minimum": 0.001,
+    "maximum": 100000,
+    "description": "Capsule/cylinder total height along local Y"
+   },
+   "offset": {
+    "type": "array",
+    "items": {
+     "type": "number"
+    },
+    "minItems": 3,
+    "maxItems": 3,
+    "description": "Shape center relative to the entity origin (local)"
+   },
+   "rotation": {
+    "type": "array",
+    "items": {
+     "type": "number"
+    },
+    "minItems": 3,
+    "maxItems": 3,
+    "description": "Shape rotation relative to the entity (Euler degrees)"
+   },
+   "isTrigger": {
+    "type": "boolean",
+    "description": "Sensor: detects overlaps (trigger_enter/exit) but never blocks"
+   },
+   "friction": {
+    "type": "number",
+    "minimum": -1,
+    "maximum": 10,
+    "description": "Material friction override (-1 = use the body's)"
+   },
+   "restitution": {
+    "type": "number",
+    "minimum": -1,
+    "maximum": 1,
+    "description": "Material bounciness override (-1 = use the body's)"
+   },
+   "heightmap": {
+    "type": "string",
+    "description": "Heightfield source, project-relative: 16-bit .r16/.raw (square) or .hdr; empty = sample the mesh"
+   },
+   "resolution": {
+    "type": "integer",
+    "description": "Heightfield samples per side (8..1024)"
+   }
+  },
+  "additionalProperties": false
+ },
+ "character": {
+  "type": "object",
+  "description": "Capsule character controller: walks up slopes and stairs, slides along walls, rides moving platforms, pushes dynamic bodies and is detected by triggers. Drive it from Wander every tick: walk(self, dir), jump(self), grounded(self). Units are meters (not scaled by the transform).",
+  "properties": {
+   "height": {
+    "type": "number",
+    "minimum": 0.1,
+    "maximum": 50,
+    "description": "Capsule height in m"
+   },
+   "radius": {
+    "type": "number",
+    "minimum": 0.05,
+    "maximum": 10,
+    "description": "Capsule radius in m"
+   },
+   "offset": {
+    "type": "array",
+    "items": {
+     "type": "number"
+    },
+    "minItems": 3,
+    "maxItems": 3,
+    "description": "Capsule center relative to the entity origin in m (y = height/2 for models with the origin at the feet)"
+   },
+   "maxSlope": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 89,
+    "description": "Steepest walkable slope in degrees"
+   },
+   "stepHeight": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 5,
+    "description": "Highest step/curb climbed automatically (m)"
+   },
+   "moveSpeed": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 100,
+    "description": "Walking speed in m/s for walk(self, dir) with |dir| = 1"
+   },
+   "jumpSpeed": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 100,
+    "description": "Upward speed of jump() in m/s"
+   },
+   "gravity": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 200,
+    "description": "Downward acceleration in m/s^2"
+   },
+   "airControl": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1,
+    "description": "Steering while airborne (0 none .. 1 full)"
+   },
+   "turnSpeed": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 100000,
+    "description": "Degrees/s to turn toward the walk direction (0 = off)"
+   },
+   "pushStrength": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1000000,
+    "description": "Max force in N used to push dynamic bodies"
+   },
+   "mass": {
+    "type": "number",
+    "minimum": 1,
+    "maximum": 100000,
+    "description": "Mass in kg"
+   },
+   "layer": {
+    "type": "string",
+    "enum": [
+     "default",
+     "static",
+     "player",
+     "enemy",
+     "projectile",
+     "trigger",
+     "debris"
+    ],
+    "description": "Collision layer"
+   },
+   "velocity": {
+    "type": "array",
+    "items": {
+     "type": "number"
+    },
+    "minItems": 3,
+    "maxItems": 3,
+    "description": "Current velocity m/s (live while playing; write for knockback)"
+   }
+  },
+  "additionalProperties": false
+ },
+ "joint": {
+  "type": "object",
+  "description": "Connects this entity's body to another body (`target`) or to the world. fixed = welded; hinge = doors, wheels, levers (axis, limits in degrees, motor); ball = chains, ragdoll shoulders; slider = pistons, drawers (axis, limits in m); distance = rope/rod (limits = min/max length); spring = bouncy link (stiffness Hz, damping). Breaks above breakForce (fires `on event \"joint_broken\"` on this entity).",
+  "properties": {
+   "kind": {
+    "type": "string",
+    "enum": [
+     "fixed",
+     "hinge",
+     "ball",
+     "slider",
+     "distance",
+     "spring"
+    ],
+    "description": "Joint type"
+   },
+   "target": {
+    "type": "string",
+    "description": "Other entity (name or #id); empty = attached to the world"
+   },
+   "anchor": {
+    "type": "array",
+    "items": {
+     "type": "number"
+    },
+    "minItems": 3,
+    "maxItems": 3,
+    "description": "Pivot point in this entity's local space"
+   },
+   "connectedAnchor": {
+    "type": "array",
+    "items": {
+     "type": "number"
+    },
+    "minItems": 3,
+    "maxItems": 3,
+    "description": "distance/spring: the other end in the target's local space (a world point when attached to the world)"
+   },
+   "axis": {
+    "type": "array",
+    "items": {
+     "type": "number"
+    },
+    "minItems": 3,
+    "maxItems": 3,
+    "description": "Hinge axis / slider direction in local space"
+   },
+   "limitMin": {
+    "type": "number",
+    "description": "Lower limit: degrees (hinge), m (slider, distance); used when min < max"
+   },
+   "limitMax": {
+    "type": "number",
+    "description": "Upper limit"
+   },
+   "motorSpeed": {
+    "type": "number",
+    "description": "Motor target speed: degrees/s (hinge) or m/s (slider)"
+   },
+   "motorForce": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1000000000,
+    "description": "Motor max torque (N m) or force (N); 0 = no motor"
+   },
+   "stiffness": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1000,
+    "description": "Spring frequency in Hz (spring joints)"
+   },
+   "damping": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 100,
+    "description": "Spring damping ratio (0 = bouncy, 1 = critically damped)"
+   },
+   "breakForce": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 999999995904,
+    "description": "Breaks when the joint force exceeds this (N); 0 = unbreakable"
+   },
+   "collideConnected": {
+    "type": "boolean",
+    "description": "Let the two connected bodies collide with each other"
+   },
+   "enabled": {
+    "type": "boolean",
+    "description": "Active (set to false when the joint breaks)"
+   }
+  },
+  "additionalProperties": false
+ },
+ "physics_world": {
+  "type": "object",
+  "description": "Scene-wide physics settings. One per scene (on any entity; the physics_settings tool manages it).",
+  "properties": {
+   "gravity": {
+    "type": "array",
+    "items": {
+     "type": "number"
+    },
+    "minItems": 3,
+    "maxItems": 3,
+    "description": "Gravity in m/s^2 (Earth [0,-9.81,0], Moon [0,-1.62,0])"
+   },
+   "substeps": {
+    "type": "integer",
+    "description": "Collision steps per tick (1..8; more = stabler stacks, fast objects)"
+   },
+   "ignorePairs": {
+    "type": "string",
+    "description": "Comma-separated layer pairs that never collide, e.g. \"debris-player, projectile-projectile\" (layers: default, static, player, enemy, projectile, trigger, debris)"
+   },
+   "allowSleep": {
+    "type": "boolean",
+    "description": "Let resting bodies sleep (much cheaper)"
+   },
+   "enabled": {
+    "type": "boolean",
+    "description": "Run the physics simulation while playing"
+   }
+  },
+  "additionalProperties": false
+ },
+ "nav_agent": {
+  "type": "object",
+  "description": "Path-finding agent on the navigation mesh with local avoidance (crowds). Wander: navigate(self, target), stop_navigation(self), arrived(self); fires `on event \"arrived\"`. With a character component it walks the controller; otherwise it moves the transform.",
+  "properties": {
+   "speed": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 100,
+    "description": "Max speed in m/s"
+   },
+   "acceleration": {
+    "type": "number",
+    "minimum": 0.01,
+    "maximum": 1000,
+    "description": "Acceleration in m/s^2"
+   },
+   "radius": {
+    "type": "number",
+    "minimum": 0.05,
+    "maximum": 20,
+    "description": "Radius used for avoidance in m"
+   },
+   "height": {
+    "type": "number",
+    "minimum": 0.1,
+    "maximum": 50,
+    "description": "Height in m"
+   },
+   "stoppingDistance": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 100,
+    "description": "Arrival tolerance in m"
+   },
+   "turnSpeed": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 100000,
+    "description": "Degrees/s to face the movement (0 = never rotate)"
+   },
+   "destination": {
+    "type": "array",
+    "items": {
+     "type": "number"
+    },
+    "minItems": 3,
+    "maxItems": 3,
+    "description": "World point to walk to (with navigating = true)"
+   },
+   "navigating": {
+    "type": "boolean",
+    "description": "Heading to the destination (cleared on arrival)"
+   },
+   "autoRepath": {
+    "type": "boolean",
+    "description": "Re-plan when blocked or when the destination changes"
+   },
+   "avoidance": {
+    "type": "string",
+    "enum": [
+     "none",
+     "low",
+     "medium",
+     "high"
+    ],
+    "description": "Local avoidance quality"
+   }
+  },
+  "additionalProperties": false
+ },
+ "navmesh": {
+  "type": "object",
+  "description": "Navigation-mesh bake settings and the saved bake (one per scene; nav_build creates it). Walkable surfaces come from static colliders and static meshes.",
+  "properties": {
+   "agentRadius": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 20,
+    "description": "Agent radius in m (walls are eroded by it)"
+   },
+   "agentHeight": {
+    "type": "number",
+    "minimum": 0.1,
+    "maximum": 50,
+    "description": "Agent height in m (lower ceilings block)"
+   },
+   "maxClimb": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 20,
+    "description": "Highest step in m"
+   },
+   "maxSlope": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 89,
+    "description": "Steepest walkable slope in degrees"
+   },
+   "cellSize": {
+    "type": "number",
+    "minimum": 0.01,
+    "maximum": 5,
+    "description": "Voxel size in m (radius/2..radius/3 is typical)"
+   },
+   "cellHeight": {
+    "type": "number",
+    "minimum": 0.01,
+    "maximum": 5,
+    "description": "Voxel height in m"
+   },
+   "tileSize": {
+    "type": "integer",
+    "description": "Cells per tile side (16..256)"
+   },
+   "geometry": {
+    "type": "string",
+    "enum": [
+     "both",
+     "colliders",
+     "meshes"
+    ],
+    "description": "Input: both (colliders where present, else meshes), colliders only, or render meshes only"
+   },
+   "data": {
+    "type": "string",
+    "description": "Baked navmesh file (project-relative), written by nav_build"
+   },
+   "autoBuild": {
+    "type": "boolean",
+    "description": "Bake when play starts if the saved bake is missing or stale"
+   }
+  },
+  "additionalProperties": false
+ },
+ "animator": {
+  "type": "object",
+  "description": "Skeletal animation for this entity's rigged meshes (and its children's): a state machine controller or one clip. Set parameters and triggers with animator_set or Wander set_param/trigger/play_animation.",
+  "properties": {
+   "library": {
+    "type": "string",
+    "description": "Animation library (*.anim: skeleton + clips); empty = the one imported with the mesh"
+   },
+   "controller": {
+    "type": "string",
+    "description": "State machine (*.animctl.json); empty = play `clip`"
+   },
+   "clip": {
+    "type": "string",
+    "description": "Clip to play when there is no controller (empty = the first clip)"
+   },
+   "speed": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 10,
+    "description": "Playback rate (0 pauses, 2 = double speed)"
+   },
+   "loop": {
+    "type": "boolean",
+    "description": "Loop the clip (without a controller)"
+   },
+   "rootMotion": {
+    "type": "boolean",
+    "description": "Move the entity with the animation's root (hips) movement instead of in place"
+   },
+   "preview": {
+    "type": "string",
+    "enum": [
+     "rest",
+     "pose",
+     "play"
+    ],
+    "description": "Editor preview: rest = bind pose, pose = frame at `time`, play = animate live"
+   },
+   "time": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 600,
+    "description": "Editor preview time (seconds into the default state / clip)"
+   },
+   "lookAt": {
+    "type": "string",
+    "description": "Entity the head and spine turn towards (look-at IK); empty = off"
+   },
+   "lookAtWeight": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1,
+    "description": "How strongly the head follows lookAt"
+   },
+   "lookAtLimit": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 180,
+    "description": "Maximum head/spine turn (degrees)"
+   }
+  },
+  "additionalProperties": false
+ },
+ "attach": {
+  "type": "object",
+  "description": "Keeps this entity on a bone of an animated character (weapon in a hand, hat on a head, lantern on a belt).",
+  "properties": {
+   "character": {
+    "type": "string",
+    "description": "Entity with the animator; empty = nearest ancestor that has one"
+   },
+   "bone": {
+    "type": "string",
+    "description": "Bone name, e.g. RightHand or mixamorig:Head (animation_list shows them)"
+   },
+   "offset": {
+    "type": "array",
+    "items": {
+     "type": "number"
+    },
+    "minItems": 3,
+    "maxItems": 3,
+    "description": "Position offset in the bone's space (meters)"
+   },
+   "rotation": {
+    "type": "array",
+    "items": {
+     "type": "number"
+    },
+    "minItems": 3,
+    "maxItems": 3,
+    "description": "Rotation offset in the bone's space (Euler degrees)"
+   },
+   "followScale": {
+    "type": "boolean",
+    "description": "Inherit the bone's scale (off keeps this entity's scale)"
+   }
+  },
+  "additionalProperties": false
+ },
+ "sequencer": {
+  "type": "object",
+  "description": "Plays a cinematic sequence (*.sequence.json): camera shots and cuts, keyed properties, events and animations. Build sequences with the sequence_* tools.",
+  "properties": {
+   "sequence": {
+    "type": "string",
+    "description": "Sequence asset (*.sequence.json)"
+   },
+   "playOnStart": {
+    "type": "boolean",
+    "description": "Start playing when the simulation starts"
+   },
+   "loop": {
+    "type": "boolean",
+    "description": "Loop at the end"
+   },
+   "speed": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 10,
+    "description": "Playback rate"
+   },
+   "preview": {
+    "type": "boolean",
+    "description": "Editor: show the sequence frozen at `time` in the viewport"
+   },
+   "time": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 3600,
+    "description": "Editor scrub position (seconds)"
+   }
+  },
+  "additionalProperties": false
+ },
+ "ik": {
+  "type": "object",
+  "description": "Two-bone IK effector: the character's hand or foot (and elbow or knee) reaches this entity's position.",
+  "properties": {
+   "character": {
+    "type": "string",
+    "description": "Entity with the animator; empty = nearest ancestor that has one"
+   },
+   "bone": {
+    "type": "string",
+    "description": "End bone that reaches here: LeftHand, RightFoot... (animation_list lists bones)"
+   },
+   "weight": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1,
+    "description": "Blend between the animation (0) and the target (1)"
+   },
+   "pole": {
+    "type": "array",
+    "items": {
+     "type": "number"
+    },
+    "minItems": 3,
+    "maxItems": 3,
+    "description": "Bend direction in the character's space (e.g. [0,0,-1] knees forward); [0,0,0] keeps the animated bend"
+   },
+   "matchRotation": {
+    "type": "boolean",
+    "description": "Also orient the end bone like this entity"
+   }
+  },
+  "additionalProperties": false
+ },
+ "groom": {
+  "type": "object",
+  "description": "Strand hair and fur grown on the entity's mesh (or `target`'s), or loaded from a .hair/.groom.json/.skygroom file. Rendered as real strands (Marschner shading, deep opacity self-shadowing, multiple scattering) and simulated on the GPU (gravity, wind, collisions). Easiest start: groom_create with a preset (hair_straight, hair_wavy, hair_curly, hair_ponytail, hair_short, fur_short, fur_long), then tweak fields.",
+  "properties": {
+   "preset": {
+    "type": "string",
+    "description": "Preset it was made from (informational)"
+   },
+   "visible": {
+    "type": "boolean",
+    "description": "Draw the groom"
+   },
+   "source": {
+    "type": "string",
+    "description": "Groom file (.hair = Cem Yuksel's format, .groom.json, .skygroom), project-relative; \"\" = grow procedurally on the mesh"
+   },
+   "target": {
+    "type": "string",
+    "description": "Entity whose mesh grows the hair (\"\" = this entity)"
+   },
+   "importScale": {
+    "type": "number",
+    "minimum": 1e-05,
+    "maximum": 1000,
+    "description": "Imported files: scale to meters (0.01 for centimeters)"
+   },
+   "importZUp": {
+    "type": "boolean",
+    "description": "Imported files: the source is Z-up"
+   },
+   "strands": {
+    "type": "integer",
+    "description": "Rendered strands (head of hair 50k-150k; fur 100k+). Imported files: cap"
+   },
+   "guides": {
+    "type": "integer",
+    "description": "Simulated guide strands (0 = automatic, ~4*sqrt(strands))"
+   },
+   "segments": {
+    "type": "integer",
+    "description": "Segments per strand (smoothness of curls; 4 for fur, 16-31 for long hair)"
+   },
+   "length": {
+    "type": "number",
+    "minimum": 0.001,
+    "maximum": 5,
+    "description": "Strand length in meters"
+   },
+   "lengthVariation": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 0.95,
+    "description": "Random length variation (fraction)"
+   },
+   "widthRoot": {
+    "type": "number",
+    "minimum": 0.001,
+    "maximum": 10,
+    "description": "Strand width at the root in millimeters (human hair 0.05-0.1)"
+   },
+   "widthTip": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 10,
+    "description": "Strand width at the tip in millimeters"
+   },
+   "direction": {
+    "type": "array",
+    "items": {
+     "type": "number"
+    },
+    "minItems": 3,
+    "maxItems": 3,
+    "description": "Comb direction in the mesh's space (e.g. [0,-1,-0.4] = down and back)"
+   },
+   "directionBlend": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1,
+    "description": "0 = grow along the surface normal, 1 = along `direction`"
+   },
+   "gravity": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 2,
+    "description": "Droop: 0 = stands up (fur, crew cut) .. 1 = hangs down"
+   },
+   "curlRadius": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 0.2,
+    "description": "Curl (helix) radius in meters (0.005-0.02 for curly hair)"
+   },
+   "curlFrequency": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 200,
+    "description": "Curl turns per meter of strand"
+   },
+   "wave": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 0.2,
+    "description": "Wave amplitude in meters"
+   },
+   "waveFrequency": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 100,
+    "description": "Waves per meter of strand"
+   },
+   "clumps": {
+    "type": "integer",
+    "description": "Clumps strands gather into (0 = none; hundreds for a head)"
+   },
+   "clumpStrength": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1,
+    "description": "How far strands pull into their clump"
+   },
+   "clumpShape": {
+    "type": "number",
+    "minimum": 0.1,
+    "maximum": 8,
+    "description": "Clump profile: > 1 tips clump more than roots, < 1 clump early"
+   },
+   "frizz": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 0.1,
+    "description": "Noise / flyaways in meters"
+   },
+   "frizzScale": {
+    "type": "number",
+    "minimum": 0.1,
+    "maximum": 1000,
+    "description": "Frizz noise frequency (per meter)"
+   },
+   "ponytail": {
+    "type": "boolean",
+    "description": "Comb every strand to ponytailPosition, then let them hang as one bundle"
+   },
+   "ponytailPosition": {
+    "type": "array",
+    "items": {
+     "type": "number"
+    },
+    "minItems": 3,
+    "maxItems": 3,
+    "description": "Where the ponytail is tied (mesh space, meters; just outside the scalp)"
+   },
+   "maskChannel": {
+    "type": "string",
+    "enum": [
+     "none",
+     "r",
+     "g",
+     "b",
+     "a"
+    ],
+    "description": "Vertex-color channel that controls density (scalp painting)"
+   },
+   "maskDirection": {
+    "type": "array",
+    "items": {
+     "type": "number"
+    },
+    "minItems": 3,
+    "maxItems": 3,
+    "description": "Grow only where the surface faces this way (mesh space; with maskAngle)"
+   },
+   "maskAngle": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 180,
+    "description": "Degrees around maskDirection that grow hair (180 = everywhere)"
+   },
+   "maskSoftness": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 90,
+    "description": "Soft hairline width in degrees"
+   },
+   "melanin": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1,
+    "description": "Pigment (physically based absorption): 0 white, 0.1 platinum, 0.2 blond, 0.35 dark blond, 0.5 light brown, 0.7 brown, 0.85 dark brown, 0.95+ black"
+   },
+   "redness": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1,
+    "description": "Red pigment (pheomelanin) fraction: 0.5 auburn, 0.9 ginger"
+   },
+   "dye": {
+    "description": "Dye tint (white = natural) — hex string \"#rrggbb[aa]\" or [r,g,b(,a)] in 0..1"
+   },
+   "rootColor": {
+    "description": "Color multiplier at the roots (root-to-tip gradient, e.g. dark roots) — hex string \"#rrggbb[aa]\" or [r,g,b(,a)] in 0..1"
+   },
+   "tipColor": {
+    "description": "Color multiplier at the tips (sun-bleached or dyed tips) — hex string \"#rrggbb[aa]\" or [r,g,b(,a)] in 0..1"
+   },
+   "colorVariation": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1,
+    "description": "Per-strand pigment variation"
+   },
+   "roughness": {
+    "type": "number",
+    "minimum": 0.02,
+    "maximum": 1,
+    "description": "Longitudinal roughness: highlight width (0.2 silky .. 0.6 dull)"
+   },
+   "radialRoughness": {
+    "type": "number",
+    "minimum": 0.05,
+    "maximum": 1,
+    "description": "Azimuthal roughness: softness of light through the strand"
+   },
+   "specular": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 4,
+    "description": "Primary (white) highlight strength"
+   },
+   "scatter": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 4,
+    "description": "Multiple scattering: light hair glows, dark hair stays rich"
+   },
+   "cuticleTilt": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 10,
+    "description": "Cuticle tilt in degrees (separates the two highlights)"
+   },
+   "density": {
+    "type": "number",
+    "minimum": 0.05,
+    "maximum": 8,
+    "description": "Coverage per strand (2 = a full head of hair at typical strand counts; lower for wispy, higher for thick)"
+   },
+   "simulate": {
+    "type": "boolean",
+    "description": "Simulate on the GPU (gravity, wind, collisions)"
+   },
+   "stiffness": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1,
+    "description": "How strongly strands keep their groomed shape"
+   },
+   "rootStiffness": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1,
+    "description": "Stiffness near the roots"
+   },
+   "damping": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1,
+    "description": "Velocity damping"
+   },
+   "wind": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 10,
+    "description": "Environment wind influence"
+   },
+   "collide": {
+    "type": "boolean",
+    "description": "Collide with the mesh (sphere/capsule proxy) and `colliders`"
+   },
+   "colliders": {
+    "type": "string",
+    "description": "Comma-separated entity names that hair collides with (shoulders, hands)"
+   },
+   "lod": {
+    "type": "string",
+    "enum": [
+     "auto",
+     "strands",
+     "cards"
+    ],
+    "description": "auto = strands up close, cards far away; strands; cards (cheapest)"
+   },
+   "cardsBelow": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 4096,
+    "description": "auto LOD: draw cards when the groom is smaller than this (pixels)"
+   },
+   "castShadows": {
+    "type": "boolean",
+    "description": "Cast sun shadows on the scene"
+   },
+   "seed": {
+    "type": "integer",
+    "description": "Random seed (a different head of the same style)"
+   }
+  },
+  "additionalProperties": false
+ },
+ "process": {
+  "type": "object",
+  "description": "How this entity and its children run while the game is paused (pause_game) or slowed down (time_scale), the order their behaviors run in, and whether their motion is smoothed between 60 Hz ticks on fast displays. A pause menu canvas runs `always` (UI canvases do by default); enemies stay `pausable`.",
+  "properties": {
+   "mode": {
+    "type": "string",
+    "enum": [
+     "inherit",
+     "pausable",
+     "when_paused",
+     "always",
+     "disabled"
+    ],
+    "description": "inherit (from the parent; root default pausable) | pausable (stops while the game is paused) | when_paused (runs only while paused: pause menu logic) | always (never stops: UI, music controllers) | disabled (never runs, still drawn)"
+   },
+   "priority": {
+    "type": "integer",
+    "description": "Behavior run order: lower runs first (ties keep scene order). Not inherited"
+   },
+   "clock": {
+    "type": "string",
+    "enum": [
+     "inherit",
+     "game",
+     "real"
+    ],
+    "description": "inherit | game (dt follows time_scale: slow motion) | real (ignores time_scale: menus, HUD)"
+   },
+   "interpolation": {
+    "type": "string",
+    "enum": [
+     "inherit",
+     "on",
+     "off"
+    ],
+    "description": "inherit | on (motion is smoothed between ticks on screen) | off (shown exactly at tick positions: snapping things, pixel-art)"
+   }
+  },
+  "additionalProperties": false
+ },
+ "environment": {
+  "type": "object",
+  "description": "Scene-wide sky, sun, ambient light, fog and exposure.",
+  "properties": {
+   "skyTop": {
+    "description": "Sky color at the zenith — hex string \"#rrggbb[aa]\" or [r,g,b(,a)] in 0..1"
+   },
+   "skyHorizon": {
+    "description": "Sky color at the horizon — hex string \"#rrggbb[aa]\" or [r,g,b(,a)] in 0..1"
+   },
+   "ground": {
+    "description": "Ambient bounce color from below — hex string \"#rrggbb[aa]\" or [r,g,b(,a)] in 0..1"
+   },
+   "ambient": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 10,
+    "description": "Ambient light strength"
+   },
+   "sunAzimuth": {
+    "type": "number",
+    "description": "Sun compass direction in degrees (0 = +Z)"
+   },
+   "sunElevation": {
+    "type": "number",
+    "minimum": -90,
+    "maximum": 90,
+    "description": "Sun height above horizon in degrees"
+   },
+   "sunColor": {
+    "description": "Sun light color — hex string \"#rrggbb[aa]\" or [r,g,b(,a)] in 0..1"
+   },
+   "sunIntensity": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 100,
+    "description": "Sun brightness"
+   },
+   "fogColor": {
+    "description": "Distance fog color — hex string \"#rrggbb[aa]\" or [r,g,b(,a)] in 0..1"
+   },
+   "fogDensity": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1,
+    "description": "Exponential fog density (0 = off)"
+   },
+   "exposure": {
+    "type": "number",
+    "minimum": 0.01,
+    "maximum": 20,
+    "description": "Camera exposure multiplier"
+   },
+   "autoExposure": {
+    "type": "boolean",
+    "description": "Adapt exposure to scene brightness (eye adaptation)"
+   },
+   "exposureCompensation": {
+    "type": "number",
+    "minimum": -6,
+    "maximum": 6,
+    "description": "Exposure compensation in EV stops"
+   },
+   "adaptationSpeed": {
+    "type": "number",
+    "minimum": 0.05,
+    "maximum": 20,
+    "description": "Auto exposure adaptation speed"
+   },
+   "showGrid": {
+    "type": "boolean",
+    "description": "Draw the editor ground grid"
+   },
+   "bloomIntensity": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 5,
+    "description": "Glow around bright/emissive things (0 = off)"
+   },
+   "bloomThreshold": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 10,
+    "description": "Brightness where glow starts (lower = more glow)"
+   },
+   "saturation": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 2,
+    "description": "Color saturation (1 = neutral)"
+   },
+   "contrast": {
+    "type": "number",
+    "minimum": 0.5,
+    "maximum": 2,
+    "description": "Contrast (1 = neutral)"
+   },
+   "vignette": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1,
+    "description": "Darken the image corners"
+   },
+   "grain": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1,
+    "description": "Film grain"
+   },
+   "chromaticAberration": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1,
+    "description": "Lens color fringing toward the frame edges"
+   },
+   "look": {
+    "type": "string",
+    "enum": [
+     "none",
+     "warm",
+     "cool",
+     "teal_orange",
+     "golden_hour",
+     "bleach",
+     "noir",
+     "vivid",
+     "moonlight",
+     "vintage"
+    ],
+    "description": "Color grading look"
+   },
+   "lut": {
+    "type": "string",
+    "description": "Optional .cube 3D LUT file (project-relative) applied after the look"
+   },
+   "lookStrength": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1,
+    "description": "Strength of the look / LUT"
+   },
+   "skyMode": {
+    "type": "string",
+    "enum": [
+     "gradient",
+     "atmosphere",
+     "hdri"
+    ],
+    "description": "gradient = two artist colors; atmosphere = physically inspired sky from the sun; hdri = a photographed .hdr panorama lights and backs the scene (set `hdri`)"
+   },
+   "hdri": {
+    "type": "string",
+    "description": "Equirectangular .hdr panorama, project-relative (skyMode hdri)"
+   },
+   "hdriRotation": {
+    "type": "number",
+    "description": "Panorama rotation in degrees (line its sun up with sunAzimuth)"
+   },
+   "hdriIntensity": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 20,
+    "description": "Panorama brightness"
+   },
+   "clouds": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1,
+    "description": "Procedural cloud cover"
+   },
+   "cloudMode": {
+    "type": "string",
+    "enum": [
+     "volumetric",
+     "flat"
+    ],
+    "description": "Clouds: volumetric (ray-marched, lit, shadows) or flat (cheap)"
+   },
+   "cloudHeight": {
+    "type": "number",
+    "minimum": 100,
+    "maximum": 12000,
+    "description": "Cloud layer base height in meters"
+   },
+   "cloudThickness": {
+    "type": "number",
+    "minimum": 100,
+    "maximum": 10000,
+    "description": "Cloud layer thickness in meters"
+   },
+   "cloudDensity": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 4,
+    "description": "Cloud density: 0.3 wispy .. 2 stormy"
+   },
+   "cloudScale": {
+    "type": "number",
+    "minimum": 0.1,
+    "maximum": 8,
+    "description": "Cloud feature size (0.5 small puffs .. 3 huge banks)"
+   },
+   "cloudSpeed": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 100,
+    "description": "Cloud drift speed in m/s (along windDirection)"
+   },
+   "stars": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1,
+    "description": "Stars in the night sky"
+   },
+   "sunSize": {
+    "type": "number",
+    "minimum": 0.1,
+    "maximum": 8,
+    "description": "Sun / moon disc size"
+   },
+   "fogHeight": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 2,
+    "description": "Fog pools near the ground as this grows (0 = uniform)"
+   },
+   "reflections": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 3,
+    "description": "Sky reflections / image-based lighting strength"
+   },
+   "ao": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 2,
+    "description": "Ambient occlusion (contact shadows in corners and creases)"
+   },
+   "aoRadius": {
+    "type": "number",
+    "minimum": 0.05,
+    "maximum": 5,
+    "description": "Ambient occlusion radius in meters"
+   },
+   "gi": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1,
+    "description": "Screen-space global illumination: bounce and emissive light (0 = sky light only)"
+   },
+   "giDistance": {
+    "type": "number",
+    "minimum": 0.5,
+    "maximum": 50,
+    "description": "Global illumination ray length in meters"
+   },
+   "ssr": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1,
+    "description": "Screen-space reflections on glossy surfaces (wet streets, floors, metal)"
+   },
+   "taa": {
+    "type": "boolean",
+    "description": "Temporal anti-aliasing (smooth edges, stable shimmer-free detail)"
+   },
+   "renderScale": {
+    "type": "number",
+    "minimum": 0.33,
+    "maximum": 1,
+    "description": "Real-time internal resolution: 0.5-0.77 renders fewer pixels and MetalFX temporal upscaling reconstructs full resolution (faster); 1 = native. Stills and captures with samples > 1 render native."
+   },
+   "sharpen": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1,
+    "description": "Sharpening after temporal anti-aliasing"
+   },
+   "shadowSoftness": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 6,
+    "description": "Sun shadow penumbra size"
+   },
+   "tonemap": {
+    "type": "string",
+    "enum": [
+     "aces",
+     "agx",
+     "neutral",
+     "filmic",
+     "none"
+    ],
+    "description": "HDR to display curve"
+   },
+   "temperature": {
+    "type": "number",
+    "minimum": -1,
+    "maximum": 1,
+    "description": "White balance: -1 cool .. +1 warm"
+   },
+   "tint": {
+    "type": "number",
+    "minimum": -1,
+    "maximum": 1,
+    "description": "White balance: -1 green .. +1 magenta"
+   },
+   "shadowDistance": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 5000,
+    "description": "Sun shadow range in meters (0 = automatic)"
+   },
+   "godRays": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 8,
+    "description": "Volumetric light: sun shafts through trees and windows, cones under lamps (0 = off, 1 = natural)"
+   },
+   "haze": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1,
+    "description": "Air density for volumetric light, extinction per meter: 0.0003 clear landscape, 0.002 hazy valley, 0.01-0.03 misty alley or interior"
+   },
+   "windSpeed": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 60,
+    "description": "Wind (m/s) that carries smoke, rain, snow and particles"
+   },
+   "windDirection": {
+    "type": "number",
+    "description": "Direction the wind blows toward (degrees, 0 = +Z)"
+   }
+  },
+  "additionalProperties": false
+ }
+}

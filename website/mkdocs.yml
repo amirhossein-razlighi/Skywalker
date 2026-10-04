@@ -1,0 +1,232 @@
+site_name: Skywalker
+site_description: The manual of Skywalker, a game engine built for AI agents and the people who work with them.
+site_url: https://amirhossein-razlighi.github.io/Skywalker/
+repo_url: https://github.com/amirhossein-razlighi/Skywalker
+repo_name: Skywalker
+edit_uri: edit/main/website/docs/
+copyright: "© 2026 AmirHossein (Amir) Razlighi · Business Source License 1.1"
+
+docs_dir: docs
+
+theme:
+  name: material
+  custom_dir: overrides
+  language: en
+  logo: assets/brand/logo-glyph.svg
+  favicon: assets/brand/favicon.svg
+  icon:
+    repo: fontawesome/brands/github
+    edit: material/pencil
+    view: material/eye
+  font:
+    text: Inter
+    code: JetBrains Mono
+  palette:
+    - media: "(prefers-color-scheme)"
+      scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-auto
+        name: Switch to light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-night
+        name: Switch to system preference
+  features:
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.indexes
+    - navigation.top
+    - navigation.footer
+    - navigation.instant
+    - navigation.instant.progress
+    - navigation.tracking
+    - toc.follow
+    - search.suggest
+    - search.highlight
+    - search.share
+    - content.code.copy
+    - content.code.annotate
+    - content.tabs.link
+    - content.tooltips
+    - content.action.edit
+    - content.action.view
+
+extra_css:
+  - assets/css/skywalker.css
+
+extra:
+  generator: false
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/amirhossein-razlighi/Skywalker
+      name: Skywalker on GitHub
+
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+      toc_depth: 3
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+      slugify: !!python/object/apply:pymdownx.slugs.slugify
+        kwds:
+          case: lower
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+      extend_pygments_lang:
+        - name: wander
+          lang: lua
+        - name: tool
+          lang: javascript
+        - name: jsonc
+          lang: javascript
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.mark
+  - pymdownx.caret
+  - pymdownx.tilde
+  - pymdownx.smartsymbols
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.snippets:
+      base_path: [".", ".."]
+      check_paths: true
+
+plugins:
+  - search
+
+validation:
+  nav:
+    omitted_files: warn
+    not_found: warn
+    absolute_links: warn
+  links:
+    not_found: warn
+    anchors: warn
+    absolute_links: info
+    unrecognized_links: warn
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - getting-started/index.md
+      - Install and build: getting-started/install.md
+      - Your first project: getting-started/first-project.md
+      - Editor tour: getting-started/editor-tour.md
+      - Your first game in 15 minutes: getting-started/first-game.md
+      - Connect an AI agent: getting-started/connect-agent.md
+  - Manual:
+      - manual/index.md
+      - Core:
+          - Scenes and entities: manual/scenes.md
+          - Components: manual/components.md
+          - Assets and prefabs: manual/assets.md
+          - Simulation and time: manual/simulation.md
+      - Rendering:
+          - manual/rendering/index.md
+          - Materials: manual/rendering/materials.md
+          - Lighting and shadows: manual/rendering/lighting.md
+          - Sky and atmosphere: manual/rendering/sky.md
+          - GI and reflections: manual/rendering/gi.md
+          - Camera and post-processing: manual/rendering/post.md
+          - Debug views: manual/rendering/debug-views.md
+          - Profiler: manual/rendering/profiler.md
+      - World:
+          - Terrain: manual/world/terrain.md
+          - Water: manual/world/water.md
+          - Foliage: manual/world/foliage.md
+      - Characters and effects:
+          - Hair and fur: manual/hair.md
+          - Visual effects: manual/vfx.md
+          - Animation: manual/animation.md
+      - Gameplay:
+          - Physics and navigation: manual/physics.md
+          - Audio: manual/audio.md
+          - Input: manual/input.md
+          - 2D and UI: manual/2d-ui.md
+      - Wander scripting:
+          - manual/wander/index.md
+          - Language: manual/wander/language.md
+          - Specs and tests: manual/wander/testing.md
+          - Graphs and native code: manual/wander/native.md
+      - Production:
+          - Studio and crews: manual/studio.md
+          - DCC bridge: manual/dcc.md
+          - Movie render queue: manual/movie-render.md
+          - Shipping: manual/shipping.md
+          - Performance: manual/performance.md
+  - Agent Guide:
+      - agents/index.md
+      - How agents see: agents/seeing.md
+      - The MCP server: agents/mcp.md
+      - Skills and integrations: agents/skills.md
+      - Permissions and approvals: agents/permissions.md
+      - Best practices and prompts: agents/best-practices.md
+  - Reference:
+      - reference/index.md
+      - Tools:
+          - reference/tools/index.md
+          - Scene: reference/tools/scene.md
+          - Entity: reference/tools/entity.md
+          - History: reference/tools/history.md
+          - View: reference/tools/view.md
+          - Render: reference/tools/render.md
+          - World: reference/tools/world.md
+          - Asset: reference/tools/asset.md
+          - Wander: reference/tools/wander.md
+          - Code: reference/tools/code.md
+          - Simulation: reference/tools/sim.md
+          - Physics: reference/tools/physics.md
+          - Animation: reference/tools/animation.md
+          - UI: reference/tools/ui.md
+          - Dialogue: reference/tools/dialogue.md
+          - Studio: reference/tools/studio.md
+          - DCC: reference/tools/dcc.md
+          - Files: reference/tools/files.md
+          - Network: reference/tools/network.md
+      - Components:
+          - reference/components/index.md
+          - Core: reference/components/core.md
+          - World and effects: reference/components/world.md
+          - 2D, text and UI: reference/components/2d-ui.md
+          - Audio: reference/components/audio.md
+          - Physics and navigation: reference/components/physics.md
+          - Animation: reference/components/animation.md
+      - Wander builtins: reference/wander.md
+      - Command line: reference/cli.md
+      - C API: reference/capi.md
+  - Examples:
+      - examples/index.md
+  - Showcase: showcase.md
+  - About:
+      - about/index.md
+      - Contributing: about/contributing.md
+      - License: about/license.md
+      - FAQ: about/faq.md
+      - Roadmap and changelog: about/roadmap.md

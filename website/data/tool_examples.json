@@ -1,0 +1,281 @@
+{
+ "_comment": "Hand-written example calls for tools whose description has no example and whose docs show none. gen_reference.py uses: the tool description's own example, then this file, then examples mined from docs/*.md and the skills. check_snippets.py validates every rendered example against the schema.",
+ "scene_overview": {
+  "max_entities": 200
+ },
+ "scene_query": {
+  "name": "tree*",
+  "near": [
+   0,
+   0,
+   0
+  ],
+  "radius": 25,
+  "limit": 20
+ },
+ "transform": {
+  "entity": "Crate",
+  "position": [
+   2,
+   0.5,
+   -3
+  ],
+  "rotation": [
+   0,
+   45,
+   0
+  ]
+ },
+ "entity_delete": {
+  "entity": "Crate"
+ },
+ "entity_duplicate": {
+  "entity": "Lamp",
+  "name": "Lamp Row",
+  "offset": [
+   3,
+   0,
+   0
+  ],
+  "count": 4
+ },
+ "behavior_remove": {
+  "entity": "Guard",
+  "name": "Patrol"
+ },
+ "behavior_from_graph": {
+  "_args": {
+   "entity": "Coin",
+   "name": "Spin",
+   "graph": {
+    "format": "wander-graph",
+    "version": 1,
+    "behaviors": []
+   }
+  },
+  "_note": "Pass the whole graph object that behavior_graph returned, after editing it; an empty graph like this one saves an empty behavior."
+ },
+ "wander_inspect": {
+  "entity": "Guard"
+ },
+ "viewport_pick": {
+  "x": 640,
+  "y": 360,
+  "width": 1280,
+  "height": 720
+ },
+ "selection_set": {
+  "entities": [
+   "Gate",
+   "Tower"
+  ]
+ },
+ "scene_load": {
+  "path": "scenes/main.sky.json"
+ },
+ "asset_import_mesh": {
+  "path": "models/lantern.obj",
+  "entity": "Lantern"
+ },
+ "asset_request": {
+  "kind": "texture",
+  "prompt": "weathered teak planks, seamless",
+  "style": "photoreal",
+  "target": "Deck"
+ },
+ "asset_requests": {
+  "status": "pending"
+ },
+ "asset_complete": {
+  "id": 3,
+  "path": "textures/deck_planks.png"
+ },
+ "shader_set": {
+  "source": "// the full Metal Shading Language source from shader_get, edited"
+ },
+ "asset_info": {
+  "asset": "prefabs/pine.prefab.json"
+ },
+ "asset_preview": {
+  "asset": "materials/gold.mat.json",
+  "size": 256
+ },
+ "asset_tag": {
+  "asset": "models/statue.glb",
+  "tags": [
+   "statue",
+   "marble",
+   "hero-prop"
+  ],
+  "description": "Weathered marble statue for the plaza"
+ },
+ "asset_move": {
+  "asset": "models/statue.glb",
+  "to": "models/plaza/statue.glb"
+ },
+ "material_create": {
+  "path": "materials/brass.mat.json",
+  "preset": "gold",
+  "roughness": 0.35,
+  "color": "#c9a24a"
+ },
+ "material_update": {
+  "path": "materials/brass.mat.json",
+  "roughness": 0.2,
+  "clearcoat": 0.5
+ },
+ "material_assign": {
+  "entities": [
+   "Bell",
+   "Door Handle"
+  ],
+  "material": "materials/brass.mat.json"
+ },
+ "prefab_create": {
+  "entity": "Lantern",
+  "path": "prefabs/lantern.prefab.json",
+  "tags": [
+   "light",
+   "prop"
+  ],
+  "description": "Hanging lantern with a warm point light"
+ },
+ "prefab_instantiate": {
+  "prefab": "prefabs/lantern.prefab.json",
+  "position": [
+   4,
+   0,
+   -2
+  ],
+  "yaw": 30,
+  "on_surface": true
+ },
+ "raycast": {
+  "origin": [
+   0,
+   50,
+   0
+  ],
+  "direction": [
+   0,
+   -1,
+   0
+  ]
+ },
+ "place_on_surface": {
+  "entities": [
+   "Crate 1",
+   "Crate 2",
+   "Barrel"
+  ]
+ },
+ "viewport_multi": {
+  "focus": "Village",
+  "size": 1024
+ },
+ "water_query": {
+  "points": [
+   [
+    0,
+    0,
+    0
+   ],
+   [
+    12,
+    0,
+    -8
+   ]
+  ]
+ },
+ "terrain_generate": {
+  "entity": "Island",
+  "seed": 7,
+  "generator": {
+   "erosion": 0.8
+  }
+ },
+ "terrain_layers": {
+  "entity": "Island",
+  "layers": [
+   {
+    "name": "sand",
+    "texgen": "sand",
+    "tiling": 4
+   },
+   {
+    "name": "grass",
+    "texgen": "grass",
+    "heightMin": 2,
+    "slopeMax": 30
+   },
+   {
+    "name": "rock",
+    "texgen": "rock",
+    "slopeMin": 35,
+    "triplanar": true
+   }
+  ]
+ },
+ "terrain_undo": {
+  "entity": "Island"
+ },
+ "studio_agent_remove": {
+  "agent": "aurora"
+ },
+ "studio_memory": {
+  "action": "note",
+  "agent": "nimbus",
+  "text": "The art director prefers warm rim light on hero props."
+ },
+ "studio_task_create": {
+  "title": "Widen the second canyon gap's landing",
+  "discipline": "design",
+  "priority": "high",
+  "acceptance": [
+   "Bots clear the gap in 3 of 3 runs"
+  ]
+ },
+ "studio_task_update": {
+  "task": "T-12",
+  "status": "review",
+  "comment": "Landing widened by 1.5 m; playtest attached."
+ },
+ "studio_task_claim": {
+  "as": "level_designer"
+ },
+ "studio_feedback_submit": {
+  "category": "difficulty",
+  "severity": "high",
+  "summary": "Players fall at the second canyon gap",
+  "target": "Canyon Gap 2",
+  "as": "playtester"
+ },
+ "studio_feedback_update": {
+  "feedback": "F-7",
+  "status": "verified",
+  "comment": "Deaths at the gap went from 4 to 0."
+ },
+ "studio_decide": {
+  "feedback": "F-7",
+  "verdict": "act",
+  "rationale": "Unfair difficulty spike early in the level.",
+  "targets": {
+   "deaths": {
+    "max": 1
+   }
+  }
+ },
+ "studio_message_send": {
+  "text": "@nimbus the canyon fix is ready for review",
+  "channel": "level",
+  "task": "T-12"
+ },
+ "sim_teleport": {
+  "entity": "Player",
+  "position": [
+   0,
+   1,
+   0
+  ]
+ }
+}

@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+
+{% block extrahead %}
+  <link rel="icon" href="{{ 'assets/brand/favicon.ico' | url }}" sizes="any">
+  <meta name="theme-color" content="#0a0c18">
+  <meta property="og:site_name" content="Skywalker">
+  <meta property="og:title" content="{% if page and page.title and not page.is_homepage %}{{ page.title }} · {% endif %}Skywalker">
+  <meta property="og:description" content="{{ config.site_description }}">
+  <meta property="og:image" content="{{ config.site_url }}assets/images/social-card.jpg">
+  <meta name="twitter:card" content="summary_large_image">
+{% endblock %}
