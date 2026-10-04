@@ -51,7 +51,7 @@ interface the editor uses.
   height fog, an **FFT ocean**, GPU **fluid fire and smoke**, **GPU particles** (sub-emitters,
   ribbons, flipbooks, collisions) and **strand hair** with Marschner shading.
 - Eroded **terrain** with splat layers and wet shorelines, instanced **foliage** with wind and
-  automatic LODs, auto exposure, depth of field, motion blur, looks and .cube LUTs.
+  automatic LODs and octahedral impostors for distant forests, auto exposure, depth of field, motion blur, looks and .cube LUTs.
 - An editor viewport that stays responsive (fast / balanced / full quality while editing), a
   GPU-safe offline path, and a **Movie Render Queue** that renders sequences to HEVC / ProRes with
   real motion blur. → [docs/RENDERING.md](docs/RENDERING.md), [docs/MOVIE_RENDER.md](docs/MOVIE_RENDER.md)

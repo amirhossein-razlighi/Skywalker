@@ -13,7 +13,7 @@ The ground-up expansion described in [PLAN](PLAN.md):
   - builtin registry, graph view, ahead-of-time C++ and native modules.
 - **Rendering:**
   - G-buffer, clustered lighting, screen-space GI and reflections, TAA, MetalFX upscaling;
-  - atmosphere with volumetric clouds, terrain with erosion, instanced foliage with LODs and a triangle budget;
+  - atmosphere with volumetric clouds, terrain with erosion, instanced foliage with LODs, octahedral impostors, GPU-driven culling and a triangle budget;
   - camera post: exposure, DOF, motion blur, LUTs;
   - debug, clay and sketch views;
   - GPU particles, strand hair, FFT ocean, GPU fluids;
@@ -30,7 +30,7 @@ The ground-up expansion described in [PLAN](PLAN.md):
 
 | Area | Planned work |
 |---|---|
-| Rendering | Foliage impostors / HLOD; virtual shadow maps; hardware ray-traced reflections and GI on M3+; skin subsurface profiles; decals; virtualized geometry for scanned assets |
+| Rendering | Impostor wind sway and HLOD for buildings; virtual shadow maps; hardware ray-traced reflections and GI on M3+; skin subsurface profiles; decals; virtualized geometry for scanned assets |
 | Platforms | Vulkan backend (Windows/Linux), then D3D12; iOS player; an editor shell for non-Mac platforms |
 | World | World partition / streaming for very large maps; road and spline tools; procedural city kit |
 | Wander | Debugger (breakpoints, watch, step) in the editor; hot-reload of native modules |
