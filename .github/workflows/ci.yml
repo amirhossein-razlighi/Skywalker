@@ -1,39 +1,119 @@
 name: CI
 
+# Runs only when code or build files change: docs, media and example-only pushes are skipped.
+# Pushes to main run the fast check (debug build of engine + editor, full test suite).
+# The slower AddressSanitizer and Linux builds run nightly, on pull requests and on demand.
 on:
   push:
     branches: [main]
+    paths:
+      - "engine/**"
+      - "editor/**"
+      - "tools/**"
+      - "tests/**"
+      - "cmake/**"
+      - "integrations/**"
+      - "CMakeLists.txt"
+      - "CMakePresets.json"
+      - ".github/workflows/ci.yml"
   pull_request:
+    paths:
+      - "engine/**"
+      - "editor/**"
+      - "tools/**"
+      - "tests/**"
+      - "cmake/**"
+      - "integrations/**"
+      - "CMakeLists.txt"
+      - "CMakePresets.json"
+      - ".github/workflows/ci.yml"
+  schedule:
+    - cron: "17 3 * * *"  # nightly full run
+  workflow_dispatch:
+    inputs:
+      full:
+        description: "Also run the ASan and Linux jobs"
+        type: boolean
+        default: true
+
+# A newer push to the same branch cancels the run in progress.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  macos:
-    name: macOS (${{ matrix.preset }})
+  macos-debug:
+    name: macOS (debug)
     runs-on: macos-15
-    strategy:
-      fail-fast: false
-      matrix:
-        preset: [debug, asan]
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v5
       - name: Tools
-        run: brew install ninja
+        run: brew install ninja ccache
+      - name: Compiler cache
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Caches/ccache
+          key: ccache-macos-debug-${{ hashFiles('CMakeLists.txt', 'cmake/**', 'engine/CMakeLists.txt', 'tests/CMakeLists.txt') }}-${{ github.sha }}
+          restore-keys: |
+            ccache-macos-debug-${{ hashFiles('CMakeLists.txt', 'cmake/**', 'engine/CMakeLists.txt', 'tests/CMakeLists.txt') }}-
+            ccache-macos-debug-
       - name: Configure
-        run: cmake --preset ${{ matrix.preset }}
+        run: cmake --preset debug -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_OBJCXX_COMPILER_LAUNCHER=ccache
       - name: Build
-        run: cmake --build --preset ${{ matrix.preset }}
+        run: cmake --build --preset debug
       - name: Test
-        run: ctest --preset ${{ matrix.preset }}
+        run: ctest --preset debug
+      - name: Cache stats
+        if: always()
+        run: ccache -s | head -12
 
-  # Linux is not a target yet: the job keeps the portable core compiling with GCC; its tests
-  # run once Linux support is taken on (a few image/persistence differences remain).
+  macos-asan:
+    name: macOS (asan)
+    if: github.event_name != 'push' && (github.event_name != 'workflow_dispatch' || inputs.full)
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+      - name: Tools
+        run: brew install ninja ccache
+      - name: Compiler cache
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Caches/ccache
+          key: ccache-macos-asan-${{ hashFiles('CMakeLists.txt', 'cmake/**', 'engine/CMakeLists.txt', 'tests/CMakeLists.txt') }}-${{ github.sha }}
+          restore-keys: |
+            ccache-macos-asan-${{ hashFiles('CMakeLists.txt', 'cmake/**', 'engine/CMakeLists.txt', 'tests/CMakeLists.txt') }}-
+            ccache-macos-asan-
+      - name: Configure
+        run: cmake --preset asan -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_OBJCXX_COMPILER_LAUNCHER=ccache
+      - name: Build
+        run: cmake --build --preset asan
+      - name: Test
+        run: ctest --preset asan
+      - name: Cache stats
+        if: always()
+        run: ccache -s | head -12
+
+  # Linux is not a target yet: this keeps the portable core compiling with GCC (no tests).
   headless-linux:
     name: Linux (headless build)
+    if: github.event_name != 'push' && (github.event_name != 'workflow_dispatch' || inputs.full)
     runs-on: ubuntu-24.04
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v5
       - name: Tools
-        run: sudo apt-get update && sudo apt-get install -y ninja-build zlib1g-dev libcurl4-openssl-dev
+        run: sudo apt-get update && sudo apt-get install -y ninja-build zlib1g-dev libcurl4-openssl-dev ccache
+      - name: Compiler cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ccache
+          key: ccache-linux-${{ hashFiles('CMakeLists.txt', 'cmake/**', 'engine/CMakeLists.txt', 'tests/CMakeLists.txt') }}-${{ github.sha }}
+          restore-keys: |
+            ccache-linux-${{ hashFiles('CMakeLists.txt', 'cmake/**', 'engine/CMakeLists.txt', 'tests/CMakeLists.txt') }}-
+            ccache-linux-
       - name: Configure
-        run: cmake --preset headless
+        run: cmake --preset headless -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
       - name: Build
         run: cmake --build --preset headless
