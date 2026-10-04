@@ -51,19 +51,20 @@ struct Client {
     int nextId = 1;
     explicit Client(const std::string& path, const std::string& name) {
         auto r = connectUnixSocket(path);
-        REQUIRE(r.ok());
-        fd = std::move(*r);
+        if (r.ok()) fd = std::move(*r);
         reader = std::make_unique<LineReader>(fd.get());
         Json init = Json::object({{"jsonrpc", "2.0"}, {"id", nextId++}, {"method", "initialize"},
                                   {"params", Json::object({{"protocolVersion", "2025-06-18"},
                                                            {"clientInfo", Json::object({{"name", name}, {"version", "1"}})}})}});
         (void)request(init);
     }
+    /// Null when the server went away (no REQUIRE here: clients run on their own threads).
     Json request(const Json& msg) {
-        REQUIRE(writeAll(fd.get(), msg.dump() + "\n"));
+        if (!writeAll(fd.get(), msg.dump() + "\n")) return Json();
         std::string line;
-        REQUIRE(reader->next(line));
-        return Json::parse(line).value();
+        if (!reader->next(line)) return Json();
+        auto parsed = Json::parse(line);
+        return parsed ? parsed.value() : Json();
     }
     /// tools/call; returns the CallToolResult.
     Json call(const std::string& tool, const Json& args) {
