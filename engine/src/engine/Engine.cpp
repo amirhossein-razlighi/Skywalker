@@ -4,6 +4,7 @@
 #include "skywalker/game/SaveGame.h"
 #include "skywalker/game/SceneFlow.h"
 #include "EngineDebug.h"  // Wander debugger runs (complete type for the destructor)
+#include "skywalker/physics2d/Physics2DSystem.h"  // 2D physics
 
 #include <algorithm>
 #include <atomic>
@@ -210,6 +211,7 @@ Engine::Engine(EngineConfig config)
     runtime_->physics = physics_.get();
     saves_ = std::make_unique<game::SaveSystem>(*this);
     sceneFlow_ = std::make_unique<game::SceneFlow>(*this);
+    physics2d_ = std::make_unique<physics2d::Physics2DSystem>(*scene_, physics2d::tileCollisionFrom(world2d_->assets()));
     registerEngineTools(*this);
     mainThread_ = std::this_thread::get_id();
     customTools_ = std::make_unique<CustomTools>(*this);  // after the built-in tools: custom ones never shadow them
@@ -349,6 +351,7 @@ void Engine::play() {
         animation_->reset();
         animation_->setPlaying(true);
         physics_->beginPlay();  // the world is built from the scene on the first tick
+        physics2d_->beginPlay();
         nav_->beginPlay();
         resetFrameFlow();  // render interpolation history, pacing stats
         saves_->beginPlay();  // game variables, play time, the persisted entities tombstones refer to
@@ -378,6 +381,7 @@ void Engine::stop() {
     animation_->reset();
     animation_->setPlaying(false);
     physics_->endPlay();
+    physics2d_->endPlay();
     nav_->endPlay();
     resetFrameFlow();
     saves_->endPlay();
@@ -684,6 +688,7 @@ FrameData Engine::buildFrameData(const CaptureOptions& opts) {
         SKY_PROFILE_SCOPE("2d.gather");
         world2d_->gather(*scene_, f, bo.editorOverlays ? selection_ : std::vector<EntityId>{}, bo.time, texelSnap);  // 2D + UI
         if (playState_ != PlayState::Editing) f.fade = sceneFlow_->fade();  // scene transition overlay (SCENE_FLOW.md)
+        physics2d_->gatherDebug(f.render2d);  // physics2d_world.debugDraw
     }
     // Effects: simulated particles (+ the light fires cast) and FFT water.
     {

@@ -30,6 +30,7 @@ Conventions:
 | `sprite_anim` | Flipbook | `clips` `{"run": {"frames": "4-11" \| [..] \| "run_*", "fps": 12, "loop": true, "events": {"3": "footstep"}, "texture"?}}`, `clip`, `playing`, `speed`. Frame events reach the entity's behaviors as `on anim "footstep"`, a non-looping clip's end as `on anim "finished"` |
 | `tilemap` | Layers of tiles | `tileset` (png or `*.tileset.json`), `tileSize`, `cellSize`, `width`, `height`, `layers` (`[{name, data, solid, z, tint, sortingLayer, order, ySort}]`), `solidTiles`, `autotile` (terrains), `sortingLayer`, `filter`, `lit`, `castShadows`, `palette` |
 | `particles2d` | Pixel-art particles | `texture` (sheet/atlas, or empty for solid `pixelSize` rectangles), `columns`/`rows`, `frames`, `animate` (random/life/loop), `rate`, `burst`, `lifetime`, `area`, `wrap` (weather fills any view), `velocity`, `gravity`, `sway`, `flutter`, `color`, `emissive`, `pulse`, `fadeIn`/`fadeOut`, `sortingLayer`, `lit`, `seed` |
+| `body2d`, `collider2d`, `joint2d`, `character2d`, `physics2d_world` | 2D physics (Box2D) | see [PHYSICS.md](PHYSICS.md#2d-physics): bodies, shapes (box, circle, capsule, polygon, chain, segment, tilemap), sensors, one-way platforms, joints, the platformer controller |
 | `light2d` | 2D light | `kind` point/spot/global (ambient), `color`, `intensity` (HDR), `radius`, `falloff`, `innerAngle`/`outerAngle` (spot along local +Y), `height` (normal maps), `shadows`, `shadowSoftness`, `halo` (glow in the air), `flicker`, `bands` (pixel-art stepped, dithered falloff) |
 | `parallax` | Parallax layer (entity + children) | `factor` (0 = fixed to camera, <1 far, >1 near), `origin`, `repeatX/Y`, `spacing` |
 | `camera2d` | On the camera entity | `pixelsPerUnit`, `referenceHeight` (e.g. 180 → integer upscaling), `pixelSnap`, `zoom`, `follow` + `smoothing` + `deadZone` + `offset`, `bounds` |
@@ -284,12 +285,64 @@ entity_create {"name": "Torch", "position": [6, -2, 0],
   "components": {"light2d": {"kind": "point", "color": "#ffb060", "intensity": 2.5, "radius": 6, "halo": 0.6, "flicker": 0.3}}}
 ```
 `tilemap_inspect {"entity": "Level"}` lists the merged collision rectangles (map-local world
-units: x right, y up from the top-left corner), ready for physics bodies.
+units: x right, y up from the top-left corner). To make the level collide, use
+`physics2d_add {"entity": "Level", "preset": "tilemap_collision"}`: see
+[2D physics: a platformer](#2d-physics-a-platformer).
 
 Auto-tiling: `blob47` takes 47 tiles ordered by ascending reduced 8-neighbour mask (N=1, NE=2,
 E=4, SE=8, S=16, SW=32, W=64, NW=128; corners count only with both adjacent edges), `wang16`
 takes 16 tiles indexed by N=1 | E=2 | S=4 | W=8, `random` mixes variants (with `weights`),
 `single` places one tile. Give `first` (consecutive ids) or an explicit `tiles` list.
+
+### 2D physics: a platformer
+
+2D physics (Box2D, [PHYSICS.md](PHYSICS.md#2d-physics)) gives sprites and tilemaps real collision:
+`collider2d` for ground, walls and one-way platforms, `body2d` for crates and balls, `character2d`
+for the hero and `joint2d` for chains, bridges and wheels. Bodies move the sprite's x/y and its Z
+rotation. A tilemap's solid layers become merged outlines with slopes and one-way tiles taken from the
+tileset's `"collision"` table (`{"41": "slope_up", "44": "top"}`).
+
+```json
+tilemap_from_ascii {"name": "Level", "tileset": "art/tiles.tileset.json", "tile_size": 16, "solid": true,
+  "legend": {"#": 1, "/": 41, "-": 44}, "map": "..........--..\n..............\n....../#######\n##############"}
+physics2d_add {"entity": "Level", "preset": "tilemap_collision"}
+physics2d_add {"entity": "Hero", "preset": "platformer_player", "overrides": {"character2d": {"jumpSpeed": 14}}}
+physics2d_add {"entities": ["Crate", "Barrel"], "preset": "crate"}
+physics2d_add {"entity": "Coin", "preset": "sensor_zone"}
+physics2d_info {}
+```
+
+```wander
+behavior Hero
+  intent "Run and jump; coyote time and jump buffering come from character2d."
+  on tick
+    let x = axis("move").x
+    move2d(self, x)
+    if pressed("jump") then
+      jump2d(self)
+    end
+    if x != 0 then
+      self.sprite.flipX = x < 0
+    end
+    if grounded2d(self) then
+      play_anim(self, "run")
+    else
+      play_anim(self, "jump")
+    end
+  end
+end
+
+behavior Coin
+  on trigger_enter "player"
+    emit "coin_collected"
+    destroy self
+  end
+end
+```
+
+Characters walk up slopes up to `maxSlope`, pass up through one-way platforms and land on them
+(`drop_through2d(self)` falls through again). Crates are pushed when the hero walks into them.
+`physics2d_world.debugDraw: true` outlines every shape in the frame.
 
 ### Sprite sheets and atlases
 

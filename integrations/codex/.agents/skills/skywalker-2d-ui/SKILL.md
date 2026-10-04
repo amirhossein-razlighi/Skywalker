@@ -1,6 +1,6 @@
 ---
 name: skywalker-2d-ui
-description: "2D games, UI and dialogue in Skywalker - sprites and sprite sheets, atlases, tilemaps from ASCII, 2D lights, parallax, pixel-perfect cameras, world text, UI canvases (HUD, menus, inventory), themes and style sheets, and Yarn-style dialogue scripts. Use for platformers, top-down and pixel-art games, HUDs, menus, settings screens, dialogue boxes, signs and damage numbers."
+description: "2D games, UI and dialogue in Skywalker - sprites and sprite sheets, atlases, tilemaps from ASCII, 2D lights, parallax, pixel-perfect cameras, 2D physics (bodies, tilemap collision, platformer characters, joints), world text, UI canvases (HUD, menus, inventory), themes and style sheets, and Yarn-style dialogue scripts. Use for platformers, top-down and pixel-art games, HUDs, menus, settings screens, dialogue boxes, signs and damage numbers."
 ---
 
 # 2D, text, UI and dialogue
@@ -39,8 +39,9 @@ Fonts built in: Inter (`sans`), EB Garamond (`serif`), JetBrains Mono (`mono`), 
 3. **Level.** `tilemap_from_ascii` (fastest), then `tilemap_paint` for edits, `tilemap_inspect` to read it back.
 4. **Characters.** Entity + `sprite_sheet_slice {entity}` (applies sprite and clips), then set `pivot`/`filter`.
 5. **Depth and mood.** `parallax` backgrounds, `light2d` torches, a dark `environment_update` for night.
-6. **Behavior.** Wander (`play_anim`, `tile_at`, `set_tile`, `on anim`, `on ui`). See skywalker-wander.
-7. **Verify.** Capture, `step`, `sim_trace`, capture again (see the loop at the end).
+6. **Physics.** `physics2d_add` presets: the level's tilemap, the hero, crates, platforms (below).
+7. **Behavior.** Wander (`play_anim`, `tile_at`, `set_tile`, `move2d`, `jump2d`, `on anim`, `on ui`). See skywalker-wander.
+8. **Verify.** Capture, `step`, `sim_trace`, capture again (see the loop at the end).
 
 ```text
 entity_create {name:"Knight", position:[2,1,0]}
@@ -65,11 +66,31 @@ tilemap_inspect {entity:"Level"}      # ASCII per layer, legend with counts, mer
 - The legend maps a character to a **tile id** (1-based, 0 = empty), a **terrain** (auto-tiled, from `autotile`) or a tile name. `' '` and `.` are empty.
 - Auto-tile modes: `blob47` (47 tiles from `first`), `wang16` (16 tiles, bit order N=1 E=2 S=4 W=8), `random` (variants, `weights`), `single`. An
   `invalid_autotile` error means the tileset has too few tiles for the mode (`terrain "ground" uses tile 9 but the tileset has 8 tiles`).
-- `solid:true` marks the layer for collision (`"tiles"` = only `solid_tiles`). Collision data is read with `tilemap_inspect`: `solidRects` are `[x, y, w, h]` in world units
-  relative to the map's **top-left**, x right, **y up**, `y` is the rect's bottom edge. The physics world does not read tilemaps by itself: for each rect create a static box,
-  `position = mapPosition + [x + w/2, y + h/2, 0]`, `scale = [w, h, 1]`, `components:{collider:{shape:"box"}}`, and give bodies `lockPosition:"z"` so they stay on the plane
-  (see skywalker-physics).
+- `solid:true` marks the layer for collision (`"tiles"` = only `solid_tiles`). `physics2d_add {entity:"Level", preset:"tilemap_collision"}` turns the solid layers into
+  merged 2D collision (one outline per connected region, no seams). `tilemap_inspect` still lists `solidRects` (`[x, y, w, h]` from the map's top-left, y up).
 - From Wander: `tile_at(map, pos)`, `set_tile(map, pos, id|"terrain")`.
+
+### 2D physics (Box2D)
+
+Components: `collider2d` alone = static ground/walls/platforms (`oneWay:true` = jump through from below), `body2d` + `collider2d` = dynamic or kinematic bodies,
+`character2d` = the platformer controller (slopes, one-way platforms, coyote time, jump buffering), `joint2d` = revolute/prismatic/distance/weld/wheel/target,
+`physics2d_world` = gravity (default `[0, -20]`), sub-steps, `debugDraw`. Bodies move the sprite's x/y and Z rotation.
+
+```text
+physics2d_add {entity:"Level", preset:"tilemap_collision"}                  # merged outlines; slopes/one-way tiles from the tileset's "collision" table
+physics2d_add {entity:"Knight", preset:"platformer_player", overrides:{character2d:{jumpSpeed:14, coyoteTime:0.12}}}
+physics2d_add {entities:["Crate 1", "Crate 2"], preset:"crate"}              # also: ball, one_way_platform, static_ground, sensor_zone, moving_platform, remove
+physics2d_settle {entities:["Crate 1", "Crate 2"]}                          # drop them to rest, one undo step
+physics2d_query {type:"raycast", origin:[2, 5], direction:[0, -1]}          # also raycast_all, overlap_circle, overlap_box, point; works while editing
+physics2d_info {}                                                          # counts, bodies, grounded characters, tilemap pieces, warnings
+```
+
+- Per-tile shapes: the tileset's `"collision": {"41": "slope_up", "42": "slope_down", "44": "top"}` (presets `full`, `none`, `slope_up/down`, `slope_up_low/high`,
+  `slope_down_low/high`, `half_bottom`, `half_top`, `top` = one-way) or `{"points": [[0,16],[16,8],[16,16]]}` in tile pixels; `collider2d.tileShapes` overrides per map.
+- Events are the 3D ones (`on collide` with `impact`, `on trigger_enter`, `on trigger_exit`) plus `on collide_end` and `on impact` (`data.speed`, `data.impulse`).
+- Builtins: `move2d(self, x)`, `jump2d(self)` (true = jumped now; a press in the air is buffered), `grounded2d(self)`, `drop_through2d(self)`, `push2d`, `impulse2d`,
+  `torque2d`, `velocity2d`, `set_velocity2d`, `raycast2d` (sets `hit_point`), `overlap2d(center, r, tag?)`, `point2d(point, tag?)`.
+- Turn on `physics2d_world.debugDraw` and capture to see every shape, contact and joint.
 
 ### Top-down games (farm sims, RPGs): depth, living tiles, seasons, weather
 
@@ -180,6 +201,18 @@ behavior Hero
   end
   on anim "hit"
     log "hit frame"
+  end
+end
+
+behavior Runner
+  on tick
+    move2d(self, axis("move").x)
+    if pressed("jump") then
+      jump2d(self)
+    end
+  end
+  on trigger_enter "coin"
+    emit "coin_collected"
   end
 end
 

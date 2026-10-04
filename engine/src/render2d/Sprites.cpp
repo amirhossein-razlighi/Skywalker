@@ -372,6 +372,7 @@ Result<Tileset> Assets2D::tileset(const std::string& path, int tileSize) {
         auto solid = tiles::parseIdList(d.get("solid"));
         if (solid) t.solid = solid.value();
         if (d.get("terrains").isObject()) t.terrains = d.get("terrains");
+        if (d.get("collision").isObject()) t.collision = d.get("collision");
         for (const auto& [name, id] : d.get("names").members()) t.names[name] = static_cast<uint32_t>(std::max(0.0, id.asNumber()));
         if (Status s = parseTileAnimations(d, t); !s) {
             c.tileset = Error::make(s.error().code, path + ": " + s.error().message, s.error().hint);

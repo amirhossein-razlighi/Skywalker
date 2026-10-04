@@ -8,6 +8,7 @@
 #include <optional>
 
 #include "skywalker/engine/Engine.h"
+#include "skywalker/physics2d/Physics2DSystem.h"
 #include "skywalker/wander/Builtins.h"
 
 namespace sky {
@@ -58,7 +59,10 @@ void Engine::stepPhysics() {
     // Fast forward splits the step so bodies never take steps longer than a tick.
     const int substeps = scale > 1.f ? static_cast<int>(std::ceil(scale)) : 1;
     const float h = kFixedDt * scale / static_cast<float>(substeps);
-    for (int i = 0; i < substeps; ++i) physics_->step(h, *runtime_);
+    for (int i = 0; i < substeps; ++i) {
+        physics_->step(h, *runtime_);
+        physics2d_->step(h, *runtime_);  // 2D physics (Box2D)
+    }
 }
 
 // ---------------------------------------------------------------------------

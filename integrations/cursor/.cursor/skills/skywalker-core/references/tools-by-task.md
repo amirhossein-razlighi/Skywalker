@@ -70,6 +70,9 @@ Native code: `wander_compile_native {entity, force, auto}`, `native_template {na
 `physics_add {entity\|entities, preset*: prop\|static_level\|kinematic_platform\|player_character\|npc_character\|trigger_zone\|debris\|projectile\|remove, overrides}`, `physics_settle {entities, seconds, freeze_others}`,
 `physics_query {type*: raycast\|raycast_all\|shapecast\|overlap, origin*, direction, max_distance, shape, radius, height, half_extents, exclude, include_triggers, layers}`, `physics_debug {view: editor\|scene\|top, focus, show_static, include_image}`,
 `physics_settings {gravity, substeps, ignorePairs, allowSleep, enabled}`, `nav_build {agent_radius, agent_height, max_climb, max_slope, cell_size, geometry, save, path}`, `nav_path {from*, to*}`, `nav_debug {focus, from, to, size}`. See skywalker-physics.
+2D physics (Box2D): `physics2d_add {entity\|entities, preset*: platformer_player\|crate\|ball\|one_way_platform\|tilemap_collision\|static_ground\|sensor_zone\|moving_platform\|remove, overrides}`,
+`physics2d_settle {entity\|entities, seconds, freeze_others}`, `physics2d_query {type*: raycast\|raycast_all\|overlap_circle\|overlap_box\|point, origin*, direction, max_distance, radius, half_extents, angle, exclude, include_sensors, layers}`,
+`physics2d_info {entity, limit}`. See skywalker-2d-ui.
 
 ## 2D, UI and dialogue
 

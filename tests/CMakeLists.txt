@@ -67,6 +67,7 @@ set(SKY_TEST_SOURCES
     test_localization.cpp
     test_scene_flow.cpp
     test_wander_debugger.cpp
+    test_physics2d.cpp
 )
 
 add_executable(skywalker_tests ${SKY_TEST_SOURCES})

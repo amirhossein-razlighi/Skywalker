@@ -19,6 +19,7 @@ void registerCharacterBuiltins(wander::BuiltinRegistry& reg);  // CharacterBuilt
 void registerSaveBuiltins(wander::BuiltinRegistry& reg);  // game/SaveBuiltins.cpp: save_game, load_game, game_var
 void registerLocaleBuiltins(wander::BuiltinRegistry& reg);  // locale/LocaleBuiltins.cpp: tr, set_locale, locale, locales
 void registerSceneFlowBuiltins(wander::BuiltinRegistry& reg);  // game/SceneFlowBuiltins.cpp: change_scene, load_additive...
+void registerPhysics2DBuiltins(wander::BuiltinRegistry& reg);  // physics2d/Physics2DBuiltins.cpp: push2d, raycast2d, move2d...
 
 namespace {
 
@@ -176,6 +177,7 @@ void registerEngineBuiltins() {
         registerSaveBuiltins(reg);  // save games (game/SaveBuiltins.cpp)
         registerLocaleBuiltins(reg);  // localization (locale/LocaleBuiltins.cpp)
         registerSceneFlowBuiltins(reg);  // runtime scene flow (game/SceneFlowBuiltins.cpp)
+        registerPhysics2DBuiltins(reg);  // 2D physics (physics2d/Physics2DBuiltins.cpp)
     });
 }
 

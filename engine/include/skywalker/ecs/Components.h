@@ -366,3 +366,9 @@ struct Environment {
 #include "skywalker/ecs/CharacterComponents.h"  // characterIk: foot planting, hand targets, turn in place
 #include "skywalker/ecs/PersistComponent.h"  // persist: what save games keep (docs/SAVE_GAMES.md)
 #include "skywalker/ecs/CarryComponent.h"  // carry: carried across runtime scene changes (docs/SCENE_FLOW.md)
+// 2D physics (Box2D, physics2d/): body2d, collider2d, joint2d, character2d, physics2d_world.
+#include "skywalker/ecs/Body2D.h"
+#include "skywalker/ecs/Collider2D.h"
+#include "skywalker/ecs/Joint2D.h"
+#include "skywalker/ecs/Character2D.h"
+#include "skywalker/ecs/Physics2DSettings.h"

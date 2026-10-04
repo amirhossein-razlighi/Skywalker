@@ -19,6 +19,10 @@ The physics components:
 | `navmesh` | Navigation-mesh bake settings and the saved bake (one per scene) |
 | `nav_agent` | An entity that finds paths on the navmesh and follows them with crowd avoidance |
 
+2D games on the XY plane have their own set, simulated with [Box2D](https://github.com/erincatto/box2d):
+`body2d`, `collider2d` (including merged tilemap collision), `joint2d`, `character2d` and
+`physics2d_world`. See [2D physics](#2d-physics).
+
 ## Quick start for agents
 
 ```jsonc
@@ -445,12 +449,164 @@ spins (above 70). `examples/demo_vehicle_yard` is a proving ground with a slalom
 Determinism: vehicles step inside the fixed tick like every body (entity order, unique constraint priorities), so the
 same inputs replay identically; everything resets when play stops.
 
+## 2D physics
+
+2D games (sprites and tilemaps on the XY plane, see [2D_AND_UI.md](2D_AND_UI.md)) use a second,
+independent simulation built on Box2D v3. Its components mirror the 3D ones, and it runs in the
+same fixed tick right after the 3D step. A 2D body moves the entity's transform: position x/y and
+the rotation around Z. z, the other rotations and the scale are left alone. Units are world units
+(1 tile at `cellSize` 1).
+
+| Component | What it is for |
+|---|---|
+| `collider2d` alone | Static geometry: ground, walls, platforms, tilemap collision |
+| `body2d` + `collider2d` | A simulated body: `dynamic` (gravity, forces, collisions), `kinematic` (follows its transform, or its `velocity` when set; pushes dynamic bodies) or `static` |
+| child entities with `collider2d` | Extra shapes of the ancestor's body (a compound) |
+| `character2d` | A kinematic platformer controller: slopes, one-way platforms, coyote time, jump buffering |
+| `joint2d` | `revolute`, `prismatic`, `distance`, `weld`, `wheel` or `target`, to another body (`other`, an entity link) or to the world |
+| `physics2d_world` | Gravity (default `[0, -20]`), solver sub-steps, sleeping, the `impact` threshold, debug drawing |
+
+### `collider2d`
+
+| Field | Meaning |
+|---|---|
+| `shape` | `box` (`size`), `circle` (`radius`), `capsule` (`radius`, `height` along local Y), `polygon` (`points`, convex, 3..8), `chain` (`points`, >= 4, `loop`), `segment` (2 `points`), `tilemap` |
+| `offset`, `rotation` | Shape placement relative to the entity (scaled and turned with its transform) |
+| `friction`, `restitution`, `density` | Material: density x area gives dynamic bodies their mass (or set `body2d.mass`) |
+| `sensor` | A zone: `on trigger_enter` / `on trigger_exit`, never blocks (sensors ignore static scenery) |
+| `layer`, `mask` | Collision layer (the 3D names: default, static, player, enemy, projectile, trigger, debris) and the layers it collides with (`"all"` or `"default, player"`) |
+| `oneWay` | A platform that only blocks from above (its local +Y): jump up through it, land on it |
+| `tileMerge`, `tileShapes` | `tilemap` only: `chains` (merged outlines) or `boxes` (merged rectangles); per-tile shapes over the tileset's |
+
+`body2d`: `motion`, `mass` (0 = from density), `gravityScale`, `linearDamping`, `angularDamping`,
+`fixedRotation`, `bullet` (continuous collision against moving bodies), `allowSleep`, `startAwake`,
+and the live `velocity`, `angularVelocity` (degrees/s) and `sleeping`. Writing `velocity` from a
+script or a tool sets it.
+
+### Tilemap collision
+
+`collider2d {"shape": "tilemap"}` on an entity with a `tilemap` builds its collision from the solid
+layers (`"solid": true` = every tile, `"solid": "tiles"` = the tiles in the tileset's `solid` ids,
+the map's `solidTiles`, or the collision table). Full tiles are merged: with `tileMerge: "chains"`
+(the default) each connected region becomes one outline loop (holes included), so bodies and
+characters slide along tile seams without catching. With `"boxes"` they become the fewest merged
+rectangles. Other tile shapes come from the collision table, either the tileset's `"collision"`
+object or `collider2d.tileShapes`, keyed by tile id:
+
+```json
+{"image": "tiles.png", "tileSize": 16, "solid": ["1-40"],
+ "collision": {"41": "slope_up", "42": "slope_down", "43": "half_bottom", "44": "top",
+               "45": {"points": [[0, 16], [16, 8], [16, 16]]}, "46": "none"}}
+```
+
+Presets: `full`, `none`, `slope_up`, `slope_down`, `slope_up_low`/`slope_up_high` and
+`slope_down_low`/`slope_down_high` (a gentle slope over two tiles), `half_bottom`, `half_top`, `top`
+(a thin one-way platform). Polygons are in tile pixels (origin top-left, y down) and can be
+one-way with `"oneWay": true`. Flipped tiles flip their shape. Half tiles and one-way tops in a row
+merge into one piece. `physics2d_info` reports how many loops, boxes and polygons each map became.
+
+### `character2d`
+
+A capsule (`height`, `radius`, `offset`: `[0, height / 2]` puts the origin at the feet) moved by
+Box2D's mover queries rather than by forces, so it never jitters, never tips over and stops
+exactly where it should. Each tick it accelerates toward the input (`moveSpeed`, `acceleration`,
+`airControl` in the air), applies its own `gravity` (times `fallMultiplier` while falling,
+clamped at `maxFallSpeed`), slides along walls, walks up and down slopes up to `maxSlope` while
+staying glued to the ground (`snapDistance`), lands on one-way platforms and passes up through
+them. A jump works up to `coyoteTime` seconds after running off a ledge, and a jump pressed in the
+air up to `jumpBuffer` seconds before landing happens on landing. `velocity` and `grounded` are live;
+write `velocity` for knockback. A kinematic proxy body follows it, so sensors detect the character
+and dynamic bodies it walks into are pushed.
+
+### `joint2d`
+
+`anchor` is the pivot in this entity's space, `other` the second body (empty = the world) and
+`otherAnchor` its end (distance joints) in the other body's space, or a world point when there is
+no `other`. Motors (`motorSpeed`, `motorForce`) move this body relative to the other one: revolute
+counter-clockwise for positive speeds, prismatic and wheel along `axis`. `limitMin < limitMax`
+turns limits on, `stiffness` (Hz) and `damping` make it springy, `breakForce` breaks it (`enabled`
+becomes false and `on event "joint_broken"` fires). `target` pulls the body toward `target` (a world
+point) or toward the `other` entity as it moves (dragging, grappling).
+
+### Wander
+
+The 3D events are delivered by 2D physics too, with the same names and values: `on collide`
+(`other`, `contact_point`, `contact_normal`, `impact` = approach speed), `on trigger_enter` and
+`on trigger_exit`. 2D adds `on collide_end` (two bodies stopped touching) and `on impact` (a hit faster
+than `physics2d_world.impactSpeed`; `data.point`, `data.normal`, `data.speed`, `data.impulse`).
+
+| Builtin | Meaning |
+|---|---|
+| `push2d(e, force)`, `impulse2d(e, impulse)`, `torque2d(e, n)` | force (N), instant kick (N s), torque for dynamic bodies |
+| `velocity2d(e)`, `set_velocity2d(e, v)` | read or set the velocity of a body or character |
+| `raycast2d(origin, dir, max?)` | first entity hit (not self, not sensors); then `hit_point`, `hit_normal`, `hit_distance` |
+| `overlap2d(center, r, tag?)` | nearest entity overlapping a circle, optionally with a tag |
+| `point2d(point, tag?)` | entity whose shape contains a point (sensors included) |
+| `move2d(e, x)`, `jump2d(e, speed?)`, `grounded2d(e)`, `drop_through2d(e)` | character2d control |
+
+```wander
+behavior Hero
+  on tick
+    move2d(self, axis("move").x)
+    if pressed("jump") then
+      jump2d(self)
+    end
+    if pressed("down") then
+      drop_through2d(self)
+    end
+  end
+  on trigger_enter "coin"
+    emit "coin_collected"
+  end
+end
+
+behavior Bomb
+  on impact
+    if data.speed > 8 then
+      let victim = overlap2d(self, 3, "enemy")
+      if exists(victim) then
+        impulse2d(victim, direction(self, victim) * 20)
+      end
+      destroy self
+    end
+  end
+end
+```
+
+### Tools
+
+| Tool | What it does |
+|---|---|
+| `physics2d_add` | Presets fitted to the sprite: `platformer_player`, `crate`, `ball`, `one_way_platform`, `tilemap_collision`, `static_ground`, `sensor_zone`, `moving_platform`, `remove` (one undo step) |
+| `physics2d_info` | Settings, counts, bodies, characters, tilemap pieces and warnings (editing and playing) |
+| `physics2d_query` | `raycast`, `raycast_all`, `overlap_circle`, `overlap_box`, `point` (works while editing) |
+| `physics2d_settle` | Simulate the listed entities until they rest and keep the poses (one undo step) |
+
+```jsonc
+{"tool": "physics2d_add", "args": {"entity": "Level", "preset": "tilemap_collision"}}
+{"tool": "physics2d_add", "args": {"entity": "Hero", "preset": "platformer_player"}}
+{"tool": "physics2d_add", "args": {"entities": ["Crate 1", "Crate 2"], "preset": "crate"}}
+{"tool": "physics2d_settle", "args": {"entities": ["Crate 1", "Crate 2"]}}
+{"tool": "physics2d_info", "args": {}}
+```
+
+**Determinism.** Box2D runs single-threaded and is compiled without floating-point contraction.
+Bodies are created in scene order and events are sorted, so a play session replays bit for bit, and
+the world is rebuilt from the restored scene on every play.
+
+**Debug draw.** `physics2d_world.debugDraw: true` adds every shape (colored by kind: dynamic,
+sleeping, kinematic, static, sensor, one-way, character), contact normals and joint lines to the
+frame (`render2d.debugLines`). Headless captures draw them over the world.
+
 ## Limitations (v0.1)
 
 - One `joint` per entity (chain links joint the previous link); no ragdoll preset yet.
 - Navmesh obstacles are baked: moving obstacles are avoided by agents (crowd avoidance) but do not
   carve the navmesh. No off-mesh links (jumps, ladders) yet.
-- Collide events are begin-only (no "collide end"); trigger exit is reported.
+- 3D collide events are begin-only (no "collide end"); trigger exit is reported. 2D physics has `on collide_end`.
+- 2D: chain and tilemap colliders belong on static or kinematic bodies (no mass). Slopes and half
+  tiles are separate polygons next to the merged outlines, so a fast dynamic body can catch on their
+  seam (characters do not). One `joint2d` per entity.
 - Heightmap files: `.r16`/`.raw` (16-bit) and `.hdr`; PNG heightmaps need an image decoder in core.
 - Non-uniform scale under rotated parents is approximated by the product of the scales along the
   hierarchy (no shear), so a non-uniformly scaled parent with a rotated child can fit a collider
@@ -483,3 +639,11 @@ same inputs replay identically; everything resets when play stops.
 | `src/physics/VehicleTestDrive.cpp`, `VehicleDebugDraw.cpp` | the test-drive autopilot; the `vehicles` overlay and telemetry JSON |
 | `src/agent/VehicleTools.cpp`, `src/engine/VehicleBuiltins.cpp` | tools and Wander builtins |
 | `tests/test_physics.cpp`, `tests/test_nav.cpp`, `tests/test_vehicle.cpp` | tests |
+| `engine/include/skywalker/ecs/Body2D.h`, `Collider2D.h`, `Joint2D.h`, `Character2D.h`, `Physics2DSettings.h` | the 2D components (tables in `physics2d/Physics2DComponents.cpp`) |
+| `engine/include/skywalker/physics2d/Physics2DWorld.h`, `src/physics2d/Physics2DWorld.cpp` | Box2D world mirroring the scene: bodies, shapes, joints, events, write-back |
+| `src/physics2d/Character2DController.cpp` | the character2d controller (mover queries, slopes, one-way platforms, coyote time, jump buffer) |
+| `engine/include/skywalker/physics2d/TileColliders.h` | merged tilemap collision (outlines, boxes, per-tile shapes) |
+| `engine/include/skywalker/physics2d/Physics2DSystem.h` | play/edit worlds, Wander events, debug draw |
+| `src/physics2d/Physics2DBuiltins.cpp`, `src/agent/Physics2DTools.cpp` | Wander builtins and the `physics2d_*` tools |
+| `cmake/Physics2DDeps.cmake` | Box2D v3.1.1 via FetchContent |
+| `tests/test_physics2d.cpp` | 2D physics tests |

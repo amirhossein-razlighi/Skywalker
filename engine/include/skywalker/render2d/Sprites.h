@@ -42,6 +42,7 @@ struct Tileset {
     int texW = 0, texH = 0;
     std::vector<uint32_t> solid;
     Json terrains = Json::object();
+    Json collision = Json::object();  // per-tile collision shapes for 2D physics ({"7": "slope_up"})
     std::map<std::string, uint32_t> names;
     std::map<uint32_t, TileAnimation> animations;  // tile id -> its animation ("animations" in *.tileset.json)
     std::map<uint32_t, int> sortOffset;            // ySort layers: a tall tile sorts with the row n cells below it

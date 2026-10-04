@@ -50,6 +50,9 @@ class SocketServer;
 class CustomTools;
 class World2D;
 class NativeModules;
+namespace physics2d {
+class Physics2DSystem;
+}
 namespace studio {
 class Studio;
 }
@@ -344,6 +347,7 @@ public:
     // --- Physics & navigation (Jolt, Recast/Detour) -------------------------------------
     physics::PhysicsSystem& physics() { return *physics_; }
     nav::NavSystem& navigation() { return *nav_; }
+    physics2d::Physics2DSystem& physics2d() { return *physics2d_; }  // 2D physics (Box2D, docs/PHYSICS.md)
 
     // --- Save games (docs/SAVE_GAMES.md) ------------------------------------------------
     game::SaveSystem& saves() { return *saves_; }
@@ -537,6 +541,7 @@ private:
     std::unique_ptr<CustomTools> customTools_;  // custom & external tools (agent/CustomTools.h)
     std::unique_ptr<game::SaveSystem> saves_;   // save games (game/SaveGame.h)
     std::unique_ptr<game::SceneFlow> sceneFlow_;  // runtime scene changes (game/SceneFlow.h)
+    std::unique_ptr<physics2d::Physics2DSystem> physics2d_;  // 2D physics (physics2d/Physics2DSystem.h)
 };
 
 void registerEngineTools(Engine& engine);

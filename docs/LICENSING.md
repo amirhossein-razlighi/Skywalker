@@ -89,6 +89,7 @@ Libraries fetched at build time (CMake FetchContent, pinned tags) and linked int
 |---|---|---|---|
 | [Jolt Physics](https://github.com/jrouwe/JoltPhysics) | v5.6.0 | MIT | Rigid bodies, colliders, character controller, joints, physics queries |
 | [Recast & Detour](https://github.com/recastnavigation/recastnavigation) | v1.6.0 | zlib | Navigation mesh generation, path finding, crowd steering |
+| [Box2D](https://github.com/erincatto/box2d) | v3.1.1 | MIT | 2D rigid bodies, shapes, chains, joints, sensors, queries and the character2d mover |
 
 ### 2D, text and UI (workstream T)
 

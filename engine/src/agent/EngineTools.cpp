@@ -1241,6 +1241,7 @@ void registerEngineTools(Engine& engine) {
     tools::addLocaleTools(engine, reg);  // engine/src/agent/LocaleTools.cpp (localization, docs/LOCALIZATION.md)
     tools::addSceneFlowTools(engine, reg);  // engine/src/agent/SceneFlowTools.cpp (runtime scene changes, docs/SCENE_FLOW.md)
     tools::addWanderDebugTools(engine, reg);  // engine/src/agent/WanderDebugTools.cpp (Wander debugger)
+    tools::addPhysics2DTools(engine, reg);  // engine/src/agent/Physics2DTools.cpp (2D physics, Box2D)
 }
 
 }  // namespace sky
