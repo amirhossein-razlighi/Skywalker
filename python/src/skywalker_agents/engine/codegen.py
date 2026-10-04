@@ -62,7 +62,11 @@ def _pascal(name: str) -> str:
 
 def _ident(name: str) -> str:
     ident = re.sub(r"\W", "_", name)
-    if keyword.iskeyword(ident) or ident in ("self", "check", "timeout", "model_config"):
+    # Keywords, our own parameters, pydantic internals, and names the annotations use (a field called
+    # `list` would shadow the builtin inside the model's namespace).
+    reserved = ("self", "check", "timeout", "model_config", "list", "dict", "str", "int", "float", "bool", "Any",
+                "Literal", "Field")
+    if keyword.iskeyword(ident) or ident in reserved or ident.startswith("model_"):
         ident += "_"
     if ident[0].isdigit():
         ident = "_" + ident

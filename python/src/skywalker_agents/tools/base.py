@@ -178,6 +178,26 @@ def _ctx_param(fn: ToolFn, hints: dict[str, Any]) -> str | None:
     return "ctx" if "ctx" in sig.parameters and "ctx" not in hints else None
 
 
+def _type_hints(fn: ToolFn) -> dict[str, Any]:
+    """Resolved annotations; names that cannot be resolved (local imports) fall back to Any, and an
+    annotation spelled ``ToolContext`` always means the injected context."""
+    try:
+        return get_type_hints(fn, localns={"ToolContext": ToolContext})
+    except Exception:
+        pass
+    out: dict[str, Any] = {}
+    glb = dict(getattr(fn, "__globals__", {}))
+    glb.setdefault("ToolContext", ToolContext)
+    for pname, ann in getattr(fn, "__annotations__", {}).items():
+        if isinstance(ann, str):
+            try:
+                ann = eval(ann, glb)  # noqa: S307 - evaluating the function's own annotation
+            except Exception:
+                ann = ToolContext if ann.endswith("ToolContext") else Any
+        out[pname] = ann
+    return out
+
+
 def _function_tool(
     fn: ToolFn,
     *,
@@ -187,7 +207,7 @@ def _function_tool(
     category: str,
     requires_approval: bool | None,
 ) -> Tool:
-    hints = get_type_hints(fn)
+    hints = _type_hints(fn)
     ctx_name = _ctx_param(fn, hints)
     summary, arg_docs = parse_docstring(fn.__doc__)
     fields: dict[str, Any] = {}

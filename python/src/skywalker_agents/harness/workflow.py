@@ -340,7 +340,8 @@ class Workflow:
             ctx.iteration = ckpt.iteration
             ctx.history = ckpt.history
             ctx.state = ckpt.state
-            done_steps = {k: StepRecord.model_validate(v) for k, v in ckpt.steps.items()}
+            # Only finished steps are kept: failed and skipped ones run (or are re-evaluated) again.
+            done_steps = {k: StepRecord.model_validate(v) for k, v in ckpt.steps.items() if v.get("status") == "done"}
             ctx.results = {k: r.result for k, r in done_steps.items() if r.status == "done"}
             tracker.tokens, tracker.cost_usd = ckpt.spent.get("tokens", 0), ckpt.spent.get("cost_usd", 0.0)
         started = time.monotonic()

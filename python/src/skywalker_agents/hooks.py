@@ -122,7 +122,7 @@ DEFAULT_SECRET_PATTERNS = [
     r"sk-ant-[A-Za-z0-9_\-]{10,}",  # Anthropic keys
     r"sk-(?:proj-)?[A-Za-z0-9_\-]{20,}",  # OpenAI-style keys
     r"AKIA[0-9A-Z]{16}",  # AWS access key ids
-    r"(?i)bearer\s+[A-Za-z0-9._\-]{20,}",  # bearer tokens
+    r"(?i:bearer)\s+[A-Za-z0-9._\-]{20,}",  # bearer tokens
     r"gh[pousr]_[A-Za-z0-9]{30,}",  # GitHub tokens
 ]
 
