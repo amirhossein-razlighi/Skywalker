@@ -58,6 +58,7 @@ bool MetalHair::build(id<MTLLibrary> lib, const FxFormats& fmt) {
         d.colorAttachments[0].pixelFormat = fmt.hdr;
         d.colorAttachments[1].pixelFormat = fmt.gbufA;
         d.colorAttachments[2].pixelFormat = fmt.gbufB;
+        d.colorAttachments[3].pixelFormat = fmt.velocity;
         d.depthAttachmentPixelFormat = fmt.depth;
         return newRenderPipeline(device_, d, &err);
     };
@@ -129,6 +130,8 @@ void MetalHair::upload(GroomGpu& g, const GroomItem& item) {
     }
     g.offsets = [device_ newBufferWithBytes:off.data() length:off.size() * 2 options:MTLResourceStorageModeShared];
     g.render = [device_ newBufferWithLength:static_cast<NSUInteger>(g.N) * g.P * 16 options:MTLResourceStorageModePrivate];
+    g.renderPrev = [device_ newBufferWithLength:static_cast<NSUInteger>(g.N) * g.P * 16 options:MTLResourceStorageModePrivate];
+    g.motion = false;
     if (!g.domDepth) {
         auto depthTex = [&]() {
             MTLTextureDescriptor* t = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatDepth32Float
@@ -256,7 +259,12 @@ void MetalHair::simulate(id<MTLCommandBuffer> cmd, const FrameData& frame) {
         g.lastTime = now;
         g.lastModel = item.model;
         // Rebuild the rendered strands from the guides.
+        g.motion = false;
         if (changed || !g.interpolated || g.drawn != g.lastDrawn) {
+            // Velocity buffer: keep last frame's strands so moving hair gets motion vectors.
+            const bool keepPrev = g.interpolated && g.drawn == g.lastDrawn && !reset;
+            if (keepPrev) std::swap(g.render, g.renderPrev);
+            g.motion = keepPrev;
             [enc setComputePipelineState:kernels_["hairInterpolate"]];
             [enc setBytes:&u length:sizeof(u) atIndex:0];
             [enc setBuffer:g.children offset:0 atIndex:1];
@@ -434,6 +442,7 @@ void MetalHair::encodeOpaque(id<MTLRenderCommandEncoder> enc) {
         } else {
             [enc setVertexBuffer:g.render offset:0 atIndex:4];
             [enc setVertexBuffer:g.children offset:0 atIndex:5];
+            [enc setVertexBuffer:(g.motion ? g.renderPrev : g.render) offset:0 atIndex:6];  // previous strands
             [enc setRenderPipelineState:strandPipeline_];
             [enc drawPrimitives:MTLPrimitiveTypeTriangleStrip vertexStart:0 vertexCount:g.P * 2 instanceCount:g.drawn];
         }
@@ -443,7 +452,7 @@ void MetalHair::encodeOpaque(id<MTLRenderCommandEncoder> enc) {
 Json MetalHair::stats() const {
     Json arr = Json::array();
     for (const auto& [id, g] : grooms_) {
-        double gpuMB = (static_cast<double>(g.G) * g.P * 16 * 3 + static_cast<double>(g.N) * (48 + g.P * 8.0 + g.P * 16.0) +
+        double gpuMB = (static_cast<double>(g.G) * g.P * 16 * 3 + static_cast<double>(g.N) * (48 + g.P * 8.0 + g.P * 32.0) +
                         kDomSize * kDomSize * 16.0) / (1024.0 * 1024.0);
         arr.push(Json::object({{"entity", id},
                                {"strands", g.N},

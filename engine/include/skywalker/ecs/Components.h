@@ -51,6 +51,8 @@ struct MeshRenderer {
     bool doubleSided = false;
     bool castShadows = true;
     float alphaCutoff = 0.f;      // > 0: alpha-tested cutout (foliage, fences, sails); pixels below are cut
+    // Render layers (docs/RENDERING.md "Render layers"): bit i = layer i+1 (20 layers).
+    int layers = 1;               // which layers this mesh is on; cameras and lights pick layers with cullMask
 
     static const TypeInfo& type();
     static const std::vector<std::string>& primitives();
@@ -62,6 +64,19 @@ struct Light {
     float intensity = 1.f;
     float range = 10.f;
     float spotAngle = 35.f;
+    // Light v2 (docs/RENDERING.md "Lights"): masks, per-term strengths, color temperature, falloff.
+    int cullMask = 0xFFFFF;       // render layers this light illuminates (bit i = layer i+1; all 20 by default)
+    float specular = 1.f;         // highlight strength (0 = diffuse only, no glints)
+    float indirect = 1.f;         // contribution to baked / world-space GI (reserved: used when GI probes exist)
+    float volumetric = 1.f;       // strength in volumetric fog / god rays
+    float temperature = 0.f;      // Kelvin (1000..40000) tints `color`; 0 = use color as is
+    float innerAngle = 0.f;       // spot: full-intensity inner cone half-angle in degrees (0 = automatic soft edge)
+    bool negative = false;        // subtracts light (darkens; stylized shadows, fake occlusion)
+    bool distanceFade = false;    // fade out with camera distance (many small lights in big levels)
+    float fadeBegin = 40.f;       // meters from the camera where fading starts
+    float fadeLength = 10.f;      // meters over which it fades to nothing
+    std::string attenuation = "smooth";  // smooth (soft, artist-friendly) | inverse_square (physical, uses size)
+    float size = 0.1f;            // emitter radius in meters (inverse_square: caps the peak near the source)
 
     static const TypeInfo& type();
 };
@@ -78,6 +93,7 @@ struct Camera {
     float focusDistance = 0.f;  // meters, 0 = autofocus on the center of the frame
     float motionBlur = 0.f;     // shutter fraction 0..1 (0.5 = 180-degree shutter), 0 = off
     float tiltShift = 0.f;      // miniature look: 0..1 blur above and below a sharp horizontal band (tilt-shift lens)
+    int cullMask = 0xFFFFF;     // render layers this camera sees (bit i = layer i+1; all 20 by default)
 
     static const TypeInfo& type();
 };

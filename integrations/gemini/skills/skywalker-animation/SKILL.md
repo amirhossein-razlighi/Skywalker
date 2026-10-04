@@ -112,6 +112,7 @@ movie_render {action:"status"}
 - `simulate:true` runs the game (scripts, physics, water bobbing boats); the default runs only sequences, animators and particles.
 - Motion blur: `shutter` 0..1 of the frame (0.5 = 180 degrees; default = the camera's `motionBlur`), sub-frames at exact fractional times; `samples` is the per-frame budget (8 previews, 16-32 finals).
 - Same move in three looks for "sketch to clay to final" transitions: render it with `debug_view:"sketch"`, `clay:true` and normally; the frames line up exactly.
+- Skinned characters write per-vertex motion vectors (their previous pose), so TAA and MetalFX keep them sharp in motion. To check, `sim_control {action:"step", ticks:1}` then `viewport_capture {samples:1, debug_view:"motion"}`: moving limbs are colored, the static set stays gray.
 - Long renders: `background:true` returns at once (the editor shows a progress bar; poll with `action:"status"`); `action:"cancel"` stops after the current sub-frame and keeps what was written; `resume:true` continues a PNG sequence.
 - Preview a range cheaply first (`quality:"fast"`, `samples:1`, `resolution:"720p"`), then render the final.
 

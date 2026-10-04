@@ -28,6 +28,7 @@
 #include <simd/simd.h>
 
 #include <algorithm>
+#include <array>
 #include <atomic>
 #include <cmath>
 #include <cstdio>
@@ -48,6 +49,7 @@
 #include "skywalker/render/Hdr.h"
 #include "skywalker/render/LightClusters.h"
 #include "skywalker/render/MeshData.h"
+#include "skywalker/render/MotionHistory.h"
 #include "skywalker/render/Renderer.h"
 #include "MetalRenderer2D.h"  // 2D world quads + UI (Frame2D)
 #include "MetalProfiler.h"     // [profiler] per-pass GPU timing
@@ -122,7 +124,11 @@ struct DrawUniforms {
     simd_float4 maps;
     simd_float4 outlineColor;
     simd_float4 material4;
+    // --- appended (velocity buffer) ---
+    simd_float4x4 prevModel;  // previous frame's model matrix (= model when static)
+    simd_float4 motion;       // x = moves (prevModel differs or a previous skinned pose is bound)
 };
+static_assert(sizeof(DrawUniforms) == 336, "must match DrawUniforms in Common.metal");
 
 struct PostUniforms {
     simd_float4 params;
@@ -197,18 +203,28 @@ struct GradeUniformsGpu {
     simd_float4 params;
 };
 
+struct MotionBlurUniformsGpu {  // MotionBlurUniforms in Post.metal
+    simd_float4 params;  // x = shutter, y = tile size (velocity texels), z = max blur (output px), w = samples
+    simd_float4 size;    // xy = velocity texture size, zw = output size
+};
+
 struct GPULight {
     simd_float4 positionRange;
     simd_float4 colorIntensity;
     simd_float4 directionCone;
     simd_float4 kind;
+    // --- appended (light v2) ---
+    simd_float4 params;   // x = specular, y = layer mask (as float), z = cos(inner cone) (0 = auto), w = inverse square
+    simd_float4 params2;  // x = emitter radius, y = indirect, z = volumetric, w = unused
 };
+static_assert(sizeof(GPULight) == 96, "must match GPULight in Common.metal");
 
 constexpr MTLPixelFormat kColorFormat = MTLPixelFormatBGRA8Unorm_sRGB;  // final LDR image
 constexpr MTLPixelFormat kHDRFormat = MTLPixelFormatRGBA16Float;     // scene, ambient, bloom, env
 constexpr MTLPixelFormat kAOFormat = MTLPixelFormatR16Float;
 constexpr MTLPixelFormat kGbufAFormat = MTLPixelFormatRGBA8Unorm_sRGB;  // albedo + material AO
 constexpr MTLPixelFormat kGbufBFormat = MTLPixelFormatRGBA16Float;      // normal (oct) + roughness + metallic/flags
+constexpr MTLPixelFormat kVelocityFormat = MTLPixelFormatRG16Float;     // motion vectors (uv, current -> previous)
 constexpr int kBloomLevels = 6;
 constexpr MTLPixelFormat kDepthFormat = MTLPixelFormatDepth32Float;
 constexpr NSUInteger kSamples = 4;
@@ -217,6 +233,7 @@ constexpr int kCascades = 4;
 constexpr NSUInteger kEnvSize = 128;
 constexpr NSUInteger kEnvMips = 6;
 constexpr NSUInteger kBrdfSize = 64;
+constexpr int kDebugMotion = 11;  // FrameData::debugView "motion": the velocity buffer
 
 simd_float4x4 toSimd(const Mat4& m) {
     simd_float4x4 r;
@@ -470,6 +487,22 @@ public:
                              {"gpuFaults", static_cast<int64_t>(gpuFaults_->load())},
                              {"meshesCached", static_cast<int64_t>(meshes_.size())},
                              {"texturesCached", static_cast<int64_t>(textures_.size())}});
+        {  // velocity buffer: what moves this frame (object motion vectors) and the upscaler inputs
+            int64_t skinnedWithHistory = 0;
+            for (const auto& [key, h] : skinHistory_) skinnedWithHistory += h.motion && h.lastFrame + 1 == frameIndex_ ? 1 : 0;
+            const MotionHistory::Stats& ms = motionHistory_.stats();
+            j["lights"] = Json::object({{"total", static_cast<int64_t>(lightStats_[0])},
+                                        {"layerMasked", static_cast<int64_t>(lightStats_[1])},
+                                        {"negative", static_cast<int64_t>(lightStats_[2])},
+                                        {"inverseSquare", static_cast<int64_t>(lightStats_[3])}});
+            j["velocity"] = Json::object({{"movingDraws", static_cast<int64_t>(movingDraws_)},
+                                          {"trackedDraws", static_cast<int64_t>(ms.tracked)},
+                                          {"teleported", static_cast<int64_t>(ms.teleported)},
+                                          {"maxObjectMotionM", std::round(ms.maxDistance * 1000.0) / 1000.0},
+                                          {"skinnedWithPreviousPose", skinnedWithHistory},
+                                          {"mipBias", std::round(mipBias_ * 1000.0) / 1000.0},
+                                          {"motionBlurTilePx", static_cast<int64_t>(motionTilePx_)}});
+        }
         if (foliage_) {  // [foliage] instances, impostors, bakes
             const Json f = foliage_->stats();
             for (const auto& [k, v] : f.members()) j[k] = v;
@@ -561,17 +594,40 @@ public:
             // All lights shade surfaces through clusters; the most important few also light
             // water, particles, fluids and the volumetric fog.
             std::vector<GPULight> allLights = gpuLights(frame);
+            lightStats_ = {};
+            for (const LightItem& l : frame.lights) {  // light v2 usage (perf_stats "lights")
+                lightStats_[0]++;
+                lightStats_[1] += (l.mask & 0xFFFFFu) != 0xFFFFFu ? 1 : 0;
+                lightStats_[2] += l.negative ? 1 : 0;
+                lightStats_[3] += l.inverseSquare ? 1 : 0;
+            }
             std::vector<GPULight> lights(allLights.begin(),
                                          allLights.begin() + static_cast<std::ptrdiff_t>(std::min(allLights.size(), FrameData::kMaxEffectLights)));
             const LightGrid grid = buildLightGrid(frame);
             base.cluster = simd_make_float4(static_cast<float>(grid.tilesX), static_cast<float>(grid.tilesY),
                                             static_cast<float>(grid.slices), std::log(grid.zFar / grid.zNear));
-            base.cluster2 = simd_make_float4(grid.zNear, static_cast<float>(grid.directionalCount), 0, 0);
             const Mat4 vp = frame.viewProjection();
-            if (frame.resetHistory || cameraCut(frame)) {
+            const bool cut = frame.resetHistory || cameraCut(frame);
+            if (cut) {
                 historyValid_ = false;
                 motionValid_ = false;
             }
+            // Velocity buffer inputs: previous transforms (object motion), the previous frame's
+            // time (foliage wind, particles), and the texture LOD bias while MetalFX upscales.
+            const float prevTime = !cut && prevTimeValid_ && frame.time >= prevTime_ && frame.time - prevTime_ < 1.f ? prevTime_ : frame.time;
+            base.cluster2 = simd_make_float4(grid.zNear, static_cast<float>(grid.directionalCount), prevTime, 0);
+            mipBias_ = (upscale || spatialUpscale) ? std::log2(renderScale) : 0.f;
+            base.extra.w = mipBias_;
+            motionHistory_.begin(cut);
+            prevModels_.resize(frame.draws.size());
+            movingDraws_ = 0;
+            for (size_t i = 0; i < frame.draws.size(); ++i) {
+                const DrawItem& d = frame.draws[i];
+                prevModels_[i] = motionHistory_.previous(d.entity, d.mesh, d.model);
+                if (transformChanged(prevModels_[i], d.model)) ++movingDraws_;
+            }
+            motionHistory_.end();
+            velocityComposed_ = false;
             const int samples = std::clamp(frame.samples, 1, 256);
             const bool accumulate = accumulateFrame;
             const bool jittered = accumulate || env.taa;
@@ -627,10 +683,11 @@ public:
                 encodeScreenSpace(cmd, frame, fu, reproject, accumulate, seed);
                 encodeResolve(cmd, frame, fu);
                 encodeEffects(cmd, frame, fu, lights, i == 0);
+                if (!accumulate) encodeVelocity(cmd, fu);  // TAA, MetalFX, motion blur, debug view
                 encodeVolumetrics(cmd, frame, fu, lights, seed);
                 int mode = accumulate ? 2 : (env.taa && historyValid_ && !upscale ? 1 : 0);
                 encodeTemporal(cmd, frame, fu, mode, 1.f / static_cast<float>(i + 1));
-                if (upscale) encodeUpscale(cmd, fu, j);
+                if (upscale) encodeUpscale(cmd, frame, j);
                 id<MTLBlitCommandEncoder> blit = profiledBlit(cmd, "Depth history", "temporal");
                 [blit copyFromTexture:depthResolved_ toTexture:depthPrev_];
                 [blit endEncoding];
@@ -642,6 +699,13 @@ public:
                 }
             }
             if (accumulate) historyValid_ = true;  // the converged still seeds later TAA frames
+            if (accumulate && ((frame.camera.motionBlur > 0.001f && !frame.camera.orthographic) || frame.debugView == kDebugMotion)) {
+                // Stills: motion since the previous rendered frame (sub-samples share one camera).
+                FrameUniforms mfu = base;
+                mfu.prevViewProj = toSimd(motionValid_ ? motionPrevVP_ : vp);
+                mfu.temporal = simd_make_float4(0, 0, 0, 0);
+                encodeVelocity(cmd, mfu);
+            }
             if (spatialUpscale) encodeSpatialUpscale(cmd);
             postSource_ = upscale || spatialUpscale ? upscaled_ : taa_[taaCurrent_];
             encodePost(cmd, frame, accumulate, base);
@@ -649,9 +713,11 @@ public:
             if (frame.debugView > 0 && frame.debugView != debugview::kImpostors && frame.debugView != debugview::kLightingOnly) {
                 PostUniforms pu{};
                 pu.params = simd_make_float4(static_cast<float>(frame.debugView), 0, 0, 0);
-                pu.texel = simd_make_float4(1.f / std::max(frame.width, 1), 1.f / std::max(frame.height, 1), 0, 0);
-                fullscreen(cmd, debugViewPipeline_, resolve_, {gbufA_, gbufB_, giOut_, ssrOut_, aoBlurred_, depthResolved_, hdr_},
-                           &pu, sizeof(pu), false, @"Debug view");
+                pu.texel = simd_make_float4(1.f / std::max(frame.width, 1), 1.f / std::max(frame.height, 1),
+                                            static_cast<float>(frame.width), static_cast<float>(frame.height));
+                fullscreen(cmd, debugViewPipeline_, resolve_,
+                           {gbufA_, gbufB_, giOut_, ssrOut_, aoBlurred_, depthResolved_, hdr_, velocity_}, &pu, sizeof(pu), false,
+                           @"Debug view");
             }
             if (r2d_) r2d_->encodeUI(cmd, frame, resolve_, depthResolved_);  // UI at output resolution
             encodeOverlays(cmd, frame, base);
@@ -679,6 +745,8 @@ public:
             prevViewProj_ = vp;
             motionPrevVP_ = vp;
             motionValid_ = true;
+            prevTime_ = frame.time;
+            prevTimeValid_ = true;
             prevEye_ = frame.camera.eye;
             prevTarget_ = frame.camera.target;
             ++frameIndex_;
@@ -785,7 +853,8 @@ private:
             "terrainShadowVertex", "cloudsFragment",
             "cloudTemporalFragment", "cloudShapeKernel", "cloudDetailKernel", "lumaFragment",
             "exposureFragment", "motionBlurFragment", "dofCocFragment", "dofBlurFragment",
-            "dofCombineFragment", "motionVectorFragment", "wireframeFragment", "overdrawFragment"};
+            "dofCombineFragment", "motionVectorFragment", "wireframeFragment", "overdrawFragment",
+            "motionTileMaxFragment", "motionNeighborMaxFragment", "fxExposureFragment"};
         return kRequired;
     }
 
@@ -862,9 +931,11 @@ private:
                 // G-buffer: opaque passes write it; blended passes leave it untouched.
                 d.colorAttachments[1].pixelFormat = kGbufAFormat;
                 d.colorAttachments[2].pixelFormat = kGbufBFormat;
+                d.colorAttachments[3].pixelFormat = kVelocityFormat;  // object motion (velocity buffer)
                 if (blend != Blend::None) {
                     d.colorAttachments[1].writeMask = MTLColorWriteMaskNone;
                     d.colorAttachments[2].writeMask = MTLColorWriteMaskNone;
+                    d.colorAttachments[3].writeMask = MTLColorWriteMaskNone;
                 }
             }
             if (depth) d.depthAttachmentPixelFormat = kDepthFormat;
@@ -916,9 +987,12 @@ private:
         id<MTLRenderPipelineState> dofCoc = motionBlur ? make("fullscreenVertex", "dofCocFragment", kHDRFormat, 1, Blend::None, false, &e) : nil;
         id<MTLRenderPipelineState> dofBlur = dofCoc ? make("fullscreenVertex", "dofBlurFragment", kHDRFormat, 1, Blend::None, false, &e) : nil;
         id<MTLRenderPipelineState> dofCombine = dofBlur ? make("fullscreenVertex", "dofCombineFragment", kHDRFormat, 1, Blend::None, false, &e) : nil;
-        id<MTLRenderPipelineState> motionVec = dofCombine ? make("fullscreenVertex", "motionVectorFragment", MTLPixelFormatRG16Float, 1, Blend::None, false, &e) : nil;
-        // [debug views] wireframe lines and overdraw counting (main pass, G-buffer untouched)
-        id<MTLRenderPipelineState> wire = motionVec ? make("meshVertex", "wireframeFragment", kHDRFormat, kSamples, Blend::Alpha, true, &e, true) : nil;
+        id<MTLRenderPipelineState> motionVec = dofCombine ? make("fullscreenVertex", "motionVectorFragment", kVelocityFormat, 1, Blend::None, false, &e) : nil;
+        id<MTLRenderPipelineState> tileMax = motionVec ? make("fullscreenVertex", "motionTileMaxFragment", kVelocityFormat, 1, Blend::None, false, &e) : nil;
+        id<MTLRenderPipelineState> neighborMax = tileMax ? make("fullscreenVertex", "motionNeighborMaxFragment", kVelocityFormat, 1, Blend::None, false, &e) : nil;
+        id<MTLRenderPipelineState> fxExposure = neighborMax ? make("fullscreenVertex", "fxExposureFragment", MTLPixelFormatR32Float, 1, Blend::None, false, &e) : nil;
+                // [debug views] wireframe lines and overdraw counting (main pass, G-buffer untouched)
+        id<MTLRenderPipelineState> wire = fxExposure ? make("meshVertex", "wireframeFragment", kHDRFormat, kSamples, Blend::Alpha, true, &e, true) : nil;
         id<MTLRenderPipelineState> overdraw = wire ? make("meshVertex", "overdrawFragment", kHDRFormat, kSamples, Blend::Additive, true, &e, true) : nil;
         id<MTLRenderPipelineState> terrainWire = overdraw ? make("terrainVertex", "wireframeFragment", kHDRFormat, kSamples, Blend::Alpha, true, &e, true) : nil;
         id<MTLRenderPipelineState> terrainOverdraw = terrainWire ? make("terrainVertex", "overdrawFragment", kHDRFormat, kSamples, Blend::Additive, true, &e, true) : nil;
@@ -939,7 +1013,7 @@ private:
             return Error::make("pipeline_error", e ? std::string(e.localizedDescription.UTF8String) : "pipeline creation failed");
         }
         // [foliage] GPU-driven foliage and impostor pipelines (same shader library).
-        if (Status fs = foliage_->build(lib, FoliageFormats{kHDRFormat, kGbufAFormat, kGbufBFormat, kDepthFormat, kSamples}); !fs) return fs;
+        if (Status fs = foliage_->build(lib, FoliageFormats{kHDRFormat, kGbufAFormat, kGbufBFormat, kDepthFormat, kSamples, kVelocityFormat}); !fs) return fs;
         skyPipeline_ = sky;
         meshPipeline_ = mesh;
         meshBlendPipeline_ = meshBlend;
@@ -983,11 +1057,14 @@ private:
         dofBlurPipeline_ = dofBlur;
         dofCombinePipeline_ = dofCombine;
         motionPipeline_ = motionVec;
+        motionTileMaxPipeline_ = tileMax;
+        motionNeighborMaxPipeline_ = neighborMax;
+        fxExposurePipeline_ = fxExposure;
         wireframePipeline_ = wire;
         overdrawPipeline_ = overdraw;
         terrainWirePipeline_ = terrainWire;
         terrainOverdrawPipeline_ = terrainOverdraw;
-        if (fx_) fx_->build(lib, FxFormats{kHDRFormat, kGbufAFormat, kGbufBFormat, kDepthFormat, kSamples, kShadowAtlas / 2});  // [hair+vfx]
+        if (fx_) fx_->build(lib, FxFormats{kHDRFormat, kGbufAFormat, kGbufBFormat, kDepthFormat, kSamples, kShadowAtlas / 2, kVelocityFormat});  // [hair+vfx]
         libraryMs_ = libMs;  // [shader cache] engine_info.shaders
         pipelinesMs_ = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
         shaderLibraryOrigin_ = builtin ? origin : "source (shader_set)";
@@ -1046,6 +1123,14 @@ private:
         upscaled_ = target2D(kHDRFormat, w, h, rt | MTLTextureUsageShaderWrite);
         dofCoc_ = target2D(kHDRFormat, ow2, oh2, rt);
         dofBlur_ = target2D(kHDRFormat, ow2, oh2, rt);
+        // Motion blur tiles (McGuire 2012): ~40 px tiles at 1080p, the largest motion per tile and
+        // per 3x3 tile neighborhood.
+        motionTilePx_ = std::clamp(static_cast<int>(std::lround(static_cast<double>(h) / 27.0)), 16, 64);
+        const NSUInteger tw = (w + static_cast<NSUInteger>(motionTilePx_) - 1) / static_cast<NSUInteger>(motionTilePx_);
+        const NSUInteger th = (h + static_cast<NSUInteger>(motionTilePx_) - 1) / static_cast<NSUInteger>(motionTilePx_);
+        motionTiles_ = target2D(kVelocityFormat, tw, th, rt);
+        motionNeighbors_ = target2D(kVelocityFormat, tw, th, rt);
+        fxExposure_ = target2D(MTLPixelFormatR32Float, 1, 1, rt);
         {
             const NSUInteger qw = std::max<NSUInteger>(1, w / 4), qh = std::max<NSUInteger>(1, h / 4);
             MTLTextureDescriptor* ld = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRG16Float width:qw height:qh mipmapped:YES];
@@ -1063,7 +1148,11 @@ private:
         for (auto& t : taa_) t = target2D(kHDRFormat, iw, ih, rt);
         historyValid_ = false;
         depthResolved_ = target2D(kDepthFormat, iw, ih, rt);
-        motion_ = target2D(MTLPixelFormatRG16Float, iw, ih, rt);
+        velocity_ = target2D(kVelocityFormat, iw, ih, rt);       // full motion vectors (camera + objects)
+        objectMotion_ = target2D(kVelocityFormat, iw, ih, rt);   // main pass color(3), resolved
+        msaaVelocity_ = targetMSAA(kVelocityFormat, iw, ih);
+        reactiveNone_ = target2D(MTLPixelFormatR8Unorm, iw, ih, rt);  // MetalFX reactive mask when no GPU particles drew
+        reactiveNoneCleared_ = false;
         const NSUInteger hw = std::max<NSUInteger>(1, iw / 2), hh = std::max<NSUInteger>(1, ih / 2);
         aoRaw_ = target2D(kAOFormat, hw, hh, rt);
         aoBlurred_ = target2D(kAOFormat, hw, hh, rt);
@@ -1125,7 +1214,11 @@ private:
         d.inputHeight = hdr_.height;
         d.outputWidth = upscaled_.width;
         d.outputHeight = upscaled_.height;
-        d.autoExposureEnabled = YES;
+        // Exposure comes from the engine (fxExposure_: what the composite applies), so MetalFX and
+        // the tonemapper agree; GPU particles feed the reactive mask (favor the current frame).
+        d.autoExposureEnabled = NO;
+        d.reactiveMaskTextureEnabled = YES;
+        d.reactiveMaskTextureFormat = MTLPixelFormatR8Unorm;
         scaler_ = [d newTemporalScalerWithDevice:device_];
         return scaler_;
     }
@@ -1218,11 +1311,19 @@ private:
                 out = *base;  // no GPU skinning: the rest pose
                 continue;
             }
-            if (!out.vertices || out.vertices == base->vertices || out.vertexCount != base->vertexCount) {
-                out.vertices = [device_ newBufferWithLength:static_cast<NSUInteger>(base->vertexCount) * MeshData::kFloatsPerVertex * sizeof(float)
-                                                    options:MTLResourceStorageModePrivate];
-                out.vertexCount = base->vertexCount;
+            // Two posed buffers per instance, alternating each frame: the other one still holds the
+            // previous pose, which the velocity buffer needs (skinned motion vectors).
+            SkinHistory& hist = skinHistory_[s.key];
+            const NSUInteger bytes = static_cast<NSUInteger>(base->vertexCount) * MeshData::kFloatsPerVertex * sizeof(float);
+            if (!hist.buffer[0] || hist.buffer[0].length != bytes) {
+                for (auto& b : hist.buffer) b = [device_ newBufferWithLength:bytes options:MTLResourceStorageModePrivate];
+                hist.lastFrame = ~0ull;
             }
+            hist.motion = hist.lastFrame != ~0ull && hist.lastFrame + 1 == frameIndex_;  // posed last frame too
+            if (hist.lastFrame != frameIndex_) hist.current ^= 1;
+            hist.lastFrame = frameIndex_;
+            out.vertices = hist.buffer[hist.current];
+            out.vertexCount = base->vertexCount;
             out.indices = base->indices;
             out.indexCount = base->indexCount;
             out.lodCount = base->lodCount;  // LOD index ranges are shared with the source mesh
@@ -1255,6 +1356,7 @@ private:
         for (auto it = skinnedKeys_.begin(); it != skinnedKeys_.end();) {
             if (frameIndex_ - it->second > 120) {
                 meshes_.erase(it->first);
+                skinHistory_.erase(it->first);
                 it = skinnedKeys_.erase(it);
             } else {
                 ++it;
@@ -1385,6 +1487,9 @@ private:
             g.colorIntensity = lin(l.color, l.intensity);
             g.directionCone = v4(l.direction, l.cosCone);
             g.kind = simd_make_float4(static_cast<float>(l.kind), 0, 0, 0);
+            if (l.negative) g.colorIntensity.w = -g.colorIntensity.w;  // subtracts light
+            g.params = simd_make_float4(l.specular, static_cast<float>(l.mask & 0xFFFFFu), l.cosInner, l.inverseSquare ? 1.f : 0.f);
+            g.params2 = simd_make_float4(l.size, l.indirect, l.volumetric, 0);
             out.push_back(g);
         }
         if (out.empty()) out.push_back(GPULight{});  // Metal requires a bound buffer
@@ -1406,6 +1511,8 @@ private:
         du.maps = maps;
         du.outlineColor = lin(s.outlineColor);
         du.material4 = simd_make_float4(s.alphaCutoff, s.textureAlphaOnly ? 1.f : 0.f, 0, 0);
+        du.prevModel = du.model;  // static unless drawMesh knows better (velocity buffer)
+        du.motion = simd_make_float4(0, static_cast<float>(d.layers & 0xFFFFFu), 0, 0);  // y = render layers (light masks)
         return du;
     }
 
@@ -1866,7 +1973,7 @@ private:
     }
 
     // --- Scene ------------------------------------------------------------------------------
-    void drawMesh(id<MTLRenderCommandEncoder> enc, const DrawItem& d) {
+    void drawMesh(id<MTLRenderCommandEncoder> enc, const DrawItem& d, size_t index) {
         const GpuMesh* m = mesh(d.mesh);
         if (!m) return;
         const Surface& s = d.surface;
@@ -1877,11 +1984,24 @@ private:
         // maps.z: 0 = no ORM map, otherwise 1 + occlusion strength.
         DrawUniforms du = drawUniforms(d, simd_make_float4(albedo ? 1 : 0, normal ? 1 : 0, orm ? 1.f + s.occlusionStrength : 0.f,
                                                            emissive ? 1 : 0));
+        // Velocity buffer: the previous transform and, for skinned meshes, the previous pose.
+        const Mat4 prev = index < prevModels_.size() ? prevModels_[index] : d.model;
+        id<MTLBuffer> prevVertices = m->vertices;
+        bool moving = transformChanged(prev, d.model);
+        if (d.skin >= 0) {
+            if (auto it = skinHistory_.find(d.mesh); it != skinHistory_.end() && it->second.motion && it->second.buffer[it->second.current] == m->vertices) {
+                prevVertices = it->second.buffer[it->second.current ^ 1];
+                moving = true;
+            }
+        }
+        du.prevModel = toSimd(prev);
+        du.motion.x = moving ? 1.f : 0.f;
         const int lod = lodForDraw(*m, d);
         du.material4.w = static_cast<float>(std::clamp(lod, 0, m->lodCount - 1) + 1);  // [debug views] lod
         bool twoSided = s.doubleSided || d.mesh == "plane" || d.mesh == "quad";
         [enc setCullMode:twoSided ? MTLCullModeNone : MTLCullModeBack];
         [enc setVertexBuffer:m->vertices offset:0 atIndex:0];
+        [enc setVertexBuffer:prevVertices offset:0 atIndex:3];
         [enc setVertexBytes:&du length:sizeof(du) atIndex:1];
         [enc setFragmentBytes:&du length:sizeof(du) atIndex:0];
         [enc setFragmentTexture:(albedo ?: white_) atIndex:0];
@@ -1925,6 +2045,11 @@ private:
         rp.colorAttachments[2].loadAction = MTLLoadActionClear;
         rp.colorAttachments[2].clearColor = MTLClearColorMake(0, 0, 1, 4);
         rp.colorAttachments[2].storeAction = MTLStoreActionMultisampleResolve;
+        rp.colorAttachments[3].texture = msaaVelocity_;  // object motion (0 = static)
+        rp.colorAttachments[3].resolveTexture = objectMotion_;
+        rp.colorAttachments[3].loadAction = MTLLoadActionClear;
+        rp.colorAttachments[3].clearColor = MTLClearColorMake(0, 0, 0, 0);
+        rp.colorAttachments[3].storeAction = MTLStoreActionMultisampleResolve;
         rp.depthAttachment.texture = msaaDepth_;
         rp.depthAttachment.resolveTexture = depthResolved_;
         rp.depthAttachment.depthResolveFilter = MTLMultisampleDepthResolveFilterSample0;
@@ -1966,7 +2091,8 @@ private:
         bool cutoutBound = false;
         const Frustum frustum(frame.viewProjection());
         culled_ = 0;
-        for (const DrawItem& d : frame.draws) {
+        for (size_t di = 0; di < frame.draws.size(); ++di) {
+            const DrawItem& d = frame.draws[di];
             if (!frustum.intersects(d.worldBounds)) {
                 ++culled_;
                 continue;
@@ -1981,7 +2107,7 @@ private:
                 [enc setRenderPipelineState:cut ? meshCutoutPipeline_ : meshPipeline_];
                 cutoutBound = cut;
             }
-            drawMesh(enc, d);
+            drawMesh(enc, d, di);
         }
         fx_->encodeOpaque(enc, frame);  // [hair+vfx] strand hair, lit mesh particles
 
@@ -1997,8 +2123,9 @@ private:
             [enc setDepthStencilState:depthRead_];
             [enc setTriangleFillMode:MTLTriangleFillModeLines];
             [enc setDepthBias:-4.0f slopeScale:-2.0f clamp:0.f];
-            for (const DrawItem& d : frame.draws) {
-                if (d.surface.color.w >= 0.999f && frustum.intersects(d.worldBounds)) drawMesh(enc, d);
+            for (size_t i = 0; i < frame.draws.size(); ++i) {
+                const DrawItem& d = frame.draws[i];
+                if (d.surface.color.w >= 0.999f && frustum.intersects(d.worldBounds)) drawMesh(enc, d, i);
             }
             drawTerrains(enc, frame, frustum, terrainWirePipeline_);
             [enc setTriangleFillMode:MTLTriangleFillModeFill];
@@ -2024,7 +2151,7 @@ private:
             });
             [enc setRenderPipelineState:meshBlendPipeline_];
             [enc setDepthStencilState:depthRead_];
-            for (const DrawItem* d : blended) drawMesh(enc, *d);
+            for (const DrawItem* d : blended) drawMesh(enc, *d, static_cast<size_t>(d - frame.draws.data()));
         }
 
         // Selection outline (inverted hull behind the selected meshes)
@@ -2063,8 +2190,9 @@ private:
         [enc setDepthStencilState:depthNone_];
         const Frustum frustum(frame.viewProjection());
         culled_ = 0;
-        for (const DrawItem& d : frame.draws) {
-            if (frustum.intersects(d.worldBounds)) drawMesh(enc, d);
+        for (size_t i = 0; i < frame.draws.size(); ++i) {
+            const DrawItem& d = frame.draws[i];
+            if (frustum.intersects(d.worldBounds)) drawMesh(enc, d, i);
             else ++culled_;
         }
         terrainNodesDrawn_ = 0;
@@ -2647,25 +2775,53 @@ private:
         t.clouds = simd_make_float4(cloudsActive_ ? 1.f : 0.f, 0, 0, 0);  // clouds seen in front of geometry from above
         id<MTLTexture> dst = taa_[taaCurrent_ ^ 1];
         fullscreenFU(cmd, temporalPipeline_, dst,
-                     {lit_, volumetric_, taa_[taaCurrent_], depthResolved_, fx_->reactiveMask(), cloudsActive_ ? cloudOut_ : clearCloud_},
+                     {lit_, volumetric_, taa_[taaCurrent_], depthResolved_, fx_->reactiveMask(), cloudsActive_ ? cloudOut_ : clearCloud_,
+                      velocity_},
                      fu, &t, sizeof(t),  // [hair+vfx] reactive
                      mode == 1 ? @"TAA" : (mode == 2 ? @"Accumulate" : @"Scene resolve"));
         taaCurrent_ ^= 1;
         (void)frame;
     }
 
-    /// MetalFX temporal upscaling: camera motion vectors from depth, then the scaler.
-    void encodeUpscale(id<MTLCommandBuffer> cmd, const FrameUniforms& fu, Vec2 jitterPx) {
-        fullscreenFU(cmd, motionPipeline_, motion_, {depthResolved_}, fu, &fu.temporal, sizeof(fu.temporal), @"Motion vectors");
+    /// The velocity buffer: camera reprojection of the depth buffer + the object motion the main
+    /// pass wrote (resolved MSAA attachment 3). `fu.prevViewProj` decides what "previous" means.
+    void encodeVelocity(id<MTLCommandBuffer> cmd, const FrameUniforms& fu) {
+        fullscreenFU(cmd, motionPipeline_, velocity_, {depthResolved_, objectMotion_}, fu, &fu.temporal, sizeof(fu.temporal),
+                     @"Velocity");
+        velocityComposed_ = true;
+    }
+
+    /// MetalFX temporal upscaling from the velocity buffer (camera + object motion), with the
+    /// engine's exposure and the GPU-particle reactive mask.
+    void encodeUpscale(id<MTLCommandBuffer> cmd, const FrameData& frame, Vec2 jitterPx) {
+        const Environment& env = frame.environment;
+        simd_float4 ep = simd_make_float4(env.exposure * std::exp2(env.exposureCompensation),
+                                          env.autoExposure && exposureValid_ ? 1.f : 0.f, 0, 0);
+        fullscreen(cmd, fxExposurePipeline_, fxExposure_, {exposure_[exposureCurrent_]}, &ep, sizeof(ep), false, @"MetalFX exposure");
+        if (!reactiveNoneCleared_) {  // a cleared (all "not reactive") mask for frames without GPU particles
+            MTLRenderPassDescriptor* rp = [MTLRenderPassDescriptor renderPassDescriptor];
+            rp.colorAttachments[0].texture = reactiveNone_;
+            rp.colorAttachments[0].loadAction = MTLLoadActionClear;
+            rp.colorAttachments[0].clearColor = MTLClearColorMake(0, 0, 0, 0);
+            rp.colorAttachments[0].storeAction = MTLStoreActionStore;
+            id<MTLRenderCommandEncoder> enc = [cmd renderCommandEncoderWithDescriptor:rp];
+            enc.label = @"Clear reactive mask";
+            [enc endEncoding];
+            reactiveNoneCleared_ = true;
+        }
+        id<MTLTexture> reactive = fx_->reactiveMask();
+        if (!reactive || reactive.width != hdr_.width || reactive.height != hdr_.height) reactive = reactiveNone_;
         id<MTLFXTemporalScaler> sc = temporalScaler();
         sc.colorTexture = taa_[taaCurrent_];
         sc.depthTexture = depthResolved_;
-        sc.motionTexture = motion_;
+        sc.motionTexture = velocity_;
         sc.outputTexture = upscaled_;
+        sc.exposureTexture = fxExposure_;
+        sc.reactiveMaskTexture = reactive;
         sc.jitterOffsetX = -jitterPx.x;
         sc.jitterOffsetY = jitterPx.y;
-        sc.motionVectorScaleX = static_cast<float>(motion_.width);
-        sc.motionVectorScaleY = static_cast<float>(motion_.height);
+        sc.motionVectorScaleX = static_cast<float>(velocity_.width);
+        sc.motionVectorScaleY = static_cast<float>(velocity_.height);
         sc.reset = !historyValid_;
         sc.depthReversed = NO;
         [sc encodeToCommandBuffer:cmd];
@@ -2708,7 +2864,9 @@ private:
             du.model = toSimd(o.model);
             du.normalMatrix = toSimd(o.model.inverse().transposed());
             du.color = lin(o.color);
+            du.prevModel = du.model;
             [enc setVertexBuffer:m->vertices offset:0 atIndex:0];
+            [enc setVertexBuffer:m->vertices offset:0 atIndex:3];  // meshVertex: previous pose (static)
             [enc setVertexBytes:&du length:sizeof(du) atIndex:1];
             [enc setFragmentBytes:&du length:sizeof(du) atIndex:0];
             [enc drawIndexedPrimitives:MTLPrimitiveTypeTriangle
@@ -2792,11 +2950,17 @@ private:
         lu.texel = simd_make_float4(1.f / src.width, 1.f / src.height, 1.f / dofCoc_.width, 1.f / dofCoc_.height);
         lu.view = simd_make_float4(static_cast<float>(src.height), 0, 0, 0);
 
-        // Motion blur (camera motion since the previous rendered frame).
-        if (cam.motionBlur > 0.001f && motionValid_ && !cam.orthographic) {
-            FrameUniforms mfu = base;
-            mfu.prevViewProj = toSimd(motionPrevVP_);
-            fullscreenFU(cmd, motionBlurPipeline_, postA_, {src, depthResolved_}, mfu, &lu, sizeof(lu), @"Motion blur");
+        // Motion blur: camera and object motion since the previous rendered frame (velocity buffer),
+        // reconstructed with tile-max / neighbor-max velocities (McGuire 2012).
+        if (cam.motionBlur > 0.001f && motionValid_ && !cam.orthographic && velocityComposed_) {
+            MotionBlurUniformsGpu mb{};
+            const float tileTexels = static_cast<float>(motionTilePx_) * static_cast<float>(velocity_.width) / static_cast<float>(src.width);
+            mb.params = simd_make_float4(cam.motionBlur, tileTexels, 2.f * static_cast<float>(motionTilePx_), accumulated ? 24.f : 15.f);
+            mb.size = simd_make_float4(static_cast<float>(velocity_.width), static_cast<float>(velocity_.height), static_cast<float>(src.width),
+                                       static_cast<float>(src.height));
+            fullscreen(cmd, motionTileMaxPipeline_, motionTiles_, {velocity_}, &mb, sizeof(mb), false, @"Motion blur tile max");
+            fullscreen(cmd, motionNeighborMaxPipeline_, motionNeighbors_, {motionTiles_}, &mb, sizeof(mb), false, @"Motion blur neighbor max");
+            fullscreenFU(cmd, motionBlurPipeline_, postA_, {src, depthResolved_, velocity_, motionNeighbors_}, base, &mb, sizeof(mb), @"Motion blur");
             src = postA_;
         }
         // Depth of field.
@@ -2883,7 +3047,27 @@ private:
         ssgiPipeline_, ssrPipeline_, ssTemporalPipeline_, resolvePipeline_, temporalPipeline_, debugViewPipeline_,
         terrainPipeline_, terrainShadowPipeline_, cloudsPipeline_, cloudTemporalPipeline_, lumaPipeline_, exposurePipeline_, motionBlurPipeline_, dofCocPipeline_,
         dofBlurPipeline_, dofCombinePipeline_;
-    id<MTLTexture> lum_, exposure_[2], postA_, postB_, dofCoc_, dofBlur_, lut_, upscaled_, motion_, postSource_;
+    id<MTLTexture> lum_, exposure_[2], postA_, postB_, dofCoc_, dofBlur_, lut_, upscaled_, postSource_;
+    // Velocity buffer (per-object motion vectors): main pass color(3) = object motion, composed
+    // with camera reprojection into velocity_ for TAA, MetalFX, motion blur and debug views.
+    id<MTLTexture> msaaVelocity_, objectMotion_, velocity_, motionTiles_, motionNeighbors_, fxExposure_, reactiveNone_;
+    id<MTLRenderPipelineState> motionTileMaxPipeline_, motionNeighborMaxPipeline_, fxExposurePipeline_;
+    int motionTilePx_ = 40;
+    bool reactiveNoneCleared_ = false, velocityComposed_ = false;
+    MotionHistory motionHistory_;          // previous transforms of drawn objects
+    std::vector<Mat4> prevModels_;         // per FrameData::draws entry, this frame
+    size_t movingDraws_ = 0;
+    std::array<size_t, 4> lightStats_{};    // lights this frame: total, layer-masked, negative, inverse square
+    float mipBias_ = 0.f;                  // texture LOD bias while MetalFX upscales (log2 renderScale)
+    float prevTime_ = 0.f;
+    bool prevTimeValid_ = false;
+    struct SkinHistory {                   // double-buffered posed vertices of one skinned instance
+        id<MTLBuffer> buffer[2];
+        int current = 0;
+        uint64_t lastFrame = ~0ull;
+        bool motion = false;               // the other buffer holds last frame's pose
+    };
+    std::unordered_map<std::string, SkinHistory> skinHistory_;
     std::shared_ptr<std::atomic<int>> gpuFaults_ = std::make_shared<std::atomic<int>>(0);
     int reportedFaults_ = 0;
     id<MTLFXTemporalScaler> scaler_;

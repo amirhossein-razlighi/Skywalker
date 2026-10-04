@@ -42,7 +42,8 @@ constexpr int kEmission = 18;
 constexpr int kSpecular = 19;
 constexpr int kUvChecker = 20;
 constexpr int kTexelDensity = 21;
-constexpr int kCount = 22;
+constexpr int kMotion = 22;
+constexpr int kCount = 23;
 }  // namespace debugview
 
 struct DebugViewInfo {

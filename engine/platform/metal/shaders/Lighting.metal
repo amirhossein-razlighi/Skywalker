@@ -364,7 +364,7 @@ fragment float4 volumetricFragment(FullscreenOut in [[stage_in]], constant Frame
             if (l.kind.x < 0.5) continue;
             float3 Ll;
             float3 rad = pointLightAt(l, p, -dir, Ll);
-            li += rad * 0.12;  // near-isotropic for lamps
+            li += rad * 0.12 * l.params2.z;  // near-isotropic for lamps; Light.volumetric scales it
         }
         float a = exp(-density * ds);
         acc += T * li * density * ds;

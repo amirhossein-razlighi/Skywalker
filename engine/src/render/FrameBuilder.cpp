@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cmath>
 
+#include "skywalker/render/RenderLayers.h"
 #include "skywalker/render/Renderer.h"
 
 namespace sky {
@@ -114,6 +115,7 @@ bool sceneCamera(const Scene& scene, ViewCamera& out, EntityId preferred) {
     out.focusDistance = c->focusDistance;
     out.motionBlur = c->motionBlur;
     out.tiltShift = c->tiltShift;
+    out.cullMask = static_cast<uint32_t>(c->cullMask) & render::kAllLayers;
     return true;
 }
 
@@ -130,7 +132,7 @@ void prioritizeLights(FrameData& f) {
     auto score = [&](const LightItem& l) {
         if (l.kind == LightItem::Kind::Directional) return -1e30f;
         float d = std::min(distance(l.position, f.camera.target), distance(l.position, f.camera.eye));
-        return std::max(0.f, d - l.range) - l.range * 0.05f * std::min(l.intensity, 10.f);
+        return std::max(0.f, d - l.range) - l.range * 0.05f * std::min(std::fabs(l.intensity), 10.f);
     };
     std::stable_sort(f.lights.begin(), f.lights.end(), [&](const LightItem& a, const LightItem& b) { return score(a) < score(b); });
     if (f.lights.size() > FrameData::kMaxLights) f.lights.resize(FrameData::kMaxLights);
@@ -150,9 +152,11 @@ FrameData buildFrame(const Scene& scene, const ViewCamera& camera, int width, in
     for (EntityId e : scene.entities()) {
         if (!scene.isActive(e)) continue;
         Mat4 world = scene.worldMatrix(e);
-        if (const MeshRenderer* m = scene.get<MeshRenderer>(e); m && m->visible) {
+        if (const MeshRenderer* m = scene.get<MeshRenderer>(e);
+            m && m->visible && (static_cast<uint32_t>(m->layers) & camera.cullMask & render::kAllLayers) != 0) {
             DrawItem d;
             d.entity = e;
+            d.layers = static_cast<uint32_t>(m->layers) & render::kAllLayers;
             d.mesh = m->mesh;
             d.castShadows = m->castShadows;
             Surface& s = d.surface;
@@ -236,7 +240,7 @@ FrameData buildFrame(const Scene& scene, const ViewCamera& camera, int width, in
                 f.lights.push_back(li);
             }
         }
-        if (const Light* l = scene.get<Light>(e); l && l->intensity > 0.f) {
+        if (const Light* l = scene.get<Light>(e); l && l->intensity > 0.f && (static_cast<uint32_t>(l->cullMask) & render::kAllLayers) != 0) {
             LightItem li;
             li.kind = l->kind == "directional" ? LightItem::Kind::Directional
                       : l->kind == "spot"      ? LightItem::Kind::Spot
@@ -244,9 +248,25 @@ FrameData buildFrame(const Scene& scene, const ViewCamera& camera, int width, in
             li.position = world.translation();
             li.direction = normalize(world.transformDir({0, 0, -1}));
             li.color = l->color.xyz();
+            if (l->temperature > 0.f) {
+                const Vec3 k = render::kelvinToRgb(l->temperature);
+                li.color = {li.color.x * k.x, li.color.y * k.y, li.color.z * k.z};
+            }
             li.intensity = l->intensity;
+            if (l->distanceFade && li.kind != LightItem::Kind::Directional) {
+                li.intensity *= render::lightDistanceFade(distance(camera.eye, li.position), l->fadeBegin, l->fadeLength);
+                if (li.intensity <= 0.f) continue;  // faded out: not sent to the GPU at all
+            }
             li.range = l->range;
             li.cosCone = std::cos(radians(l->spotAngle));
+            li.mask = static_cast<uint32_t>(l->cullMask) & render::kAllLayers;
+            li.specular = l->specular;
+            li.indirect = l->indirect;
+            li.volumetric = l->volumetric;
+            li.cosInner = l->innerAngle > 0.f ? std::cos(radians(std::min(l->innerAngle, l->spotAngle - 0.1f))) : 0.f;
+            li.inverseSquare = l->attenuation == "inverse_square";
+            li.size = std::max(l->size, 0.001f);
+            li.negative = l->negative;
             f.lights.push_back(li);
         }
     }

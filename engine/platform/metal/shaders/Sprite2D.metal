@@ -50,6 +50,7 @@ struct SpriteOut {
     float4 color [[color(0)]];
     float4 gbufA [[color(1)]];
     float4 gbufB [[color(2)]];
+    float2 velocity [[color(3)]];  // velocity buffer: sprites are static (camera motion only)
 };
 
 static SpriteOut spriteOut(float4 color, float3 albedo) {
@@ -57,6 +58,7 @@ static SpriteOut spriteOut(float4 color, float3 albedo) {
     o.color = color;
     o.gbufA = float4(albedo, 1.0);
     o.gbufB = float4(0.0, 0.0, 1.0, 4.0);  // octahedral normal (0,0,1), roughness 1, kGbufNoLighting
+    o.velocity = float2(0.0);
     return o;
 }
 

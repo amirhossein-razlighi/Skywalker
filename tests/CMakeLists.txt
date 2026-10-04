@@ -52,6 +52,7 @@ set(SKY_TEST_SOURCES
     test_game.cpp
     test_movie.cpp
     test_profiler.cpp
+    test_render_layers.cpp
 )
 
 add_executable(skywalker_tests ${SKY_TEST_SOURCES})

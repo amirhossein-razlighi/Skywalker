@@ -40,6 +40,7 @@ struct ViewCamera {
     float focusDistance = 0.f;  // 0 = autofocus
     float motionBlur = 0.f;     // shutter fraction
     float tiltShift = 0.f;      // 0..1 miniature blur outside a sharp horizontal band
+    uint32_t cullMask = 0xFFFFF;  // render layers this view draws (Camera.cullMask; editor views see all)
 
     Mat4 view() const { return Mat4::lookAt(eye, target, up); }
     /// Points the camera from `eye` at `target` with clip planes suited to any view distance
@@ -105,6 +106,7 @@ struct DrawItem {
     bool castShadows = true;
     Aabb worldBounds;
     int skin = -1;  // index into FrameData::skins for skinned (animated) meshes
+    uint32_t layers = 1;  // render layers (MeshRenderer.layers); lights only light draws sharing a bit with their mask
 };
 
 // --- Animation: GPU skinning input ------------------------------------------------------
@@ -130,6 +132,15 @@ struct LightItem {
     float intensity = 1;
     float range = 10;
     float cosCone = 0.8f;
+    // Light v2 (Light component fields, resolved): see docs/RENDERING.md "Lights".
+    uint32_t mask = 0xFFFFF;  // render layers lit (Light.cullMask)
+    float specular = 1.f;
+    float indirect = 1.f;
+    float volumetric = 1.f;
+    float cosInner = 0.f;    // spot inner cone (0 = automatic soft edge)
+    bool inverseSquare = false;
+    float size = 0.1f;       // emitter radius (inverse square)
+    bool negative = false;   // subtracts light
 };
 
 /// Unlit geometry drawn on top of the scene (gizmos, editor helpers).
@@ -280,9 +291,10 @@ struct FrameData {
     /// Discards temporal history (camera cuts). Large camera jumps are detected automatically.
     bool resetHistory = false;
     /// Buffer visualization / shading override instead of the final image (render/DebugViews.h:
-    /// 0 off, 1 albedo, 2 normals, ... 11 wireframe, 12 overdraw, 13 unshaded, 14 lighting_only,
-    /// 15 shadow_cascades, 16 light_complexity, 17 lod, 18 emission, 19 specular, 20 uv_checker,
-    /// 21 texel_density).
+    /// 0 off, 1 albedo, 2 normals, 3 roughness/metallic, 4 GI, 5 reflections, 6 AO, 7 depth,
+    /// 8 lighting before GI, 9 sketch, 10 impostors, 11 wireframe, 12 overdraw, 13 unshaded,
+    /// 14 lighting_only, 15 shadow_cascades, 16 light_complexity, 17 lod, 18 emission, 19 specular,
+    /// 20 uv_checker, 21 texel_density, 22 motion (velocity buffer: hue = direction, brightness = speed)).
     int debugView = 0;
     /// Viewport quality: 0 full (play, captures), 1 balanced, 2 fast (editing a heavy world).
     /// Lower tiers pick coarser LODs and cheaper shadows; the engine also trims the environment.

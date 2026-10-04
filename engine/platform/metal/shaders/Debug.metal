@@ -16,11 +16,14 @@ constant int kDbgEmission = 18;
 constant int kDbgSpecular = 19;
 constant int kDbgUvChecker = 20;
 constant int kDbgTexelDensity = 21;
+constant int kDbgMotion = 22;
 
 static int debugMode(constant FrameUniforms& f) { return int(f.debug.x + 0.5); }
 
 // Surface views that replace the color entirely (lighting_only only changes the material).
-static bool debugReplacesColor(int mode) { return mode >= kDbgWireframe && mode != kDbgLightingOnly && mode != kDbgOverdraw; }
+static bool debugReplacesColor(int mode) {
+    return mode >= kDbgWireframe && mode != kDbgLightingOnly && mode != kDbgOverdraw && mode != kDbgMotion;
+}
 
 // Discrete heat ramp shared by overdraw and light complexity (counts): 0 black, 1 dark blue,
 // 2 blue, 3 cyan, 4 green, 5-6 yellow, 7-9 orange, 10-15 red, 16+ white.

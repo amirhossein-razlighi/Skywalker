@@ -205,6 +205,7 @@ Status MetalFoliage::build(id<MTLLibrary> lib, const FoliageFormats& fmt) {
             d.colorAttachments[0].pixelFormat = fmt.hdr;
             d.colorAttachments[1].pixelFormat = fmt.gbufA;
             d.colorAttachments[2].pixelFormat = fmt.gbufB;
+            d.colorAttachments[3].pixelFormat = fmt.velocity;
         }
         return newRenderPipeline(device_, d, &e);
     };

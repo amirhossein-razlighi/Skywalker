@@ -42,6 +42,9 @@ const std::vector<DebugViewInfo>& debugViews() {
         {kTexelDensity, "texel_density", "surface",
          "base-color texels per meter: blue < 128, cyan 256, green 512 (target), yellow 1024, red > 2048; gray = "
          "untextured"},
+        {kMotion, "motion", "gbuffer",
+         "the velocity buffer TAA, MetalFX and motion blur use: hue = direction, strength = speed on a log scale "
+         "(faint at 0.25 px, full at 15 px per frame) over a dimmed scene; capture twice (samples 1) while something moves"},
     };
     return kViews;
 }

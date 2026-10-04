@@ -142,6 +142,11 @@ set(SKY_ENGINE_SOURCES
     src/core/Profiler.cpp
     src/render/DebugViews.cpp
     src/render/ShaderCache.cpp
+    # Velocity buffer (per-object motion vectors) and render layers / light v2 (docs/RENDERING.md)
+    src/render/MotionHistory.cpp
+    src/render/RenderLayers.cpp
+    src/agent/RenderLayerTools.cpp
+    src/engine/RenderBuiltins.cpp
 )
 
 # DCC bridge: the Python helper library and the Blender add-on are embedded so the engine can

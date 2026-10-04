@@ -92,7 +92,7 @@ constexpr sampler terrainSampler(coord::normalized, filter::linear, mip_filter::
 constexpr sampler overlaySampler(coord::normalized, filter::linear, mip_filter::linear, address::clamp_to_edge, max_anisotropy(16));
 
 static LayerSample sampleLayer(int i, float3 wp, float3 N, float dist, constant TerrainUniforms& tu,
-                               texture2d<float> albedoTex, texture2d<float> normalTex, texture2d<float> ormTex) {
+                               texture2d<float> albedoTex, texture2d<float> normalTex, texture2d<float> ormTex, float mipBias) {
     float4 lp = tu.layerParams[i];
     int flags = int(lp.w + 0.5);
     bool hasA = (flags & 1) != 0, hasN = (flags & 2) != 0, hasO = (flags & 4) != 0, tri = (flags & 8) != 0;
@@ -107,28 +107,28 @@ static LayerSample sampleLayer(int i, float3 wp, float3 N, float dist, constant 
         float3 w = pow(abs(N), float3(6.0));
         w /= (w.x + w.y + w.z);
         float2 uvX = wp.zy * tiling, uvY = wp.xz * tiling, uvZ = wp.xy * tiling;
-        if (hasA) s.albedo *= (albedoTex.sample(terrainSampler, uvX).rgb * w.x + albedoTex.sample(terrainSampler, uvY).rgb * w.y +
-                               albedoTex.sample(terrainSampler, uvZ).rgb * w.z);
-        if (hasO) s.orm = (ormTex.sample(terrainSampler, uvX).rgb * w.x + ormTex.sample(terrainSampler, uvY).rgb * w.y +
-                           ormTex.sample(terrainSampler, uvZ).rgb * w.z) * float3(1.0, lp.z * 2.0, 1.0);
-        if (hasN) s.normalTS = normalize(normalTex.sample(terrainSampler, uvY).xyz * 2.0 - 1.0);
+        if (hasA) s.albedo *= (albedoTex.sample(terrainSampler, uvX, bias(mipBias)).rgb * w.x + albedoTex.sample(terrainSampler, uvY, bias(mipBias)).rgb * w.y +
+                               albedoTex.sample(terrainSampler, uvZ, bias(mipBias)).rgb * w.z);
+        if (hasO) s.orm = (ormTex.sample(terrainSampler, uvX, bias(mipBias)).rgb * w.x + ormTex.sample(terrainSampler, uvY, bias(mipBias)).rgb * w.y +
+                           ormTex.sample(terrainSampler, uvZ, bias(mipBias)).rgb * w.z) * float3(1.0, lp.z * 2.0, 1.0);
+        if (hasN) s.normalTS = normalize(normalTex.sample(terrainSampler, uvY, bias(mipBias)).xyz * 2.0 - 1.0);
         s.normalTS.xy *= lp.y;
         return s;
     }
     float2 uv1 = wp.xz * tiling;
     float2 uv2 = float2(wp.x * 0.7071 - wp.z * 0.7071, wp.x * 0.7071 + wp.z * 0.7071) * tiling * 0.23;
     if (hasA) {
-        float3 a1 = albedoTex.sample(terrainSampler, uv1).rgb;
-        float3 a2 = albedoTex.sample(terrainSampler, uv2).rgb;
+        float3 a1 = albedoTex.sample(terrainSampler, uv1, bias(mipBias)).rgb;
+        float3 a2 = albedoTex.sample(terrainSampler, uv2, bias(mipBias)).rgb;
         s.albedo *= mix(a1, a2, farMix * 0.65);
     }
     if (hasN) {
-        float3 n1 = normalTex.sample(terrainSampler, uv1).xyz * 2.0 - 1.0;
-        float3 n2 = normalTex.sample(terrainSampler, uv2).xyz * 2.0 - 1.0;
+        float3 n1 = normalTex.sample(terrainSampler, uv1, bias(mipBias)).xyz * 2.0 - 1.0;
+        float3 n2 = normalTex.sample(terrainSampler, uv2, bias(mipBias)).xyz * 2.0 - 1.0;
         s.normalTS = normalize(mix(n1, n2, farMix * 0.5));
         s.normalTS.xy *= lp.y;
     }
-    if (hasO) s.orm = ormTex.sample(terrainSampler, uv1).rgb * float3(1.0, lp.z * 2.0, 1.0);
+    if (hasO) s.orm = ormTex.sample(terrainSampler, uv1, bias(mipBias)).rgb * float3(1.0, lp.z * 2.0, 1.0);
     return s;
 }
 
@@ -179,14 +179,14 @@ fragment MainOut terrainFragment(TerrainOut in [[stage_in]],
         if (i >= layerCount || weights[i] < 0.004) continue;
         LayerSample s;
         switch (i) {
-            case 0: s = sampleLayer(0, wp, Ngeo, dist, tu, l0a, l0n, l0o); break;
-            case 1: s = sampleLayer(1, wp, Ngeo, dist, tu, l1a, l1n, l1o); break;
-            case 2: s = sampleLayer(2, wp, Ngeo, dist, tu, l2a, l2n, l2o); break;
-            case 3: s = sampleLayer(3, wp, Ngeo, dist, tu, l3a, l3n, l3o); break;
-            case 4: s = sampleLayer(4, wp, Ngeo, dist, tu, l4a, l4n, l4o); break;
-            case 5: s = sampleLayer(5, wp, Ngeo, dist, tu, l5a, l5n, l5o); break;
-            case 6: s = sampleLayer(6, wp, Ngeo, dist, tu, l6a, l6n, l6o); break;
-            default: s = sampleLayer(7, wp, Ngeo, dist, tu, l7a, l7n, l7o); break;
+            case 0: s = sampleLayer(0, wp, Ngeo, dist, tu, l0a, l0n, l0o, f.extra.w); break;
+            case 1: s = sampleLayer(1, wp, Ngeo, dist, tu, l1a, l1n, l1o, f.extra.w); break;
+            case 2: s = sampleLayer(2, wp, Ngeo, dist, tu, l2a, l2n, l2o, f.extra.w); break;
+            case 3: s = sampleLayer(3, wp, Ngeo, dist, tu, l3a, l3n, l3o, f.extra.w); break;
+            case 4: s = sampleLayer(4, wp, Ngeo, dist, tu, l4a, l4n, l4o, f.extra.w); break;
+            case 5: s = sampleLayer(5, wp, Ngeo, dist, tu, l5a, l5n, l5o, f.extra.w); break;
+            case 6: s = sampleLayer(6, wp, Ngeo, dist, tu, l6a, l6n, l6o, f.extra.w); break;
+            default: s = sampleLayer(7, wp, Ngeo, dist, tu, l7a, l7n, l7o, f.extra.w); break;
         }
         ls[i] = s;
         float height = dot(s.albedo, float3(0.3, 0.5, 0.2)) * 0.5 + s.orm.x * 0.5;
@@ -324,12 +324,13 @@ static float impostorWeight(float dist, float4 fade) {
     return fade.x > 0.0 ? saturate((dist - (fade.x - fade.y)) / max(fade.y, 1e-3)) : 0.0;
 }
 
-static float3 foliageWorld(float3 p, FoliageInstanceGpu inst, constant FoliageUniforms& fu, thread float& h01) {
+// The bent position at time `t` (s): the vertex shader also evaluates the previous frame's time
+// so wind sway reaches the velocity buffer.
+static float3 foliageWorldAt(float3 p, FoliageInstanceGpu inst, constant FoliageUniforms& fu, thread float& h01, float t) {
     float3 base = instanceOrigin(inst);
     float3 world = float3(dot(inst.row0.xyz, p), dot(inst.row1.xyz, p), dot(inst.row2.xyz, p)) + base;
     h01 = saturate(p.y / max(fu.params.y, 1e-3));
     float bend = h01 * h01;
-    float t = fu.params.w;
     float2 dir = fu.wind.xy;
     float speed = fu.wind.z;
     float travel = dot(base.xz, dir);
@@ -341,6 +342,10 @@ static float3 foliageWorld(float3 p, FoliageInstanceGpu inst, constant FoliageUn
     world.xz += off;
     world.y -= length(off) * 0.35 * bend;  // keep the blade length roughly constant
     return world;
+}
+
+static float3 foliageWorld(float3 p, FoliageInstanceGpu inst, constant FoliageUniforms& fu, thread float& h01) {
+    return foliageWorldAt(p, inst, fu, h01, fu.params.w);
 }
 
 vertex MeshOut foliageVertex(uint vid [[vertex_id]], uint iid [[instance_id]],
@@ -361,10 +366,15 @@ vertex MeshOut foliageVertex(uint vid [[vertex_id]], uint iid [[instance_id]],
     float h01;
     float3 local = (fu.part * float4(float3(v.position), 1.0)).xyz;
     float3 world = foliageWorld(local * float3(1.0, shrink, 1.0), inst, fu, h01);
+    float prevH01;  // wind sway at the previous frame's time (velocity buffer); fu.params.w = this frame's time
+    float3 prevWorld = fu.wind.w > 0.0 && f.cluster2.z != fu.params.w
+                           ? foliageWorldAt(local * float3(1.0, shrink, 1.0), inst, fu, prevH01, f.cluster2.z)
+                           : world;
     float3 ln = (fu.part * float4(float3(v.normal), 0.0)).xyz;
     float3 n = float3(dot(inst.row0.xyz, ln), dot(inst.row1.xyz, ln), dot(inst.row2.xyz, ln));
     o.position = shrink <= 0.0 ? float4(0.0, 0.0, -2.0, 1.0) : f.viewProj * float4(world, 1.0);
     o.worldPos = world;
+    o.prevWorldPos = prevWorld;
     o.normal = normalize(n);
     o.uv = float2(v.uv);
     o.color = float4(instanceTint(float4(v.color).rgb, inst.params.x), float4(v.color).a);
@@ -733,6 +743,7 @@ struct ImpostorFragmentOut {
     float4 color [[color(0)]];
     float4 gbufA [[color(1)]];
     float4 gbufB [[color(2)]];
+    float2 velocity [[color(3)]];  // impostors don't sway: static (camera motion only)
     float depth [[depth(greater)]];
 };
 
@@ -801,6 +812,7 @@ fragment ImpostorFragmentOut impostorFragment(ImpostorOut in [[stage_in]],
     o.color = m.color;
     o.gbufA = m.gbufA;
     o.gbufB = m.gbufB;
+    o.velocity = m.velocity;
     float4 clip = f.viewProj * float4(worldPos, 1.0);  // pixel depth offset: real depth for SSAO and intersections
     o.depth = max(clip.z / clip.w, in.position.z);
     return o;

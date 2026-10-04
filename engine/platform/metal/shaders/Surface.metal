@@ -2,15 +2,19 @@
 // Lit meshes
 // ---------------------------------------------------------------------------
 
+// `prevVerts` holds the previous frame's posed vertices of skinned meshes (the same buffer as
+// `verts` otherwise); with `prevModel` it gives the velocity buffer per-object motion.
 vertex MeshOut meshVertex(uint vid [[vertex_id]],
                           const device Vertex* verts [[buffer(0)]],
                           constant DrawUniforms& d [[buffer(1)]],
-                          constant FrameUniforms& f [[buffer(2)]]) {
+                          constant FrameUniforms& f [[buffer(2)]],
+                          const device Vertex* prevVerts [[buffer(3)]]) {
     Vertex v = verts[vid];
     float4 world = d.model * float4(float3(v.position), 1.0);
     MeshOut o;
     o.position = f.viewProj * world;
     o.worldPos = world.xyz;
+    o.prevWorldPos = d.motion.x > 0.5 ? (d.prevModel * float4(float3(prevVerts[vid].position), 1.0)).xyz : world.xyz;
     o.normal = (d.normalMatrix * float4(float3(v.normal), 0.0)).xyz;
     o.uv = float2(v.uv);
     o.color = float4(v.color);
@@ -33,9 +37,11 @@ static Triplanar triplanar(float3 p, float3 n, float2 tiling) {
     return t;
 }
 
-static float4 sampleTri(texture2d<float> tex, Triplanar t) {
-    return tex.sample(materialSampler, t.uvX) * t.w.x + tex.sample(materialSampler, t.uvY) * t.w.y +
-           tex.sample(materialSampler, t.uvZ) * t.w.z;
+// `mipBias` sharpens textures when the frame renders below output resolution and MetalFX
+// upscales it (FrameUniforms.extra.w = log2(renderScale)); 0 otherwise.
+static float4 sampleTri(texture2d<float> tex, Triplanar t, float mipBias) {
+    return tex.sample(materialSampler, t.uvX, bias(mipBias)) * t.w.x + tex.sample(materialSampler, t.uvY, bias(mipBias)) * t.w.y +
+           tex.sample(materialSampler, t.uvZ, bias(mipBias)) * t.w.z;
 }
 
 // Normal mapping without vertex tangents: cotangent frame from screen-space derivatives.
@@ -50,11 +56,11 @@ static float3 perturbNormal(float3 N, float3 p, float2 uv, float3 mapN) {
     return normalize(TBN * mapN);
 }
 
-static float3 triplanarNormal(texture2d<float> tex, Triplanar t, float3 N, float strength) {
+static float3 triplanarNormal(texture2d<float> tex, Triplanar t, float3 N, float strength, float mipBias) {
     // Whiteout blend of three tangent-space normals into world space.
-    float3 tx = tex.sample(materialSampler, t.uvX).xyz * 2.0 - 1.0;
-    float3 ty = tex.sample(materialSampler, t.uvY).xyz * 2.0 - 1.0;
-    float3 tz = tex.sample(materialSampler, t.uvZ).xyz * 2.0 - 1.0;
+    float3 tx = tex.sample(materialSampler, t.uvX, bias(mipBias)).xyz * 2.0 - 1.0;
+    float3 ty = tex.sample(materialSampler, t.uvY, bias(mipBias)).xyz * 2.0 - 1.0;
+    float3 tz = tex.sample(materialSampler, t.uvZ, bias(mipBias)).xyz * 2.0 - 1.0;
     tx.xy *= strength;
     ty.xy *= strength;
     tz.xy *= strength;
@@ -69,7 +75,7 @@ static float3 triplanarNormal(texture2d<float> tex, Triplanar t, float3 N, float
 static float3 shadeSurface(SurfaceData s, float3 Ngeo, float3 worldPos, float2 fragXY, float3 V, bool toon, float rim,
                            constant FrameUniforms& f, const device GPULight* lights, const device uint2* clusterCells,
                            const device uint* clusterIndices, depth2d<float> shadowAtlas, texturecube<float> envTex,
-                           texture2d<float> brdfLut, texture3d<float> cloudShape) {
+                           texture2d<float> brdfLut, texture3d<float> cloudShape, uint layers = 1u) {
     // Sun
     float3 L = -f.sunDir.xyz;
     float sunVisible = L.y > -0.08 ? shadowFactor(worldPos, Ngeo, fragXY, f, shadowAtlas) : 0.0;
@@ -84,25 +90,12 @@ static float3 shadeSurface(SurfaceData s, float3 Ngeo, float3 worldPos, float2 f
     for (int k = 0; k < total; ++k) {
         int i = k < dirCount ? k : int(clusterIndices[cell.x + uint(k - dirCount)]);
         GPULight l = lights[i];
+        if (!lightAffects(l, layers)) continue;  // render layers: the light's cullMask excludes this surface
         float3 Ll;
-        float atten = 1.0;
-        if (l.kind.x < 0.5) {
-            Ll = -l.directionCone.xyz;
-        } else {
-            float3 toL = l.positionRange.xyz - worldPos;
-            float dist = length(toL);
-            Ll = toL / max(dist, 1e-4);
-            float r = l.positionRange.w;
-            float falloff = saturate(1.0 - pow(dist / r, 4.0));
-            atten = falloff * falloff / (dist * dist + 1.0);
-            if (l.kind.x > 1.5) {
-                float cd = dot(-Ll, l.directionCone.xyz);
-                atten *= smoothstep(l.directionCone.w, mix(l.directionCone.w, 1.0, 0.2), cd);
-            }
-        }
-        float3 rad = l.colorIntensity.rgb * l.colorIntensity.w * atten;
-        color += toon ? toonLight(s, V, Ll, rad) : directLight(s, V, Ll, rad);
+        float3 rad = lightRadiance(l, worldPos, Ll);
+        color += toon ? toonLight(s, V, Ll, rad, l.params.x) : directLight(s, V, Ll, rad, l.params.x);
     }
+    color = max(color, 0.0);  // negative lights darken, never below black
 
     // Image-based lighting (sky cubemap). `ambient` scales how much sky light reaches the
     // scene (interiors, caves, night); `reflections` scales the specular part.
@@ -161,7 +154,8 @@ struct MaterialSample {
 
 static MaterialSample evaluateMaterial(float3 worldPos, float3 normal, float2 uvIn, float4 vertexColor, bool frontFacing,
                                        constant DrawUniforms& d, texture2d<float> albedoTex, texture2d<float> normalTex,
-                                       texture2d<float> ormTex, texture2d<float> emissiveTex, bool hardAlphaTest) {
+                                       texture2d<float> ormTex, texture2d<float> emissiveTex, bool hardAlphaTest,
+                                       float mipBias = 0.0) {
     MaterialSample m;
     m.Ngeo = normalize(normal) * (frontFacing ? 1.0 : -1.0);
     bool tri = d.material2.w > 0.5;
@@ -172,7 +166,7 @@ static MaterialSample evaluateMaterial(float3 worldPos, float3 normal, float2 uv
     s.albedo = d.color.rgb * vertexColor.rgb;
     s.alpha = d.color.a * vertexColor.a;
     if (d.maps.x > 0.5) {
-        float4 t = tri ? sampleTri(albedoTex, tp) : albedoTex.sample(materialSampler, uv);
+        float4 t = tri ? sampleTri(albedoTex, tp, mipBias) : albedoTex.sample(materialSampler, uv, bias(mipBias));
         if (d.material4.y < 0.5) s.albedo *= t.rgb;
         s.alpha *= t.a;
         if (d.material4.x > 0.0) {
@@ -189,13 +183,13 @@ static MaterialSample evaluateMaterial(float3 worldPos, float3 normal, float2 uv
         }
     }
     m.emissive = d.emissive.rgb * d.emissive.w;
-    if (d.maps.w > 0.5) m.emissive *= (tri ? sampleTri(emissiveTex, tp) : emissiveTex.sample(materialSampler, uv)).rgb;
+    if (d.maps.w > 0.5) m.emissive *= (tri ? sampleTri(emissiveTex, tp, mipBias) : emissiveTex.sample(materialSampler, uv, bias(mipBias))).rgb;
 
     s.metallic = d.material.x;
     s.roughness = d.material.y;
     s.ao = 1.0;
     if (d.maps.z > 0.5) {
-        float3 orm = (tri ? sampleTri(ormTex, tp) : ormTex.sample(materialSampler, uv)).rgb;
+        float3 orm = (tri ? sampleTri(ormTex, tp, mipBias) : ormTex.sample(materialSampler, uv, bias(mipBias))).rgb;
         s.ao = mix(1.0, orm.r, saturate(d.maps.z - 1.0));
         s.roughness *= orm.g;
         s.metallic *= orm.b;
@@ -203,9 +197,9 @@ static MaterialSample evaluateMaterial(float3 worldPos, float3 normal, float2 uv
     s.N = m.Ngeo;
     if (d.maps.y > 0.5) {
         if (tri) {
-            s.N = triplanarNormal(normalTex, tp, m.Ngeo, d.material2.z);
+            s.N = triplanarNormal(normalTex, tp, m.Ngeo, d.material2.z, mipBias);
         } else {
-            float3 mapN = normalTex.sample(materialSampler, uv).xyz * 2.0 - 1.0;
+            float3 mapN = normalTex.sample(materialSampler, uv, bias(mipBias)).xyz * 2.0 - 1.0;
             mapN.xy *= d.material2.z;
             s.N = perturbNormal(m.Ngeo, worldPos, uv, normalize(mapN));
         }
@@ -236,7 +230,7 @@ fragment MainOut meshFragment(MeshOut in [[stage_in]],
     float3 V = normalize(f.cameraPos.xyz - in.worldPos);
     if (f.cameraForward.w > 0.5) V = -f.cameraForward.xyz;
     MaterialSample m = evaluateMaterial(in.worldPos, in.normal, in.uv, in.color, frontFacing, d, albedoTex, normalTex, ormTex,
-                                        emissiveTex, false);
+                                        emissiveTex, false, f.extra.w);
     SurfaceData s = m.s;
     float3 Ngeo = m.Ngeo;
     float3 emissive = m.emissive;
@@ -264,7 +258,9 @@ fragment MainOut meshFragment(MeshOut in [[stage_in]],
 
     int shading = int(d.material.w + 0.5);
     if (shading == 2) {  // unlit: flat color, still emissive
-        return mainOut(float4(s.albedo + emissive, s.alpha), s.albedo, 1.0, Ngeo, 1.0, kGbufNoLighting);
+        MainOut o = mainOut(float4(s.albedo + emissive, s.alpha), s.albedo, 1.0, Ngeo, 1.0, kGbufNoLighting);
+        o.velocity = objectMotion(f, in.worldPos, in.prevWorldPos);
+        return o;
     }
     if (shading == 3) {
         // Water: a sum of wind-driven directional waves (analytic slopes) plus fine ripples,
@@ -301,14 +297,18 @@ fragment MainOut meshFragment(MeshOut in [[stage_in]],
     s.roughness = clamp(sqrt(alpha), 0.045, 1.0);
     bool toon = shading == 1;
 
+    // Render layers of this draw (DrawUniforms.motion.y; 0 = unset, e.g. mesh particles: layer 1).
+    const uint layers = d.motion.y > 0.5 ? uint(d.motion.y) : 1u;
     float3 color = shadeSurface(s, Ngeo, in.worldPos, in.position.xy, V, toon, d.material3.z, f, lights, clusterCells,
-                                clusterIndices, shadowAtlas, envTex, brdfLut, cloudShape) + emissive;
+                                clusterIndices, shadowAtlas, envTex, brdfLut, cloudShape, layers) + emissive;
     color = applyFog(color, in.worldPos, V, f);
 
 
     // Toon and legacy water keep their stylized ambient: no screen-space GI/reflections.
     bool screenSpace = !toon && shading != 3;
-    return mainOut(float4(color, s.alpha), s.albedo, s.ao, s.N, s.roughness, screenSpace ? s.metallic : kGbufNoLighting);
+    MainOut o = mainOut(float4(color, s.alpha), s.albedo, s.ao, s.N, s.roughness, screenSpace ? s.metallic : kGbufNoLighting);
+    o.velocity = objectMotion(f, in.worldPos, in.prevWorldPos);
+    return o;
 }
 
 // ---------------------------------------------------------------------------

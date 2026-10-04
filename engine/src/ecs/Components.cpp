@@ -69,6 +69,11 @@ const TypeInfo& MeshRenderer::type() {
             SKY_FIELD(MeshRenderer, castShadows, Bool, "Cast sun shadows"),
             SKY_FIELD_RANGE(MeshRenderer, alphaCutoff, Float,
                             "Alpha-tested cutout: texture alpha below this is cut (foliage, fences, sails); 0 = off", 0.f, 1.f),
+            SKY_FIELD_RANGE(MeshRenderer, layers, Int,
+                            "Render layers bitmask (bit 0 = layer 1 .. bit 19 = layer 20; default 1). A camera draws the mesh when "
+                            "its cullMask shares a bit; a light lights it when the light's cullMask does. Name layers in game.json "
+                            "and set them by name with render_layers",
+                            0.f, 1048575.f),
         }};
     return info;
 }
@@ -83,6 +88,28 @@ const TypeInfo& Light::type() {
             SKY_FIELD_RANGE(Light, intensity, Float, "Brightness multiplier", 0.f, 1000.f),
             SKY_FIELD_RANGE(Light, range, Float, "Falloff distance in meters (point/spot)", 0.01f, 10000.f),
             SKY_FIELD_RANGE(Light, spotAngle, Float, "Cone half-angle in degrees (spot)", 1.f, 89.f),
+            SKY_FIELD_RANGE(Light, cullMask, Int,
+                            "Render layers this light illuminates (bitmask, bit 0 = layer 1; default all 20). E.g. a rim light that "
+                            "only lights the hero: put the hero on layer 2 and set cullMask 2",
+                            0.f, 1048575.f),
+            SKY_FIELD_RANGE(Light, specular, Float, "Specular highlight strength (0 = diffuse only)", 0.f, 16.f),
+            SKY_FIELD_RANGE(Light, indirect, Float, "Contribution to world-space GI (reserved for GI probes / lightmaps)", 0.f, 16.f),
+            SKY_FIELD_RANGE(Light, volumetric, Float, "Strength in volumetric light / god rays (environment godRays)", 0.f, 16.f),
+            SKY_FIELD_RANGE(Light, temperature, Float,
+                            "Color temperature in Kelvin, multiplied with color (1900 candle, 2700 tungsten, 4000 fluorescent, "
+                            "5500 noon, 6500 white, 9000 overcast sky); 0 = off",
+                            0.f, 40000.f),
+            SKY_FIELD_RANGE(Light, innerAngle, Float,
+                            "Spot: half-angle of the full-intensity inner cone in degrees (0 = automatic); smaller = softer edge", 0.f, 89.f),
+            SKY_FIELD(Light, negative, Bool, "Subtract light instead of adding it (stylized darkening)"),
+            SKY_FIELD(Light, distanceFade, Bool, "Fade the light out with distance from the camera (cheap crowds of small lights)"),
+            SKY_FIELD_RANGE(Light, fadeBegin, Float, "Distance fade: meters from the camera where fading starts", 0.f, 100000.f),
+            SKY_FIELD_RANGE(Light, fadeLength, Float, "Distance fade: meters over which the light fades out", 0.01f, 100000.f),
+            SKY_FIELD_ENUM(Light, attenuation,
+                           "Falloff: smooth = soft artist-friendly curve that reaches 0 at range; inverse_square = physical 1/d^2 "
+                           "(brighter near the source, uses size), still windowed to range",
+                           "smooth", "inverse_square"),
+            SKY_FIELD_RANGE(Light, size, Float, "Emitter radius in meters (inverse_square falloff peak)", 0.001f, 100.f),
         }};
     return info;
 }
@@ -104,6 +131,10 @@ const TypeInfo& Camera::type() {
             SKY_FIELD_RANGE(Camera, tiltShift, Float,
                             "Tilt-shift miniature look: blur above and below a sharp band across the middle of the frame (0 = off, 1 = strong)",
                             0.f, 1.f),
+            SKY_FIELD_RANGE(Camera, cullMask, Int,
+                            "Render layers this camera draws (bitmask, bit 0 = layer 1; default all 20). E.g. hide first-person arms "
+                            "from a security camera, or editor-only helpers from the game camera",
+                            0.f, 1048575.f),
         }};
     return info;
 }
