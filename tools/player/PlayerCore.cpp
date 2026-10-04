@@ -5,6 +5,8 @@
 #include <filesystem>
 
 #include "skywalker/core/Strings.h"
+#include "skywalker/locale/Localization.h"
+#include "skywalker/ui/World2D.h"
 #include "skywalker/native/NativeModules.h"
 #include "skywalker/render/Image.h"
 
@@ -165,6 +167,8 @@ Result<std::unique_ptr<Session>> openSession(const Options& options, const std::
         return Error::make(loaded.error().code, "cannot load the scene " + session->scene + ": " + loaded.error().message, loaded.error().hint);
     }
     s.applyQuality(engine.scene().environment());
+    // Localization: the player's language (game.json localization.useSystemLocale decides whether it wins).
+    engine.world2d().localization().setSystemLocale(loc::systemLocale());
     return session;
 }
 
