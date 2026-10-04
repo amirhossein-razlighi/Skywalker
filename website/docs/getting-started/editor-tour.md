@@ -78,7 +78,7 @@ descriptions, and lazily rendered thumbnails. Drag a mesh or prefab into the vie
 the cursor; drag a material or texture onto an object to apply it. Right-click a model and choose **Open in Blender**
 to edit it live through the [DCC bridge](../manual/dcc.md).
 
-<div class="sky-placeholder"><strong>Editor screenshot</strong>assets/editor/asset-browser.webp · The Assets tab with thumbnails and the inspector showing an asset's provenance and usage</div>
+<div class="sky-placeholder"><strong>Editor screenshot</strong>assets/editor/assets-dock.webp · The Assets dock with type filters and counts, thumbnails, and the inspector showing an asset's license, provenance and usage</div>
 
 ## Agents and the Studio
 
