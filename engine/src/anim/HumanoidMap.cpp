@@ -241,10 +241,17 @@ bool HumanoidMap::complete() const {
     return std::all_of(std::begin(kRequired), std::end(kRequired), [&](HumanBone b) { return (*this)[b] >= 0; });
 }
 
-std::vector<std::string> HumanoidMap::missing() const {
+bool HumanoidMap::retargetable() const { return missing(true).empty(); }
+
+std::vector<std::string> HumanoidMap::missing(bool forRetarget) const {
     std::vector<std::string> out;
     for (HumanBone b : kRequired) {
-        if ((*this)[b] < 0) out.emplace_back(humanBoneName(b));
+        if ((*this)[b] >= 0) continue;
+        if (forRetarget) {
+            if (b == HumanBone::LeftHand || b == HumanBone::RightHand || b == HumanBone::LeftFoot || b == HumanBone::RightFoot) continue;
+            if (b == HumanBone::Head && (*this)[HumanBone::Neck] >= 0) continue;
+        }
+        out.emplace_back(humanBoneName(b));
     }
     return out;
 }
@@ -266,6 +273,7 @@ Json HumanoidMap::toJson(const Skeleton& sk) const {
     return Json::object({{"convention", convention},
                          {"confidence", std::round(confidence * 100.f) / 100.f},
                          {"complete", complete()},
+                         {"retargetable", retargetable()},
                          {"bones", map},
                          {"missing", miss},
                          {"warnings", warn}});
@@ -337,6 +345,19 @@ HumanoidMap detectHumanoid(const Skeleton& sk) {
         return p;
     };
     auto fixChain = [&](H end, H lower, H upper) {
+        // An end bone outside the limb its parts name is an IK control (a foot target under the root):
+        // the limb ends at its lower part (some rigs deform the foot with the shin).
+        if (m[end] >= 0 && m[upper] >= 0 && m[lower] >= 0 && sk.isDescendant(m[lower], m[upper]) && !sk.isDescendant(m[end], m[upper])) {
+            m.warnings.push_back(sk.bones[static_cast<size_t>(m[end])].name + " is not below " + sk.bones[static_cast<size_t>(m[upper])].name +
+                                 " (an IK control?): ignored for " + humanBoneName(end));
+            m.at(end) = -1;
+            for (size_t i = 0; i < n; ++i) {
+                if (sk.bones[i].parent == m[lower] && !parsed[i].skip) {
+                    m.at(end) = static_cast<int>(i);
+                    break;
+                }
+            }
+        }
         if (m[end] < 0) return;
         int p = namedParent(m[end]);
         if (p >= 0 && (m[lower] < 0 || m[lower] == m[end] || !sk.isDescendant(m[end], m[lower]) || sk.isDescendant(p, m[lower]))) {
@@ -363,9 +384,13 @@ HumanoidMap detectHumanoid(const Skeleton& sk) {
             }
         }
     }
-    if (m[H::Hips] < 0) {
+    {
+        // The hips carry both legs: a bone named "hips" that does not (a spine segment) gives way to the legs' ancestor.
         int ca = commonAncestor(sk, m[H::LeftUpperLeg], m[H::RightUpperLeg]);
-        if (ca >= 0) {
+        bool carries = m[H::Hips] >= 0 && m[H::LeftUpperLeg] >= 0 && m[H::RightUpperLeg] >= 0 &&
+                       sk.isDescendant(m[H::LeftUpperLeg], m[H::Hips]) && sk.isDescendant(m[H::RightUpperLeg], m[H::Hips]);
+        if (ca >= 0 && !carries) {
+            if (m[H::Hips] >= 0) spines.push_back(m[H::Hips]);
             m.at(H::Hips) = ca;
             m.warnings.push_back("hips inferred from the legs (common ancestor): " + sk.bones[static_cast<size_t>(ca)].name);
         }

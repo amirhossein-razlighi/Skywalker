@@ -128,7 +128,7 @@ const TypeInfo& Groom::type() {
 
 const std::vector<std::string>& Groom::presets() {
     static const std::vector<std::string> n{"hair_straight", "hair_wavy", "hair_curly", "hair_ponytail", "hair_short",
-                                            "fur_short", "fur_long", "beard", "eyebrows", "fur_dense"};
+                                            "fur_short", "fur_long", "beard", "eyebrows", "hair_scalp", "fur_dense"};
     return n;
 }
 
@@ -216,6 +216,7 @@ void transportFrames(const Vec3* b, int P, Vec3 ref, Vec3* T, Vec3* N, Vec3 alt 
 struct Surface {
     const MeshData* mesh = nullptr;
     const std::vector<float>* vmask = nullptr;  // per-vertex density (bone mask), multiplies the mask
+    std::vector<Vec3> smoothN;  // growth normals: averaged over vertices that share a position (flat-shaded meshes)
     // Region mask (maskCenter / maskRadius), evaluated exactly at each sampled point.
     bool region = false;
     Vec3 center{0, 0, 0}, radius{1, 1, 1};
@@ -259,12 +260,12 @@ float vmaskAt(const Surface& s, uint32_t i) {
     return s.vmask && i < s.vmask->size() ? (*s.vmask)[i] : 1.f;
 }
 
-/// Soft ellipsoid region weight at p (1 inside, fading over the outer 30%).
+/// Soft ellipsoid region weight at p (1 inside, fading over the outer half: natural beard and brow edges).
 float regionWeight(const Surface& s, Vec3 p) {
     if (!s.region) return 1.f;
     float d = length((p - s.center) / s.radius);
     if (s.mirror) d = std::min(d, length((Vec3{-p.x, p.y, p.z} - s.center) / s.radius));
-    return 1.f - smoothstep(0.7f, 1.f, d);
+    return 1.f - smoothstep(0.45f, 1.f, d);
 }
 
 /// Could any point of the triangle be inside the region (its bounds against the ellipsoid's box)?
@@ -278,11 +279,45 @@ bool regionTouches(const Surface& s, Vec3 a, Vec3 b, Vec3 c) {
     return touches(s.center) || (s.mirror && touches(Vec3{-s.center.x, s.center.y, s.center.z}));
 }
 
+/// Vertex normals averaged over every vertex at the same position: hair on a flat-shaded (low-poly)
+/// mesh grows smoothly across its faces instead of in facets.
+std::vector<Vec3> weldedNormals(const MeshData& m) {
+    const size_t n = m.vertexCount();
+    std::vector<Vec3> out(n);
+    Aabb b{Vec3(1e30f), Vec3(-1e30f)};
+    for (size_t i = 0; i < n; ++i) {
+        b.min = vmin(b.min, vpos(m, static_cast<uint32_t>(i)));
+        b.max = vmax(b.max, vpos(m, static_cast<uint32_t>(i)));
+    }
+    const float tol = std::max(length(b.max - b.min) * 1e-5f, 1e-7f);
+    auto key = [&](Vec3 p) {
+        auto q = [&](float v) { return static_cast<int64_t>(std::llround(v / tol)); };
+        return (static_cast<uint64_t>(q(p.x)) * 73856093ull) ^ (static_cast<uint64_t>(q(p.y)) * 19349663ull) ^
+               (static_cast<uint64_t>(q(p.z)) * 83492791ull);
+    };
+    std::unordered_map<uint64_t, Vec3> sum;
+    // Face normals weighted by area, accumulated per position.
+    for (size_t t = 0; t + 2 < m.indices.size(); t += 3) {
+        uint32_t i0 = m.indices[t], i1 = m.indices[t + 1], i2 = m.indices[t + 2];
+        Vec3 fn = cross(vpos(m, i1) - vpos(m, i0), vpos(m, i2) - vpos(m, i0));
+        if (dot(fn, vnorm(m, i0) + vnorm(m, i1) + vnorm(m, i2)) < 0.f) fn = -fn;  // agree with the authored side
+        for (uint32_t i : {i0, i1, i2}) sum[key(vpos(m, i))] += fn;
+    }
+    for (size_t i = 0; i < n; ++i) {
+        Vec3 own = vnorm(m, static_cast<uint32_t>(i));
+        auto it = sum.find(key(vpos(m, static_cast<uint32_t>(i))));
+        Vec3 w = it == sum.end() ? own : it->second;
+        out[i] = dot(w, own) > 0.f ? safeNormalize(w, own) : safeNormalize(own, Vec3{0, 1, 0});
+    }
+    return out;
+}
+
 Surface buildSurface(const MeshData& m, const Groom& g, const std::vector<float>* vmask, const Vec3* regionCenter,
                      const Vec3* regionRadius) {
     Surface s;
     s.mesh = &m;
     s.vmask = vmask;
+    s.smoothN = weldedNormals(m);
     const Vec3 r = regionRadius ? *regionRadius : g.maskRadius;
     if (length(g.maskRadius) > 0.f) {
         s.region = true;
@@ -325,6 +360,7 @@ Surface buildSurface(const MeshData& m, const Groom& g, const std::vector<float>
 struct Root {
     Vec3 p, n;
     GroomData::RootBind bind;  // its triangle and barycentrics
+    float density = 1.f;       // bone / region mask at the root (soft edges grow shorter strands)
 };
 
 /// Area-weighted random points where the mask allows hair (rejection sampling).
@@ -341,7 +377,9 @@ bool sampleRoot(const Surface& s, const Groom& g, Random& rng, Root& out) {
         float sq = std::sqrt(r1);
         float b0 = 1.f - sq, b1 = sq * (1.f - r2), b2 = sq * r2;
         Vec3 p = vpos(m, i0) * b0 + vpos(m, i1) * b1 + vpos(m, i2) * b2;
-        Vec3 n = safeNormalize(vnorm(m, i0) * b0 + vnorm(m, i1) * b1 + vnorm(m, i2) * b2,
+        Vec3 n0 = s.smoothN.empty() ? vnorm(m, i0) : s.smoothN[i0], n1 = s.smoothN.empty() ? vnorm(m, i1) : s.smoothN[i1];
+        Vec3 n2 = s.smoothN.empty() ? vnorm(m, i2) : s.smoothN[i2];
+        Vec3 n = safeNormalize(n0 * b0 + n1 * b1 + n2 * b2,
                                safeNormalize(cross(vpos(m, i1) - vpos(m, i0), vpos(m, i2) - vpos(m, i0)), Vec3{0, 1, 0}));
         Vec4 c = vcolor(m, i0) * b0 + vcolor(m, i1) * b1 + vcolor(m, i2) * b2;
         float vm = (vmaskAt(s, i0) * b0 + vmaskAt(s, i1) * b1 + vmaskAt(s, i2) * b2) * regionWeight(s, p);
@@ -354,6 +392,7 @@ bool sampleRoot(const Surface& s, const Groom& g, Random& rng, Root& out) {
             out.bind.v[2] = i2;
             out.bind.b1 = b1;
             out.bind.b2 = b2;
+            out.density = std::clamp(vm, 0.f, 1.f);
             return true;
         }
     }
@@ -708,6 +747,7 @@ Result<GroomData> generateGroom(const Groom& g, const MeshData* mesh, const std:
         GroomData::Child& c = d.children[placed++];
         c.root = r.p;
         c.lengthScale = 1.f - std::clamp(g.lengthVariation, 0.f, 0.95f) * rng.nextFloat();
+        c.lengthScale *= 0.45f + 0.55f * r.density;  // masked edges (beard lines, hairlines) taper off
         c.random = rng.nextFloat();
         c.width = 0.8f + 0.4f * rng.nextFloat();
     }
@@ -1281,17 +1321,23 @@ Json groomPreset(const std::string& name) {
             "clumpShape":1.6,"frizz":0.0025,"frizzScale":60,"maskAngle":180,"melanin":0.25,"redness":0.3,
             "colorVariation":0.3,"roughness":0.45,"radialRoughness":0.85,"scatter":1.3,"stiffness":0.6})"},
         // Faces of skinned characters: a bone mask (the head) and a region in front of / around it.
-        {"beard", R"({"strands":45000,"segments":7,"length":0.032,"lengthVariation":0.35,"widthRoot":0.065,"widthTip":0.025,
-            "direction":[0,-1,-0.25],"directionBlend":0.7,"gravity":0.45,"clumps":900,"clumpStrength":0.35,"clumpShape":1.3,
-            "curlRadius":0.0018,"curlFrequency":70,"frizz":0.0018,"frizzScale":70,"maskBone":"Head","maskSpace":"bounds",
-            "maskCenter":[0,-0.62,-0.85],"maskRadius":[0.78,0.42,0.55],"maskDirection":[0,-0.35,-1],"maskAngle":95,"maskSoftness":20,"melanin":0.85,
-            "redness":0.2,"colorVariation":0.2,"roughness":0.45,"radialRoughness":0.8,"stiffness":0.85,"rootStiffness":1,
-            "follow":0.9,"simulate":false,"attach":"skinned","density":1.6})"},
-        {"eyebrows", R"({"strands":5000,"segments":4,"length":0.011,"lengthVariation":0.3,"widthRoot":0.06,"widthTip":0.02,
-            "direction":[1,0.35,0],"directionBlend":0.9,"gravity":0.05,"clumps":300,"clumpStrength":0.3,"frizz":0.0006,
-            "maskBone":"Head","maskSpace":"bounds","maskCenter":[0.36,0.08,-0.92],"maskRadius":[0.26,0.07,0.2],"maskMirror":true,
-            "maskDirection":[0,0.2,-1],"maskAngle":75,"maskSoftness":20,"melanin":0.88,"redness":0.15,"roughness":0.5,
-            "stiffness":1,"rootStiffness":1,"follow":1,"simulate":false,"attach":"skinned","density":1.8})"},
+        {"beard", R"({"strands":40000,"segments":7,"length":0.03,"lengthVariation":0.4,"widthRoot":0.055,"widthTip":0.018,
+            "direction":[0,-1,-0.3],"directionBlend":0.75,"gravity":0.4,"clumps":1200,"clumpStrength":0.45,"clumpShape":1.3,
+            "curlRadius":0.0025,"curlFrequency":60,"frizz":0.002,"frizzScale":70,"maskBone":"Head","maskSpace":"bounds",
+            "maskCenter":[0,-0.66,-0.85],"maskRadius":[0.82,0.42,0.6],"maskDirection":[0,-0.35,-1],"maskAngle":95,"maskSoftness":20,
+            "melanin":0.7,"redness":0.3,"colorVariation":0.3,"roughness":0.42,"radialRoughness":0.8,"stiffness":0.85,"rootStiffness":1,
+            "follow":0.9,"simulate":false,"attach":"skinned","density":1.0})"},
+        {"eyebrows", R"({"strands":2600,"segments":4,"length":0.009,"lengthVariation":0.35,"widthRoot":0.05,"widthTip":0.015,
+            "direction":[1,0.3,0],"directionBlend":0.92,"gravity":0.05,"clumps":200,"clumpStrength":0.3,"frizz":0.0005,
+            "maskBone":"Head","maskSpace":"bounds","maskCenter":[0.34,0.25,-0.9],"maskRadius":[0.28,0.055,0.25],"maskMirror":true,
+            "maskDirection":[0,0.2,-1],"maskAngle":75,"maskSoftness":20,"melanin":0.72,"redness":0.2,"roughness":0.5,
+            "stiffness":1,"rootStiffness":1,"follow":1,"simulate":false,"attach":"skinned","density":1.1})"},
+        {"hair_scalp", R"({"strands":90000,"segments":12,"length":0.09,"lengthVariation":0.25,"widthRoot":0.07,"widthTip":0.03,
+            "direction":[0,-0.6,1],"directionBlend":0.85,"gravity":0.7,"clumps":900,"clumpStrength":0.4,"clumpShape":1.6,
+            "wave":0.006,"waveFrequency":10,"frizz":0.0015,"frizzScale":40,"maskBone":"Head","maskSpace":"bounds",
+            "maskCenter":[0,0.5,0.15],"maskRadius":[1.15,0.75,1.15],"maskDirection":[0,1,0.3],"maskAngle":100,"maskSoftness":14,
+            "melanin":0.75,"redness":0.25,"roughness":0.32,"radialRoughness":0.7,"stiffness":0.55,"rootStiffness":0.95,"follow":0.6,
+            "attach":"skinned"})"},
         {"fur_dense", R"({"strands":400000,"segments":6,"length":0.05,"lengthVariation":0.4,"widthRoot":0.06,"widthTip":0.008,
             "direction":[0,-0.5,1],"directionBlend":0.7,"gravity":0.35,"clumps":6000,"clumpStrength":0.5,"clumpShape":1.5,
             "frizz":0.003,"frizzScale":60,"maskAngle":180,"melanin":0.6,"redness":0.4,"colorVariation":0.25,"roughness":0.45,

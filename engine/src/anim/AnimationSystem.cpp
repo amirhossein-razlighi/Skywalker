@@ -191,14 +191,14 @@ std::string AnimationSystem::retargetMethod(const Library& src, const Library& d
     // auto: rigs of one family (every humanoid slot of the target found by name in the source) keep
     // the name mapping; different rigs go through pose space when both are humanoids.
     HumanoidMap tm = detectHumanoid(dst.skeleton);
-    if (!tm.complete()) return "name";
+    if (!tm.retargetable()) return "name";
     bool allByName = true;
     for (size_t i = 0; i < kHumanBones && allByName; ++i) {
         int b = tm.bones[i];
         if (b >= 0 && src.skeleton.find(dst.skeleton.bones[static_cast<size_t>(b)].name) < 0) allByName = false;
     }
     if (allByName) return "name";
-    return detectHumanoid(src.skeleton).complete() ? "pose" : "name";
+    return detectHumanoid(src.skeleton).retargetable() ? "pose" : "name";
 }
 
 Result<std::shared_ptr<const RetargetSetup>> AnimationSystem::retargetSetup(const std::shared_ptr<const Library>& src,
@@ -579,6 +579,16 @@ void AnimationSystem::poseEditing(Instance& inst, EntityId e, const Animator& a)
             key += "|" + std::to_string(p.x) + "," + std::to_string(p.y) + "," + std::to_string(p.z);
         }
         Vec3 me = scene_.worldMatrix(e).translation();
+        key += "|" + std::to_string(me.x) + "," + std::to_string(me.y) + "," + std::to_string(me.z);
+    }
+    if (const CharacterIk* cik = scene_.get<CharacterIk>(e)) {  // foot / hand IK settings and targets re-pose
+        key += "|cik" + reflect::toJson(cik, CharacterIk::type()).dump();
+        for (const EntityLink* l : {&cik->leftHand, &cik->rightHand}) {
+            if (EntityId t = l->empty() ? kNoEntity : scene_.resolve(*l, e)) {
+                for (float v : scene_.worldMatrix(t).m) key += "," + std::to_string(v);
+            }
+        }
+        Vec3 me = scene_.worldMatrix(e).translation();  // the ground under the feet changes as it moves
         key += "|" + std::to_string(me.x) + "," + std::to_string(me.y) + "," + std::to_string(me.z);
     }
     if (const std::vector<EntityId>* effectors = ikEffectors(e)) {  // moving an IK target re-poses

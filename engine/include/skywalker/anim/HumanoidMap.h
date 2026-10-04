@@ -74,8 +74,11 @@ struct HumanoidMap {
     int& at(HumanBone b) { return bones[static_cast<size_t>(b)]; }
     /// Hips, a spine bone, the head, both arms (upper, lower, hand) and both legs (upper, lower, foot).
     bool complete() const;
-    /// Slots that are required but missing.
-    std::vector<std::string> missing() const;
+    /// Enough to retarget: hips, a spine bone, the head or neck, both upper and lower arms and legs
+    /// (hands and feet are mapped when both rigs have them; some rigs deform feet with the shin).
+    bool retargetable() const;
+    /// Slots that are required but missing (`forRetarget`: only those retargetable() needs).
+    std::vector<std::string> missing(bool forRetarget = false) const;
     size_t mapped() const;
     /// {convention, confidence, complete, bones: {slot: bone name}, missing, warnings}.
     Json toJson(const Skeleton& skeleton) const;

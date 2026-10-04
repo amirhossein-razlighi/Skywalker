@@ -118,9 +118,9 @@ Result<RetargetSetup> prepareRetarget(const Skeleton& src, int srcRoot, const Sk
     if (Status st = applyHumanoidOverrides(s.source, src, o.sourceMap); !st) return st.error();
     if (Status st = applyHumanoidOverrides(s.target, dst, o.targetMap); !st) return st.error();
     for (auto [m, what] : {std::pair{&s.source, "source"}, std::pair{&s.target, "target"}}) {
-        if (!m->complete()) {
+        if (!m->retargetable()) {
             std::string miss;
-            for (const auto& x : m->missing()) miss += (miss.empty() ? "" : ", ") + x;
+            for (const auto& x : m->missing(true)) miss += (miss.empty() ? "" : ", ") + x;
             return Error::make("not_humanoid", std::string("the ") + what + " skeleton is not a complete humanoid (missing " + miss + ")",
                                std::string("map the slots by hand with ") + what + "_map, e.g. {\"leftHand\": \"<bone>\"}; "
                                "character_inspect / animation_retarget {preview: true} show what was detected");

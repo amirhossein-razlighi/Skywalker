@@ -7,7 +7,8 @@
 //   1. the animated ankle and toe are probed downward (heel and toe rays, `stepHeight` above and below);
 //   2. the ground offset under the heel (relative to the character's base plane) lifts or lowers the
 //      ankle target, keeping the animation's own lift (swing feet stay in the air);
-//   3. the pelvis drops by the lowest negative offset so the lower foot can reach (smoothed);
+//   3. the pelvis drops just enough for every foot to reach its target with the leg's length (or by the lowest
+//      negative offset when the leg length is unknown), smoothed;
 //   4. the foot pitches / rolls onto the slope from the heel -> toe probe line and the ground normal,
 //      clamped at `maxSlope`; the toe never sinks into a higher step;
 //   5. a foot in contact (slow and low, or flagged by animation events) locks to its world spot until the
@@ -71,6 +72,8 @@ struct FootInput {
     Vec3 ankle{0, 0, 0};  // animated ankle
     Vec3 toe{0, 0, 0};    // animated toe joint
     GroundProbe heel, toeProbe;
+    Vec3 hip{0, 0, 0};       // the leg's hip joint (pelvis drop: only as far as the leg cannot reach)
+    float legLength = 0.f;   // hip -> knee -> ankle; 0 = unknown (the pelvis drops by the lowest ground offset)
 };
 
 struct FootIkResult {

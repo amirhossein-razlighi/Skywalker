@@ -156,6 +156,36 @@ TEST_CASE("humanoid map: mixamo, UE and generic names, inferred links, sides by 
     CHECK(ns[HumanBone::RightUpperLeg] == 1);
     CHECK_FALSE(ns.complete());
 
+    // A rig whose feet are IK controls under the root and whose "Hips" is a spine segment above the legs' parent.
+    Skeleton knight;
+    int bone = addBone(knight, "Bone", -1, {0, 0, 0});
+    addBone(knight, "Foot.L", bone, {0.1f, 0.05f, 0});
+    int body = addBone(knight, "Body", bone, {0, 0.9f, 0});
+    int khips = addBone(knight, "Hips", body, {0, 0.05f, 0});
+    int abdomen = addBone(knight, "Abdomen", khips, {0, 0.15f, 0});
+    int torso = addBone(knight, "Torso", abdomen, {0, 0.2f, 0});
+    int kneck = addBone(knight, "Neck", torso, {0, 0.2f, 0});
+    addBone(knight, "Head", kneck, {0, 0.1f, 0});
+    for (int side = 0; side < 2; ++side) {
+        std::string S = side ? ".R" : ".L";
+        float x = side ? -1.f : 1.f;
+        int sh = addBone(knight, "Shoulder" + S, torso, {0.08f * x, 0.15f, 0});
+        int ua = addBone(knight, "UpperArm" + S, sh, {0.1f * x, 0, 0});
+        int la = addBone(knight, "LowerArm" + S, ua, {0.25f * x, 0, 0});
+        addBone(knight, "Palm" + S, la, {0.22f * x, 0, 0});
+        int ul = addBone(knight, "UpperLeg" + S, body, {0.1f * x, -0.05f, 0});
+        addBone(knight, "LowerLeg" + S, ul, {0, -0.42f, 0});
+        addBone(knight, "PoleTarget" + S, bone, {0.1f * x, 0.5f, 0.4f});
+    }
+    addBone(knight, "Foot.R", bone, {-0.1f, 0.05f, 0});
+    HumanoidMap k = detectHumanoid(knight);
+    CHECK(knight.bones[static_cast<size_t>(k[HumanBone::Hips])].name == "Body");
+    CHECK(k[HumanBone::LeftFoot] == -1);  // Foot.L is an IK target, not part of the leg
+    CHECK(knight.bones[static_cast<size_t>(k[HumanBone::LeftHand])].name == "Palm.L");
+    CHECK_FALSE(k.complete());
+    CHECK(k.retargetable());
+    REQUIRE(prepareRetarget(mx, -1, knight, 0));
+
     // Overrides: a bad slot or bone fails with a hint.
     HumanoidMap o = detectHumanoid(mx);
     Status bad = applyHumanoidOverrides(o, mx, Json::parse(R"({"lefthand": "mixamorig:LeftHand", "leftHnad": "x"})").value());
@@ -432,6 +462,31 @@ TEST_CASE("foot IK: ground offsets, pelvis drop, slopes, reach and toe clearance
         CHECK(r.ankle[0].y == doctest::Approx(0.08f + 0.18f).epsilon(0.001));
         CHECK(r.ankle[1].y == doctest::Approx(0.08f));
     }
+}
+
+TEST_CASE("foot IK: with leg lengths the pelvis drops only as far as a leg cannot reach") {
+    FootIkSettings s;
+    s.footHeight = 0.08f;
+    FootIkState st;
+    auto in = standing(-0.15f, 0.f);
+    for (int i = 0; i < 2; ++i) {
+        in[static_cast<size_t>(i)].hip = in[static_cast<size_t>(i)].ankle + Vec3{0, 0.8f, 0};
+        in[static_cast<size_t>(i)].legLength = 0.85f;  // the animated leg is bent: 5 cm of reach to spare
+    }
+    FootIkResult r = solveFeet(s, in, {0, 0, 0}, {0, 1, 0}, 0.f, st);
+    CHECK(r.ankle[0].y == doctest::Approx(0.08f - 0.15f));
+    // The left leg reaches 0.8 + 0.15 = 0.95 m but has 0.85 * 0.995: the pelvis drops the difference only.
+    CHECK(r.pelvisOffset == doctest::Approx(-(0.95f - 0.85f * 0.995f)).epsilon(0.01));
+    // A swing foot high in the air over a low step needs no drop at all.
+    FootIkState st2;
+    auto swing = standing(-0.15f, 0.f);
+    swing[0].ankle.y = 0.3f;
+    swing[0].hip = swing[0].ankle + Vec3{0, 0.55f, 0};
+    swing[0].legLength = 0.85f;
+    swing[1].hip = swing[1].ankle + Vec3{0, 0.8f, 0};
+    swing[1].legLength = 0.85f;
+    FootIkResult r2 = solveFeet(s, swing, {0, 0, 0}, {0, 1, 0}, 0.f, st2);
+    CHECK(r2.pelvisOffset == doctest::Approx(0.f));
 }
 
 TEST_CASE("foot IK: planted feet lock while sliding slowly and re-plant with a step") {

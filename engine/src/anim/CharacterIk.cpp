@@ -109,7 +109,16 @@ FootIkResult solveFeet(const FootIkSettings& s, const std::array<FootInput, 2>& 
         r.ankle[static_cast<size_t>(i)] = desired;
         r.tilt[static_cast<size_t>(i)] = tilt;
         r.weight[static_cast<size_t>(i)] = std::clamp(f.weight * s.weight, 0.f, 1.f);
-        lowest = std::min(lowest, dot(desired - in.ankle, up) * f.weight);
+        if (in.legLength > 1e-4f) {
+            // Drop only as far as this leg cannot reach: |hip - up * d - target| = reach.
+            const float legReach = in.legLength * 0.995f;
+            Vec3 v = in.hip - desired;
+            float vu = dot(v, up), disc = vu * vu - dot(v, v) + legReach * legReach;
+            float d = disc >= 0.f ? vu - std::sqrt(disc) : vu;
+            lowest = std::min(lowest, -std::clamp(d, 0.f, s.stepHeight) * f.weight);
+        } else {
+            lowest = std::min(lowest, dot(desired - in.ankle, up) * f.weight);
+        }
     }
     const float pelvisGoal = s.pelvis ? lowest * std::clamp(s.weight, 0.f, 1.f) : 0.f;
     state.pelvisOffset += (pelvisGoal - state.pelvisOffset) * k;
@@ -295,6 +304,13 @@ void AnimationSystem::applyCharacterIk(Instance& inst, EntityId e) {
             int toe = (*map)[i ? HumanBone::RightToes : HumanBone::LeftToes];
             FootInput& f = in[static_cast<size_t>(i)];
             f.ankle = modelWorld.transformPoint(inst.globals[static_cast<size_t>(foot)].translation());
+            int hip = (*map)[i ? HumanBone::RightUpperLeg : HumanBone::LeftUpperLeg];
+            int knee = (*map)[i ? HumanBone::RightLowerLeg : HumanBone::LeftLowerLeg];
+            if (hip >= 0 && knee >= 0) {
+                f.hip = modelWorld.transformPoint(inst.globals[static_cast<size_t>(hip)].translation());
+                Vec3 k = modelWorld.transformPoint(inst.globals[static_cast<size_t>(knee)].translation());
+                f.legLength = distance(f.hip, k) + distance(k, f.ankle);
+            }
             f.toe = toe >= 0 ? modelWorld.transformPoint(inst.globals[static_cast<size_t>(toe)].translation()) : f.ankle;
             const float reach = s.stepHeight + s.footHeight;
             // Probe from above the highest reachable ground straight down past the lowest.
