@@ -373,3 +373,4 @@ struct Environment {
 #include "skywalker/ecs/Joint2D.h"
 #include "skywalker/ecs/Character2D.h"
 #include "skywalker/ecs/Physics2DSettings.h"
+#include "skywalker/ecs/SpriteTrail.h"  // sprite_trail: afterimages of dashing sprites (render2d/SpriteTrail.cpp)

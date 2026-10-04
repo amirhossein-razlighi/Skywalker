@@ -17,7 +17,9 @@ struct SpriteInstance {
     float4 color;     // linear rgba
     float4 emission;  // Color: rgb glow; Sdf: outline rgb + width
     float4 params;    // x = mode (0 color, 1 sdf, 2 halo), y = lit, z = normal map, w = sdf dilation
-    float4 extra;     // x = casts shadows, y = alpha cutoff
+    float4 extra;     // x = casts shadows, y = alpha cutoff, z = sway pin (0 bottom, 1 top), w = additive
+    float4 fx;        // x = blur radius (texels), y = sway amplitude (fraction of width), z = sway Hz, w = sway waves
+    float4 flash;     // rgb linear, a = amount
 };
 
 struct Sprite2DUniforms {
@@ -97,6 +99,36 @@ static float stepped(float v, float bands, float threshold) {
     return (f + (fringe > threshold ? 1.0 : 0.0)) / bands;
 }
 
+// Wind / cloth sway: the image bends sideways inside its quad, more toward the free edge (in.local.y = 0 is
+// the top of the frame). Each quad gets its own phase from its position, so neighbours do not move in lockstep.
+static float2 swayUv(SpriteInstance s, VOut in, constant Sprite2DUniforms& u) {
+    float v = in.local.y;                                  // 0 top .. 1 bottom
+    float free = s.extra.z > 0.5 ? v : 1.0 - v;            // distance from the pinned edge
+    float weight = free * free * (3.0 - 2.0 * free);
+    float phase = s.origin.x * 0.73 + s.origin.y * 0.31;
+    float t = u.params.y * s.fx.z * 6.2831853;
+    float wave = sin(t + phase + v * s.fx.w * 6.2831853) * 0.75 + sin(t * 0.53 + phase * 1.7 + v * s.fx.w * 3.1) * 0.25;
+    float du = s.fx.y * weight * wave * (s.uv.z - s.uv.x);
+    return float2(in.uv.x + du, in.uv.y);
+}
+
+// Depth-of-field blur: a golden-angle disk of taps on a coarser mip, averaged in premultiplied alpha so
+// soft edges do not pick up the dark color of transparent texels.
+static float4 blurred(texture2d<float> tex, sampler smp, float2 uv, float radius) {
+    float2 texel = 1.0 / float2(tex.get_width(), tex.get_height());
+    float lod = log2(max(radius * 0.35, 1.0));
+    float4 acc = float4(0.0);
+    const int kTaps = 24;
+    for (int i = 0; i < kTaps; ++i) {
+        float r = sqrt((float(i) + 0.5) / float(kTaps)) * radius;
+        float a = float(i) * 2.39996323;
+        float4 t = tex.sample(smp, uv + float2(cos(a), sin(a)) * r * texel, level(lod));
+        acc += float4(t.rgb * t.a, t.a);
+    }
+    acc /= float(kTaps);
+    return acc.a > 1e-4 ? float4(acc.rgb / acc.a, acc.a) : float4(0.0);
+}
+
 static float shadowAt(float2 fragUv, float3 lightPos, constant Sprite2DUniforms& u, texture2d<float> occluders, sampler smp,
                       float softness) {
     float4 clip = u.viewProj * float4(lightPos, 1.0);
@@ -130,7 +162,9 @@ fragment SpriteOut spriteFragment(VOut in [[stage_in]],
         float g = stepped(r * r, s.params.y, bayer4(in.world.xy, in.position.xy, u));
         return spriteOut(float4(s.color.rgb * g, 0.0), float3(0.0));
     }
-    float4 tex = albedo.sample(smp, in.uv);
+    float2 uv = in.uv;
+    if (mode == 0 && s.fx.y != 0.0) uv = swayUv(s, in, u);
+    float4 tex = (mode == 0 && s.fx.x > 0.25) ? blurred(albedo, smp, uv, s.fx.x) : albedo.sample(smp, uv);
     float4 c;
     if (mode == 1) {  // SDF glyph
         float d = tex.r + s.params.w;
@@ -161,7 +195,7 @@ fragment SpriteOut spriteFragment(VOut in [[stage_in]],
         float3 n = N0;
         bool mapped = s.params.z > 0.5;
         if (mapped) {
-            float3 m = normalMap.sample(smp, in.uv).xyz * 2.0 - 1.0;
+            float3 m = normalMap.sample(smp, uv).xyz * 2.0 - 1.0;
             n = normalize(T * m.x + B * m.y + N0 * max(m.z, 0.05));
         }
         float3 light = u.ambient.rgb;
@@ -193,10 +227,12 @@ fragment SpriteOut spriteFragment(VOut in [[stage_in]],
         rgb *= light;
     }
     rgb += s.emission.rgb * tex.a;
+    rgb = mix(rgb, s.flash.rgb, saturate(s.flash.a));  // hit flash
     // Atmospheric fog by distance (far parallax layers fade into the haze).
     float dist = length(in.world - u.cameraPos.xyz);
     float fog = (1.0 - exp(-u.fog.a * dist)) * s.origin.w;
     rgb = mix(rgb, u.fog.rgb, saturate(fog));
+    if (s.extra.w > 0.5) return spriteOut(float4(rgb * c.a, 0.0), float3(0.0));  // additive: premultiplied, dst kept
     return spriteOut(float4(rgb, c.a), c.rgb);
 }
 

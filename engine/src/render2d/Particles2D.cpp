@@ -55,6 +55,10 @@ const TypeInfo& Particles2D::type() {
             SKY_FIELD(Particles2D, lit, Bool, "Lit by 2D lights (else full bright)"),
             SKY_FIELD(Particles2D, prewarm, Bool, "Start as if it had been running for a while"),
             SKY_FIELD(Particles2D, seed, Int, "Random seed (same seed, same particles)"),
+            SKY_FIELD_ENUM(Particles2D, filter, "nearest (pixel art, texel-snapped) or linear (painted motes, smooth sub-pixel motion)",
+                           "nearest", "linear"),
+            SKY_FIELD_ENUM(Particles2D, blend, "alpha (normal) or add (sparks, embers, glowing spores)", "alpha", "add"),
+            SKY_FIELD_RANGE(Particles2D, sizeJitter, Float, "Random size per particle: 0.5 = 50% to 150%", 0.f, 1.f),
         }};
     return info;
 }
@@ -94,6 +98,7 @@ void spawn(Particles2D& p, Vec3 origin, int frameCount) {
     q.phase = uniform(p.rng_) * 6.2831853f;
     q.shade = 1.f - uniform(p.rng_) * p.colorJitter;
     q.frame = frameCount > 1 ? static_cast<int>(splitmix(p.rng_) % static_cast<uint64_t>(frameCount)) : 0;
+    if (p.sizeJitter > 0.f) q.scale = std::max(0.05f, 1.f + signedUnit(p.rng_) * p.sizeJitter);  // only drawn when used: old seeds replay
     p.particles_.push_back(q);
 }
 

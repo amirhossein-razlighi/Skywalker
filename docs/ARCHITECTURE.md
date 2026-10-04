@@ -100,6 +100,9 @@ from a snapshot if they fail.
 
 ## Game pause, process modes and time scale
 
+(Hit-stop: `hit_stop(seconds, scale)` lowers the clock of the next ticks below the time scale for a number of fixed ticks, then
+returns; `process.timeScale` multiplies an entity's clock down its hierarchy. See docs/2D_AND_UI.md "Painted 2D".)
+
 The editor's pause (`sim_control pause`, the toolbar) stops everything. A *game* needs its own
 pause: the world freezes while the pause menu keeps working. That is `pause_game()` in Wander
 (`sim_control pause_game` for agents), and the `process` component decides what keeps running.

@@ -53,6 +53,15 @@ const TypeInfo& Sprite::type() {
                                            "lower on screen (smaller world y at the pivot) draws in front"),
             SKY_FIELD(Sprite, palette, String, "Palette swap: *.palette.json ({\"swap\": {\"#3a7d44\": \"#d8e4ec\"}}) or a 2-row png "
                                                "(row 0 source colors, row 1 targets); recolors the texture (seasons, variants)"),
+            SKY_FIELD_RANGE(Sprite, blur, Float, "Depth-of-field blur radius in texture pixels: soft out-of-focus foreground "
+                                                 "silhouettes and far layers (0 = sharp; 4-24 typical)", 0.f, 64.f),
+            SKY_FIELD(Sprite, sway, Vec4, "Wind/cloth sway (the image bends inside its quad): [amplitude as a fraction of the "
+                                          "width (0.02-0.1), speed Hz, waves along the height, pin: 0 = bottom fixed (grass, "
+                                          "banners on poles), 1 = top fixed (curtains, hanging silk)]; amplitude 0 = off"),
+            SKY_FIELD_ENUM(Sprite, blend, "alpha (normal) or add (light shafts, god rays, glows, sparks: brightens what is behind)",
+                           "alpha", "add"),
+            SKY_FIELD(Sprite, flash, Color, "Hit flash: rgb mixed over the sprite by alpha (0 = none). Wander flash(e, 0.12) "
+                                            "plays a fading one"),
         }};
     return info;
 }
@@ -155,6 +164,9 @@ const TypeInfo& Camera2D::type() {
             SKY_FIELD(Camera2D, deadZone, Vec2, "Half-size of the box the target moves in without moving the camera"),
             SKY_FIELD(Camera2D, offset, Vec2, "Framing offset from the target"),
             SKY_FIELD(Camera2D, bounds, Vec4, "[minX, minY, maxX, maxY] the view stays inside (all 0 = unbounded)"),
+            SKY_FIELD_RANGE(Camera2D, shakeAmplitude, Float, "camera_shake: world units of offset at full trauma", 0.f, 100.f),
+            SKY_FIELD_RANGE(Camera2D, shakeFrequency, Float, "camera_shake: noise frequency (Hz)", 0.1f, 120.f),
+            SKY_FIELD_RANGE(Camera2D, shakeDecay, Float, "camera_shake: trauma lost per second", 0.f, 100.f),
         }};
     return info;
 }

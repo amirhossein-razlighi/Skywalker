@@ -89,7 +89,9 @@ set(SKY_ENGINE_SOURCES
     src/render2d/Sprites.cpp
     src/render2d/Raster2D.cpp
     src/render2d/Particles2D.cpp
+    src/render2d/SpriteTrail.cpp
     src/agent/Particles2DTools.cpp
+    src/agent/Painted2DTools.cpp
     src/ui/UiStyle.cpp
     src/ui/UiLayout.cpp
     src/ui/UiSystem.cpp
@@ -100,6 +102,7 @@ set(SKY_ENGINE_SOURCES
     src/agent/UiTools.cpp
     src/agent/DialogueTools.cpp
     src/engine/EngineBuiltins.cpp
+    src/engine/GameFeelBuiltins.cpp
     # audio + input (workstream S)
     src/audio/AudioComponents.cpp
     src/audio/Wav.cpp

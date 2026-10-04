@@ -23,6 +23,7 @@ struct Particle2D {
     float phase = 0.f;   // sway / pulse phase (radians)
     float shade = 1.f;   // brightness multiplier (colorJitter)
     int frame = 0;       // frame index into the selected frames (random mode)
+    float scale = 1.f;   // size multiplier (sizeJitter)
 };
 
 struct Particles2D {
@@ -61,6 +62,9 @@ struct Particles2D {
     bool lit = false;                 // lit by 2D lights (night rain) — otherwise full bright
     bool prewarm = true;              // start as if it had been running for a while
     int seed = 0;
+    std::string filter = "nearest";   // nearest (pixel art: texel snapped) | linear (painted motes, smooth motion)
+    std::string blend = "alpha";      // alpha | add (sparks, embers, glowing motes)
+    float sizeJitter = 0.f;           // random size variation per particle (0..1: 0.5 = 50%..150%)
 
     // Runtime state (owned by the simulation, not serialized; cleared when play stops).
     std::vector<Particle2D> particles_;

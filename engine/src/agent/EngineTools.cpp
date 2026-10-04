@@ -1242,6 +1242,7 @@ void registerEngineTools(Engine& engine) {
     tools::addSceneFlowTools(engine, reg);  // engine/src/agent/SceneFlowTools.cpp (runtime scene changes, docs/SCENE_FLOW.md)
     tools::addWanderDebugTools(engine, reg);  // engine/src/agent/WanderDebugTools.cpp (Wander debugger)
     tools::addPhysics2DTools(engine, reg);  // engine/src/agent/Physics2DTools.cpp (2D physics, Box2D)
+    tools::addPainted2DTools(engine, reg);  // engine/src/agent/Painted2DTools.cpp (sprite_sheet_import, game_feel)
 }
 
 }  // namespace sky

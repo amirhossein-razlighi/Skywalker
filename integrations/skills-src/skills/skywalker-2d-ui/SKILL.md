@@ -20,7 +20,8 @@ Captures (`viewport_capture`) include sprites, tiles, world text and UI with rea
 
 | Component | Use | Key fields |
 |---|---|---|
-| `sprite` | Textured quad | `texture` (png or `*.atlas.json`), `frame`, `columns`/`rows`, `pivot` ([0.5,0] = feet), `size` or `pixelsPerUnit`, `color`, `flipX`, `sortingLayer`, `order`, `filter:"nearest"` for pixel art, `normalMap`, `emissive`, `billboard`, `lit` |
+| `sprite` | Textured quad | `texture` (png or `*.atlas.json`), `frame`, `columns`/`rows`, `pivot` ([0.5,0] = feet), `size` or `pixelsPerUnit`, `color`, `flipX`, `sortingLayer`, `order`, `filter:"nearest"` for pixel art, `normalMap`, `emissive`, `billboard`, `lit`, `blur` (depth of field), `sway` (wind/cloth), `blend:"add"`, `flash` |
+| `sprite_trail` | Afterimages of a moving sprite | `count`, `interval`, `minSpeed`, `color`, `opacity`, `emissive`, `additive`, `emitting` (toggle around a dash) |
 | `sprite_anim` | Flipbook | `clips` `{"run":{"frames":"4-11"\|"run_*"\|[..], "fps":12, "loop":true, "events":{"3":"footstep"}}}`, `clip`, `playing`, `speed` |
 | `tilemap` | Tile layers | `tileset`, `tileSize`, `cellSize`, `layers[{name,data,solid,z,tint,sortingLayer}]`, `solidTiles`, `autotile`, `filter` |
 | `light2d` | 2D light | `kind` point/spot/global, `color`, `intensity`, `radius`, `falloff`, `height` (normal maps), `shadows`, `halo`, `flicker` (max 32 per frame) |
@@ -115,6 +116,30 @@ particles2d_create {preset:"smoke", name:"Chimney Smoke", parent:"Farmhouse", po
 particles2d_info {}
 entity_update {entity:"Ground", components:{tilemap:{palette:"palettes/winter.palette.json"}}}
 entity_update {entity:"Oak", components:{sprite:{ySort:true, pivot:[0.5, 0], palette:"palettes/autumn.palette.json"}}}
+```
+
+### Painted action games: depth, motion and impact
+
+- **Rendered characters.** Render each clip from Blender (or any DCC) as `renders/<hero>/<clip>/0001.png` plus a normal pass in
+  `renders/<hero>_normals/<clip>/`, then one call packs normal-mapped atlases and applies them: `sprite_sheet_import` (supersampled renders: `downsample:2`).
+  The atlas carries its normal map (`"normalMap"` in the atlas), so 2D lights shade every animation frame.
+- **Depth.** Far layers and foreground silhouettes get `sprite.blur` (texels; 4-16) for depth of field; light shafts, god rays and glows use `blend:"add"`;
+  curtains, banners, grass and hanging silk bend with `sway:[amplitude, Hz, waves, pin]` (pin 1 = hangs from the top).
+  Painted motes and sparks: `particles2d` with `filter:"linear"`, `blend:"add"`, `sizeJitter`.
+- **Impact.** In Wander: `hit_stop(0.07)` freezes the clock on a hit (counted in ticks, replays exactly), `camera_shake(0.3)` adds trauma to the camera2d
+  (`shakeAmplitude`, `shakeFrequency`, `shakeDecay`), `flash(enemy, 0.12, #ffffff)` flashes a sprite. `process.timeScale` slows one entity (and its children).
+  Try them on a running game with `game_feel`.
+- **Dashes.** Add `sprite_trail` and toggle `self.sprite_trail.emitting` around the dash.
+
+```text
+sprite_sheet_import {folder:"renders/heroine", normals:"renders/heroine_normals", output:"art/heroine/heroine", downsample:2, fps:30, clips:{attack1:{loop:false, events:{"4":"hit"}}}, entity:"Heroine", pivot:[0.5, 0.15], pixels_per_unit:128}
+entity_update {entity:"FG Pillar", components:{sprite:{blur:10}}}
+entity_update {entity:"Curtain", components:{sprite:{sway:[0.03, 0.15, 0.6, 1]}}}
+entity_update {entity:"Moon Shaft", components:{sprite:{blend:"add", color:"#ffffff90"}}}
+entity_update {entity:"Heroine", components:{sprite_trail:{count:6, interval:0.03, color:"#8fb8ff", additive:true, emitting:false}}}
+game_feel {action:"shake", trauma:0.5}
+game_feel {action:"hit_stop", seconds:0.08}
+game_feel {action:"info"}
 ```
 
 ## Workflow B: UI (HUD, menus, inventory)

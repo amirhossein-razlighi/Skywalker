@@ -31,6 +31,7 @@ set(SKY_TEST_SOURCES
     test_dialogue.cpp
     test_2d_tools.cpp
     test_2d_topdown.cpp
+    test_painted2d.cpp
     test_wander_examples.cpp
     test_wander2.cpp
     test_wander_native.cpp

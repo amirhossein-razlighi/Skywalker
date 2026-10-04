@@ -110,6 +110,7 @@ void Scene::registerKinds() {
     kinds_.push_back(makeReflectedKind<Joint2D>());
     kinds_.push_back(makeReflectedKind<Character2D>());
     kinds_.push_back(makeReflectedKind<Physics2DSettings>());
+    kinds_.push_back(makeReflectedKind<SpriteTrail>());  // afterimages of dashing sprites (ecs/SpriteTrail.h)
 }
 
 const ComponentKind* Scene::componentKind(std::string_view n) const {

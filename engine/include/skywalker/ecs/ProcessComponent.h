@@ -20,6 +20,7 @@ struct Process {
     int priority = 0;                       // behaviors run in (priority, scene order) order: lower first (not inherited)
     std::string clock = "inherit";          // inherit | game (follows time_scale) | real (ignores it: menus, HUD)
     std::string interpolation = "inherit";  // inherit | on | off: smooth motion between 60 Hz ticks on fast displays
+    float timeScale = 1.f;                  // this entity's own clock speed, multiplied down the hierarchy (slow one enemy)
 
     static const TypeInfo& type();
 };

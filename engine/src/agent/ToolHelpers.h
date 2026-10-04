@@ -84,5 +84,6 @@ void addSaveTools(Engine& engine, ToolRegistry& reg);    // SaveTools.cpp: save_
 void addLocaleTools(Engine& engine, ToolRegistry& reg);  // LocaleTools.cpp: locale_list, locale_set, locale_check, locale_extract, locale_pseudo
 void addSceneFlowTools(Engine& engine, ToolRegistry& reg);  // SceneFlowTools.cpp: scene_flow_info, scene_change, scene_additive_*
 void addWanderDebugTools(Engine& engine, ToolRegistry& reg);  // WanderDebugTools.cpp: wander_break_*, wander_step, wander_stack...
+void addPainted2DTools(Engine& engine, ToolRegistry& reg);  // Painted2DTools.cpp: sprite_sheet_import, game_feel
 
 }  // namespace sky::tools

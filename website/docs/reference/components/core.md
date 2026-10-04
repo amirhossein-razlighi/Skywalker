@@ -194,6 +194,7 @@ How this entity and its children run while the game is paused (pause_game) or sl
 | `priority` | integer | Behavior run order: lower runs first (ties keep scene order). Not inherited |  |
 | `clock` | string | inherit \| game (dt follows time_scale: slow motion) \| real (ignores time_scale: menus, HUD) | `inherit` `game` `real` |
 | `interpolation` | string | inherit \| on (motion is smoothed between ticks on screen) \| off (shown exactly at tick positions: snapping things, pixel-art) | `inherit` `on` `off` |
+| `timeScale` | number | This entity's own clock speed (multiplied with its parents' and the game time_scale): 0.2 slows one enemy or a boss arm, 0 freezes it (a per-entity hit-stop) | 0 .. 10 |
 
 === "Tool call"
 

@@ -25,6 +25,7 @@ SRC = HERE / "skills-src"
 # Words that look like tool names but are not (recipe names, file paths, wander functions...).
 ALLOW = {
     "sprite_anim", "ui_canvas", "physics_world", "nav_agent", "nav_ignore", "dialogue_var", "dialogue_choose",  # components / builtins
+    "sprite_trail", "camera_shake", "hit_stop",
     "terrain_chunk", "wind_loop", "rain_loop", "fire_crackle_loop", "ocean_waves_loop", "ambient_drone", "footstep_grass", "footstep_stone",
     "footstep_wood", "ui_click", "ui_hover", "play_sound", "stop_sound", "set_volume", "water_height", "tool_timeout_sec", "startup_timeout_sec",
     "studio_id", "scene_query", "place_on_surface", "sim_trace", "audio_info", "asset_list", "playtest_run", "perf_stats", "select_unit",

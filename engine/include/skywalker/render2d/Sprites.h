@@ -26,6 +26,7 @@ struct FrameRef {
     float x = 0, y = 0, w = 0, h = 0;  // drawn rect in the image (pixels)
     float sourceW = 0, sourceH = 0;    // untrimmed frame size
     float offsetX = 0, offsetY = 0;    // drawn rect inside the untrimmed frame (from its top-left)
+    std::string normalPath;            // the atlas's companion normal map (absolute; "" = none)
 };
 
 /// An animated tile: the ids it cycles through (water shimmer, swaying flowers).
@@ -159,6 +160,13 @@ EntityId activeCamera(const Scene& scene, EntityId preferred = kNoEntity);
 float applyCamera2D(const Scene& scene, EntityId cameraEntity, ViewCamera& view, int width, int height);
 /// Moves cameras with camera2d.follow toward their targets (deterministic; call per fixed tick).
 void tickCameras(Scene& scene, float dt, const ProcessGate* gate = nullptr);
+
+/// Adds camera_shake trauma (0..1; the offset grows with its square and decays by shakeDecay per second).
+void addCameraShake(Camera2D& camera, float trauma);
+/// Advances sprite flashes and records sprite_trail afterimages (fixed ticks; render2d/SpriteTrail.cpp).
+void tickSpriteFx(Scene& scene, Assets2D& assets, float dt, const ProcessGate* gate = nullptr);
+/// Starts a hit flash on a sprite: `color` (sRGB, alpha = strength) fading out over `seconds`.
+void flashSprite(Sprite& sprite, float seconds, Vec4 color);
 
 /// sRGB (authoring) -> linear (rendering).
 Vec4 toLinear(Vec4 srgb);

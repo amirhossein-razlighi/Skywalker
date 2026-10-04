@@ -41,6 +41,16 @@ struct Sprite {
     bool visible = true;
     bool ySort = false;               // top-down depth: within its layer and order, lower on screen (smaller y) draws in front
     std::string palette;              // palette swap (*.palette.json or a 2-row png strip): recolors the texture
+    // Painterly 2D effects (docs/2D_AND_UI.md "Painted 2D: depth, motion and impact").
+    float blur = 0.f;                 // depth-of-field blur radius in texture pixels (foreground silhouettes, far layers)
+    Vec4 sway{0.f, 0.f, 0.f, 0.f};    // [amplitude (fraction of width), speed (Hz), waves along the height, pin (0 bottom, 1 top)]
+    std::string blend = "alpha";      // alpha | add (light shafts, glows, sparks)
+    Vec4 flash{1.f, 1.f, 1.f, 0.f};   // hit flash: rgb mixed over the sprite by alpha (0 = none)
+
+    // Runtime (not serialized): flash(entity, seconds) fades this flash out over its duration.
+    Vec4 flashColor_{1.f, 1.f, 1.f, 1.f};
+    float flashTimer_ = 0.f;
+    float flashDuration_ = 0.f;
 
     static const TypeInfo& type();
     static const std::vector<std::string>& sortingLayers();
@@ -129,6 +139,14 @@ struct Camera2D {
     Vec2 deadZone{0.f, 0.f};      // half-size of the box the target moves in freely (world units)
     Vec2 offset{0.f, 0.f};        // framing offset from the target
     Vec4 bounds{0.f, 0.f, 0.f, 0.f};  // [minX, minY, maxX, maxY] the view stays inside (all 0 = none)
+    float shakeAmplitude = 0.4f;      // world units of offset at full trauma (camera_shake)
+    float shakeFrequency = 18.f;      // Hz of the shake noise
+    float shakeDecay = 1.6f;          // trauma lost per second
+
+    // Runtime (not serialized): camera_shake trauma and this tick's offset.
+    float trauma_ = 0.f;
+    float shakeTime_ = 0.f;
+    Vec2 shakeOffset_{0.f, 0.f};
 
     static const TypeInfo& type();
 };

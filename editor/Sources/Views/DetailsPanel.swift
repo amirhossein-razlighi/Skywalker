@@ -36,7 +36,7 @@ struct EntityDetails: View {
                                          "joint", "vehicle", "chase_camera", "nav_agent", "navmesh", "physics_world", "animator", "characterIk", "attach", "ik", "sequencer",
                                          "sprite", "sprite_anim", "tilemap", "body2d", "collider2d", "character2d", "joint2d",
                                          "physics2d_world", "light2d", "parallax", "camera2d", "text", "ui_canvas",
-                                         "ui", "dialogue", "process", "particles2d", "persist", "carry"]
+                                         "ui", "dialogue", "process", "particles2d", "persist", "carry", "sprite_trail"]
     /// Components offered by Add Component (transform is always present).
     private static let addable = ["mesh", "light", "reflection_probe", "camera", "particles", "groom", "water", "terrain",
                                   "foliage", "audio", "listener", "body", "collider", "character", "joint", "vehicle", "chase_camera",
@@ -44,7 +44,7 @@ struct EntityDetails: View {
                                   "physics_world", "animator", "characterIk", "attach", "ik", "sequencer", "sprite", "sprite_anim",
                                   "tilemap", "body2d", "collider2d", "character2d", "joint2d", "physics2d_world",
                                   "light2d", "parallax", "camera2d", "text", "ui_canvas", "ui", "dialogue", "process", "particles2d",
-                                  "persist", "carry"]
+                                  "persist", "carry", "sprite_trail"]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -136,6 +136,7 @@ struct EntityDetails: View {
         case "physics2d_world": "globe.desk"
         case "persist": "square.and.arrow.down.on.square"
         case "carry": "suitcase"
+        case "sprite_trail": "wind"
         default: "puzzlepiece"
         }
     }
@@ -165,6 +166,7 @@ struct EntityDetails: View {
         case "physics2d_world": "Physics 2D Settings"
         case "persist": "Persist (Save Games)"
         case "carry": "Carry (Scene Changes)"
+        case "sprite_trail": "Sprite Trail"
         default: comp.capitalized
         }
     }
