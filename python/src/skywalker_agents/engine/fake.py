@@ -97,6 +97,13 @@ class FakeEngine:
         self._hosts: dict[str, _Host] = {}
         self._pending: dict[int, asyncio.Future[dict[str, Any]]] = {}
         self._ids = itertools.count(1)
+        # `_meta` of tools/call requests (a hosted tool's callbacks carry {"skywalker/call_id": ...}).
+        self.call_meta: list[dict[str, Any]] = []
+        # How hosted tools were registered (capabilities, limits), by public name.
+        self.hosted_specs: dict[str, dict[str, Any]] = {}
+        # True mimics the engine's default "auto" policy in tool_host_register's status: hosted tools that mutate
+        # or reach the network report pending_approval (the fake still runs them).
+        self.require_approval = False
         self._playtests = 0
         self._register_builtin()
         for a in roster or [
@@ -985,7 +992,9 @@ class FakeEngine:
                         cid = next(self._ids)
                         fut: asyncio.Future[dict[str, Any]] = asyncio.get_running_loop().create_future()
                         self._pending[cid] = fut
-                        host.queue.append({"call": cid, "tool": tool_name, "args": args, "actor": caller})
+                        host.queue.append(
+                            {"call": cid, "call_id": f"call-{cid}", "tool": tool_name, "args": args, "actor": caller}
+                        )
                         cond = self._cond()
                         if cond is not None:
                             await self._notify(cond)
@@ -1012,7 +1021,16 @@ class FakeEngine:
                         self.tools.pop(n, None)
             self._hosts[hid] = _Host(hid, names, old.queue if old else [])
             self.emit({"type": "tool_host", "action": "register", "host": hid, "actor": actor, "tools": names})
-            return ToolResult.ok(f"serving {len(names)} tool(s) as host {hid}", {"host": hid, "tools": names})
+            # Like the engine's default policy ("auto"): tools that mutate wait for a human's approval.
+            status: dict[str, dict[str, Any]] = {}
+            for spec, n in zip(a["tools"], names, strict=True):
+                self.hosted_specs[n] = dict(spec)
+                caps = spec.get("capabilities") or {}
+                needs_ok = bool(spec.get("mutates") or caps.get("mutate") or caps.get("network"))
+                status[n] = {"status": "pending_approval" if needs_ok and self.require_approval else "active"}
+            return ToolResult.ok(
+                f"serving {len(names)} tool(s) as host {hid}", {"host": hid, "tools": names, "status": status}
+            )
 
         async def host_poll(a: dict[str, Any], actor: str) -> ToolResult:
             host = self._hosts.get(a["host"])
@@ -1117,8 +1135,14 @@ class FakeConnection:
         return f"mcp:{self.client_name}"
 
     async def call_tool(
-        self, name: str, arguments: dict[str, Any] | None = None, timeout: float | None = None
+        self,
+        name: str,
+        arguments: dict[str, Any] | None = None,
+        timeout: float | None = None,
+        meta: dict[str, Any] | None = None,
     ) -> ToolResult:
+        if meta:
+            self.engine.call_meta.append({"tool": name, "actor": self.actor, "meta": dict(meta)})
         coro = self.engine.call(name, dict(arguments or {}), self.actor)
         return await (asyncio.wait_for(coro, timeout) if timeout else coro)
 
@@ -1127,7 +1151,7 @@ class FakeConnection:
             return {"tools": self.engine.list_tools()}
         if method == "tools/call":
             p = params or {}
-            return (await self.call_tool(str(p["name"]), p.get("arguments"))).to_mcp()
+            return (await self.call_tool(str(p["name"]), p.get("arguments"), meta=p.get("_meta"))).to_mcp()
         if method == "ping":
             return {}
         raise NotImplementedError(method)

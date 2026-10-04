@@ -67,6 +67,8 @@ class Tool:
         requires_approval: bool | None = None,
         source: str = "python",
         strict: bool = False,
+        capabilities: dict[str, Any] | None = None,
+        limits: dict[str, Any] | None = None,
     ) -> None:
         if not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", name):
             raise ValueError(f"tool name '{name}' must match [A-Za-z0-9_-]{{1,64}}")
@@ -79,6 +81,11 @@ class Tool:
         self.requires_approval = requires_approval
         self.source = source
         self.strict = strict
+        # When served to the engine (host_tools): the engine tools it may call back into while serving a call
+        # ({"calls": [names or globs], "mutate": bool, "network": bool}) and its limits ({"timeout_ms",
+        # "max_output_bytes", "max_calls"}); see docs/CUSTOM_TOOLS.md. None = the engine's defaults.
+        self.capabilities = dict(capabilities) if capabilities else None
+        self.limits = dict(limits) if limits else None
 
     async def run(self, args: dict[str, Any], ctx: ToolContext | None = None) -> ToolResult:
         """Runs the tool; exceptions become error results the model can read."""
@@ -108,6 +115,8 @@ class Tool:
             requires_approval=self.requires_approval,
             source=self.source,
             strict=self.strict,
+            capabilities=self.capabilities,
+            limits=self.limits,
         )
         return clone
 
@@ -260,6 +269,8 @@ def tool(
     mutates: bool = False,
     category: str = "python",
     requires_approval: bool | None = None,
+    capabilities: dict[str, Any] | None = None,
+    limits: dict[str, Any] | None = None,
 ) -> Callable[[ToolFn], Tool]: ...
 
 
@@ -272,11 +283,16 @@ def tool(
     mutates: bool = False,
     category: str = "python",
     requires_approval: bool | None = None,
+    capabilities: dict[str, Any] | None = None,
+    limits: dict[str, Any] | None = None,
 ) -> Tool | Callable[[ToolFn], Tool]:
-    """Turns a (sync or async) function into a :class:`Tool`. Usable bare or with options."""
+    """Turns a (sync or async) function into a :class:`Tool`. Usable bare or with options.
+
+    ``capabilities`` and ``limits`` apply when the tool is served to the engine (:meth:`AsyncEngine.host_tools`).
+    """
 
     def wrap(f: ToolFn) -> Tool:
-        return _function_tool(
+        t = _function_tool(
             f,
             name=name,
             description=description,
@@ -284,6 +300,9 @@ def tool(
             category=category,
             requires_approval=requires_approval,
         )
+        t.capabilities = dict(capabilities) if capabilities else None
+        t.limits = dict(limits) if limits else None
+        return t
 
     return wrap(fn) if fn is not None else wrap
 

@@ -206,3 +206,62 @@ async def test_tool_host_serves_python_tools_to_other_agents(engine: AsyncEngine
     await host.stop()
     assert "py_shout" not in fake.tools
     assert host.served == 1
+
+
+async def test_hosted_tools_declare_capabilities_report_status_and_tag_callbacks(
+    engine: AsyncEngine, fake: FakeEngine
+) -> None:
+    from skywalker_agents import ToolContext, tool
+
+    fake.require_approval = True  # like the engine's default policy: tools that mutate wait for a human
+
+    @tool(capabilities={"calls": ["scene_overview"]}, limits={"timeout_ms": 20000})
+    async def scene_size(*, ctx: ToolContext) -> dict[str, Any]:
+        """How many entities the scene has (asks the engine while serving the call)."""
+        assert ctx.session is not None
+        res = await ctx.session.call("scene_overview", {"max_entities": 0}, check=True)
+        return {"count": res.data.get("count", 0), "call_id": ctx.call_id}
+
+    @tool(mutates=True)
+    async def tidy() -> str:
+        """Tidies the scene."""
+        return "tidied"
+
+    host = await engine.host_tools(
+        [scene_size, tidy], label="test", capabilities={"tidy": {"calls": ["entity_delete"], "mutate": True}}
+    )
+    try:
+        # What was registered: per-tool capabilities and limits, with explicit overrides winning.
+        assert fake.hosted_specs["py_scene_size"]["capabilities"] == {"calls": ["scene_overview"]}
+        assert fake.hosted_specs["py_scene_size"]["limits"] == {"timeout_ms": 20000}
+        assert fake.hosted_specs["py_tidy"]["capabilities"]["mutate"] is True
+        # The engine's answer: which tools run now and which wait for approval.
+        assert host.status["py_scene_size"]["status"] == "active"
+        assert host.status["py_tidy"]["status"] == "pending_approval"
+        assert host.pending() == ["py_tidy"]
+
+        res = await engine.as_agent("critic").call("py_scene_size", {}, check=True)
+        call_id = res.data["call_id"]
+        assert call_id.startswith("call-")
+        # The callback carried the engine's call id in _meta, so the engine can apply the tool's capabilities.
+        tagged = [m for m in fake.call_meta if m["tool"] == "scene_overview"]
+        assert tagged and tagged[-1]["meta"] == {"skywalker/call_id": call_id}
+        # Calls outside a hosted call carry no _meta.
+        before = len(fake.call_meta)
+        await engine.as_agent("critic").call("scene_overview", {})
+        assert len(fake.call_meta) == before
+    finally:
+        await host.stop()
+
+
+async def test_capabilities_for_unknown_tools_are_rejected(engine: AsyncEngine) -> None:
+    from skywalker_agents import tool
+    from skywalker_agents.engine.host import ToolHostServer
+
+    @tool
+    def ping() -> str:
+        """Pong."""
+        return "pong"
+
+    with pytest.raises(ValueError, match="py_pong"):
+        ToolHostServer(engine, [ping], label="x", capabilities={"pong": {"calls": []}})

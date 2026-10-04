@@ -62,10 +62,19 @@ async def test_event_stream_is_live_and_attributed(live: AsyncEngine) -> None:
     await stream.close()
 
 
-async def test_python_tools_served_to_every_agent(live: AsyncEngine) -> None:
+async def test_python_tools_served_to_every_agent(live: AsyncEngine, sky_dash: Path) -> None:
+    import json
+
+    # Hosted tools follow the project's custom tool policy: memory_remember and memory_forget change data, so under
+    # the default policy they wait for a human's approval. This throwaway project trusts its own tools.
+    game = sky_dash / "game.json"
+    settings = json.loads(game.read_text())
+    settings["customTools"] = {"policy": "trust"}
+    game.write_text(json.dumps(settings, indent=2))
     mem = Memory(SQLiteMemoryStore())
     host = await live.host_tools(mem.tools(), label="test memory")
     try:
+        assert not host.pending(), host.status
         names = {s.name for s in await live.list_tools(refresh=True)}
         assert {"py_memory_remember", "py_memory_recall"} <= names
         r = await live.as_agent("aurora").call(
@@ -178,3 +187,37 @@ async def test_stdio_transport(binary: str, sky_dash: Path) -> None:
 def test_sync_client_spawn(binary: str, sky_dash: Path) -> None:
     with Engine.spawn(sky_dash, binary=binary) as eng:
         assert "Sky Dash" in eng.tools.scene_overview().text
+
+
+async def test_hosted_tool_callbacks_run_under_its_capabilities(live: AsyncEngine) -> None:
+    from typing import Any
+
+    from skywalker_agents import ToolContext, tool
+
+    @tool(capabilities={"calls": ["scene_overview"]})
+    async def probe(*, ctx: ToolContext) -> dict[str, Any]:
+        """Counts the scene's entities, then tries a call it did not declare."""
+        assert ctx.session is not None
+        allowed = await ctx.session.call("scene_overview", {"max_entities": 0})
+        denied = await ctx.session.call("entity_create", {"name": "Not Allowed"})
+        return {"count": allowed.data.get("count"), "allowed_error": allowed.error_code, "denied": denied.error_code}
+
+    @tool(mutates=True)
+    async def rebuild() -> str:
+        """Rebuilds the level (needs a human's approval under the default policy)."""
+        return "rebuilt"
+
+    host = await live.host_tools([probe, rebuild], label="capabilities test")
+    try:
+        assert host.status["py_probe"]["status"] == "active"
+        assert host.status["py_rebuild"]["status"] == "pending_approval"
+        assert host.pending() == ["py_rebuild"]
+        res = await live.as_agent("aurora").call("py_probe", {}, check=True)
+        assert res.data["count"] > 0 and not res.data["allowed_error"]
+        assert res.data["denied"]  # the callback carried the call id and fell outside capabilities.calls
+        found = await live.call("scene_query", {"name": "Not Allowed"}, check=True)
+        assert found.data["matches"] == []  # nothing was created
+        names = {s.name for s in await live.list_tools(refresh=True)}
+        assert "py_probe" in names and "py_rebuild" not in names  # pending tools are not offered until approved
+    finally:
+        await host.stop()

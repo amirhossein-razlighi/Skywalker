@@ -26,7 +26,11 @@ class Connection(Protocol):
     client_name: str
 
     async def call_tool(
-        self, name: str, arguments: dict[str, Any] | None = None, timeout: float | None = None
+        self,
+        name: str,
+        arguments: dict[str, Any] | None = None,
+        timeout: float | None = None,
+        meta: dict[str, Any] | None = None,
     ) -> ToolResult: ...
 
     async def request(self, method: str, params: dict[str, Any] | None = None, timeout: float | None = None) -> Any: ...
@@ -97,9 +101,16 @@ class JsonRpcConnection:
             self._pending.pop(rid, None)
 
     async def call_tool(
-        self, name: str, arguments: dict[str, Any] | None = None, timeout: float | None = None
+        self,
+        name: str,
+        arguments: dict[str, Any] | None = None,
+        timeout: float | None = None,
+        meta: dict[str, Any] | None = None,
     ) -> ToolResult:
-        result = await self.request("tools/call", {"name": name, "arguments": arguments or {}}, timeout=timeout)
+        params: dict[str, Any] = {"name": name, "arguments": arguments or {}}
+        if meta:
+            params["_meta"] = meta  # e.g. {"skywalker/call_id": ...} on a hosted tool's callbacks
+        result = await self.request("tools/call", params, timeout=timeout)
         return ToolResult.from_mcp(name, result)
 
     async def _send(self, msg: dict[str, Any]) -> None:

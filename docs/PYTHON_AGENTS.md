@@ -76,6 +76,12 @@ Synchronous code uses `Engine` (same API): `Engine.spawn("examples/sky_dash").to
 - `engine.events(types=["studio.message"])` follows the event stream (`events_poll`): an async iterator of `Event`
   (`type`, `kind`, `action`, `actor`, `tool`, `summary`, plus the payload); `await stream.next(timeout=5)` waits with a deadline.
 - `await engine.host_tools([tool, ...])` serves Python tools to every client of the engine as `py_<name>` (below).
+  Hosted tools follow the project's [custom tool](CUSTOM_TOOLS.md) rules: each declares the engine tools it may call
+  back into and its limits (`@tool(capabilities={"calls": ["scene_query"]}, limits={"timeout_ms": 20000})`, or
+  `host_tools(..., capabilities={name: ...}, limits={name: ...})`), `server.status` / `server.pending()` say which tools
+  wait for a human's approval (tools that mutate, under the default policy), and engine calls a tool makes through
+  `ctx.session` while serving a call carry that call's id (`_meta["skywalker/call_id"]`), so the engine checks them
+  against the declared capabilities and attributes them to the original caller.
 
 ### Agents
 
@@ -267,8 +273,8 @@ any MCP client.
 | Tool / command | What it does |
 |---|---|
 | `events_poll {since, types, actors, exclude_actors, limit, wait_ms}` | Reads the event log (every event the Activity feed sees, numbered by `seq`, the last 4096 kept) after a cursor, without consuming it. `wait_ms` long-polls on agent socket connections (the wait runs on the connection's thread, never the engine's). |
-| `tool_host_register {tools, host, label, ttl_seconds, replace}` | A process offers tools to every client as `py_<name>` (names valid for every model API). |
-| `tool_host_poll {host, wait_ms, max}` / `tool_host_reply {host, call, text, structured, images, is_error}` | The host fetches queued calls and answers them; the caller's connection waits up to 120 s. Hosts that stop polling for `ttl_seconds` are dropped with their tools. |
+| `tool_host_register {tools, host, label, ttl_seconds, replace}` | A process offers tools to every client as `py_<name>` (names valid for every model API). Each tool may declare `capabilities` and `limits`; the result gives each tool's `status` (`active`, `pending_approval`, ...). |
+| `tool_host_poll {host, wait_ms, max}` / `tool_host_reply {host, call, text, structured, images, is_error}` | The host fetches queued calls (each with a `call_id` for its callbacks) and answers them; the caller's connection waits up to 120 s. Hosts that stop polling for `ttl_seconds` are dropped with their tools. |
 | `tool_host_unregister {host}` / `tool_host_list` | Stop serving; who serves what, queue sizes, the event cursor range. |
 | `studio_presence {status, activity, as}` | Live status in the Studio panel for agents run outside the editor. |
 | `studio_message_send {kind, data}`, `studio_inbox {thread, after}` | Structured messages and whole threads. Message events carry the full message. |

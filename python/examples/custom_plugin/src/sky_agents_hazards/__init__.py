@@ -27,7 +27,7 @@ from skywalker_agents.tools import ToolContext, tool
 _LINE = re.compile(r"^#(\d+) (.+?) \(.*?\bpos \[(-?[\d.]+)", re.M)
 
 
-@tool
+@tool(capabilities={"calls": ["scene_query"]})  # served to the engine, it may only call scene_query back
 async def hazard_audit(min_gap: float = 6.0, *, ctx: ToolContext) -> dict[str, Any]:
     """List hazards along the level (by x) and flag pairs closer than ``min_gap`` meters.
 

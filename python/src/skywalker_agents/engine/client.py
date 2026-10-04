@@ -211,10 +211,11 @@ class AsyncEngine:
             return await self._session()
         return await self._connect(f"{self.client_name}/{purpose}")
 
-    def as_agent(self, agent_id: str, *, lane: str = "") -> AgentSession:
+    def as_agent(self, agent_id: str, *, lane: str = "", meta: dict[str, Any] | None = None) -> AgentSession:
         """Calls attributed to a roster member: ``mcp:sky-agents/<id>`` in the Activity feed (``lane``: a
-        parallel connection with the same identity, see :meth:`connection`)."""
-        return AgentSession(self, agent_id, lane=lane)
+        parallel connection with the same identity, see :meth:`connection`; ``meta``: MCP ``_meta`` sent with
+        every call, e.g. ``{"skywalker/call_id": ...}`` for the callbacks of a hosted tool call)."""
+        return AgentSession(self, agent_id, lane=lane, meta=meta)
 
     # ------------------------------------------------------------------ calls
     async def call(
@@ -278,13 +279,33 @@ class AsyncEngine:
         )
 
     async def host_tools(
-        self, tools: list[Tool], *, label: str | None = None, concurrency: int = 8, ttl_seconds: float = 60
+        self,
+        tools: list[Tool],
+        *,
+        label: str | None = None,
+        concurrency: int = 8,
+        ttl_seconds: float = 60,
+        capabilities: dict[str, dict[str, Any]] | None = None,
+        limits: dict[str, dict[str, Any]] | None = None,
     ) -> ToolHostServer:
-        """Serve Python tools to every agent on this engine as ``py_<name>`` (socket and fake modes)."""
+        """Serve Python tools to every agent on this engine as ``py_<name>`` (socket and fake modes).
+
+        ``capabilities`` and ``limits`` (by tool name, with or without ``py_``) override what each tool
+        declares (:attr:`Tool.capabilities`, :attr:`Tool.limits`): the engine tools it may call back into while
+        serving a call (``{"calls": [...], "mutate": bool, "network": bool}``) and its ``timeout_ms``,
+        ``max_output_bytes`` and ``max_calls`` (docs/CUSTOM_TOOLS.md). ``server.status`` then says whether each
+        tool is ``active`` or waits for a human's approval (``pending_approval``).
+        """
         from .host import ToolHostServer
 
         server = ToolHostServer(
-            self, tools, label=label or self.client_name, concurrency=concurrency, ttl_seconds=ttl_seconds
+            self,
+            tools,
+            label=label or self.client_name,
+            concurrency=concurrency,
+            ttl_seconds=ttl_seconds,
+            capabilities=capabilities,
+            limits=limits,
         )
         await server.start()
         self._hosts.append(server)
@@ -318,10 +339,13 @@ class AsyncEngine:
 class AgentSession:
     """An engine handle attributed to one roster member (its own connection; ``as`` on stdio)."""
 
-    def __init__(self, engine: AsyncEngine, agent_id: str, *, lane: str = "") -> None:
+    def __init__(
+        self, engine: AsyncEngine, agent_id: str, *, lane: str = "", meta: dict[str, Any] | None = None
+    ) -> None:
         self.engine = engine
         self.agent_id = agent_id
         self.lane = lane
+        self.meta = dict(meta or {})  # MCP _meta sent with every call (a hosted tool's call id)
 
     @property
     def actor(self) -> str:
@@ -344,7 +368,10 @@ class AgentSession:
             if spec is not None and spec.accepts("as"):
                 merged["as"] = self.agent_id
         conn = await self.engine.connection(self.agent_id, lane=self.lane)
-        result = await conn.call_tool(tool, merged, timeout=timeout)
+        if self.meta:
+            result = await conn.call_tool(tool, merged, timeout=timeout, meta=self.meta)
+        else:
+            result = await conn.call_tool(tool, merged, timeout=timeout)
         return result.raise_for_error() if check else result
 
     @property
@@ -478,8 +505,15 @@ class Engine:
         finally:
             self._portal.run(stream.close())
 
-    def host_tools(self, tools: list[Tool], *, label: str | None = None) -> ToolHostServer:
-        return self._portal.run(self.aio.host_tools(tools, label=label))
+    def host_tools(
+        self,
+        tools: list[Tool],
+        *,
+        label: str | None = None,
+        capabilities: dict[str, dict[str, Any]] | None = None,
+        limits: dict[str, dict[str, Any]] | None = None,
+    ) -> ToolHostServer:
+        return self._portal.run(self.aio.host_tools(tools, label=label, capabilities=capabilities, limits=limits))
 
     def close(self) -> None:
         try:
