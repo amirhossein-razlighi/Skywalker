@@ -20,6 +20,7 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -188,12 +189,29 @@ int runMcp(const Args& args) {
     return 0;
 }
 
+/// The project a scene file belongs to: the nearest folder above it with a game.json, or the parent
+/// of its scenes/ folder; "." when neither is found (then paths resolve from the current directory).
+std::string projectOfScene(const std::string& scene) {
+    namespace fs = std::filesystem;
+    std::error_code ec;
+    fs::path dir = fs::absolute(scene, ec).parent_path();
+    for (int i = 0; i < 6 && !dir.empty(); ++i, dir = dir.parent_path()) {
+        if (fs::exists(dir / "game.json", ec)) return dir.string();
+        if (dir.filename() == "scenes") return dir.parent_path().string();
+        if (dir == dir.parent_path()) break;
+    }
+    return ".";
+}
+
 int runRender(const Args& args, bool simulate) {
     if (args.positional.size() < 2) return usage();
     EngineConfig cfg;
-    cfg.projectDir = args.get("--project", ".");
+    // Without --project, the scene's own project: art, scripts and sequences resolve as in the editor.
+    std::string scene = args.positional[1];
+    cfg.projectDir = args.has("--project") ? args.get("--project", ".") : projectOfScene(scene);
+    if (!args.has("--project") && cfg.projectDir != ".") scene = std::filesystem::absolute(scene).string();
     Engine engine(cfg);
-    if (Status s = engine.loadScene(args.positional[1]); !s) {
+    if (Status s = engine.loadScene(scene); !s) {
         std::fprintf(stderr, "error: %s\n", s.error().message.c_str());
         return 1;
     }

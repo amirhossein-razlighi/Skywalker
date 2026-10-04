@@ -1,0 +1,69 @@
+{
+  "format": "skywalker.sequence",
+  "version": 1,
+  "name": "bellwether",
+  "duration": 19,
+  "tracks": [
+    {
+      "type": "property",
+      "entity": "Cam Bellwether",
+      "property": "transform.position",
+      "keys": [
+        {
+          "t": 13.4,
+          "value": [
+            64.4,
+            10.9,
+            20
+          ],
+          "ease": "smooth"
+        },
+        {
+          "t": 19,
+          "value": [
+            64.7,
+            10.6,
+            20
+          ],
+          "ease": "smooth"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "entity": "Cam Bellwether",
+      "property": "camera.orthoSize",
+      "keys": [
+        {
+          "t": 13.4,
+          "value": 4.4,
+          "ease": "smooth"
+        },
+        {
+          "t": 19,
+          "value": 3.85,
+          "ease": "smooth"
+        }
+      ]
+    },
+    {
+      "type": "camera",
+      "keys": [
+        {
+          "t": 0,
+          "camera": "Cam Bellwether"
+        }
+      ]
+    },
+    {
+      "type": "event",
+      "keys": [
+        {
+          "t": 0,
+          "event": "hud_show",
+          "target": "HUD"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,69 @@
+{
+  "format": "skywalker.sequence",
+  "version": 1,
+  "name": "bridge",
+  "duration": 12.9,
+  "tracks": [
+    {
+      "type": "property",
+      "entity": "Cam Bridge",
+      "property": "transform.position",
+      "keys": [
+        {
+          "t": 10.3,
+          "value": [
+            50.5,
+            9.3,
+            20
+          ],
+          "ease": "smooth"
+        },
+        {
+          "t": 12.9,
+          "value": [
+            57.5,
+            9.9,
+            20
+          ],
+          "ease": "smooth"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "entity": "Cam Bridge",
+      "property": "camera.orthoSize",
+      "keys": [
+        {
+          "t": 10.3,
+          "value": 5,
+          "ease": "smooth"
+        },
+        {
+          "t": 12.9,
+          "value": 5,
+          "ease": "smooth"
+        }
+      ]
+    },
+    {
+      "type": "camera",
+      "keys": [
+        {
+          "t": 0,
+          "camera": "Cam Bridge"
+        }
+      ]
+    },
+    {
+      "type": "event",
+      "keys": [
+        {
+          "t": 0,
+          "event": "hud_show",
+          "target": "HUD"
+        }
+      ]
+    }
+  ]
+}

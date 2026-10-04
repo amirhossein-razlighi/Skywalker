@@ -273,7 +273,9 @@ TextLayout layoutText(FontLibrary& fonts, std::string_view text, const LayoutPar
         }
         x += shaped[i].advance;
         bool space = isSpace(shaped[i].cp);
-        if (wrap && x > p.maxWidth && !space && i > lineStart) {
+        // A little slack: a box measured from this text at another scale (UI fit, then drawn at the
+        // screen scale) differs only by float rounding and must not wrap its last word.
+        if (wrap && x > p.maxWidth * (1.f + 1e-4f) + 1e-3f * shaped[i].size && !space && i > lineStart) {
             size_t breakAt = lastBreak != SIZE_MAX && lastBreak >= lineStart ? lastBreak + 1 : i;
             lineRanges.push_back({lineStart, breakAt, false});
             lineStart = breakAt;

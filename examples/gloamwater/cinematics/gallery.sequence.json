@@ -1,0 +1,52 @@
+{
+  "format": "skywalker.sequence",
+  "version": 1,
+  "name": "gallery",
+  "duration": 44.6,
+  "tracks": [
+    {
+      "type": "shot",
+      "camera": "Cam Gallery",
+      "keys": [
+        {
+          "t": 40.4,
+          "shot": "track",
+          "duration": 4.200000000000003,
+          "target": "Wick",
+          "offset": [
+            1.8,
+            2.6,
+            0
+          ],
+          "distance": 20,
+          "angle": 0,
+          "from": -0.6,
+          "to": 0.6
+        }
+      ]
+    },
+    {
+      "type": "camera",
+      "keys": [
+        {
+          "t": 0,
+          "camera": "Cam Gallery"
+        },
+        {
+          "t": 40.4,
+          "camera": "Cam Gallery"
+        }
+      ]
+    },
+    {
+      "type": "event",
+      "keys": [
+        {
+          "t": 0,
+          "event": "hud_show",
+          "target": "HUD"
+        }
+      ]
+    }
+  ]
+}
