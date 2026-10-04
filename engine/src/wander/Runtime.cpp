@@ -729,6 +729,7 @@ void setField(ExecState& st, const Value& obj, const FieldRef& f, const Value& v
     // Missing component (added on assignment, like the inspector) or validated string fields.
     Status s = r.kind->apply(st.scene, id, Json::object({{f.field, toJson(v)}}));
     if (!s) raise(loc, s.error().message + (s.error().hint.empty() ? "" : " (" + s.error().hint + ")"));
+    if (fi.type == FieldType::Entity || fi.type == FieldType::EntityList) st.scene.bindLinks(id);  // names -> ids
 }
 
 void iterSet(Value* R, int a, bool two, const Value& coll, size_t i) {

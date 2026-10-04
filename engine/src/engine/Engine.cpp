@@ -1550,8 +1550,10 @@ std::vector<EntityId> Engine::assetUsage(const std::string& path) const {
     std::vector<EntityId> out;
     for (EntityId e : scene_->entities()) {
         const MeshRenderer* m = scene_->get<MeshRenderer>(e);
-        if (m && (m->mesh == "asset:" + path || str::startsWith(m->mesh, "asset:" + path + "#") || m->texture == path ||
-                  m->material == path)) {
+        const EntityRecord* r = scene_->record(e);
+        bool instance = r->prefab.linked() && r->prefab.instance == e && r->prefab.source == path;  // linked prefabs
+        if (instance || (m && (m->mesh == "asset:" + path || str::startsWith(m->mesh, "asset:" + path + "#") ||
+                               m->texture == path || m->material == path))) {
             out.push_back(e);
         }
     }
