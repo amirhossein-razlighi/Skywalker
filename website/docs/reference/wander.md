@@ -5,7 +5,7 @@ title: "Wander builtins"
 
 # Wander builtins
 
-Every function a Wander script can call lives in one registry: name, typed parameters, return type, category, documentation and an example. The compiler checks calls against it (arity, types, did-you-mean), and this page is generated from it. **173 builtins** in 24 categories.
+Every function a Wander script can call lives in one registry: name, typed parameters, return type, category, documentation and an example. The compiler checks calls against it (arity, types, did-you-mean), and this page is generated from it. **177 builtins** in 24 categories.
 
 Agents get the same information from `wander_reference` (the guide) and `wander_reference {topic}` (structured entries for a category or a function). For the language itself, read the [Wander manual](../manual/wander/index.md).
 
@@ -18,7 +18,7 @@ Agents get the same information from `wander_reference` (the guide) and `wander_
 | [character2d](#character2d) | [`drop_through2d`](#character2d-drop_through2d), [`grounded2d`](#character2d-grounded2d), [`jump2d`](#character2d-jump2d), [`move2d`](#character2d-move2d) |
 | [color](#color) | [`color`](#color-color), [`hsv`](#color-hsv) |
 | [dialogue](#dialogue) | [`dialogue_advance`](#dialogue-dialogue_advance), [`dialogue_choose`](#dialogue-dialogue_choose), [`dialogue_var`](#dialogue-dialogue_var), [`start_dialogue`](#dialogue-start_dialogue) |
-| [effects](#effects) | [`burst`](#effects-burst), [`water_height`](#effects-water_height) |
+| [effects](#effects) | [`burst`](#effects-burst), [`camera_shake`](#effects-camera_shake), [`flash`](#effects-flash), [`hit_stop`](#effects-hit_stop), [`hit_stop_left`](#effects-hit_stop_left), [`water_height`](#effects-water_height) |
 | [input](#input) | [`action`](#input-action), [`axis`](#input-axis), [`cursor_lock`](#input-cursor_lock), [`key`](#input-key), [`key_pressed`](#input-key_pressed), [`pressed`](#input-pressed), [`quit_game`](#input-quit_game), [`released`](#input-released) |
 | [list](#list) | [`clear`](#list-clear), [`contains`](#list-contains), [`first`](#list-first), [`index_of`](#list-index_of), [`insert`](#list-insert), [`is_empty`](#list-is_empty), [`join`](#list-join), [`last`](#list-last), [`pop`](#list-pop), [`push`](#list-push), [`remove`](#list-remove), [`remove_at`](#list-remove_at), [`reverse`](#list-reverse), [`slice`](#list-slice), [`sort`](#list-sort), [`sorted`](#list-sorted), [`sum`](#list-sum) |
 | [locale](#locale) | [`locale`](#locale-locale), [`locales`](#locale-locales), [`set_locale`](#locale-set_locale), [`tr`](#locale-tr) |
@@ -662,6 +662,81 @@ Returns: `none`
 
 ```text
 burst(40)
+```
+
+### `camera_shake` { #effects-camera_shake }
+
+```text
+camera_shake(trauma: number, camera: entity?)
+```
+
+Shakes the 2D camera: adds `trauma` (0..1; 0.2 a hit, 0.5 a heavy slam, 1 an explosion) to the camera2d (the active camera, or the given one). The offset grows with trauma squared (camera2d.shakeAmplitude world units at 1) and decays by shakeDecay per second. Runs through hit-stops; replays identically.
+
+| Parameter | Type | |
+|---|---|---|
+| `trauma` | number |  |
+| `camera` | entity | optional |
+
+Returns: `none`
+
+```text
+camera_shake(0.4)
+```
+
+### `flash` { #effects-flash }
+
+```text
+flash(entity: entity, seconds: number?, color: color?)
+```
+
+Flashes a sprite: it turns `color` (default white; its alpha is the strength) and fades back over `seconds` (default 0.12). Damage feedback, parries, pickups. For a constant tint set sprite.flash.
+
+| Parameter | Type | |
+|---|---|---|
+| `entity` | entity |  |
+| `seconds` | number | optional |
+| `color` | color | optional |
+
+Returns: `none`
+
+```text
+flash(enemy, 0.15, #ffffff)
+```
+
+### `hit_stop` { #effects-hit_stop }
+
+```text
+hit_stop(seconds: number, scale: number?)
+```
+
+Freeze frames on impact: the game clock stops (or runs at `scale`, 0..1) for `seconds` of real time, then resumes at the time scale. 0.04-0.12 s sells a hit; a longer, stronger stop extends the current one. UI, camera_shake and entities on the real clock keep moving. Per entity: set `process.timeScale` instead.
+
+| Parameter | Type | |
+|---|---|---|
+| `seconds` | number |  |
+| `scale` | number | optional |
+
+Returns: `none`
+
+```text
+on event "hit"
+  hit_stop(0.07)
+  camera_shake(0.35)
+end
+```
+
+### `hit_stop_left` { #effects-hit_stop_left }
+
+```text
+hit_stop_left() -> number
+```
+
+Real seconds of hit-stop left (0 when the game clock runs normally).
+
+Returns: `number`
+
+```text
+if hit_stop_left() > 0 then return end
 ```
 
 ### `water_height` { #effects-water_height }
@@ -3370,6 +3445,10 @@ let w = vehicle_wheel(self, "rear_left")
         start_dialogue(entity_or_node: entity|string, node: string?) — Starts a conversation at a node: start_dialogue("Intro") on the first dialogue component, or start_dialogue(entity, "Intro").
       [effects]
         burst(entity_or_count: number|entity, count: number?) — Emits particles right now from self's particles (or particles2d) component: burst(n), or burst(entity, n) for another emitter. Explosions, muzzle flashes, impacts, dust puffs.
+        camera_shake(trauma: number, camera: entity?) — Shakes the 2D camera: adds `trauma` (0..1; 0.2 a hit, 0.5 a heavy slam, 1 an explosion) to the camera2d (the active camera, or the given one). The offset grows with trauma squared (camera2d.shakeAmplitude world units at 1) and decays by shakeDecay per second. Runs through hit-stops; replays identically.
+        flash(entity: entity, seconds: number?, color: color?) — Flashes a sprite: it turns `color` (default white; its alpha is the strength) and fades back over `seconds` (default 0.12). Damage feedback, parries, pickups. For a constant tint set sprite.flash.
+        hit_stop(seconds: number, scale: number?) — Freeze frames on impact: the game clock stops (or runs at `scale`, 0..1) for `seconds` of real time, then resumes at the time scale. 0.04-0.12 s sells a hit; a longer, stronger stop extends the current one. UI, camera_shake and entities on the real clock keep moving. Per entity: set `process.timeScale` instead.
+        hit_stop_left() -> number — Real seconds of hit-stop left (0 when the game clock runs normally).
         water_height(x_or_point: number|vector|entity, z: number?) -> number — Height of the animated water surface at (x, z) or at a point — the same surface that is rendered (0 where there is no water). Boats, buoyancy, splashes.
       [input]
         action(name: string) -> bool — Whether an input action is held ("jump", "fire" from input.json).

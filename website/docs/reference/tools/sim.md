@@ -7,7 +7,7 @@ title: "Simulation tools"
 
 Play, pause, step and stop; inject input; trace and inspect what runs.
 
-14 tools in the `sim` category. Badges: **read-only** tools never change the project; **mutating** tools are undoable and attributed; **open-world** tools reach outside the engine and MCP clients ask before running them.
+15 tools in the `sim` category. Badges: **read-only** tools never change the project; **mutating** tools are undoable and attributed; **open-world** tools reach outside the engine and MCP clients ask before running them.
 
 | Tool | Summary |
 |---|---|
@@ -25,6 +25,7 @@ Play, pause, step and stop; inject input; trace and inspect what runs.
 | [`save_list`](#save_list) | Lists the save slots of this project: slot, metadata (title, chapter...), file size, format and game version, play time, scene, tick and when it was saved. |
 | [`save_inspect`](#save_inspect) | Diffs a save slot against the running game to debug "what didn't restore": per persisted entity, the fields whose current value differs from the saved one (path, saved, current), entities missing from the scene, entities the save destroyed or never had, game var differences, the scene and the tick. |
 | [`save_delete`](#save_delete) | Deletes a save slot's file. |
+| [`game_feel`](#game_feel) | Try impact feedback on the running game exactly as Wander does: `hit_stop` freezes the game clock for `seconds` (or slows it to `scale`), `shake` adds trauma (0..1) to the 2D camera (`camera`, default the active one), `flash` flashes an entity's sprite `color` fading over `seconds`; `info` reads the hit-stop left, each camera2d's trauma and offset, and active flashes. |
 
 ### `sim_control` { #sim_control }
 
@@ -626,6 +627,51 @@ Deletes a save slot's file. Cannot be undone. Example: {"slot": "slot3"}.
         "name": "save_delete",
         "arguments": {
           "slot": "slot3"
+        }
+      }
+    }
+    ```
+
+### `game_feel` { #game_feel }
+
+**Game feel (hit-stop, shake, flash)** <span class="sky-badge sky-badge--mut" title="Changes the project; undoable and attributed">mutating</span>
+
+Try impact feedback on the running game exactly as Wander does: `hit_stop` freezes the game clock for `seconds` (or slows it to `scale`), `shake` adds trauma (0..1) to the 2D camera (`camera`, default the active one), `flash` flashes an entity's sprite `color` fading over `seconds`; `info` reads the hit-stop left, each camera2d's trauma and offset, and active flashes. Use while playing (sim_control play), then step and capture. Example: {"action": "shake", "trauma": 0.5}
+
+| Argument | Type | Required | Description | Values |
+|---|---|---|---|---|
+| `action` | string | yes | What to do | `hit_stop` `shake` `flash` `info` |
+| `seconds` | number |  | hit_stop / flash duration (default 0.08 / 0.12) |  |
+| `scale` | number |  | hit_stop: clock speed during the stop (0 = frozen) |  |
+| `trauma` | number |  | shake: trauma added (0..1, default 0.4) |  |
+| `camera` | integer \| string |  | shake: camera entity with camera2d |  |
+| `entity` | integer \| string |  | flash: sprite entity |  |
+| `color` | string |  | flash: color (default #ffffff) |  |
+
+=== "Tool call"
+
+    ```tool
+    game_feel {"action": "shake", "trauma": 0.5}
+    ```
+
+=== "CLI"
+
+    ```bash
+    skywalker call game_feel '{"action": "shake", "trauma": 0.5}' --project my_game
+    ```
+
+=== "MCP request"
+
+    ```json
+    {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "method": "tools/call",
+      "params": {
+        "name": "game_feel",
+        "arguments": {
+          "action": "shake",
+          "trauma": 0.5
         }
       }
     }

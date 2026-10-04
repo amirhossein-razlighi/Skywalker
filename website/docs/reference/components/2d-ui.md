@@ -36,6 +36,10 @@ A textured quad on the entity's XY plane (2D characters, props, backgrounds, pix
 | `visible` | boolean | Whether the sprite is drawn |  |
 | `ySort` | boolean | Top-down depth: among ySort sprites and tile rows of the same layer and order, the one lower on screen (smaller world y at the pivot) draws in front |  |
 | `palette` | string | Palette swap: *.palette.json ({"swap": {"#3a7d44": "#d8e4ec"}}) or a 2-row png (row 0 source colors, row 1 targets); recolors the texture (seasons, variants) |  |
+| `blur` | number | Depth-of-field blur radius in texture pixels: soft out-of-focus foreground silhouettes and far layers (0 = sharp; 4-24 typical) | 0 .. 64 |
+| `sway` | number[] | Wind/cloth sway (the image bends inside its quad): [amplitude as a fraction of the width (0.02-0.1), speed Hz, waves along the height, pin: 0 = bottom fixed (grass, banners on poles), 1 = top fixed (curtains, hanging silk)]; amplitude 0 = off |  |
+| `blend` | string | alpha (normal) or add (light shafts, god rays, glows, sparks: brightens what is behind) | `alpha` `add` |
+| `flash` | color | Hit flash: rgb mixed over the sprite by alpha (0 = none). Wander flash(e, 0.12) plays a fading one — hex string "#rrggbb[aa]" or [r,g,b(,a)] in 0..1 |  |
 
 === "Tool call"
 
@@ -70,6 +74,33 @@ Flipbook animation for the entity's sprite. clips: {"run": {"frames": "4-11", "f
 
     ```text
     self.sprite_anim.clips          -- read or write any field
+    ```
+
+## `sprite_trail` { #sprite_trail }
+
+Afterimages behind a moving sprite: dashes, lunges, fast slashes, a swooping boss. While the entity moves faster than minSpeed it records its pose and animation frame every `interval` seconds; the last `count` poses are drawn behind the sprite in `color`, fading out with age. Toggle `emitting` from Wander around a dash.
+
+| Field | Type | Description | Values |
+|---|---|---|---|
+| `emitting` | boolean | Record new afterimages (existing ones still fade out) |  |
+| `count` | integer | Afterimages drawn at most (3-10) |  |
+| `interval` | number | Seconds between afterimages (0.02-0.06) | 0.005 .. 2 |
+| `minSpeed` | number | World units per second needed to record (0 = always) | 0 .. 1000 |
+| `color` | color | Tint of the afterimages — hex string "#rrggbb[aa]" or [r,g,b(,a)] in 0..1 |  |
+| `opacity` | number | Opacity of the newest afterimage | 0 .. 1 |
+| `emissive` | number | Glow of the afterimages (blooms in HDR) | 0 .. 50 |
+| `additive` | boolean | Blend additively (energy streaks) instead of as translucent copies |  |
+
+=== "Tool call"
+
+    ```tool
+    entity_update {"entity": "Crate", "components": {"sprite_trail": {}}}
+    ```
+
+=== "Wander"
+
+    ```text
+    self.sprite_trail.emitting          -- read or write any field
     ```
 
 ## `tilemap` { #tilemap }
@@ -179,6 +210,9 @@ Pixel-art particles on the 2D plane: rain streaks, snow, falling leaves and peta
 | `lit` | boolean | Lit by 2D lights (else full bright) |  |
 | `prewarm` | boolean | Start as if it had been running for a while |  |
 | `seed` | integer | Random seed (same seed, same particles) |  |
+| `filter` | string | nearest (pixel art, texel-snapped) or linear (painted motes, smooth sub-pixel motion) | `nearest` `linear` |
+| `blend` | string | alpha (normal) or add (sparks, embers, glowing spores) | `alpha` `add` |
+| `sizeJitter` | number | Random size per particle: 0.5 = 50% to 150% | 0 .. 1 |
 
 === "Tool call"
 
@@ -231,6 +265,9 @@ Parallax scrolling for this entity and its children (2D, orthographic cameras): 
 | `deadZone` | number[2] | Half-size of the box the target moves in without moving the camera |  |
 | `offset` | number[2] | Framing offset from the target |  |
 | `bounds` | number[] | [minX, minY, maxX, maxY] the view stays inside (all 0 = unbounded) |  |
+| `shakeAmplitude` | number | camera_shake: world units of offset at full trauma | 0 .. 100 |
+| `shakeFrequency` | number | camera_shake: noise frequency (Hz) | 0.1 .. 120 |
+| `shakeDecay` | number | camera_shake: trauma lost per second | 0 .. 100 |
 
 === "Tool call"
 

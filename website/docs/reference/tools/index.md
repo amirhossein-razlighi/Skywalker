@@ -5,7 +5,7 @@ title: "Tools"
 
 # Tools
 
-Skywalker exposes **236 tools** (engine 0.1.0). The editor, its in-app agents, the CLI and every MCP client call the same tools with the same JSON arguments, so anything you read here works everywhere. 135 tools change the project; every such change is undoable and attributed to whoever made it.
+Skywalker exposes **238 tools** (engine 0.1.0). The editor, its in-app agents, the CLI and every MCP client call the same tools with the same JSON arguments, so anything you read here works everywhere. 137 tools change the project; every such change is undoable and attributed to whoever made it.
 
 Arguments are validated before a tool runs: unknown keys, wrong types and bad enum values fail with a *did you mean …?* hint. Each tool page shows the arguments, the annotations MCP clients use for approvals, and the same call as a tool call, a CLI command and a raw MCP request.
 
@@ -17,10 +17,10 @@ Arguments are validated before a tool runs: unknown keys, wrong types and bad en
 | [View](view.md) | 9 | See the scene: captures with entity boxes, debug views, multi-view sheets, selection and the editor camera. |
 | [Render](render.md) | 27 | Environment, effects, hair, shaders, render layers, impostors, benchmarks and the movie renderer. |
 | [World](world.md) | 15 | Terrain, foliage, water queries and spatial placement on real geometry. |
-| [Asset](asset.md) | 27 | The asset database, import and download, materials, textures, prefabs, audio generation and previews. |
+| [Asset](asset.md) | 28 | The asset database, import and download, materials, textures, prefabs, audio generation and previews. |
 | [Wander](wander.md) | 19 | Write, check, test, graph and inspect Wander behaviors. |
 | [Code](code.md) | 4 | Native code: ahead-of-time compiled behaviors and C++ modules (trusted local code; clients ask first). |
-| [Simulation](sim.md) | 14 | Play, pause, step and stop; inject input; trace and inspect what runs. |
+| [Simulation](sim.md) | 15 | Play, pause, step and stop; inject input; trace and inspect what runs. |
 | [Physics](physics.md) | 16 | Rigid bodies, characters, queries, settling and navigation meshes. |
 | [Animation](animation.md) | 15 | Skeletal animation, controllers, IK, bone attachments and cinematic sequences. |
 | [UI](ui.md) | 4 | Build, style, inspect and drive user interfaces. |
@@ -134,6 +134,7 @@ Arguments are validated before a tool runs: unknown keys, wrong types and bad en
 | [`prefab_revert`](asset.md#prefab_revert) | Asset | Undo overrides so an instance matches its prefab again. |
 | [`prefab_unpack`](asset.md#prefab_unpack) | Asset | Make an instance local: its entities stay exactly as they are but are no longer linked to the prefab (edits to the prefab stop reaching it, and the scene saves it in full); also known as "make local". |
 | [`sprite_atlas_pack`](asset.md#sprite_atlas_pack) | Asset | Pack many images (a folder, a list, or globs like "sprites/hero/*.png") into one atlas texture plus a *.atlas.json describing every frame (trimmed of transparent borders, padded and edge-extruded so nothing bleeds). |
+| [`sprite_sheet_import`](asset.md#sprite_sheet_import) | Asset | Turn rendered animation frames (a Blender/DCC render: one subfolder of numbered PNGs per clip, e.g. |
 | [`sprite_sheet_slice`](asset.md#sprite_sheet_slice) | Asset | Describe a grid sprite sheet as an atlas (*.atlas.json) so frames get names: give the cell size (or columns/rows), optional margin/spacing, and either names or a prefix. |
 | [`texture_generate`](asset.md#texture_generate) | Asset | Procedurally generate a seamless PBR texture set — albedo, normal map and ORM (occlusion/roughness/metallic) — for realistic or stylized surfaces: bricks, planks, cobblestone, rock, rust, marble, fabric, scales, ... |
 | [`behavior_from_graph`](wander.md#behavior_from_graph) | Wander | Turn a node graph (from behavior_graph, possibly edited) back into Wander source. |
@@ -161,6 +162,7 @@ Arguments are validated before a tool runs: unknown keys, wrong types and bad en
 | [`wander_compile_native`](code.md#wander_compile_native) | Code | AOT-compile Wander behaviors to C++ and load them as native code (system clang++, cached by program hash, so unchanged behaviors load instantly). |
 | [`audio_mix`](sim.md#audio_mix) | Simulation | Read or set the project's mixer (audio.json): per-bus volume and mute for master, music, sfx, ambience, voice and ui, and the default music crossfade. |
 | [`audio_play`](sim.md#audio_play) | Simulation | Listen to a clip or an entity's audio component. |
+| [`game_feel`](sim.md#game_feel) | Simulation | Try impact feedback on the running game exactly as Wander does: `hit_stop` freezes the game clock for `seconds` (or slows it to `scale`), `shake` adds trauma (0..1) to the 2D camera (`camera`, default the active one), `flash` flashes an entity's sprite `color` fading over `seconds`; `info` reads the hit-stop left, each camera2d's trauma and offset, and active flashes. |
 | [`input_map`](sim.md#input_map) | Simulation | Read or edit the project's input action map (input.json): named, device-independent actions bound to keyboard, mouse and gamepad. |
 | [`load_game`](sim.md#load_game) | Simulation | Restores a slot into the running game: persisted entities return to their saved state (spawned ones are recreated with their ids, ones destroyed before the save are removed again), game vars, the scene (a save from another scene is an immediate scene flow change: `carry` entities come along) and the exact behavior state (state machines, timers, waiting handlers, random generator), then `on loaded` runs. |
 | [`logs`](sim.md#logs) | Simulation | Recent Wander log output and runtime/compile errors. |

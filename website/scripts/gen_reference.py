@@ -62,7 +62,7 @@ COMPONENT_GROUPS = OrderedDict([
     ("world", ("World and effects", "Large-scale world building and simulated effects.",
                ["terrain", "foliage", "water", "particles", "fluid", "groom"])),
     ("2d-ui", ("2D, text and UI", "Sprites, tilemaps, 2D lights and cameras, world text, UI canvases, dialogue and 2D physics.",
-               ["sprite", "sprite_anim", "tilemap", "light2d", "particles2d", "parallax", "camera2d", "text", "ui_canvas", "ui",
+               ["sprite", "sprite_anim", "sprite_trail", "tilemap", "light2d", "particles2d", "parallax", "camera2d", "text", "ui_canvas", "ui",
                 "dialogue", "body2d", "collider2d", "character2d", "joint2d", "physics2d_world"])),
     ("audio", ("Audio", "Spatial sound sources and the listener.", ["audio", "listener"])),
     ("physics", ("Physics and navigation", "Rigid bodies, colliders, characters, joints, vehicles, world settings and navigation.",
