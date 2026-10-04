@@ -1,0 +1,8574 @@
+{
+ "width": 1920,
+ "height": 1080,
+ "visible": [
+  {
+   "id": 491,
+   "name": "Pumpkin Stem",
+   "box": [
+    971,
+    1069,
+    10,
+    11
+   ],
+   "distance": 20.13,
+   "coverage": 0
+  },
+  {
+   "id": 490,
+   "name": "Pumpkin Body",
+   "box": [
+    918,
+    1043,
+    114,
+    37
+   ],
+   "distance": 20.42,
+   "coverage": 0.002
+  },
+  {
+   "id": 479,
+   "name": "Pumpkin Stem",
+   "box": [
+    1074,
+    1001,
+    5,
+    11
+   ],
+   "distance": 22.04,
+   "coverage": 0
+  },
+  {
+   "id": 478,
+   "name": "Pumpkin Body",
+   "box": [
+    1047,
+    989,
+    60,
+    63
+   ],
+   "distance": 22.22,
+   "coverage": 0.002
+  },
+  {
+   "id": 477,
+   "name": "pumpkin 13",
+   "box": [
+    1070,
+    1026,
+    12,
+    12
+   ],
+   "distance": 22.38,
+   "coverage": 0
+  },
+  {
+   "id": 497,
+   "name": "Pumpkin Stem",
+   "box": [
+    941,
+    953,
+    9,
+    17
+   ],
+   "distance": 22.39,
+   "coverage": 0
+  },
+  {
+   "id": 496,
+   "name": "Pumpkin Body",
+   "box": [
+    893,
+    934,
+    105,
+    103
+   ],
+   "distance": 22.66,
+   "coverage": 0.005
+  },
+  {
+   "id": 495,
+   "name": "pumpkin 19",
+   "box": [
+    940,
+    997,
+    12,
+    12
+   ],
+   "distance": 22.92,
+   "coverage": 0
+  },
+  {
+   "id": 266,
+   "name": "Stall Stripe 7",
+   "box": [
+    951,
+    758,
+    81,
+    56
+   ],
+   "distance": 23.6,
+   "coverage": 0.002
+  },
+  {
+   "id": 353,
+   "name": "String Bulb 28",
+   "box": [
+    799,
+    721,
+    8,
+    8
+   ],
+   "distance": 23.78,
+   "coverage": 0
+  },
+  {
+   "id": 388,
+   "name": "String Bulb 63",
+   "box": [
+    751,
+    724,
+    8,
+    8
+   ],
+   "distance": 23.79,
+   "coverage": 0
+  },
+  {
+   "id": 488,
+   "name": "Pumpkin Stem",
+   "box": [
+    644,
+    939,
+    9,
+    14
+   ],
+   "distance": 23.82,
+   "coverage": 0
+  },
+  {
+   "id": 265,
+   "name": "Stall Stripe 6",
+   "box": [
+    964,
+    750,
+    80,
+    54
+   ],
+   "distance": 23.92,
+   "coverage": 0.002
+  },
+  {
+   "id": 487,
+   "name": "Pumpkin Body",
+   "box": [
+    602,
+    922,
+    94,
+    83
+   ],
+   "distance": 24.03,
+   "coverage": 0.004
+  },
+  {
+   "id": 258,
+   "name": "Stall Post 1-1",
+   "box": [
+    1013,
+    798,
+    7,
+    127
+   ],
+   "distance": 24.13,
+   "coverage": 0
+  },
+  {
+   "id": 322,
+   "name": "Light Pole 5",
+   "box": [
+    772,
+    717,
+    18,
+    201
+   ],
+   "distance": 24.18,
+   "coverage": 0.002
+  },
+  {
+   "id": 486,
+   "name": "pumpkin 16",
+   "box": [
+    645,
+    972,
+    12,
+    12
+   ],
+   "distance": 24.22,
+   "coverage": 0
+  },
+  {
+   "id": 264,
+   "name": "Stall Stripe 5",
+   "box": [
+    978,
+    743,
+    79,
+    53
+   ],
+   "distance": 24.24,
+   "coverage": 0.002
+  },
+  {
+   "id": 354,
+   "name": "String Bulb 29",
+   "box": [
+    824,
+    721,
+    8,
+    8
+   ],
+   "distance": 24.32,
+   "coverage": 0
+  },
+  {
+   "id": 387,
+   "name": "String Bulb 62",
+   "box": [
+    731,
+    727,
+    8,
+    8
+   ],
+   "distance": 24.34,
+   "coverage": 0
+  },
+  {
+   "id": 269,
+   "name": "Stall Bulb R",
+   "box": [
+    969,
+    801,
+    6,
+    7
+   ],
+   "distance": 24.48,
+   "coverage": 0
+  },
+  {
+   "id": 263,
+   "name": "Stall Stripe 4",
+   "box": [
+    991,
+    736,
+    78,
+    52
+   ],
+   "distance": 24.57,
+   "coverage": 0.002
+  },
+  {
+   "id": 494,
+   "name": "Pumpkin Stem",
+   "box": [
+    831,
+    894,
+    5,
+    10
+   ],
+   "distance": 24.63,
+   "coverage": 0
+  },
+  {
+   "id": 515,
+   "name": "Pumpkin Stem",
+   "box": [
+    609,
+    905,
+    9,
+    15
+   ],
+   "distance": 24.67,
+   "coverage": 0
+  },
+  {
+   "id": 259,
+   "name": "Stall Post 11",
+   "box": [
+    970,
+    781,
+    6,
+    124
+   ],
+   "distance": 24.69,
+   "coverage": 0
+  },
+  {
+   "id": 461,
+   "name": "Pumpkin Stem",
+   "box": [
+    696,
+    917,
+    4,
+    7
+   ],
+   "distance": 24.72,
+   "coverage": 0
+  },
+  {
+   "id": 493,
+   "name": "Pumpkin Body",
+   "box": [
+    806,
+    886,
+    55,
+    54
+   ],
+   "distance": 24.81,
+   "coverage": 0.001
+  },
+  {
+   "id": 460,
+   "name": "Pumpkin Body",
+   "box": [
+    678,
+    911,
+    41,
+    40
+   ],
+   "distance": 24.85,
+   "coverage": 0.001
+  },
+  {
+   "id": 355,
+   "name": "String Bulb 30",
+   "box": [
+    848,
+    718,
+    8,
+    8
+   ],
+   "distance": 24.85,
+   "coverage": 0
+  },
+  {
+   "id": 386,
+   "name": "String Bulb 61",
+   "box": [
+    711,
+    727,
+    8,
+    8
+   ],
+   "distance": 24.87,
+   "coverage": 0
+  },
+  {
+   "id": 262,
+   "name": "Stall Stripe 3",
+   "box": [
+    1004,
+    728,
+    78,
+    51
+   ],
+   "distance": 24.9,
+   "coverage": 0.002
+  },
+  {
+   "id": 730,
+   "name": "Hay Bale 6",
+   "box": [
+    471,
+    889,
+    112,
+    108
+   ],
+   "distance": 24.9,
+   "coverage": 0.006
+  },
+  {
+   "id": 514,
+   "name": "Pumpkin Body",
+   "box": [
+    564,
+    889,
+    102,
+    90
+   ],
+   "distance": 24.9,
+   "coverage": 0.004
+  },
+  {
+   "id": 459,
+   "name": "pumpkin 7",
+   "box": [
+    694,
+    934,
+    12,
+    12
+   ],
+   "distance": 24.97,
+   "coverage": 0
+  },
+  {
+   "id": 492,
+   "name": "pumpkin 18",
+   "box": [
+    828,
+    920,
+    12,
+    12
+   ],
+   "distance": 24.97,
+   "coverage": 0
+  },
+  {
+   "id": 513,
+   "name": "pumpkin 25",
+   "box": [
+    612,
+    944,
+    12,
+    12
+   ],
+   "distance": 25.13,
+   "coverage": 0
+  },
+  {
+   "id": 267,
+   "name": "Stall Sign",
+   "box": [
+    978,
+    753,
+    47,
+    45
+   ],
+   "distance": 25.18,
+   "coverage": 0.001
+  },
+  {
+   "id": 261,
+   "name": "Stall Stripe 2",
+   "box": [
+    1016,
+    721,
+    77,
+    50
+   ],
+   "distance": 25.24,
+   "coverage": 0.002
+  },
+  {
+   "id": 775,
+   "name": "Stall Light 1",
+   "box": [
+    990,
+    775,
+    12,
+    12
+   ],
+   "distance": 25.35,
+   "coverage": 0
+  },
+  {
+   "id": 356,
+   "name": "String Bulb 31",
+   "box": [
+    871,
+    713,
+    7,
+    8
+   ],
+   "distance": 25.36,
+   "coverage": 0
+  },
+  {
+   "id": 385,
+   "name": "String Bulb 60",
+   "box": [
+    691,
+    725,
+    8,
+    8
+   ],
+   "distance": 25.39,
+   "coverage": 0
+  },
+  {
+   "id": 260,
+   "name": "Stall Stripe 1",
+   "box": [
+    1028,
+    715,
+    76,
+    49
+   ],
+   "distance": 25.57,
+   "coverage": 0.002
+  },
+  {
+   "id": 527,
+   "name": "Pumpkin Stem",
+   "box": [
+    800,
+    855,
+    7,
+    13
+   ],
+   "distance": 25.58,
+   "coverage": 0
+  },
+  {
+   "id": 772,
+   "name": "Visitor 14 Head",
+   "box": [
+    732,
+    817,
+    33,
+    31
+   ],
+   "distance": 25.69,
+   "coverage": 0
+  },
+  {
+   "id": 255,
+   "name": "Stall Counter",
+   "box": [
+    970,
+    808,
+    117,
+    117
+   ],
+   "distance": 25.71,
+   "coverage": 0.007
+  },
+  {
+   "id": 526,
+   "name": "Pumpkin Body",
+   "box": [
+    766,
+    845,
+    76,
+    69
+   ],
+   "distance": 25.79,
+   "coverage": 0.003
+  },
+  {
+   "id": 512,
+   "name": "Pumpkin Stem",
+   "box": [
+    915,
+    840,
+    8,
+    14
+   ],
+   "distance": 25.79,
+   "coverage": 0
+  },
+  {
+   "id": 729,
+   "name": "Hay Bale 5",
+   "box": [
+    444,
+    868,
+    106,
+    100
+   ],
+   "distance": 25.83,
+   "coverage": 0.005
+  },
+  {
+   "id": 357,
+   "name": "String Bulb 32",
+   "box": [
+    893,
+    705,
+    7,
+    8
+   ],
+   "distance": 25.85,
+   "coverage": 0
+  },
+  {
+   "id": 384,
+   "name": "String Bulb 59",
+   "box": [
+    672,
+    719,
+    8,
+    8
+   ],
+   "distance": 25.87,
+   "coverage": 0
+  },
+  {
+   "id": 256,
+   "name": "Stall Post -1-1",
+   "box": [
+    1080,
+    753,
+    9,
+    118
+   ],
+   "distance": 25.93,
+   "coverage": 0.001
+  },
+  {
+   "id": 525,
+   "name": "pumpkin 29",
+   "box": [
+    799,
+    888,
+    12,
+    12
+   ],
+   "distance": 26,
+   "coverage": 0
+  },
+  {
+   "id": 254,
+   "name": "Stall 1",
+   "box": [
+    1023,
+    880,
+    12,
+    12
+   ],
+   "distance": 26,
+   "coverage": 0
+  },
+  {
+   "id": 511,
+   "name": "Pumpkin Body",
+   "box": [
+    874,
+    827,
+    91,
+    79
+   ],
+   "distance": 26.02,
+   "coverage": 0.003
+  },
+  {
+   "id": 268,
+   "name": "Stall Bulb L",
+   "box": [
+    1031,
+    762,
+    6,
+    6
+   ],
+   "distance": 26.04,
+   "coverage": 0
+  },
+  {
+   "id": 771,
+   "name": "Visitor 14 Body",
+   "box": [
+    737,
+    831,
+    26,
+    60
+   ],
+   "distance": 26.05,
+   "coverage": 0.001
+  },
+  {
+   "id": 510,
+   "name": "pumpkin 24",
+   "box": [
+    914,
+    875,
+    12,
+    12
+   ],
+   "distance": 26.23,
+   "coverage": 0
+  },
+  {
+   "id": 524,
+   "name": "Pumpkin Stem",
+   "box": [
+    846,
+    841,
+    6,
+    10
+   ],
+   "distance": 26.27,
+   "coverage": 0
+  },
+  {
+   "id": 358,
+   "name": "String Bulb 33",
+   "box": [
+    913,
+    693,
+    7,
+    7
+   ],
+   "distance": 26.31,
+   "coverage": 0
+  },
+  {
+   "id": 383,
+   "name": "String Bulb 58",
+   "box": [
+    653,
+    709,
+    8,
+    8
+   ],
+   "distance": 26.33,
+   "coverage": 0
+  },
+  {
+   "id": 509,
+   "name": "Pumpkin Stem",
+   "box": [
+    1249,
+    861,
+    6,
+    10
+   ],
+   "distance": 26.33,
+   "coverage": 0
+  },
+  {
+   "id": 770,
+   "name": "Visitor 14",
+   "box": [
+    745,
+    880,
+    12,
+    12
+   ],
+   "distance": 26.35,
+   "coverage": 0
+  },
+  {
+   "id": 523,
+   "name": "Pumpkin Body",
+   "box": [
+    813,
+    830,
+    72,
+    61
+   ],
+   "distance": 26.44,
+   "coverage": 0.002
+  },
+  {
+   "id": 257,
+   "name": "Stall Post -11",
+   "box": [
+    1039,
+    739,
+    7,
+    116
+   ],
+   "distance": 26.45,
+   "coverage": 0
+  },
+  {
+   "id": 508,
+   "name": "Pumpkin Body",
+   "box": [
+    1219,
+    851,
+    64,
+    56
+   ],
+   "distance": 26.49,
+   "coverage": 0.002
+  },
+  {
+   "id": 522,
+   "name": "pumpkin 28",
+   "box": [
+    844,
+    866,
+    12,
+    12
+   ],
+   "distance": 26.6,
+   "coverage": 0
+  },
+  {
+   "id": 507,
+   "name": "pumpkin 23",
+   "box": [
+    1244,
+    884,
+    12,
+    12
+   ],
+   "distance": 26.64,
+   "coverage": 0
+  },
+  {
+   "id": 359,
+   "name": "String Bulb 34",
+   "box": [
+    933,
+    678,
+    7,
+    7
+   ],
+   "distance": 26.75,
+   "coverage": 0
+  },
+  {
+   "id": 382,
+   "name": "String Bulb 57",
+   "box": [
+    635,
+    696,
+    8,
+    7
+   ],
+   "distance": 26.76,
+   "coverage": 0
+  },
+  {
+   "id": 728,
+   "name": "Hay Bale 4",
+   "box": [
+    429,
+    848,
+    89,
+    87
+   ],
+   "distance": 26.86,
+   "coverage": 0.004
+  },
+  {
+   "id": 485,
+   "name": "Pumpkin Stem",
+   "box": [
+    1123,
+    837,
+    3,
+    7
+   ],
+   "distance": 26.98,
+   "coverage": 0
+  },
+  {
+   "id": 757,
+   "name": "Visitor 9 Head",
+   "box": [
+    786,
+    784,
+    29,
+    27
+   ],
+   "distance": 27.04,
+   "coverage": 0
+  },
+  {
+   "id": 484,
+   "name": "Pumpkin Body",
+   "box": [
+    1106,
+    832,
+    36,
+    34
+   ],
+   "distance": 27.1,
+   "coverage": 0.001
+  },
+  {
+   "id": 381,
+   "name": "String Bulb 56",
+   "box": [
+    617,
+    681,
+    8,
+    7
+   ],
+   "distance": 27.17,
+   "coverage": 0
+  },
+  {
+   "id": 360,
+   "name": "String Bulb 35",
+   "box": [
+    953,
+    661,
+    7,
+    7
+   ],
+   "distance": 27.17,
+   "coverage": 0
+  },
+  {
+   "id": 483,
+   "name": "pumpkin 15",
+   "box": [
+    1117,
+    852,
+    12,
+    12
+   ],
+   "distance": 27.21,
+   "coverage": 0
+  },
+  {
+   "id": 476,
+   "name": "Pumpkin Stem",
+   "box": [
+    982,
+    821,
+    3,
+    7
+   ],
+   "distance": 27.28,
+   "coverage": 0
+  },
+  {
+   "id": 751,
+   "name": "Visitor 7 Head",
+   "box": [
+    628,
+    785,
+    28,
+    28
+   ],
+   "distance": 27.32,
+   "coverage": 0
+  },
+  {
+   "id": 756,
+   "name": "Visitor 9 Body",
+   "box": [
+    790,
+    797,
+    23,
+    52
+   ],
+   "distance": 27.35,
+   "coverage": 0.001
+  },
+  {
+   "id": 475,
+   "name": "Pumpkin Body",
+   "box": [
+    964,
+    816,
+    38,
+    36
+   ],
+   "distance": 27.4,
+   "coverage": 0.001
+  },
+  {
+   "id": 474,
+   "name": "pumpkin 12",
+   "box": [
+    977,
+    837,
+    12,
+    12
+   ],
+   "distance": 27.52,
+   "coverage": 0
+  },
+  {
+   "id": 380,
+   "name": "String Bulb 55",
+   "box": [
+    599,
+    664,
+    7,
+    7
+   ],
+   "distance": 27.58,
+   "coverage": 0
+  },
+  {
+   "id": 361,
+   "name": "String Bulb 36",
+   "box": [
+    971,
+    643,
+    7,
+    7
+   ],
+   "distance": 27.59,
+   "coverage": 0
+  },
+  {
+   "id": 755,
+   "name": "Visitor 9",
+   "box": [
+    796,
+    838,
+    12,
+    12
+   ],
+   "distance": 27.61,
+   "coverage": 0
+  },
+  {
+   "id": 750,
+   "name": "Visitor 7 Body",
+   "box": [
+    632,
+    799,
+    23,
+    58
+   ],
+   "distance": 27.67,
+   "coverage": 0.001
+  },
+  {
+   "id": 742,
+   "name": "Visitor 4 Head",
+   "box": [
+    803,
+    774,
+    19,
+    21
+   ],
+   "distance": 27.72,
+   "coverage": 0
+  },
+  {
+   "id": 282,
+   "name": "Stall Stripe 7",
+   "box": [
+    1096,
+    676,
+    72,
+    43
+   ],
+   "distance": 27.75,
+   "coverage": 0.002
+  },
+  {
+   "id": 727,
+   "name": "Hay Bale 3",
+   "box": [
+    383,
+    832,
+    87,
+    84
+   ],
+   "distance": 27.84,
+   "coverage": 0.004
+  },
+  {
+   "id": 749,
+   "name": "Visitor 7",
+   "box": [
+    640,
+    846,
+    12,
+    12
+   ],
+   "distance": 27.96,
+   "coverage": 0
+  },
+  {
+   "id": 741,
+   "name": "Visitor 4 Body",
+   "box": [
+    806,
+    785,
+    15,
+    44
+   ],
+   "distance": 28,
+   "coverage": 0
+  },
+  {
+   "id": 779,
+   "name": "Midway Light 1",
+   "box": [
+    804,
+    638,
+    12,
+    12
+   ],
+   "distance": 28.02,
+   "coverage": 0
+  },
+  {
+   "id": 281,
+   "name": "Stall Stripe 6",
+   "box": [
+    1106,
+    671,
+    72,
+    43
+   ],
+   "distance": 28.11,
+   "coverage": 0.001
+  },
+  {
+   "id": 452,
+   "name": "Pumpkin Stem",
+   "box": [
+    593,
+    809,
+    7,
+    12
+   ],
+   "distance": 28.2,
+   "coverage": 0
+  },
+  {
+   "id": 274,
+   "name": "Stall Post 1-1",
+   "box": [
+    1148,
+    708,
+    10,
+    110
+   ],
+   "distance": 28.22,
+   "coverage": 0.001
+  },
+  {
+   "id": 740,
+   "name": "Visitor 4",
+   "box": [
+    809,
+    820,
+    12,
+    12
+   ],
+   "distance": 28.23,
+   "coverage": 0
+  },
+  {
+   "id": 763,
+   "name": "Visitor 11 Head",
+   "box": [
+    913,
+    745,
+    25,
+    25
+   ],
+   "distance": 28.27,
+   "coverage": 0
+  },
+  {
+   "id": 451,
+   "name": "Pumpkin Body",
+   "box": [
+    559,
+    800,
+    78,
+    65
+   ],
+   "distance": 28.41,
+   "coverage": 0.002
+  },
+  {
+   "id": 326,
+   "name": "String Bulb 1",
+   "box": [
+    608,
+    648,
+    7,
+    7
+   ],
+   "distance": 28.43,
+   "coverage": 0
+  },
+  {
+   "id": 397,
+   "name": "String Bulb 72",
+   "box": [
+    968,
+    629,
+    6,
+    6
+   ],
+   "distance": 28.48,
+   "coverage": 0
+  },
+  {
+   "id": 280,
+   "name": "Stall Stripe 5",
+   "box": [
+    1116,
+    665,
+    71,
+    42
+   ],
+   "distance": 28.48,
+   "coverage": 0.001
+  },
+  {
+   "id": 285,
+   "name": "Stall Bulb R",
+   "box": [
+    1110,
+    713,
+    5,
+    6
+   ],
+   "distance": 28.55,
+   "coverage": 0
+  },
+  {
+   "id": 450,
+   "name": "pumpkin 4",
+   "box": [
+    594,
+    841,
+    12,
+    12
+   ],
+   "distance": 28.6,
+   "coverage": 0
+  },
+  {
+   "id": 762,
+   "name": "Visitor 11 Body",
+   "box": [
+    916,
+    758,
+    19,
+    53
+   ],
+   "distance": 28.61,
+   "coverage": 0
+  },
+  {
+   "id": 362,
+   "name": "String Bulb 37",
+   "box": [
+    1006,
+    627,
+    6,
+    6
+   ],
+   "distance": 28.64,
+   "coverage": 0
+  },
+  {
+   "id": 458,
+   "name": "Pumpkin Stem",
+   "box": [
+    756,
+    793,
+    5,
+    8
+   ],
+   "distance": 28.65,
+   "coverage": 0
+  },
+  {
+   "id": 275,
+   "name": "Stall Post 11",
+   "box": [
+    1109,
+    696,
+    9,
+    108
+   ],
+   "distance": 28.71,
+   "coverage": 0
+  },
+  {
+   "id": 318,
+   "name": "Light Pole 1",
+   "box": [
+    581,
+    644,
+    24,
+    175
+   ],
+   "distance": 28.78,
+   "coverage": 0.002
+  },
+  {
+   "id": 457,
+   "name": "Pumpkin Body",
+   "box": [
+    732,
+    786,
+    55,
+    44
+   ],
+   "distance": 28.79,
+   "coverage": 0.001
+  },
+  {
+   "id": 754,
+   "name": "Visitor 8 Head",
+   "box": [
+    830,
+    732,
+    25,
+    25
+   ],
+   "distance": 28.8,
+   "coverage": 0
+  },
+  {
+   "id": 323,
+   "name": "Light Pole 6",
+   "box": [
+    988,
+    622,
+    8,
+    168
+   ],
+   "distance": 28.81,
+   "coverage": 0.001
+  },
+  {
+   "id": 745,
+   "name": "Visitor 5 Head",
+   "box": [
+    654,
+    757,
+    28,
+    25
+   ],
+   "distance": 28.82,
+   "coverage": 0
+  },
+  {
+   "id": 279,
+   "name": "Stall Stripe 4",
+   "box": [
+    1125,
+    660,
+    71,
+    41
+   ],
+   "distance": 28.84,
+   "coverage": 0.001
+  },
+  {
+   "id": 327,
+   "name": "String Bulb 2",
+   "box": [
+    634,
+    650,
+    7,
+    7
+   ],
+   "distance": 28.89,
+   "coverage": 0
+  },
+  {
+   "id": 761,
+   "name": "Visitor 11",
+   "box": [
+    920,
+    801,
+    12,
+    12
+   ],
+   "distance": 28.89,
+   "coverage": 0
+  },
+  {
+   "id": 456,
+   "name": "pumpkin 6",
+   "box": [
+    754,
+    812,
+    12,
+    12
+   ],
+   "distance": 28.92,
+   "coverage": 0
+  },
+  {
+   "id": 396,
+   "name": "String Bulb 71",
+   "box": [
+    948,
+    633,
+    6,
+    6
+   ],
+   "distance": 28.94,
+   "coverage": 0
+  },
+  {
+   "id": 518,
+   "name": "Pumpkin Stem",
+   "box": [
+    858,
+    771,
+    5,
+    9
+   ],
+   "distance": 29.06,
+   "coverage": 0
+  },
+  {
+   "id": 726,
+   "name": "Hay Bale 2",
+   "box": [
+    342,
+    811,
+    88,
+    81
+   ],
+   "distance": 29.09,
+   "coverage": 0.003
+  },
+  {
+   "id": 744,
+   "name": "Visitor 5 Body",
+   "box": [
+    658,
+    770,
+    23,
+    49
+   ],
+   "distance": 29.11,
+   "coverage": 0.001
+  },
+  {
+   "id": 753,
+   "name": "Visitor 8 Body",
+   "box": [
+    834,
+    746,
+    19,
+    55
+   ],
+   "distance": 29.15,
+   "coverage": 0.001
+  },
+  {
+   "id": 278,
+   "name": "Stall Stripe 3",
+   "box": [
+    1135,
+    655,
+    70,
+    40
+   ],
+   "distance": 29.21,
+   "coverage": 0.001
+  },
+  {
+   "id": 517,
+   "name": "Pumpkin Body",
+   "box": [
+    831,
+    764,
+    59,
+    49
+   ],
+   "distance": 29.22,
+   "coverage": 0.001
+  },
+  {
+   "id": 363,
+   "name": "String Bulb 38",
+   "box": [
+    1023,
+    628,
+    6,
+    6
+   ],
+   "distance": 29.26,
+   "coverage": 0
+  },
+  {
+   "id": 328,
+   "name": "String Bulb 3",
+   "box": [
+    659,
+    649,
+    7,
+    7
+   ],
+   "distance": 29.34,
+   "coverage": 0
+  },
+  {
+   "id": 743,
+   "name": "Visitor 5",
+   "box": [
+    665,
+    808,
+    12,
+    12
+   ],
+   "distance": 29.35,
+   "coverage": 0
+  },
+  {
+   "id": 766,
+   "name": "Visitor 12 Head",
+   "box": [
+    771,
+    753,
+    18,
+    17
+   ],
+   "distance": 29.36,
+   "coverage": 0
+  },
+  {
+   "id": 283,
+   "name": "Stall Sign",
+   "box": [
+    1116,
+    676,
+    36,
+    36
+   ],
+   "distance": 29.37,
+   "coverage": 0.001
+  },
+  {
+   "id": 516,
+   "name": "pumpkin 26",
+   "box": [
+    855,
+    794,
+    12,
+    12
+   ],
+   "distance": 29.38,
+   "coverage": 0
+  },
+  {
+   "id": 395,
+   "name": "String Bulb 70",
+   "box": [
+    929,
+    634,
+    6,
+    6
+   ],
+   "distance": 29.39,
+   "coverage": 0
+  },
+  {
+   "id": 752,
+   "name": "Visitor 8",
+   "box": [
+    838,
+    790,
+    12,
+    12
+   ],
+   "distance": 29.44,
+   "coverage": 0
+  },
+  {
+   "id": 776,
+   "name": "Stall Light 2",
+   "box": [
+    1123,
+    694,
+    12,
+    12
+   ],
+   "distance": 29.51,
+   "coverage": 0
+  },
+  {
+   "id": 277,
+   "name": "Stall Stripe 2",
+   "box": [
+    1144,
+    650,
+    70,
+    40
+   ],
+   "distance": 29.58,
+   "coverage": 0.001
+  },
+  {
+   "id": 765,
+   "name": "Visitor 12 Body",
+   "box": [
+    774,
+    761,
+    14,
+    36
+   ],
+   "distance": 29.59,
+   "coverage": 0
+  },
+  {
+   "id": 500,
+   "name": "Pumpkin Stem",
+   "box": [
+    958,
+    749,
+    7,
+    11
+   ],
+   "distance": 29.62,
+   "coverage": 0
+  },
+  {
+   "id": 329,
+   "name": "String Bulb 4",
+   "box": [
+    682,
+    646,
+    7,
+    6
+   ],
+   "distance": 29.77,
+   "coverage": 0
+  },
+  {
+   "id": 764,
+   "name": "Visitor 12",
+   "box": [
+    775,
+    789,
+    12,
+    12
+   ],
+   "distance": 29.78,
+   "coverage": 0
+  },
+  {
+   "id": 499,
+   "name": "Pumpkin Body",
+   "box": [
+    922,
+    740,
+    80,
+    63
+   ],
+   "distance": 29.82,
+   "coverage": 0.002
+  },
+  {
+   "id": 271,
+   "name": "Stall Counter",
+   "box": [
+    1108,
+    726,
+    96,
+    92
+   ],
+   "distance": 29.82,
+   "coverage": 0.004
+  },
+  {
+   "id": 394,
+   "name": "String Bulb 69",
+   "box": [
+    909,
+    634,
+    6,
+    6
+   ],
+   "distance": 29.82,
+   "coverage": 0
+  },
+  {
+   "id": 364,
+   "name": "String Bulb 39",
+   "box": [
+    1039,
+    628,
+    6,
+    6
+   ],
+   "distance": 29.87,
+   "coverage": 0
+  },
+  {
+   "id": 276,
+   "name": "Stall Stripe 1",
+   "box": [
+    1153,
+    645,
+    69,
+    39
+   ],
+   "distance": 29.95,
+   "coverage": 0.001
+  },
+  {
+   "id": 498,
+   "name": "pumpkin 20",
+   "box": [
+    956,
+    779,
+    12,
+    12
+   ],
+   "distance": 30,
+   "coverage": 0
+  },
+  {
+   "id": 725,
+   "name": "Hay Bale 1",
+   "box": [
+    335,
+    788,
+    97,
+    83
+   ],
+   "distance": 30.01,
+   "coverage": 0.004
+  },
+  {
+   "id": 270,
+   "name": "Stall 2",
+   "box": [
+    1150,
+    784,
+    12,
+    12
+   ],
+   "distance": 30.07,
+   "coverage": 0
+  },
+  {
+   "id": 521,
+   "name": "Pumpkin Stem",
+   "box": [
+    570,
+    767,
+    8,
+    12
+   ],
+   "distance": 30.18,
+   "coverage": 0
+  },
+  {
+   "id": 330,
+   "name": "String Bulb 5",
+   "box": [
+    704,
+    640,
+    6,
+    6
+   ],
+   "distance": 30.19,
+   "coverage": 0
+  },
+  {
+   "id": 272,
+   "name": "Stall Post -1-1",
+   "box": [
+    1198,
+    675,
+    11,
+    104
+   ],
+   "distance": 30.23,
+   "coverage": 0.001
+  },
+  {
+   "id": 393,
+   "name": "String Bulb 68",
+   "box": [
+    891,
+    630,
+    6,
+    6
+   ],
+   "distance": 30.24,
+   "coverage": 0
+  },
+  {
+   "id": 284,
+   "name": "Stall Bulb L",
+   "box": [
+    1155,
+    685,
+    5,
+    5
+   ],
+   "distance": 30.31,
+   "coverage": 0
+  },
+  {
+   "id": 520,
+   "name": "Pumpkin Body",
+   "box": [
+    533,
+    757,
+    87,
+    67
+   ],
+   "distance": 30.38,
+   "coverage": 0.003
+  },
+  {
+   "id": 365,
+   "name": "String Bulb 40",
+   "box": [
+    1054,
+    626,
+    6,
+    6
+   ],
+   "distance": 30.46,
+   "coverage": 0
+  },
+  {
+   "id": 519,
+   "name": "pumpkin 27",
+   "box": [
+    572,
+    799,
+    12,
+    12
+   ],
+   "distance": 30.56,
+   "coverage": 0
+  },
+  {
+   "id": 473,
+   "name": "Pumpkin Stem",
+   "box": [
+    702,
+    755,
+    5,
+    8
+   ],
+   "distance": 30.58,
+   "coverage": 0
+  },
+  {
+   "id": 331,
+   "name": "String Bulb 6",
+   "box": [
+    726,
+    631,
+    6,
+    6
+   ],
+   "distance": 30.59,
+   "coverage": 0
+  },
+  {
+   "id": 392,
+   "name": "String Bulb 67",
+   "box": [
+    873,
+    623,
+    6,
+    6
+   ],
+   "distance": 30.63,
+   "coverage": 0
+  },
+  {
+   "id": 273,
+   "name": "Stall Post -11",
+   "box": [
+    1160,
+    665,
+    10,
+    102
+   ],
+   "distance": 30.69,
+   "coverage": 0
+  },
+  {
+   "id": 472,
+   "name": "Pumpkin Body",
+   "box": [
+    676,
+    748,
+    60,
+    46
+   ],
+   "distance": 30.72,
+   "coverage": 0.001
+  },
+  {
+   "id": 471,
+   "name": "pumpkin 11",
+   "box": [
+    701,
+    775,
+    12,
+    12
+   ],
+   "distance": 30.85,
+   "coverage": 0
+  },
+  {
+   "id": 449,
+   "name": "Pumpkin Stem",
+   "box": [
+    812,
+    740,
+    5,
+    8
+   ],
+   "distance": 30.95,
+   "coverage": 0
+  },
+  {
+   "id": 464,
+   "name": "Pumpkin Stem",
+   "box": [
+    505,
+    780,
+    5,
+    7
+   ],
+   "distance": 30.96,
+   "coverage": 0
+  },
+  {
+   "id": 332,
+   "name": "String Bulb 7",
+   "box": [
+    746,
+    619,
+    6,
+    6
+   ],
+   "distance": 30.96,
+   "coverage": 0
+  },
+  {
+   "id": 391,
+   "name": "String Bulb 66",
+   "box": [
+    855,
+    613,
+    6,
+    6
+   ],
+   "distance": 31,
+   "coverage": 0
+  },
+  {
+   "id": 366,
+   "name": "String Bulb 41",
+   "box": [
+    1069,
+    620,
+    6,
+    6
+   ],
+   "distance": 31.02,
+   "coverage": 0
+  },
+  {
+   "id": 463,
+   "name": "Pumpkin Body",
+   "box": [
+    484,
+    774,
+    51,
+    39
+   ],
+   "distance": 31.07,
+   "coverage": 0.001
+  },
+  {
+   "id": 448,
+   "name": "Pumpkin Body",
+   "box": [
+    787,
+    734,
+    54,
+    42
+   ],
+   "distance": 31.08,
+   "coverage": 0.001
+  },
+  {
+   "id": 462,
+   "name": "pumpkin 8",
+   "box": [
+    504,
+    796,
+    12,
+    12
+   ],
+   "distance": 31.19,
+   "coverage": 0
+  },
+  {
+   "id": 447,
+   "name": "pumpkin 3",
+   "box": [
+    809,
+    758,
+    12,
+    12
+   ],
+   "distance": 31.21,
+   "coverage": 0
+  },
+  {
+   "id": 333,
+   "name": "String Bulb 8",
+   "box": [
+    766,
+    605,
+    6,
+    6
+   ],
+   "distance": 31.33,
+   "coverage": 0
+  },
+  {
+   "id": 446,
+   "name": "Pumpkin Stem",
+   "box": [
+    450,
+    780,
+    6,
+    8
+   ],
+   "distance": 31.34,
+   "coverage": 0
+  },
+  {
+   "id": 390,
+   "name": "String Bulb 65",
+   "box": [
+    837,
+    601,
+    6,
+    6
+   ],
+   "distance": 31.36,
+   "coverage": 0
+  },
+  {
+   "id": 445,
+   "name": "Pumpkin Body",
+   "box": [
+    425,
+    773,
+    58,
+    44
+   ],
+   "distance": 31.46,
+   "coverage": 0.001
+  },
+  {
+   "id": 367,
+   "name": "String Bulb 42",
+   "box": [
+    1083,
+    612,
+    6,
+    6
+   ],
+   "distance": 31.56,
+   "coverage": 0
+  },
+  {
+   "id": 444,
+   "name": "pumpkin 2",
+   "box": [
+    450,
+    799,
+    12,
+    12
+   ],
+   "distance": 31.58,
+   "coverage": 0
+  },
+  {
+   "id": 334,
+   "name": "String Bulb 9",
+   "box": [
+    785,
+    589,
+    6,
+    6
+   ],
+   "distance": 31.69,
+   "coverage": 0
+  },
+  {
+   "id": 389,
+   "name": "String Bulb 64",
+   "box": [
+    820,
+    588,
+    6,
+    6
+   ],
+   "distance": 31.71,
+   "coverage": 0
+  },
+  {
+   "id": 368,
+   "name": "String Bulb 43",
+   "box": [
+    1097,
+    601,
+    6,
+    6
+   ],
+   "distance": 32.08,
+   "coverage": 0
+  },
+  {
+   "id": 443,
+   "name": "Pumpkin Stem",
+   "box": [
+    736,
+    712,
+    7,
+    11
+   ],
+   "distance": 32.08,
+   "coverage": 0
+  },
+  {
+   "id": 442,
+   "name": "Pumpkin Body",
+   "box": [
+    702,
+    705,
+    76,
+    57
+   ],
+   "distance": 32.27,
+   "coverage": 0.002
+  },
+  {
+   "id": 298,
+   "name": "Stall Stripe 7",
+   "box": [
+    1204,
+    616,
+    66,
+    35
+   ],
+   "distance": 32.31,
+   "coverage": 0.001
+  },
+  {
+   "id": 441,
+   "name": "pumpkin 1",
+   "box": [
+    735,
+    741,
+    12,
+    12
+   ],
+   "distance": 32.45,
+   "coverage": 0
+  },
+  {
+   "id": 369,
+   "name": "String Bulb 44",
+   "box": [
+    1111,
+    587,
+    6,
+    6
+   ],
+   "distance": 32.59,
+   "coverage": 0
+  },
+  {
+   "id": 335,
+   "name": "String Bulb 10",
+   "box": [
+    822,
+    577,
+    6,
+    5
+   ],
+   "distance": 32.61,
+   "coverage": 0
+  },
+  {
+   "id": 297,
+   "name": "Stall Stripe 6",
+   "box": [
+    1211,
+    612,
+    65,
+    35
+   ],
+   "distance": 32.7,
+   "coverage": 0.001
+  },
+  {
+   "id": 290,
+   "name": "Stall Post 1-1",
+   "box": [
+    1249,
+    642,
+    11,
+    97
+   ],
+   "distance": 32.74,
+   "coverage": 0.001
+  },
+  {
+   "id": 319,
+   "name": "Light Pole 2",
+   "box": [
+    803,
+    572,
+    12,
+    150
+   ],
+   "distance": 32.76,
+   "coverage": 0.001
+  },
+  {
+   "id": 301,
+   "name": "Stall Bulb R",
+   "box": [
+    1214,
+    649,
+    5,
+    5
+   ],
+   "distance": 33.04,
+   "coverage": 0
+  },
+  {
+   "id": 370,
+   "name": "String Bulb 45",
+   "box": [
+    1124,
+    573,
+    6,
+    5
+   ],
+   "distance": 33.08,
+   "coverage": 0
+  },
+  {
+   "id": 296,
+   "name": "Stall Stripe 5",
+   "box": [
+    1219,
+    608,
+    65,
+    34
+   ],
+   "distance": 33.09,
+   "coverage": 0.001
+  },
+  {
+   "id": 291,
+   "name": "Stall Post 11",
+   "box": [
+    1212,
+    633,
+    10,
+    95
+   ],
+   "distance": 33.15,
+   "coverage": 0
+  },
+  {
+   "id": 336,
+   "name": "String Bulb 11",
+   "box": [
+    840,
+    580,
+    6,
+    5
+   ],
+   "distance": 33.15,
+   "coverage": 0
+  },
+  {
+   "id": 295,
+   "name": "Stall Stripe 4",
+   "box": [
+    1226,
+    603,
+    64,
+    34
+   ],
+   "distance": 33.48,
+   "coverage": 0.001
+  },
+  {
+   "id": 27,
+   "name": "Midway",
+   "box": [
+    295,
+    560,
+    1008,
+    520
+   ],
+   "distance": 33.65,
+   "coverage": 0.253
+  },
+  {
+   "id": 337,
+   "name": "String Bulb 12",
+   "box": [
+    857,
+    580,
+    5,
+    5
+   ],
+   "distance": 33.69,
+   "coverage": 0
+  },
+  {
+   "id": 294,
+   "name": "Stall Stripe 3",
+   "box": [
+    1233,
+    599,
+    64,
+    33
+   ],
+   "distance": 33.87,
+   "coverage": 0.001
+  },
+  {
+   "id": 299,
+   "name": "Stall Sign",
+   "box": [
+    1219,
+    619,
+    28,
+    29
+   ],
+   "distance": 33.93,
+   "coverage": 0
+  },
+  {
+   "id": 406,
+   "name": "String Bulb 81",
+   "box": [
+    1118,
+    563,
+    5,
+    5
+   ],
+   "distance": 33.97,
+   "coverage": 0
+  },
+  {
+   "id": 777,
+   "name": "Stall Light 3",
+   "box": [
+    1222,
+    632,
+    12,
+    12
+   ],
+   "distance": 34.06,
+   "coverage": 0
+  },
+  {
+   "id": 371,
+   "name": "String Bulb 46",
+   "box": [
+    1147,
+    562,
+    5,
+    5
+   ],
+   "distance": 34.16,
+   "coverage": 0
+  },
+  {
+   "id": 338,
+   "name": "String Bulb 13",
+   "box": [
+    874,
+    579,
+    5,
+    5
+   ],
+   "distance": 34.22,
+   "coverage": 0
+  },
+  {
+   "id": 324,
+   "name": "Light Pole 7",
+   "box": [
+    1131,
+    556,
+    12,
+    144
+   ],
+   "distance": 34.25,
+   "coverage": 0.001
+  },
+  {
+   "id": 293,
+   "name": "Stall Stripe 2",
+   "box": [
+    1240,
+    595,
+    63,
+    33
+   ],
+   "distance": 34.26,
+   "coverage": 0.001
+  },
+  {
+   "id": 287,
+   "name": "Stall Counter",
+   "box": [
+    1212,
+    663,
+    82,
+    76
+   ],
+   "distance": 34.32,
+   "coverage": 0.003
+  },
+  {
+   "id": 405,
+   "name": "String Bulb 80",
+   "box": [
+    1098,
+    567,
+    5,
+    5
+   ],
+   "distance": 34.36,
+   "coverage": 0
+  },
+  {
+   "id": 286,
+   "name": "Stall 3",
+   "box": [
+    1246,
+    711,
+    12,
+    12
+   ],
+   "distance": 34.54,
+   "coverage": 0
+  },
+  {
+   "id": 467,
+   "name": "Pumpkin Stem",
+   "box": [
+    493,
+    720,
+    4,
+    6
+   ],
+   "distance": 34.58,
+   "coverage": 0
+  },
+  {
+   "id": 292,
+   "name": "Stall Stripe 1",
+   "box": [
+    1247,
+    592,
+    63,
+    32
+   ],
+   "distance": 34.65,
+   "coverage": 0.001
+  },
+  {
+   "id": 466,
+   "name": "Pumpkin Body",
+   "box": [
+    476,
+    717,
+    40,
+    29
+   ],
+   "distance": 34.67,
+   "coverage": 0.001
+  },
+  {
+   "id": 339,
+   "name": "String Bulb 14",
+   "box": [
+    890,
+    574,
+    5,
+    5
+   ],
+   "distance": 34.72,
+   "coverage": 0
+  },
+  {
+   "id": 404,
+   "name": "String Bulb 79",
+   "box": [
+    1080,
+    570,
+    5,
+    5
+   ],
+   "distance": 34.74,
+   "coverage": 0
+  },
+  {
+   "id": 372,
+   "name": "String Bulb 47",
+   "box": [
+    1157,
+    566,
+    5,
+    5
+   ],
+   "distance": 34.74,
+   "coverage": 0
+  },
+  {
+   "id": 465,
+   "name": "pumpkin 9",
+   "box": [
+    490,
+    732,
+    12,
+    12
+   ],
+   "distance": 34.76,
+   "coverage": 0
+  },
+  {
+   "id": 531,
+   "name": "Orchard",
+   "box": [
+    907,
+    691,
+    12,
+    12
+   ],
+   "distance": 34.83,
+   "coverage": 0
+  },
+  {
+   "id": 26,
+   "name": "Meadow",
+   "box": [
+    0,
+    0,
+    1920,
+    1080
+   ],
+   "distance": 34.83,
+   "coverage": 1
+  },
+  {
+   "id": 664,
+   "name": "West Grove",
+   "box": [
+    907,
+    691,
+    12,
+    12
+   ],
+   "distance": 34.83,
+   "coverage": 0
+  },
+  {
+   "id": 440,
+   "name": "Pumpkin Patch",
+   "box": [
+    907,
+    691,
+    12,
+    12
+   ],
+   "distance": 34.83,
+   "coverage": 0
+  },
+  {
+   "id": 288,
+   "name": "Stall Post -1-1",
+   "box": [
+    1286,
+    617,
+    11,
+    92
+   ],
+   "distance": 34.88,
+   "coverage": 0.001
+  },
+  {
+   "id": 300,
+   "name": "Stall Bulb L",
+   "box": [
+    1249,
+    627,
+    4,
+    4
+   ],
+   "distance": 34.92,
+   "coverage": 0
+  },
+  {
+   "id": 403,
+   "name": "String Bulb 78",
+   "box": [
+    1062,
+    570,
+    5,
+    5
+   ],
+   "distance": 35.11,
+   "coverage": 0
+  },
+  {
+   "id": 340,
+   "name": "String Bulb 15",
+   "box": [
+    905,
+    568,
+    5,
+    5
+   ],
+   "distance": 35.2,
+   "coverage": 0
+  },
+  {
+   "id": 289,
+   "name": "Stall Post -11",
+   "box": [
+    1251,
+    609,
+    10,
+    90
+   ],
+   "distance": 35.27,
+   "coverage": 0
+  },
+  {
+   "id": 373,
+   "name": "String Bulb 48",
+   "box": [
+    1167,
+    568,
+    5,
+    5
+   ],
+   "distance": 35.3,
+   "coverage": 0
+  },
+  {
+   "id": 503,
+   "name": "Pumpkin Stem",
+   "box": [
+    456,
+    710,
+    4,
+    6
+   ],
+   "distance": 35.42,
+   "coverage": 0
+  },
+  {
+   "id": 402,
+   "name": "String Bulb 77",
+   "box": [
+    1044,
+    567,
+    5,
+    5
+   ],
+   "distance": 35.46,
+   "coverage": 0
+  },
+  {
+   "id": 502,
+   "name": "Pumpkin Body",
+   "box": [
+    437,
+    706,
+    45,
+    33
+   ],
+   "distance": 35.53,
+   "coverage": 0.001
+  },
+  {
+   "id": 736,
+   "name": "Visitor 2 Head",
+   "box": [
+    960,
+    644,
+    16,
+    14
+   ],
+   "distance": 35.56,
+   "coverage": 0
+  },
+  {
+   "id": 501,
+   "name": "pumpkin 21",
+   "box": [
+    455,
+    725,
+    12,
+    12
+   ],
+   "distance": 35.63,
+   "coverage": 0
+  },
+  {
+   "id": 341,
+   "name": "String Bulb 16",
+   "box": [
+    920,
+    558,
+    5,
+    5
+   ],
+   "distance": 35.67,
+   "coverage": 0
+  },
+  {
+   "id": 735,
+   "name": "Visitor 2 Body",
+   "box": [
+    962,
+    651,
+    12,
+    30
+   ],
+   "distance": 35.75,
+   "coverage": 0
+  },
+  {
+   "id": 401,
+   "name": "String Bulb 76",
+   "box": [
+    1027,
+    562,
+    5,
+    5
+   ],
+   "distance": 35.79,
+   "coverage": 0
+  },
+  {
+   "id": 374,
+   "name": "String Bulb 49",
+   "box": [
+    1176,
+    567,
+    5,
+    5
+   ],
+   "distance": 35.85,
+   "coverage": 0
+  },
+  {
+   "id": 734,
+   "name": "Visitor 2",
+   "box": [
+    962,
+    673,
+    12,
+    12
+   ],
+   "distance": 35.92,
+   "coverage": 0
+  },
+  {
+   "id": 400,
+   "name": "String Bulb 75",
+   "box": [
+    1011,
+    554,
+    5,
+    5
+   ],
+   "distance": 36.11,
+   "coverage": 0
+  },
+  {
+   "id": 342,
+   "name": "String Bulb 17",
+   "box": [
+    934,
+    547,
+    5,
+    5
+   ],
+   "distance": 36.13,
+   "coverage": 0
+  },
+  {
+   "id": 760,
+   "name": "Visitor 10 Head",
+   "box": [
+    1075,
+    626,
+    22,
+    19
+   ],
+   "distance": 36.18,
+   "coverage": 0
+  },
+  {
+   "id": 375,
+   "name": "String Bulb 50",
+   "box": [
+    1186,
+    564,
+    5,
+    5
+   ],
+   "distance": 36.37,
+   "coverage": 0
+  },
+  {
+   "id": 399,
+   "name": "String Bulb 74",
+   "box": [
+    994,
+    545,
+    5,
+    5
+   ],
+   "distance": 36.42,
+   "coverage": 0
+  },
+  {
+   "id": 759,
+   "name": "Visitor 10 Body",
+   "box": [
+    1077,
+    636,
+    17,
+    40
+   ],
+   "distance": 36.43,
+   "coverage": 0
+  },
+  {
+   "id": 482,
+   "name": "Pumpkin Stem",
+   "box": [
+    430,
+    682,
+    7,
+    11
+   ],
+   "distance": 36.53,
+   "coverage": 0
+  },
+  {
+   "id": 343,
+   "name": "String Bulb 18",
+   "box": [
+    949,
+    535,
+    5,
+    5
+   ],
+   "distance": 36.57,
+   "coverage": 0
+  },
+  {
+   "id": 758,
+   "name": "Visitor 10",
+   "box": [
+    1079,
+    668,
+    12,
+    12
+   ],
+   "distance": 36.64,
+   "coverage": 0
+  },
+  {
+   "id": 481,
+   "name": "Pumpkin Body",
+   "box": [
+    397,
+    676,
+    77,
+    54
+   ],
+   "distance": 36.7,
+   "coverage": 0.002
+  },
+  {
+   "id": 398,
+   "name": "String Bulb 73",
+   "box": [
+    978,
+    533,
+    5,
+    5
+   ],
+   "distance": 36.72,
+   "coverage": 0
+  },
+  {
+   "id": 480,
+   "name": "pumpkin 14",
+   "box": [
+    432,
+    711,
+    12,
+    12
+   ],
+   "distance": 36.86,
+   "coverage": 0
+  },
+  {
+   "id": 376,
+   "name": "String Bulb 51",
+   "box": [
+    1195,
+    558,
+    5,
+    5
+   ],
+   "distance": 36.87,
+   "coverage": 0
+  },
+  {
+   "id": 780,
+   "name": "Midway Light 2",
+   "box": [
+    1077,
+    531,
+    12,
+    12
+   ],
+   "distance": 36.89,
+   "coverage": 0
+  },
+  {
+   "id": 314,
+   "name": "Stall Stripe 7",
+   "box": [
+    1287,
+    569,
+    60,
+    29
+   ],
+   "distance": 37.13,
+   "coverage": 0.001
+  },
+  {
+   "id": 377,
+   "name": "String Bulb 52",
+   "box": [
+    1204,
+    550,
+    5,
+    5
+   ],
+   "distance": 37.35,
+   "coverage": 0
+  },
+  {
+   "id": 306,
+   "name": "Stall Post 1-1",
+   "box": [
+    1326,
+    591,
+    12,
+    87
+   ],
+   "distance": 37.51,
+   "coverage": 0
+  },
+  {
+   "id": 313,
+   "name": "Stall Stripe 6",
+   "box": [
+    1293,
+    566,
+    59,
+    29
+   ],
+   "distance": 37.53,
+   "coverage": 0.001
+  },
+  {
+   "id": 344,
+   "name": "String Bulb 19",
+   "box": [
+    974,
+    526,
+    5,
+    5
+   ],
+   "distance": 37.55,
+   "coverage": 0
+  },
+  {
+   "id": 320,
+   "name": "Light Pole 3",
+   "box": [
+    962,
+    520,
+    5,
+    130
+   ],
+   "distance": 37.63,
+   "coverage": 0
+  },
+  {
+   "id": 317,
+   "name": "Stall Bulb R",
+   "box": [
+    1295,
+    599,
+    4,
+    4
+   ],
+   "distance": 37.8,
+   "coverage": 0
+  },
+  {
+   "id": 378,
+   "name": "String Bulb 53",
+   "box": [
+    1213,
+    540,
+    5,
+    5
+   ],
+   "distance": 37.82,
+   "coverage": 0
+  },
+  {
+   "id": 307,
+   "name": "Stall Post 11",
+   "box": [
+    1293,
+    584,
+    11,
+    85
+   ],
+   "distance": 37.88,
+   "coverage": 0
+  },
+  {
+   "id": 312,
+   "name": "Stall Stripe 5",
+   "box": [
+    1298,
+    563,
+    59,
+    29
+   ],
+   "distance": 37.93,
+   "coverage": 0.001
+  },
+  {
+   "id": 345,
+   "name": "String Bulb 20",
+   "box": [
+    985,
+    530,
+    5,
+    4
+   ],
+   "distance": 38.08,
+   "coverage": 0
+  },
+  {
+   "id": 379,
+   "name": "String Bulb 54",
+   "box": [
+    1222,
+    528,
+    5,
+    5
+   ],
+   "distance": 38.27,
+   "coverage": 0
+  },
+  {
+   "id": 311,
+   "name": "Stall Stripe 4",
+   "box": [
+    1304,
+    559,
+    58,
+    28
+   ],
+   "distance": 38.34,
+   "coverage": 0.001
+  },
+  {
+   "id": 739,
+   "name": "Visitor 3 Head",
+   "box": [
+    1104,
+    603,
+    20,
+    17
+   ],
+   "distance": 38.35,
+   "coverage": 0
+  },
+  {
+   "id": 738,
+   "name": "Visitor 3 Body",
+   "box": [
+    1105,
+    612,
+    16,
+    38
+   ],
+   "distance": 38.58,
+   "coverage": 0
+  },
+  {
+   "id": 346,
+   "name": "String Bulb 21",
+   "box": [
+    996,
+    532,
+    5,
+    4
+   ],
+   "distance": 38.6,
+   "coverage": 0
+  },
+  {
+   "id": 455,
+   "name": "Pumpkin Stem",
+   "box": [
+    262,
+    698,
+    5,
+    7
+   ],
+   "distance": 38.64,
+   "coverage": 0
+  },
+  {
+   "id": 201,
+   "name": "Carousel Bulb 4",
+   "box": [
+    705,
+    517,
+    8,
+    6
+   ],
+   "distance": 38.73,
+   "coverage": 0
+  },
+  {
+   "id": 315,
+   "name": "Stall Sign",
+   "box": [
+    1299,
+    574,
+    23,
+    24
+   ],
+   "distance": 38.73,
+   "coverage": 0
+  },
+  {
+   "id": 310,
+   "name": "Stall Stripe 3",
+   "box": [
+    1310,
+    556,
+    58,
+    28
+   ],
+   "distance": 38.74,
+   "coverage": 0.001
+  },
+  {
+   "id": 454,
+   "name": "Pumpkin Body",
+   "box": [
+    241,
+    694,
+    49,
+    34
+   ],
+   "distance": 38.74,
+   "coverage": 0.001
+  },
+  {
+   "id": 737,
+   "name": "Visitor 3",
+   "box": [
+    1106,
+    641,
+    12,
+    12
+   ],
+   "distance": 38.77,
+   "coverage": 0
+  },
+  {
+   "id": 453,
+   "name": "pumpkin 5",
+   "box": [
+    262,
+    714,
+    12,
+    12
+   ],
+   "distance": 38.84,
+   "coverage": 0
+  },
+  {
+   "id": 778,
+   "name": "Stall Light 4",
+   "box": [
+    1299,
+    585,
+    12,
+    12
+   ],
+   "distance": 38.85,
+   "coverage": 0
+  },
+  {
+   "id": 202,
+   "name": "Carousel Bulb 5",
+   "box": [
+    649,
+    519,
+    8,
+    6
+   ],
+   "distance": 38.98,
+   "coverage": 0
+  },
+  {
+   "id": 415,
+   "name": "String Bulb 90",
+   "box": [
+    1213,
+    521,
+    5,
+    4
+   ],
+   "distance": 39.06,
+   "coverage": 0
+  },
+  {
+   "id": 733,
+   "name": "Visitor 1 Head",
+   "box": [
+    1015,
+    600,
+    18,
+    15
+   ],
+   "distance": 39.07,
+   "coverage": 0
+  },
+  {
+   "id": 303,
+   "name": "Stall Counter",
+   "box": [
+    1292,
+    614,
+    71,
+    64
+   ],
+   "distance": 39.08,
+   "coverage": 0.002
+  },
+  {
+   "id": 347,
+   "name": "String Bulb 22",
+   "box": [
+    1007,
+    532,
+    5,
+    4
+   ],
+   "distance": 39.1,
+   "coverage": 0
+  },
+  {
+   "id": 309,
+   "name": "Stall Stripe 2",
+   "box": [
+    1315,
+    553,
+    58,
+    27
+   ],
+   "distance": 39.15,
+   "coverage": 0.001
+  },
+  {
+   "id": 769,
+   "name": "Visitor 13 Head",
+   "box": [
+    1098,
+    605,
+    13,
+    12
+   ],
+   "distance": 39.2,
+   "coverage": 0
+  },
+  {
+   "id": 732,
+   "name": "Visitor 1 Body",
+   "box": [
+    1016,
+    608,
+    16,
+    32
+   ],
+   "distance": 39.2,
+   "coverage": 0
+  },
+  {
+   "id": 200,
+   "name": "Carousel Bulb 3",
+   "box": [
+    757,
+    511,
+    8,
+    6
+   ],
+   "distance": 39.23,
+   "coverage": 0
+  },
+  {
+   "id": 302,
+   "name": "Stall 4",
+   "box": [
+    1320,
+    655,
+    12,
+    12
+   ],
+   "distance": 39.27,
+   "coverage": 0
+  },
+  {
+   "id": 325,
+   "name": "Light Pole 8",
+   "box": [
+    1223,
+    515,
+    14,
+    128
+   ],
+   "distance": 39.3,
+   "coverage": 0.001
+  },
+  {
+   "id": 731,
+   "name": "Visitor 1",
+   "box": [
+    1018,
+    632,
+    12,
+    12
+   ],
+   "distance": 39.31,
+   "coverage": 0
+  },
+  {
+   "id": 768,
+   "name": "Visitor 13 Body",
+   "box": [
+    1099,
+    612,
+    10,
+    29
+   ],
+   "distance": 39.39,
+   "coverage": 0
+  },
+  {
+   "id": 414,
+   "name": "String Bulb 89",
+   "box": [
+    1195,
+    525,
+    5,
+    4
+   ],
+   "distance": 39.4,
+   "coverage": 0
+  },
+  {
+   "id": 470,
+   "name": "Pumpkin Stem",
+   "box": [
+    507,
+    639,
+    5,
+    8
+   ],
+   "distance": 39.43,
+   "coverage": 0
+  },
+  {
+   "id": 748,
+   "name": "Visitor 6 Head",
+   "box": [
+    1051,
+    595,
+    17,
+    14
+   ],
+   "distance": 39.46,
+   "coverage": 0
+  },
+  {
+   "id": 767,
+   "name": "Visitor 13",
+   "box": [
+    1097,
+    634,
+    12,
+    12
+   ],
+   "distance": 39.55,
+   "coverage": 0
+  },
+  {
+   "id": 308,
+   "name": "Stall Stripe 1",
+   "box": [
+    1321,
+    550,
+    57,
+    27
+   ],
+   "distance": 39.56,
+   "coverage": 0.001
+  },
+  {
+   "id": 469,
+   "name": "Pumpkin Body",
+   "box": [
+    485,
+    637,
+    52,
+    39
+   ],
+   "distance": 39.57,
+   "coverage": 0.001
+  },
+  {
+   "id": 348,
+   "name": "String Bulb 23",
+   "box": [
+    1017,
+    529,
+    5,
+    4
+   ],
+   "distance": 39.58,
+   "coverage": 0
+  },
+  {
+   "id": 747,
+   "name": "Visitor 6 Body",
+   "box": [
+    1053,
+    603,
+    13,
+    32
+   ],
+   "distance": 39.67,
+   "coverage": 0
+  },
+  {
+   "id": 468,
+   "name": "pumpkin 10",
+   "box": [
+    506,
+    662,
+    12,
+    12
+   ],
+   "distance": 39.71,
+   "coverage": 0
+  },
+  {
+   "id": 413,
+   "name": "String Bulb 88",
+   "box": [
+    1177,
+    528,
+    5,
+    4
+   ],
+   "distance": 39.73,
+   "coverage": 0
+  },
+  {
+   "id": 304,
+   "name": "Stall Post -1-1",
+   "box": [
+    1356,
+    572,
+    12,
+    83
+   ],
+   "distance": 39.74,
+   "coverage": 0
+  },
+  {
+   "id": 316,
+   "name": "Stall Bulb L",
+   "box": [
+    1323,
+    582,
+    4,
+    4
+   ],
+   "distance": 39.76,
+   "coverage": 0
+  },
+  {
+   "id": 145,
+   "name": "Cabin 1 Roof",
+   "box": [
+    1309,
+    279,
+    59,
+    10
+   ],
+   "distance": 39.79,
+   "coverage": 0
+  },
+  {
+   "id": 143,
+   "name": "Cabin 1",
+   "box": [
+    1332,
+    279,
+    12,
+    12
+   ],
+   "distance": 39.79,
+   "coverage": 0
+  },
+  {
+   "id": 146,
+   "name": "Cabin 1 Rod",
+   "box": [
+    1336,
+    284,
+    4,
+    13
+   ],
+   "distance": 39.8,
+   "coverage": 0
+  },
+  {
+   "id": 144,
+   "name": "Cabin 1 Car",
+   "box": [
+    1311,
+    292,
+    54,
+    35
+   ],
+   "distance": 39.83,
+   "coverage": 0.001
+  },
+  {
+   "id": 746,
+   "name": "Visitor 6",
+   "box": [
+    1053,
+    627,
+    12,
+    12
+   ],
+   "distance": 39.85,
+   "coverage": 0
+  },
+  {
+   "id": 203,
+   "name": "Carousel Bulb 6",
+   "box": [
+    602,
+    515,
+    8,
+    6
+   ],
+   "distance": 39.93,
+   "coverage": 0
+  },
+  {
+   "id": 506,
+   "name": "Pumpkin Stem",
+   "box": [
+    421,
+    649,
+    4,
+    7
+   ],
+   "distance": 40.03,
+   "coverage": 0
+  },
+  {
+   "id": 142,
+   "name": "Rim Bulb 24",
+   "box": [
+    1345,
+    311,
+    7,
+    6
+   ],
+   "distance": 40.03,
+   "coverage": 0
+  },
+  {
+   "id": 349,
+   "name": "String Bulb 24",
+   "box": [
+    1027,
+    525,
+    5,
+    4
+   ],
+   "distance": 40.04,
+   "coverage": 0
+  },
+  {
+   "id": 412,
+   "name": "String Bulb 87",
+   "box": [
+    1160,
+    529,
+    5,
+    4
+   ],
+   "distance": 40.06,
+   "coverage": 0
+  },
+  {
+   "id": 119,
+   "name": "Rim Bulb 1",
+   "box": [
+    1337,
+    252,
+    7,
+    6
+   ],
+   "distance": 40.07,
+   "coverage": 0
+  },
+  {
+   "id": 305,
+   "name": "Stall Post -11",
+   "box": [
+    1323,
+    565,
+    11,
+    82
+   ],
+   "distance": 40.09,
+   "coverage": 0
+  },
+  {
+   "id": 36,
+   "name": "Rim 1b",
+   "box": [
+    1333,
+    264,
+    20,
+    42
+   ],
+   "distance": 40.12,
+   "coverage": 0
+  },
+  {
+   "id": 106,
+   "name": "Rim 36b",
+   "box": [
+    1338,
+    302,
+    13,
+    42
+   ],
+   "distance": 40.15,
+   "coverage": 0
+  },
+  {
+   "id": 505,
+   "name": "Pumpkin Body",
+   "box": [
+    403,
+    647,
+    44,
+    33
+   ],
+   "distance": 40.15,
+   "coverage": 0.001
+  },
+  {
+   "id": 189,
+   "name": "Cabin 12 Roof",
+   "box": [
+    1297,
+    390,
+    57,
+    14
+   ],
+   "distance": 40.2,
+   "coverage": 0
+  },
+  {
+   "id": 187,
+   "name": "Cabin 12",
+   "box": [
+    1319,
+    392,
+    12,
+    12
+   ],
+   "distance": 40.2,
+   "coverage": 0
+  },
+  {
+   "id": 38,
+   "name": "Rim 2b",
+   "box": [
+    1321,
+    227,
+    26,
+    41
+   ],
+   "distance": 40.21,
+   "coverage": 0.001
+  },
+  {
+   "id": 190,
+   "name": "Cabin 12 Rod",
+   "box": [
+    1324,
+    396,
+    3,
+    12
+   ],
+   "distance": 40.23,
+   "coverage": 0
+  },
+  {
+   "id": 141,
+   "name": "Rim Bulb 23",
+   "box": [
+    1338,
+    368,
+    7,
+    6
+   ],
+   "distance": 40.24,
+   "coverage": 0
+  },
+  {
+   "id": 504,
+   "name": "pumpkin 22",
+   "box": [
+    420,
+    667,
+    12,
+    12
+   ],
+   "distance": 40.26,
+   "coverage": 0
+  },
+  {
+   "id": 104,
+   "name": "Rim 35b",
+   "box": [
+    1333,
+    340,
+    15,
+    41
+   ],
+   "distance": 40.28,
+   "coverage": 0
+  },
+  {
+   "id": 188,
+   "name": "Cabin 12 Car",
+   "box": [
+    1299,
+    403,
+    51,
+    36
+   ],
+   "distance": 40.32,
+   "coverage": 0.001
+  },
+  {
+   "id": 411,
+   "name": "String Bulb 86",
+   "box": [
+    1144,
+    527,
+    5,
+    4
+   ],
+   "distance": 40.37,
+   "coverage": 0
+  },
+  {
+   "id": 148,
+   "name": "Cabin 2 Car",
+   "box": [
+    1267,
+    191,
+    52,
+    30
+   ],
+   "distance": 40.37,
+   "coverage": 0.001
+  },
+  {
+   "id": 199,
+   "name": "Carousel Bulb 2",
+   "box": [
+    796,
+    501,
+    8,
+    5
+   ],
+   "distance": 40.37,
+   "coverage": 0
+  },
+  {
+   "id": 120,
+   "name": "Rim Bulb 2",
+   "box": [
+    1314,
+    199,
+    7,
+    6
+   ],
+   "distance": 40.38,
+   "coverage": 0
+  },
+  {
+   "id": 150,
+   "name": "Cabin 2 Rod",
+   "box": [
+    1293,
+    180,
+    3,
+    13
+   ],
+   "distance": 40.38,
+   "coverage": 0
+  },
+  {
+   "id": 147,
+   "name": "Cabin 2",
+   "box": [
+    1289,
+    176,
+    12,
+    12
+   ],
+   "distance": 40.38,
+   "coverage": 0
+  },
+  {
+   "id": 149,
+   "name": "Cabin 2 Roof",
+   "box": [
+    1265,
+    177,
+    59,
+    6
+   ],
+   "distance": 40.38,
+   "coverage": 0
+  },
+  {
+   "id": 40,
+   "name": "Rim 3b",
+   "box": [
+    1304,
+    194,
+    31,
+    38
+   ],
+   "distance": 40.4,
+   "coverage": 0.001
+  },
+  {
+   "id": 420,
+   "name": "Balloon 2 Skin",
+   "box": [
+    1275,
+    505,
+    26,
+    27
+   ],
+   "distance": 40.4,
+   "coverage": 0
+  },
+  {
+   "id": 419,
+   "name": "Balloon 2",
+   "box": [
+    1282,
+    512,
+    12,
+    12
+   ],
+   "distance": 40.4,
+   "coverage": 0
+  },
+  {
+   "id": 350,
+   "name": "String Bulb 25",
+   "box": [
+    1038,
+    517,
+    4,
+    4
+   ],
+   "distance": 40.48,
+   "coverage": 0
+  },
+  {
+   "id": 102,
+   "name": "Rim 34b",
+   "box": [
+    1319,
+    376,
+    21,
+    41
+   ],
+   "distance": 40.53,
+   "coverage": 0
+  },
+  {
+   "id": 421,
+   "name": "Balloon 2 String",
+   "box": [
+    1282,
+    525,
+    10,
+    55
+   ],
+   "distance": 40.63,
+   "coverage": 0
+  },
+  {
+   "id": 410,
+   "name": "String Bulb 85",
+   "box": [
+    1128,
+    522,
+    5,
+    4
+   ],
+   "distance": 40.66,
+   "coverage": 0
+  },
+  {
+   "id": 140,
+   "name": "Rim Bulb 22",
+   "box": [
+    1318,
+    421,
+    7,
+    6
+   ],
+   "distance": 40.69,
+   "coverage": 0
+  },
+  {
+   "id": 42,
+   "name": "Rim 4b",
+   "box": [
+    1282,
+    165,
+    35,
+    35
+   ],
+   "distance": 40.7,
+   "coverage": 0.001
+  },
+  {
+   "id": 225,
+   "name": "Horse 3 Pole",
+   "box": [
+    667,
+    517,
+    10,
+    91
+   ],
+   "distance": 40.79,
+   "coverage": 0
+  },
+  {
+   "id": 435,
+   "name": "Balloon 7 Skin",
+   "box": [
+    1310,
+    495,
+    25,
+    26
+   ],
+   "distance": 40.83,
+   "coverage": 0
+  },
+  {
+   "id": 434,
+   "name": "Balloon 7",
+   "box": [
+    1317,
+    502,
+    12,
+    12
+   ],
+   "distance": 40.83,
+   "coverage": 0
+  },
+  {
+   "id": 422,
+   "name": "Balloon 3",
+   "box": [
+    1316,
+    519,
+    12,
+    12
+   ],
+   "distance": 40.86,
+   "coverage": 0
+  },
+  {
+   "id": 423,
+   "name": "Balloon 3 Skin",
+   "box": [
+    1309,
+    512,
+    26,
+    27
+   ],
+   "distance": 40.86,
+   "coverage": 0
+  },
+  {
+   "id": 100,
+   "name": "Rim 33b",
+   "box": [
+    1301,
+    409,
+    26,
+    39
+   ],
+   "distance": 40.87,
+   "coverage": 0
+  },
+  {
+   "id": 438,
+   "name": "Balloon 8 Skin",
+   "box": [
+    1292,
+    526,
+    25,
+    27
+   ],
+   "distance": 40.88,
+   "coverage": 0
+  },
+  {
+   "id": 437,
+   "name": "Balloon 8",
+   "box": [
+    1298,
+    533,
+    12,
+    12
+   ],
+   "distance": 40.88,
+   "coverage": 0
+  },
+  {
+   "id": 121,
+   "name": "Rim Bulb 3",
+   "box": [
+    1280,
+    156,
+    7,
+    6
+   ],
+   "distance": 40.91,
+   "coverage": 0
+  },
+  {
+   "id": 351,
+   "name": "String Bulb 26",
+   "box": [
+    1047,
+    509,
+    4,
+    4
+   ],
+   "distance": 40.91,
+   "coverage": 0
+  },
+  {
+   "id": 432,
+   "name": "Balloon 6 Skin",
+   "box": [
+    1290,
+    509,
+    25,
+    27
+   ],
+   "distance": 40.92,
+   "coverage": 0
+  },
+  {
+   "id": 431,
+   "name": "Balloon 6",
+   "box": [
+    1297,
+    516,
+    12,
+    12
+   ],
+   "distance": 40.92,
+   "coverage": 0
+  },
+  {
+   "id": 220,
+   "name": "Horse 2 Pole",
+   "box": [
+    738,
+    510,
+    8,
+    89
+   ],
+   "distance": 40.93,
+   "coverage": 0
+  },
+  {
+   "id": 222,
+   "name": "Horse 2 Head",
+   "box": [
+    718,
+    576,
+    19,
+    17
+   ],
+   "distance": 40.93,
+   "coverage": 0
+  },
+  {
+   "id": 409,
+   "name": "String Bulb 84",
+   "box": [
+    1112,
+    516,
+    4,
+    4
+   ],
+   "distance": 40.94,
+   "coverage": 0
+  },
+  {
+   "id": 429,
+   "name": "Balloon 5 Skin",
+   "box": [
+    1284,
+    499,
+    25,
+    26
+   ],
+   "distance": 40.96,
+   "coverage": 0
+  },
+  {
+   "id": 428,
+   "name": "Balloon 5",
+   "box": [
+    1291,
+    507,
+    12,
+    12
+   ],
+   "distance": 40.96,
+   "coverage": 0
+  },
+  {
+   "id": 223,
+   "name": "Horse 2 Mane",
+   "box": [
+    729,
+    575,
+    15,
+    13
+   ],
+   "distance": 41.07,
+   "coverage": 0
+  },
+  {
+   "id": 417,
+   "name": "Balloon 1 Skin",
+   "box": [
+    1301,
+    517,
+    26,
+    27
+   ],
+   "distance": 41.09,
+   "coverage": 0
+  },
+  {
+   "id": 416,
+   "name": "Balloon 1",
+   "box": [
+    1308,
+    524,
+    12,
+    12
+   ],
+   "distance": 41.09,
+   "coverage": 0
+  },
+  {
+   "id": 44,
+   "name": "Rim 5b",
+   "box": [
+    1256,
+    141,
+    37,
+    30
+   ],
+   "distance": 41.09,
+   "coverage": 0.001
+  },
+  {
+   "id": 439,
+   "name": "Balloon 8 String",
+   "box": [
+    1295,
+    546,
+    8,
+    55
+   ],
+   "distance": 41.1,
+   "coverage": 0
+  },
+  {
+   "id": 426,
+   "name": "Balloon 4 Skin",
+   "box": [
+    1276,
+    508,
+    25,
+    27
+   ],
+   "distance": 41.11,
+   "coverage": 0
+  },
+  {
+   "id": 425,
+   "name": "Balloon 4",
+   "box": [
+    1283,
+    515,
+    12,
+    12
+   ],
+   "distance": 41.11,
+   "coverage": 0
+  },
+  {
+   "id": 433,
+   "name": "Balloon 6 String",
+   "box": [
+    1295,
+    529,
+    8,
+    55
+   ],
+   "distance": 41.12,
+   "coverage": 0
+  },
+  {
+   "id": 228,
+   "name": "Horse 3 Mane",
+   "box": [
+    658,
+    581,
+    17,
+    13
+   ],
+   "distance": 41.15,
+   "coverage": 0
+  },
+  {
+   "id": 35,
+   "name": "Rim 1a",
+   "box": [
+    1345,
+    263,
+    19,
+    41
+   ],
+   "distance": 41.15,
+   "coverage": 0
+  },
+  {
+   "id": 105,
+   "name": "Rim 36a",
+   "box": [
+    1351,
+    300,
+    13,
+    41
+   ],
+   "distance": 41.17,
+   "coverage": 0
+  },
+  {
+   "id": 226,
+   "name": "Horse 3 Body",
+   "box": [
+    645,
+    587,
+    59,
+    31
+   ],
+   "distance": 41.21,
+   "coverage": 0.001
+  },
+  {
+   "id": 224,
+   "name": "Horse 3",
+   "box": [
+    669,
+    596,
+    12,
+    12
+   ],
+   "distance": 41.21,
+   "coverage": 0
+  },
+  {
+   "id": 408,
+   "name": "String Bulb 83",
+   "box": [
+    1097,
+    508,
+    4,
+    4
+   ],
+   "distance": 41.21,
+   "coverage": 0
+  },
+  {
+   "id": 37,
+   "name": "Rim 2a",
+   "box": [
+    1334,
+    227,
+    25,
+    40
+   ],
+   "distance": 41.23,
+   "coverage": 0
+  },
+  {
+   "id": 436,
+   "name": "Balloon 7 String",
+   "box": [
+    1317,
+    514,
+    8,
+    55
+   ],
+   "distance": 41.24,
+   "coverage": 0
+  },
+  {
+   "id": 424,
+   "name": "Balloon 3 String",
+   "box": [
+    1312,
+    531,
+    10,
+    55
+   ],
+   "distance": 41.27,
+   "coverage": 0
+  },
+  {
+   "id": 227,
+   "name": "Horse 3 Head",
+   "box": [
+    645,
+    580,
+    23,
+    18
+   ],
+   "distance": 41.28,
+   "coverage": 0
+  },
+  {
+   "id": 98,
+   "name": "Rim 32b",
+   "box": [
+    1278,
+    438,
+    30,
+    37
+   ],
+   "distance": 41.3,
+   "coverage": 0.001
+  },
+  {
+   "id": 103,
+   "name": "Rim 35a",
+   "box": [
+    1345,
+    337,
+    14,
+    41
+   ],
+   "distance": 41.31,
+   "coverage": 0
+  },
+  {
+   "id": 427,
+   "name": "Balloon 4 String",
+   "box": [
+    1282,
+    528,
+    9,
+    54
+   ],
+   "distance": 41.32,
+   "coverage": 0
+  },
+  {
+   "id": 352,
+   "name": "String Bulb 27",
+   "box": [
+    1057,
+    498,
+    4,
+    4
+   ],
+   "distance": 41.33,
+   "coverage": 0
+  },
+  {
+   "id": 221,
+   "name": "Horse 2 Body",
+   "box": [
+    718,
+    580,
+    52,
+    28
+   ],
+   "distance": 41.35,
+   "coverage": 0.001
+  },
+  {
+   "id": 219,
+   "name": "Horse 2",
+   "box": [
+    738,
+    587,
+    12,
+    12
+   ],
+   "distance": 41.35,
+   "coverage": 0
+  },
+  {
+   "id": 139,
+   "name": "Rim Bulb 21",
+   "box": [
+    1286,
+    463,
+    7,
+    6
+   ],
+   "distance": 41.35,
+   "coverage": 0
+  },
+  {
+   "id": 430,
+   "name": "Balloon 5 String",
+   "box": [
+    1290,
+    518,
+    9,
+    55
+   ],
+   "distance": 41.37,
+   "coverage": 0
+  },
+  {
+   "id": 204,
+   "name": "Carousel Bulb 7",
+   "box": [
+    571,
+    506,
+    8,
+    6
+   ],
+   "distance": 41.39,
+   "coverage": 0
+  },
+  {
+   "id": 39,
+   "name": "Rim 3a",
+   "box": [
+    1317,
+    194,
+    30,
+    37
+   ],
+   "distance": 41.43,
+   "coverage": 0.001
+  },
+  {
+   "id": 185,
+   "name": "Cabin 11 Roof",
+   "box": [
+    1238,
+    471,
+    55,
+    17
+   ],
+   "distance": 41.47,
+   "coverage": 0
+  },
+  {
+   "id": 407,
+   "name": "String Bulb 82",
+   "box": [
+    1082,
+    498,
+    4,
+    4
+   ],
+   "distance": 41.48,
+   "coverage": 0
+  },
+  {
+   "id": 183,
+   "name": "Cabin 11",
+   "box": [
+    1259,
+    475,
+    12,
+    12
+   ],
+   "distance": 41.48,
+   "coverage": 0
+  },
+  {
+   "id": 418,
+   "name": "Balloon 1 String",
+   "box": [
+    1303,
+    536,
+    10,
+    54
+   ],
+   "distance": 41.48,
+   "coverage": 0
+  },
+  {
+   "id": 186,
+   "name": "Cabin 11 Rod",
+   "box": [
+    1263,
+    480,
+    3,
+    12
+   ],
+   "distance": 41.52,
+   "coverage": 0
+  },
+  {
+   "id": 101,
+   "name": "Rim 34a",
+   "box": [
+    1332,
+    373,
+    20,
+    40
+   ],
+   "distance": 41.55,
+   "coverage": 0
+  },
+  {
+   "id": 46,
+   "name": "Rim 6b",
+   "box": [
+    1227,
+    125,
+    38,
+    25
+   ],
+   "distance": 41.56,
+   "coverage": 0
+  },
+  {
+   "id": 122,
+   "name": "Rim Bulb 4",
+   "box": [
+    1236,
+    126,
+    7,
+    6
+   ],
+   "distance": 41.62,
+   "coverage": 0
+  },
+  {
+   "id": 184,
+   "name": "Cabin 11 Car",
+   "box": [
+    1238,
+    484,
+    49,
+    38
+   ],
+   "distance": 41.66,
+   "coverage": 0.001
+  },
+  {
+   "id": 41,
+   "name": "Rim 4a",
+   "box": [
+    1296,
+    166,
+    34,
+    34
+   ],
+   "distance": 41.72,
+   "coverage": 0.001
+  },
+  {
+   "id": 152,
+   "name": "Cabin 3 Car",
+   "box": [
+    1183,
+    131,
+    51,
+    33
+   ],
+   "distance": 41.75,
+   "coverage": 0.001
+  },
+  {
+   "id": 154,
+   "name": "Cabin 3 Rod",
+   "box": [
+    1208,
+    122,
+    3,
+    13
+   ],
+   "distance": 41.77,
+   "coverage": 0
+  },
+  {
+   "id": 151,
+   "name": "Cabin 3",
+   "box": [
+    1204,
+    118,
+    12,
+    12
+   ],
+   "distance": 41.78,
+   "coverage": 0
+  },
+  {
+   "id": 153,
+   "name": "Cabin 3 Roof",
+   "box": [
+    1182,
+    117,
+    57,
+    10
+   ],
+   "distance": 41.78,
+   "coverage": 0
+  },
+  {
+   "id": 96,
+   "name": "Rim 31b",
+   "box": [
+    1253,
+    463,
+    33,
+    33
+   ],
+   "distance": 41.79,
+   "coverage": 0.001
+  },
+  {
+   "id": 99,
+   "name": "Rim 33a",
+   "box": [
+    1314,
+    405,
+    25,
+    39
+   ],
+   "distance": 41.88,
+   "coverage": 0
+  },
+  {
+   "id": 198,
+   "name": "Carousel Bulb 1",
+   "box": [
+    817,
+    490,
+    7,
+    5
+   ],
+   "distance": 41.94,
+   "coverage": 0
+  },
+  {
+   "id": 107,
+   "name": "Spoke 1",
+   "box": [
+    1160,
+    275,
+    190,
+    61
+   ],
+   "distance": 42,
+   "coverage": 0.006
+  },
+  {
+   "id": 32,
+   "name": "Wheel Leg 11",
+   "box": [
+    1141,
+    321,
+    112,
+    303
+   ],
+   "distance": 42.03,
+   "coverage": 0.016
+  },
+  {
+   "id": 48,
+   "name": "Rim 7b",
+   "box": [
+    1196,
+    115,
+    38,
+    18
+   ],
+   "distance": 42.09,
+   "coverage": 0
+  },
+  {
+   "id": 43,
+   "name": "Rim 5a",
+   "box": [
+    1270,
+    143,
+    37,
+    30
+   ],
+   "distance": 42.1,
+   "coverage": 0.001
+  },
+  {
+   "id": 138,
+   "name": "Rim Bulb 20",
+   "box": [
+    1247,
+    494,
+    7,
+    6
+   ],
+   "distance": 42.15,
+   "coverage": 0
+  },
+  {
+   "id": 118,
+   "name": "Spoke 12",
+   "box": [
+    1158,
+    321,
+    185,
+    75
+   ],
+   "distance": 42.19,
+   "coverage": 0.007
+  },
+  {
+   "id": 530,
+   "name": "Pumpkin Stem",
+   "box": [
+    530,
+    616,
+    3,
+    5
+   ],
+   "distance": 42.26,
+   "coverage": 0
+  },
+  {
+   "id": 108,
+   "name": "Spoke 2",
+   "box": [
+    1160,
+    181,
+    148,
+    151
+   ],
+   "distance": 42.28,
+   "coverage": 0.011
+  },
+  {
+   "id": 321,
+   "name": "Light Pole 4",
+   "box": [
+    1064,
+    487,
+    8,
+    117
+   ],
+   "distance": 42.29,
+   "coverage": 0
+  },
+  {
+   "id": 97,
+   "name": "Rim 32a",
+   "box": [
+    1291,
+    434,
+    29,
+    36
+   ],
+   "distance": 42.3,
+   "coverage": 0.001
+  },
+  {
+   "id": 773,
+   "name": "Wheel Glow",
+   "box": [
+    1134,
+    320,
+    12,
+    12
+   ],
+   "distance": 42.3,
+   "coverage": 0
+  },
+  {
+   "id": 230,
+   "name": "Horse 4 Pole",
+   "box": [
+    615,
+    505,
+    11,
+    88
+   ],
+   "distance": 42.33,
+   "coverage": 0
+  },
+  {
+   "id": 94,
+   "name": "Rim 30b",
+   "box": [
+    1225,
+    482,
+    34,
+    29
+   ],
+   "distance": 42.34,
+   "coverage": 0
+  },
+  {
+   "id": 217,
+   "name": "Horse 1 Head",
+   "box": [
+    769,
+    554,
+    21,
+    17
+   ],
+   "distance": 42.34,
+   "coverage": 0
+  },
+  {
+   "id": 529,
+   "name": "Pumpkin Body",
+   "box": [
+    515,
+    614,
+    34,
+    25
+   ],
+   "distance": 42.35,
+   "coverage": 0
+  },
+  {
+   "id": 528,
+   "name": "pumpkin 30",
+   "box": [
+    527,
+    628,
+    12,
+    12
+   ],
+   "distance": 42.45,
+   "coverage": 0
+  },
+  {
+   "id": 123,
+   "name": "Rim Bulb 5",
+   "box": [
+    1189,
+    111,
+    7,
+    6
+   ],
+   "distance": 42.46,
+   "coverage": 0
+  },
+  {
+   "id": 45,
+   "name": "Rim 6a",
+   "box": [
+    1241,
+    126,
+    38,
+    24
+   ],
+   "distance": 42.55,
+   "coverage": 0
+  },
+  {
+   "id": 218,
+   "name": "Horse 1 Mane",
+   "box": [
+    774,
+    552,
+    16,
+    12
+   ],
+   "distance": 42.64,
+   "coverage": 0
+  },
+  {
+   "id": 215,
+   "name": "Horse 1 Pole",
+   "box": [
+    779,
+    489,
+    7,
+    86
+   ],
+   "distance": 42.66,
+   "coverage": 0
+  },
+  {
+   "id": 50,
+   "name": "Rim 8b",
+   "box": [
+    1165,
+    112,
+    37,
+    12
+   ],
+   "distance": 42.66,
+   "coverage": 0
+  },
+  {
+   "id": 197,
+   "name": "Carousel Flag",
+   "box": [
+    682,
+    416,
+    24,
+    26
+   ],
+   "distance": 42.69,
+   "coverage": 0
+  },
+  {
+   "id": 231,
+   "name": "Horse 4 Body",
+   "box": [
+    599,
+    574,
+    48,
+    27
+   ],
+   "distance": 42.73,
+   "coverage": 0.001
+  },
+  {
+   "id": 229,
+   "name": "Horse 4",
+   "box": [
+    617,
+    582,
+    12,
+    12
+   ],
+   "distance": 42.73,
+   "coverage": 0
+  },
+  {
+   "id": 95,
+   "name": "Rim 31a",
+   "box": [
+    1266,
+    458,
+    32,
+    33
+   ],
+   "distance": 42.78,
+   "coverage": 0.001
+  },
+  {
+   "id": 117,
+   "name": "Spoke 11",
+   "box": [
+    1153,
+    321,
+    135,
+    157
+   ],
+   "distance": 42.81,
+   "coverage": 0.01
+  },
+  {
+   "id": 233,
+   "name": "Horse 4 Mane",
+   "box": [
+    612,
+    566,
+    14,
+    12
+   ],
+   "distance": 42.83,
+   "coverage": 0
+  },
+  {
+   "id": 92,
+   "name": "Rim 29b",
+   "box": [
+    1196,
+    496,
+    35,
+    24
+   ],
+   "distance": 42.93,
+   "coverage": 0
+  },
+  {
+   "id": 195,
+   "name": "Carousel Roof",
+   "box": [
+    433,
+    399,
+    512,
+    164
+   ],
+   "distance": 42.94,
+   "coverage": 0.04
+  },
+  {
+   "id": 109,
+   "name": "Spoke 3",
+   "box": [
+    1159,
+    125,
+    65,
+    202
+   ],
+   "distance": 42.95,
+   "coverage": 0.006
+  },
+  {
+   "id": 137,
+   "name": "Rim Bulb 19",
+   "box": [
+    1203,
+    511,
+    6,
+    6
+   ],
+   "distance": 43.05,
+   "coverage": 0
+  },
+  {
+   "id": 216,
+   "name": "Horse 1 Body",
+   "box": [
+    757,
+    555,
+    56,
+    28
+   ],
+   "distance": 43.05,
+   "coverage": 0.001
+  },
+  {
+   "id": 214,
+   "name": "Horse 1",
+   "box": [
+    779,
+    563,
+    12,
+    12
+   ],
+   "distance": 43.05,
+   "coverage": 0
+  },
+  {
+   "id": 47,
+   "name": "Rim 7a",
+   "box": [
+    1211,
+    117,
+    38,
+    18
+   ],
+   "distance": 43.07,
+   "coverage": 0
+  },
+  {
+   "id": 205,
+   "name": "Carousel Bulb 8",
+   "box": [
+    562,
+    495,
+    8,
+    5
+   ],
+   "distance": 43.09,
+   "coverage": 0
+  },
+  {
+   "id": 196,
+   "name": "Carousel Trim",
+   "box": [
+    444,
+    438,
+    495,
+    127
+   ],
+   "distance": 43.14,
+   "coverage": 0.03
+  },
+  {
+   "id": 232,
+   "name": "Horse 4 Head",
+   "box": [
+    606,
+    563,
+    19,
+    16
+   ],
+   "distance": 43.15,
+   "coverage": 0
+  },
+  {
+   "id": 181,
+   "name": "Cabin 10 Roof",
+   "box": [
+    1154,
+    505,
+    52,
+    19
+   ],
+   "distance": 43.21,
+   "coverage": 0
+  },
+  {
+   "id": 179,
+   "name": "Cabin 10",
+   "box": [
+    1174,
+    509,
+    12,
+    12
+   ],
+   "distance": 43.22,
+   "coverage": 0
+  },
+  {
+   "id": 52,
+   "name": "Rim 9b",
+   "box": [
+    1134,
+    114,
+    36,
+    9
+   ],
+   "distance": 43.25,
+   "coverage": 0
+  },
+  {
+   "id": 182,
+   "name": "Cabin 10 Rod",
+   "box": [
+    1178,
+    513,
+    3,
+    11
+   ],
+   "distance": 43.27,
+   "coverage": 0
+  },
+  {
+   "id": 774,
+   "name": "Carousel Glow",
+   "box": [
+    693,
+    499,
+    12,
+    12
+   ],
+   "distance": 43.28,
+   "coverage": 0
+  },
+  {
+   "id": 93,
+   "name": "Rim 30a",
+   "box": [
+    1239,
+    477,
+    34,
+    28
+   ],
+   "distance": 43.32,
+   "coverage": 0
+  },
+  {
+   "id": 124,
+   "name": "Rim Bulb 6",
+   "box": [
+    1140,
+    113,
+    6,
+    6
+   ],
+   "distance": 43.37,
+   "coverage": 0
+  },
+  {
+   "id": 180,
+   "name": "Cabin 10 Car",
+   "box": [
+    1154,
+    516,
+    46,
+    38
+   ],
+   "distance": 43.44,
+   "coverage": 0.001
+  },
+  {
+   "id": 90,
+   "name": "Rim 28b",
+   "box": [
+    1167,
+    504,
+    34,
+    18
+   ],
+   "distance": 43.52,
+   "coverage": 0
+  },
+  {
+   "id": 156,
+   "name": "Cabin 4 Car",
+   "box": [
+    1091,
+    132,
+    48,
+    32
+   ],
+   "distance": 43.53,
+   "coverage": 0.001
+  },
+  {
+   "id": 158,
+   "name": "Cabin 4 Rod",
+   "box": [
+    1115,
+    124,
+    3,
+    12
+   ],
+   "distance": 43.55,
+   "coverage": 0
+  },
+  {
+   "id": 155,
+   "name": "Cabin 4",
+   "box": [
+    1111,
+    119,
+    12,
+    12
+   ],
+   "distance": 43.55,
+   "coverage": 0
+  },
+  {
+   "id": 157,
+   "name": "Cabin 4 Roof",
+   "box": [
+    1090,
+    119,
+    54,
+    10
+   ],
+   "distance": 43.55,
+   "coverage": 0
+  },
+  {
+   "id": 33,
+   "name": "Wheel",
+   "box": [
+    1155,
+    317,
+    12,
+    12
+   ],
+   "distance": 43.6,
+   "coverage": 0
+  },
+  {
+   "id": 34,
+   "name": "Wheel Hub",
+   "box": [
+    1129,
+    301,
+    64,
+    43
+   ],
+   "distance": 43.6,
+   "coverage": 0.001
+  },
+  {
+   "id": 194,
+   "name": "Carousel Pole",
+   "box": [
+    681,
+    480,
+    40,
+    119
+   ],
+   "distance": 43.61,
+   "coverage": 0.002
+  },
+  {
+   "id": 49,
+   "name": "Rim 8a",
+   "box": [
+    1181,
+    114,
+    37,
+    11
+   ],
+   "distance": 43.63,
+   "coverage": 0
+  },
+  {
+   "id": 116,
+   "name": "Spoke 10",
+   "box": [
+    1151,
+    322,
+    53,
+    189
+   ],
+   "distance": 43.66,
+   "coverage": 0.005
+  },
+  {
+   "id": 213,
+   "name": "Carousel Bulb 16",
+   "box": [
+    818,
+    479,
+    7,
+    5
+   ],
+   "distance": 43.67,
+   "coverage": 0
+  },
+  {
+   "id": 110,
+   "name": "Spoke 4",
+   "box": [
+    1121,
+    124,
+    52,
+    199
+   ],
+   "distance": 43.82,
+   "coverage": 0.005
+  },
+  {
+   "id": 54,
+   "name": "Rim 10b",
+   "box": [
+    1105,
+    118,
+    35,
+    16
+   ],
+   "distance": 43.85,
+   "coverage": 0
+  },
+  {
+   "id": 91,
+   "name": "Rim 29a",
+   "box": [
+    1210,
+    490,
+    34,
+    23
+   ],
+   "distance": 43.89,
+   "coverage": 0
+  },
+  {
+   "id": 584,
+   "name": "Autumn Tree Leaves 3",
+   "box": [
+    1540,
+    485,
+    133,
+    102
+   ],
+   "distance": 43.95,
+   "coverage": 0.007
+  },
+  {
+   "id": 136,
+   "name": "Rim Bulb 18",
+   "box": [
+    1159,
+    515,
+    6,
+    6
+   ],
+   "distance": 43.96,
+   "coverage": 0
+  },
+  {
+   "id": 88,
+   "name": "Rim 27b",
+   "box": [
+    1139,
+    507,
+    33,
+    12
+   ],
+   "distance": 44.12,
+   "coverage": 0
+  },
+  {
+   "id": 585,
+   "name": "Autumn Tree Leaves 4",
+   "box": [
+    1597,
+    448,
+    114,
+    84
+   ],
+   "distance": 44.17,
+   "coverage": 0.005
+  },
+  {
+   "id": 192,
+   "name": "Carousel Base",
+   "box": [
+    539,
+    542,
+    325,
+    116
+   ],
+   "distance": 44.2,
+   "coverage": 0.018
+  },
+  {
+   "id": 51,
+   "name": "Rim 9a",
+   "box": [
+    1150,
+    116,
+    35,
+    9
+   ],
+   "distance": 44.21,
+   "coverage": 0
+  },
+  {
+   "id": 28,
+   "name": "Plaza",
+   "box": [
+    468,
+    536,
+    463,
+    153
+   ],
+   "distance": 44.28,
+   "coverage": 0.034
+  },
+  {
+   "id": 125,
+   "name": "Rim Bulb 7",
+   "box": [
+    1096,
+    128,
+    6,
+    5
+   ],
+   "distance": 44.28,
+   "coverage": 0
+  },
+  {
+   "id": 191,
+   "name": "Carousel",
+   "box": [
+    699,
+    593,
+    12,
+    12
+   ],
+   "distance": 44.28,
+   "coverage": 0
+  },
+  {
+   "id": 193,
+   "name": "Carousel Spin",
+   "box": [
+    699,
+    593,
+    12,
+    12
+   ],
+   "distance": 44.28,
+   "coverage": 0
+  },
+  {
+   "id": 30,
+   "name": "Wheel Leg -11",
+   "box": [
+    1034,
+    314,
+    96,
+    283
+   ],
+   "distance": 44.36,
+   "coverage": 0.013
+  },
+  {
+   "id": 582,
+   "name": "Autumn Tree Leaves 1",
+   "box": [
+    1551,
+    455,
+    184,
+    139
+   ],
+   "distance": 44.36,
+   "coverage": 0.012
+  },
+  {
+   "id": 56,
+   "name": "Rim 11b",
+   "box": [
+    1078,
+    128,
+    33,
+    21
+   ],
+   "distance": 44.43,
+   "coverage": 0
+  },
+  {
+   "id": 89,
+   "name": "Rim 28a",
+   "box": [
+    1181,
+    498,
+    34,
+    18
+   ],
+   "distance": 44.47,
+   "coverage": 0
+  },
+  {
+   "id": 31,
+   "name": "Wheel Leg 1-1",
+   "box": [
+    1178,
+    316,
+    109,
+    288
+   ],
+   "distance": 44.49,
+   "coverage": 0.015
+  },
+  {
+   "id": 115,
+   "name": "Spoke 9",
+   "box": [
+    1106,
+    319,
+    57,
+    183
+   ],
+   "distance": 44.52,
+   "coverage": 0.005
+  },
+  {
+   "id": 235,
+   "name": "Horse 5 Pole",
+   "box": [
+    613,
+    483,
+    11,
+    85
+   ],
+   "distance": 44.55,
+   "coverage": 0
+  },
+  {
+   "id": 252,
+   "name": "Horse 8 Head",
+   "box": [
+    775,
+    531,
+    17,
+    15
+   ],
+   "distance": 44.6,
+   "coverage": 0
+  },
+  {
+   "id": 111,
+   "name": "Spoke 5",
+   "box": [
+    1050,
+    176,
+    120,
+    148
+   ],
+   "distance": 44.66,
+   "coverage": 0.009
+  },
+  {
+   "id": 86,
+   "name": "Rim 26b",
+   "box": [
+    1111,
+    500,
+    32,
+    14
+   ],
+   "distance": 44.69,
+   "coverage": 0
+  },
+  {
+   "id": 206,
+   "name": "Carousel Bulb 9",
+   "box": [
+    573,
+    484,
+    7,
+    5
+   ],
+   "distance": 44.77,
+   "coverage": 0
+  },
+  {
+   "id": 53,
+   "name": "Rim 10a",
+   "box": [
+    1121,
+    120,
+    34,
+    15
+   ],
+   "distance": 44.79,
+   "coverage": 0
+  },
+  {
+   "id": 135,
+   "name": "Rim Bulb 17",
+   "box": [
+    1116,
+    506,
+    6,
+    6
+   ],
+   "distance": 44.84,
+   "coverage": 0
+  },
+  {
+   "id": 253,
+   "name": "Horse 8 Mane",
+   "box": [
+    772,
+    530,
+    13,
+    11
+   ],
+   "distance": 44.87,
+   "coverage": 0
+  },
+  {
+   "id": 250,
+   "name": "Horse 8 Pole",
+   "box": [
+    770,
+    469,
+    7,
+    82
+   ],
+   "distance": 44.87,
+   "coverage": 0
+  },
+  {
+   "id": 234,
+   "name": "Horse 5",
+   "box": [
+    615,
+    556,
+    12,
+    12
+   ],
+   "distance": 44.92,
+   "coverage": 0
+  },
+  {
+   "id": 236,
+   "name": "Horse 5 Body",
+   "box": [
+    592,
+    548,
+    57,
+    27
+   ],
+   "distance": 44.92,
+   "coverage": 0.001
+  },
+  {
+   "id": 177,
+   "name": "Cabin 9 Roof",
+   "box": [
+    1071,
+    489,
+    49,
+    16
+   ],
+   "distance": 44.93,
+   "coverage": 0
+  },
+  {
+   "id": 175,
+   "name": "Cabin 9",
+   "box": [
+    1090,
+    492,
+    12,
+    12
+   ],
+   "distance": 44.94,
+   "coverage": 0
+  },
+  {
+   "id": 581,
+   "name": "Autumn Tree Trunk",
+   "box": [
+    1612,
+    538,
+    38,
+    104
+   ],
+   "distance": 44.97,
+   "coverage": 0.002
+  },
+  {
+   "id": 178,
+   "name": "Cabin 9 Rod",
+   "box": [
+    1094,
+    496,
+    2,
+    11
+   ],
+   "distance": 44.98,
+   "coverage": 0
+  },
+  {
+   "id": 58,
+   "name": "Rim 12b",
+   "box": [
+    1054,
+    144,
+    30,
+    25
+   ],
+   "distance": 44.99,
+   "coverage": 0
+  },
+  {
+   "id": 238,
+   "name": "Horse 5 Mane",
+   "box": [
+    615,
+    541,
+    17,
+    12
+   ],
+   "distance": 45.03,
+   "coverage": 0
+  },
+  {
+   "id": 87,
+   "name": "Rim 27a",
+   "box": [
+    1153,
+    501,
+    33,
+    12
+   ],
+   "distance": 45.06,
+   "coverage": 0
+  },
+  {
+   "id": 126,
+   "name": "Rim Bulb 8",
+   "box": [
+    1057,
+    155,
+    6,
+    5
+   ],
+   "distance": 45.13,
+   "coverage": 0
+  },
+  {
+   "id": 176,
+   "name": "Cabin 9 Car",
+   "box": [
+    1073,
+    500,
+    43,
+    34
+   ],
+   "distance": 45.14,
+   "coverage": 0.001
+  },
+  {
+   "id": 114,
+   "name": "Spoke 8",
+   "box": [
+    1042,
+    314,
+    120,
+    140
+   ],
+   "distance": 45.16,
+   "coverage": 0.008
+  },
+  {
+   "id": 583,
+   "name": "Autumn Tree Leaves 2",
+   "box": [
+    1608,
+    490,
+    126,
+    97
+   ],
+   "distance": 45.21,
+   "coverage": 0.006
+  },
+  {
+   "id": 160,
+   "name": "Cabin 5 Car",
+   "box": [
+    1018,
+    186,
+    44,
+    26
+   ],
+   "distance": 45.21,
+   "coverage": 0.001
+  },
+  {
+   "id": 162,
+   "name": "Cabin 5 Rod",
+   "box": [
+    1040,
+    177,
+    2,
+    11
+   ],
+   "distance": 45.21,
+   "coverage": 0
+  },
+  {
+   "id": 159,
+   "name": "Cabin 5",
+   "box": [
+    1035,
+    172,
+    12,
+    12
+   ],
+   "distance": 45.21,
+   "coverage": 0
+  },
+  {
+   "id": 161,
+   "name": "Cabin 5 Roof",
+   "box": [
+    1016,
+    174,
+    51,
+    6
+   ],
+   "distance": 45.21,
+   "coverage": 0
+  },
+  {
+   "id": 84,
+   "name": "Rim 25b",
+   "box": [
+    1085,
+    487,
+    31,
+    19
+   ],
+   "distance": 45.23,
+   "coverage": 0
+  },
+  {
+   "id": 112,
+   "name": "Spoke 6",
+   "box": [
+    1011,
+    260,
+    153,
+    64
+   ],
+   "distance": 45.24,
+   "coverage": 0.005
+  },
+  {
+   "id": 251,
+   "name": "Horse 8 Body",
+   "box": [
+    753,
+    535,
+    45,
+    23
+   ],
+   "distance": 45.24,
+   "coverage": 0.001
+  },
+  {
+   "id": 249,
+   "name": "Horse 8",
+   "box": [
+    769,
+    540,
+    12,
+    12
+   ],
+   "distance": 45.24,
+   "coverage": 0
+  },
+  {
+   "id": 212,
+   "name": "Carousel Bulb 15",
+   "box": [
+    801,
+    470,
+    7,
+    5
+   ],
+   "distance": 45.29,
+   "coverage": 0
+  },
+  {
+   "id": 237,
+   "name": "Horse 5 Head",
+   "box": [
+    616,
+    537,
+    21,
+    16
+   ],
+   "distance": 45.35,
+   "coverage": 0
+  },
+  {
+   "id": 55,
+   "name": "Rim 11a",
+   "box": [
+    1094,
+    130,
+    32,
+    21
+   ],
+   "distance": 45.36,
+   "coverage": 0
+  },
+  {
+   "id": 113,
+   "name": "Spoke 7",
+   "box": [
+    1009,
+    311,
+    153,
+    58
+   ],
+   "distance": 45.42,
+   "coverage": 0.004
+  },
+  {
+   "id": 580,
+   "name": "autumn_tree 9",
+   "box": [
+    1617,
+    631,
+    12,
+    12
+   ],
+   "distance": 45.46,
+   "coverage": 0
+  },
+  {
+   "id": 60,
+   "name": "Rim 13b",
+   "box": [
+    1033,
+    164,
+    26,
+    29
+   ],
+   "distance": 45.5,
+   "coverage": 0
+  },
+  {
+   "id": 85,
+   "name": "Rim 26a",
+   "box": [
+    1126,
+    495,
+    32,
+    14
+   ],
+   "distance": 45.62,
+   "coverage": 0
+  },
+  {
+   "id": 134,
+   "name": "Rim Bulb 16",
+   "box": [
+    1077,
+    485,
+    6,
+    5
+   ],
+   "distance": 45.62,
+   "coverage": 0
+  },
+  {
+   "id": 82,
+   "name": "Rim 24b",
+   "box": [
+    1062,
+    469,
+    29,
+    23
+   ],
+   "distance": 45.71,
+   "coverage": 0
+  },
+  {
+   "id": 127,
+   "name": "Rim Bulb 9",
+   "box": [
+    1026,
+    192,
+    6,
+    5
+   ],
+   "distance": 45.87,
+   "coverage": 0
+  },
+  {
+   "id": 57,
+   "name": "Rim 12a",
+   "box": [
+    1070,
+    145,
+    29,
+    25
+   ],
+   "distance": 45.91,
+   "coverage": 0
+  },
+  {
+   "id": 62,
+   "name": "Rim 14b",
+   "box": [
+    1017,
+    188,
+    22,
+    31
+   ],
+   "distance": 45.95,
+   "coverage": 0
+  },
+  {
+   "id": 661,
+   "name": "Autumn Tree Leaves 2",
+   "box": [
+    1756,
+    520,
+    111,
+    89
+   ],
+   "distance": 46.01,
+   "coverage": 0.005
+  },
+  {
+   "id": 80,
+   "name": "Rim 23b",
+   "box": [
+    1041,
+    448,
+    27,
+    27
+   ],
+   "distance": 46.13,
+   "coverage": 0
+  },
+  {
+   "id": 83,
+   "name": "Rim 25a",
+   "box": [
+    1100,
+    482,
+    31,
+    18
+   ],
+   "distance": 46.14,
+   "coverage": 0
+  },
+  {
+   "id": 240,
+   "name": "Horse 6 Pole",
+   "box": [
+    658,
+    464,
+    9,
+    81
+   ],
+   "distance": 46.15,
+   "coverage": 0
+  },
+  {
+   "id": 173,
+   "name": "Cabin 8 Roof",
+   "box": [
+    1007,
+    432,
+    48,
+    13
+   ],
+   "distance": 46.19,
+   "coverage": 0
+  },
+  {
+   "id": 207,
+   "name": "Carousel Bulb 10",
+   "box": [
+    601,
+    474,
+    7,
+    5
+   ],
+   "distance": 46.19,
+   "coverage": 0
+  },
+  {
+   "id": 171,
+   "name": "Cabin 8",
+   "box": [
+    1025,
+    434,
+    12,
+    12
+   ],
+   "distance": 46.2,
+   "coverage": 0
+  },
+  {
+   "id": 174,
+   "name": "Cabin 8 Rod",
+   "box": [
+    1030,
+    438,
+    2,
+    10
+   ],
+   "distance": 46.22,
+   "coverage": 0
+  },
+  {
+   "id": 133,
+   "name": "Rim Bulb 15",
+   "box": [
+    1044,
+    456,
+    6,
+    5
+   ],
+   "distance": 46.27,
+   "coverage": 0
+  },
+  {
+   "id": 245,
+   "name": "Horse 7 Pole",
+   "box": [
+    720,
+    459,
+    8,
+    80
+   ],
+   "distance": 46.27,
+   "coverage": 0
+  },
+  {
+   "id": 64,
+   "name": "Rim 15b",
+   "box": [
+    1006,
+    215,
+    18,
+    33
+   ],
+   "distance": 46.33,
+   "coverage": 0
+  },
+  {
+   "id": 247,
+   "name": "Horse 7 Head",
+   "box": [
+    731,
+    516,
+    19,
+    15
+   ],
+   "distance": 46.33,
+   "coverage": 0
+  },
+  {
+   "id": 172,
+   "name": "Cabin 8 Car",
+   "box": [
+    1010,
+    443,
+    42,
+    32
+   ],
+   "distance": 46.33,
+   "coverage": 0.001
+  },
+  {
+   "id": 165,
+   "name": "Cabin 6 Roof",
+   "box": [
+    975,
+    258,
+    49,
+    7
+   ],
+   "distance": 46.35,
+   "coverage": 0
+  },
+  {
+   "id": 163,
+   "name": "Cabin 6",
+   "box": [
+    994,
+    256,
+    12,
+    12
+   ],
+   "distance": 46.35,
+   "coverage": 0
+  },
+  {
+   "id": 166,
+   "name": "Cabin 6 Rod",
+   "box": [
+    998,
+    261,
+    2,
+    11
+   ],
+   "distance": 46.35,
+   "coverage": 0
+  },
+  {
+   "id": 164,
+   "name": "Cabin 6 Car",
+   "box": [
+    979,
+    268,
+    42,
+    27
+   ],
+   "distance": 46.37,
+   "coverage": 0.001
+  },
+  {
+   "id": 59,
+   "name": "Rim 13a",
+   "box": [
+    1050,
+    165,
+    26,
+    28
+   ],
+   "distance": 46.41,
+   "coverage": 0
+  },
+  {
+   "id": 248,
+   "name": "Horse 7 Mane",
+   "box": [
+    725,
+    517,
+    15,
+    11
+   ],
+   "distance": 46.41,
+   "coverage": 0
+  },
+  {
+   "id": 128,
+   "name": "Rim Bulb 10",
+   "box": [
+    1005,
+    235,
+    6,
+    5
+   ],
+   "distance": 46.45,
+   "coverage": 0
+  },
+  {
+   "id": 78,
+   "name": "Rim 22b",
+   "box": [
+    1024,
+    424,
+    24,
+    30
+   ],
+   "distance": 46.48,
+   "coverage": 0
+  },
+  {
+   "id": 243,
+   "name": "Horse 6 Mane",
+   "box": [
+    663,
+    521,
+    14,
+    11
+   ],
+   "distance": 46.48,
+   "coverage": 0
+  },
+  {
+   "id": 241,
+   "name": "Horse 6 Body",
+   "box": [
+    640,
+    529,
+    48,
+    24
+   ],
+   "distance": 46.5,
+   "coverage": 0.001
+  },
+  {
+   "id": 239,
+   "name": "Horse 6",
+   "box": [
+    659,
+    534,
+    12,
+    12
+   ],
+   "distance": 46.5,
+   "coverage": 0
+  },
+  {
+   "id": 663,
+   "name": "Autumn Tree Leaves 4",
+   "box": [
+    1771,
+    475,
+    98,
+    75
+   ],
+   "distance": 46.54,
+   "coverage": 0.004
+  },
+  {
+   "id": 211,
+   "name": "Carousel Bulb 14",
+   "box": [
+    770,
+    463,
+    7,
+    5
+   ],
+   "distance": 46.57,
+   "coverage": 0
+  },
+  {
+   "id": 81,
+   "name": "Rim 24a",
+   "box": [
+    1077,
+    465,
+    29,
+    23
+   ],
+   "distance": 46.62,
+   "coverage": 0
+  },
+  {
+   "id": 246,
+   "name": "Horse 7 Body",
+   "box": [
+    700,
+    522,
+    52,
+    24
+   ],
+   "distance": 46.63,
+   "coverage": 0.001
+  },
+  {
+   "id": 244,
+   "name": "Horse 7",
+   "box": [
+    720,
+    528,
+    12,
+    12
+   ],
+   "distance": 46.63,
+   "coverage": 0
+  },
+  {
+   "id": 66,
+   "name": "Rim 16b",
+   "box": [
+    998,
+    245,
+    14,
+    34
+   ],
+   "distance": 46.63,
+   "coverage": 0
+  },
+  {
+   "id": 242,
+   "name": "Horse 6 Head",
+   "box": [
+    670,
+    519,
+    17,
+    15
+   ],
+   "distance": 46.63,
+   "coverage": 0
+  },
+  {
+   "id": 29,
+   "name": "Wheel Leg -1-1",
+   "box": [
+    1074,
+    309,
+    95,
+    270
+   ],
+   "distance": 46.7,
+   "coverage": 0.012
+  },
+  {
+   "id": 169,
+   "name": "Cabin 7 Roof",
+   "box": [
+    973,
+    349,
+    48,
+    11
+   ],
+   "distance": 46.7,
+   "coverage": 0
+  },
+  {
+   "id": 167,
+   "name": "Cabin 7",
+   "box": [
+    991,
+    350,
+    12,
+    12
+   ],
+   "distance": 46.71,
+   "coverage": 0
+  },
+  {
+   "id": 170,
+   "name": "Cabin 7 Rod",
+   "box": [
+    996,
+    354,
+    2,
+    10
+   ],
+   "distance": 46.72,
+   "coverage": 0
+  },
+  {
+   "id": 132,
+   "name": "Rim Bulb 14",
+   "box": [
+    1018,
+    419,
+    6,
+    5
+   ],
+   "distance": 46.73,
+   "coverage": 0
+  },
+  {
+   "id": 76,
+   "name": "Rim 21b",
+   "box": [
+    1011,
+    397,
+    20,
+    32
+   ],
+   "distance": 46.74,
+   "coverage": 0
+  },
+  {
+   "id": 168,
+   "name": "Cabin 7 Car",
+   "box": [
+    977,
+    360,
+    42,
+    30
+   ],
+   "distance": 46.77,
+   "coverage": 0.001
+  },
+  {
+   "id": 68,
+   "name": "Rim 17b",
+   "box": [
+    995,
+    276,
+    9,
+    34
+   ],
+   "distance": 46.84,
+   "coverage": 0
+  },
+  {
+   "id": 129,
+   "name": "Rim Bulb 11",
+   "box": [
+    994,
+    282,
+    6,
+    5
+   ],
+   "distance": 46.84,
+   "coverage": 0
+  },
+  {
+   "id": 61,
+   "name": "Rim 14a",
+   "box": [
+    1034,
+    189,
+    22,
+    31
+   ],
+   "distance": 46.85,
+   "coverage": 0
+  },
+  {
+   "id": 660,
+   "name": "Autumn Tree Leaves 1",
+   "box": [
+    1738,
+    481,
+    158,
+    125
+   ],
+   "distance": 46.88,
+   "coverage": 0.01
+  },
+  {
+   "id": 74,
+   "name": "Rim 20b",
+   "box": [
+    1001,
+    368,
+    16,
+    33
+   ],
+   "distance": 46.91,
+   "coverage": 0
+  },
+  {
+   "id": 70,
+   "name": "Rim 18b",
+   "box": [
+    995,
+    307,
+    8,
+    34
+   ],
+   "distance": 46.96,
+   "coverage": 0
+  },
+  {
+   "id": 72,
+   "name": "Rim 19b",
+   "box": [
+    996,
+    338,
+    12,
+    34
+   ],
+   "distance": 46.98,
+   "coverage": 0
+  },
+  {
+   "id": 131,
+   "name": "Rim Bulb 13",
+   "box": [
+    1001,
+    376,
+    6,
+    5
+   ],
+   "distance": 46.99,
+   "coverage": 0
+  },
+  {
+   "id": 130,
+   "name": "Rim Bulb 12",
+   "box": [
+    993,
+    329,
+    6,
+    5
+   ],
+   "distance": 47.03,
+   "coverage": 0
+  },
+  {
+   "id": 79,
+   "name": "Rim 23a",
+   "box": [
+    1057,
+    444,
+    26,
+    26
+   ],
+   "distance": 47.03,
+   "coverage": 0
+  },
+  {
+   "id": 208,
+   "name": "Carousel Bulb 11",
+   "box": [
+    640,
+    466,
+    7,
+    5
+   ],
+   "distance": 47.17,
+   "coverage": 0
+  },
+  {
+   "id": 63,
+   "name": "Rim 15a",
+   "box": [
+    1022,
+    215,
+    18,
+    33
+   ],
+   "distance": 47.23,
+   "coverage": 0
+  },
+  {
+   "id": 210,
+   "name": "Carousel Bulb 13",
+   "box": [
+    730,
+    461,
+    7,
+    5
+   ],
+   "distance": 47.37,
+   "coverage": 0
+  },
+  {
+   "id": 77,
+   "name": "Rim 22a",
+   "box": [
+    1040,
+    420,
+    23,
+    29
+   ],
+   "distance": 47.37,
+   "coverage": 0
+  },
+  {
+   "id": 659,
+   "name": "Autumn Tree Trunk",
+   "box": [
+    1786,
+    556,
+    37,
+    93
+   ],
+   "distance": 47.4,
+   "coverage": 0.002
+  },
+  {
+   "id": 65,
+   "name": "Rim 16a",
+   "box": [
+    1015,
+    244,
+    13,
+    34
+   ],
+   "distance": 47.52,
+   "coverage": 0
+  },
+  {
+   "id": 209,
+   "name": "Carousel Bulb 12",
+   "box": [
+    685,
+    462,
+    7,
+    5
+   ],
+   "distance": 47.57,
+   "coverage": 0
+  },
+  {
+   "id": 75,
+   "name": "Rim 21a",
+   "box": [
+    1027,
+    393,
+    20,
+    31
+   ],
+   "distance": 47.63,
+   "coverage": 0
+  },
+  {
+   "id": 67,
+   "name": "Rim 17a",
+   "box": [
+    1012,
+    274,
+    9,
+    34
+   ],
+   "distance": 47.73,
+   "coverage": 0
+  },
+  {
+   "id": 73,
+   "name": "Rim 20a",
+   "box": [
+    1017,
+    365,
+    16,
+    33
+   ],
+   "distance": 47.79,
+   "coverage": 0
+  },
+  {
+   "id": 658,
+   "name": "autumn_tree 22",
+   "box": [
+    1789,
+    638,
+    12,
+    12
+   ],
+   "distance": 47.81,
+   "coverage": 0
+  },
+  {
+   "id": 69,
+   "name": "Rim 18a",
+   "box": [
+    1011,
+    305,
+    8,
+    33
+   ],
+   "distance": 47.84,
+   "coverage": 0
+  },
+  {
+   "id": 71,
+   "name": "Rim 19a",
+   "box": [
+    1012,
+    336,
+    12,
+    33
+   ],
+   "distance": 47.86,
+   "coverage": 0
+  },
+  {
+   "id": 662,
+   "name": "Autumn Tree Leaves 3",
+   "box": [
+    1765,
+    503,
+    113,
+    90
+   ],
+   "distance": 47.9,
+   "coverage": 0.005
+  },
+  {
+   "id": 600,
+   "name": "Autumn Tree Leaves 1",
+   "box": [
+    1899,
+    436,
+    21,
+    169
+   ],
+   "distance": 48.75,
+   "coverage": 0.002
+  },
+  {
+   "id": 602,
+   "name": "Autumn Tree Leaves 3",
+   "box": [
+    1890,
+    465,
+    30,
+    120
+   ],
+   "distance": 49.71,
+   "coverage": 0.002
+  },
+  {
+   "id": 571,
+   "name": "Autumn Tree Leaves 2",
+   "box": [
+    1240,
+    411,
+    126,
+    87
+   ],
+   "distance": 50.39,
+   "coverage": 0.005
+  },
+  {
+   "id": 573,
+   "name": "Autumn Tree Leaves 4",
+   "box": [
+    1248,
+    365,
+    111,
+    72
+   ],
+   "distance": 51.2,
+   "coverage": 0.004
+  },
+  {
+   "id": 570,
+   "name": "Autumn Tree Leaves 1",
+   "box": [
+    1214,
+    373,
+    178,
+    121
+   ],
+   "distance": 51.6,
+   "coverage": 0.01
+  },
+  {
+   "id": 699,
+   "name": "Autumn Tree Leaves 3",
+   "box": [
+    253,
+    480,
+    86,
+    62
+   ],
+   "distance": 51.75,
+   "coverage": 0.003
+  },
+  {
+   "id": 620,
+   "name": "Autumn Tree Leaves 3",
+   "box": [
+    1763,
+    478,
+    105,
+    82
+   ],
+   "distance": 51.92,
+   "coverage": 0.004
+  },
+  {
+   "id": 569,
+   "name": "Autumn Tree Trunk",
+   "box": [
+    1282,
+    448,
+    30,
+    97
+   ],
+   "distance": 52.19,
+   "coverage": 0.001
+  },
+  {
+   "id": 700,
+   "name": "Autumn Tree Leaves 4",
+   "box": [
+    264,
+    450,
+    72,
+    50
+   ],
+   "distance": 52.38,
+   "coverage": 0.002
+  },
+  {
+   "id": 697,
+   "name": "Autumn Tree Leaves 1",
+   "box": [
+    242,
+    456,
+    116,
+    83
+   ],
+   "distance": 52.44,
+   "coverage": 0.005
+  },
+  {
+   "id": 568,
+   "name": "autumn_tree 7",
+   "box": [
+    1287,
+    535,
+    12,
+    12
+   ],
+   "distance": 52.7,
+   "coverage": 0
+  },
+  {
+   "id": 621,
+   "name": "Autumn Tree Leaves 4",
+   "box": [
+    1789,
+    443,
+    88,
+    66
+   ],
+   "distance": 52.72,
+   "coverage": 0.003
+  },
+  {
+   "id": 618,
+   "name": "Autumn Tree Leaves 1",
+   "box": [
+    1754,
+    450,
+    142,
+    109
+   ],
+   "distance": 52.77,
+   "coverage": 0.007
+  },
+  {
+   "id": 696,
+   "name": "Autumn Tree Trunk",
+   "box": [
+    296,
+    508,
+    24,
+    66
+   ],
+   "distance": 52.85,
+   "coverage": 0.001
+  },
+  {
+   "id": 674,
+   "name": "Autumn Tree Leaves 2",
+   "box": [
+    454,
+    414,
+    115,
+    79
+   ],
+   "distance": 52.92,
+   "coverage": 0.004
+  },
+  {
+   "id": 572,
+   "name": "Autumn Tree Leaves 3",
+   "box": [
+    1241,
+    397,
+    127,
+    86
+   ],
+   "distance": 52.98,
+   "coverage": 0.005
+  },
+  {
+   "id": 695,
+   "name": "autumn_tree 6",
+   "box": [
+    307,
+    566,
+    12,
+    12
+   ],
+   "distance": 53.18,
+   "coverage": 0
+  },
+  {
+   "id": 617,
+   "name": "Autumn Tree Trunk",
+   "box": [
+    1796,
+    517,
+    34,
+    84
+   ],
+   "distance": 53.24,
+   "coverage": 0.001
+  },
+  {
+   "id": 698,
+   "name": "Autumn Tree Leaves 2",
+   "box": [
+    266,
+    475,
+    79,
+    57
+   ],
+   "distance": 53.38,
+   "coverage": 0.002
+  },
+  {
+   "id": 616,
+   "name": "autumn_tree 15",
+   "box": [
+    1798,
+    592,
+    12,
+    12
+   ],
+   "distance": 53.62,
+   "coverage": 0
+  },
+  {
+   "id": 676,
+   "name": "Autumn Tree Leaves 4",
+   "box": [
+    457,
+    371,
+    101,
+    66
+   ],
+   "distance": 53.73,
+   "coverage": 0.003
+  },
+  {
+   "id": 619,
+   "name": "Autumn Tree Leaves 2",
+   "box": [
+    1776,
+    474,
+    96,
+    74
+   ],
+   "distance": 53.9,
+   "coverage": 0.003
+  },
+  {
+   "id": 673,
+   "name": "Autumn Tree Leaves 1",
+   "box": [
+    431,
+    379,
+    163,
+    110
+   ],
+   "distance": 54.09,
+   "coverage": 0.009
+  },
+  {
+   "id": 672,
+   "name": "Autumn Tree Trunk",
+   "box": [
+    505,
+    448,
+    30,
+    91
+   ],
+   "distance": 54.63,
+   "coverage": 0.001
+  },
+  {
+   "id": 671,
+   "name": "autumn_tree 2",
+   "box": [
+    519,
+    529,
+    12,
+    12
+   ],
+   "distance": 55.1,
+   "coverage": 0
+  },
+  {
+   "id": 675,
+   "name": "Autumn Tree Leaves 3",
+   "box": [
+    464,
+    400,
+    116,
+    79
+   ],
+   "distance": 55.37,
+   "coverage": 0.004
+  },
+  {
+   "id": 687,
+   "name": "Autumn Tree Leaves 3",
+   "box": [
+    0,
+    470,
+    78,
+    80
+   ],
+   "distance": 55.4,
+   "coverage": 0.003
+  },
+  {
+   "id": 626,
+   "name": "Autumn Tree Leaves 3",
+   "box": [
+    1306,
+    437,
+    78,
+    54
+   ],
+   "distance": 55.94,
+   "coverage": 0.002
+  },
+  {
+   "id": 688,
+   "name": "Autumn Tree Leaves 4",
+   "box": [
+    0,
+    435,
+    55,
+    64
+   ],
+   "distance": 56.26,
+   "coverage": 0.002
+  },
+  {
+   "id": 685,
+   "name": "Autumn Tree Leaves 1",
+   "box": [
+    0,
+    442,
+    91,
+    107
+   ],
+   "distance": 56.28,
+   "coverage": 0.005
+  },
+  {
+   "id": 627,
+   "name": "Autumn Tree Leaves 4",
+   "box": [
+    1318,
+    412,
+    65,
+    44
+   ],
+   "distance": 56.65,
+   "coverage": 0.001
+  },
+  {
+   "id": 624,
+   "name": "Autumn Tree Leaves 1",
+   "box": [
+    1295,
+    417,
+    105,
+    72
+   ],
+   "distance": 56.69,
+   "coverage": 0.004
+  },
+  {
+   "id": 684,
+   "name": "Autumn Tree Trunk",
+   "box": [
+    2,
+    508,
+    38,
+    83
+   ],
+   "distance": 56.72,
+   "coverage": 0.002
+  },
+  {
+   "id": 623,
+   "name": "Autumn Tree Trunk",
+   "box": [
+    1334,
+    462,
+    18,
+    58
+   ],
+   "distance": 57.07,
+   "coverage": 0.001
+  },
+  {
+   "id": 683,
+   "name": "autumn_tree 4",
+   "box": [
+    24,
+    582,
+    12,
+    12
+   ],
+   "distance": 57.08,
+   "coverage": 0
+  },
+  {
+   "id": 559,
+   "name": "Autumn Tree Leaves 2",
+   "box": [
+    1466,
+    438,
+    68,
+    55
+   ],
+   "distance": 57.13,
+   "coverage": 0.002
+  },
+  {
+   "id": 561,
+   "name": "Autumn Tree Leaves 4",
+   "box": [
+    1454,
+    408,
+    60,
+    47
+   ],
+   "distance": 57.14,
+   "coverage": 0.001
+  },
+  {
+   "id": 536,
+   "name": "Autumn Tree Leaves 3",
+   "box": [
+    915,
+    386,
+    104,
+    69
+   ],
+   "distance": 57.21,
+   "coverage": 0.003
+  },
+  {
+   "id": 686,
+   "name": "Autumn Tree Leaves 2",
+   "box": [
+    0,
+    468,
+    59,
+    73
+   ],
+   "distance": 57.37,
+   "coverage": 0.002
+  },
+  {
+   "id": 622,
+   "name": "autumn_tree 16",
+   "box": [
+    1335,
+    512,
+    12,
+    12
+   ],
+   "distance": 57.38,
+   "coverage": 0
+  },
+  {
+   "id": 558,
+   "name": "Autumn Tree Leaves 1",
+   "box": [
+    1431,
+    413,
+    97,
+    77
+   ],
+   "distance": 57.41,
+   "coverage": 0.004
+  },
+  {
+   "id": 625,
+   "name": "Autumn Tree Leaves 2",
+   "box": [
+    1309,
+    434,
+    71,
+    50
+   ],
+   "distance": 57.64,
+   "coverage": 0.002
+  },
+  {
+   "id": 557,
+   "name": "Autumn Tree Trunk",
+   "box": [
+    1464,
+    463,
+    20,
+    64
+   ],
+   "distance": 57.83,
+   "coverage": 0.001
+  },
+  {
+   "id": 560,
+   "name": "Autumn Tree Leaves 3",
+   "box": [
+    1425,
+    429,
+    70,
+    56
+   ],
+   "distance": 57.98,
+   "coverage": 0.002
+  },
+  {
+   "id": 556,
+   "name": "autumn_tree 5",
+   "box": [
+    1464,
+    519,
+    12,
+    12
+   ],
+   "distance": 58.16,
+   "coverage": 0
+  },
+  {
+   "id": 706,
+   "name": "Autumn Tree Leaves 4",
+   "box": [
+    592,
+    383,
+    68,
+    48
+   ],
+   "distance": 58.19,
+   "coverage": 0.002
+  },
+  {
+   "id": 537,
+   "name": "Autumn Tree Leaves 4",
+   "box": [
+    934,
+    354,
+    86,
+    55
+   ],
+   "distance": 58.21,
+   "coverage": 0.002
+  },
+  {
+   "id": 534,
+   "name": "Autumn Tree Leaves 1",
+   "box": [
+    905,
+    361,
+    140,
+    92
+   ],
+   "distance": 58.24,
+   "coverage": 0.006
+  },
+  {
+   "id": 717,
+   "name": "Autumn Tree Leaves 3",
+   "box": [
+    302,
+    423,
+    108,
+    67
+   ],
+   "distance": 58.33,
+   "coverage": 0.004
+  },
+  {
+   "id": 703,
+   "name": "Autumn Tree Leaves 1",
+   "box": [
+    569,
+    390,
+    109,
+    79
+   ],
+   "distance": 58.42,
+   "coverage": 0.004
+  },
+  {
+   "id": 705,
+   "name": "Autumn Tree Leaves 3",
+   "box": [
+    563,
+    409,
+    80,
+    58
+   ],
+   "distance": 58.57,
+   "coverage": 0.002
+  },
+  {
+   "id": 704,
+   "name": "Autumn Tree Leaves 2",
+   "box": [
+    611,
+    411,
+    75,
+    54
+   ],
+   "distance": 58.62,
+   "coverage": 0.002
+  },
+  {
+   "id": 533,
+   "name": "Autumn Tree Trunk",
+   "box": [
+    965,
+    419,
+    19,
+    77
+   ],
+   "distance": 58.73,
+   "coverage": 0.001
+  },
+  {
+   "id": 702,
+   "name": "Autumn Tree Trunk",
+   "box": [
+    619,
+    440,
+    19,
+    66
+   ],
+   "distance": 58.85,
+   "coverage": 0.001
+  },
+  {
+   "id": 718,
+   "name": "Autumn Tree Leaves 4",
+   "box": [
+    328,
+    393,
+    90,
+    54
+   ],
+   "distance": 58.88,
+   "coverage": 0.002
+  },
+  {
+   "id": 715,
+   "name": "Autumn Tree Leaves 1",
+   "box": [
+    299,
+    399,
+    145,
+    89
+   ],
+   "distance": 58.97,
+   "coverage": 0.006
+  },
+  {
+   "id": 532,
+   "name": "autumn_tree 1",
+   "box": [
+    968,
+    488,
+    12,
+    12
+   ],
+   "distance": 59.15,
+   "coverage": 0
+  },
+  {
+   "id": 701,
+   "name": "autumn_tree 7",
+   "box": [
+    625,
+    499,
+    12,
+    12
+   ],
+   "distance": 59.21,
+   "coverage": 0
+  },
+  {
+   "id": 548,
+   "name": "Autumn Tree Leaves 3",
+   "box": [
+    1626,
+    414,
+    93,
+    74
+   ],
+   "distance": 59.33,
+   "coverage": 0.003
+  },
+  {
+   "id": 714,
+   "name": "Autumn Tree Trunk",
+   "box": [
+    365,
+    454,
+    28,
+    71
+   ],
+   "distance": 59.41,
+   "coverage": 0.001
+  },
+  {
+   "id": 535,
+   "name": "Autumn Tree Leaves 2",
+   "box": [
+    932,
+    384,
+    94,
+    63
+   ],
+   "distance": 59.58,
+   "coverage": 0.003
+  },
+  {
+   "id": 549,
+   "name": "Autumn Tree Leaves 4",
+   "box": [
+    1610,
+    378,
+    77,
+    59
+   ],
+   "distance": 59.71,
+   "coverage": 0.002
+  },
+  {
+   "id": 713,
+   "name": "autumn_tree 9",
+   "box": [
+    378,
+    518,
+    12,
+    12
+   ],
+   "distance": 59.76,
+   "coverage": 0
+  },
+  {
+   "id": 546,
+   "name": "Autumn Tree Leaves 1",
+   "box": [
+    1585,
+    387,
+    125,
+    98
+   ],
+   "distance": 59.76,
+   "coverage": 0.006
+  },
+  {
+   "id": 682,
+   "name": "Autumn Tree Leaves 4",
+   "box": [
+    102,
+    378,
+    111,
+    66
+   ],
+   "distance": 59.77,
+   "coverage": 0.004
+  },
+  {
+   "id": 681,
+   "name": "Autumn Tree Leaves 3",
+   "box": [
+    59,
+    416,
+    134,
+    83
+   ],
+   "distance": 59.8,
+   "coverage": 0.005
+  },
+  {
+   "id": 716,
+   "name": "Autumn Tree Leaves 2",
+   "box": [
+    339,
+    420,
+    98,
+    61
+   ],
+   "distance": 59.94,
+   "coverage": 0.003
+  },
+  {
+   "id": 679,
+   "name": "Autumn Tree Leaves 1",
+   "box": [
+    67,
+    387,
+    179,
+    111
+   ],
+   "distance": 59.97,
+   "coverage": 0.01
+  },
+  {
+   "id": 644,
+   "name": "Autumn Tree Leaves 3",
+   "box": [
+    1742,
+    402,
+    130,
+    91
+   ],
+   "distance": 60.19,
+   "coverage": 0.006
+  },
+  {
+   "id": 545,
+   "name": "Autumn Tree Trunk",
+   "box": [
+    1624,
+    450,
+    28,
+    83
+   ],
+   "distance": 60.23,
+   "coverage": 0.001
+  },
+  {
+   "id": 547,
+   "name": "Autumn Tree Leaves 2",
+   "box": [
+    1573,
+    412,
+    84,
+    67
+   ],
+   "distance": 60.27,
+   "coverage": 0.003
+  },
+  {
+   "id": 578,
+   "name": "Autumn Tree Leaves 3",
+   "box": [
+    1165,
+    385,
+    80,
+    62
+   ],
+   "distance": 60.28,
+   "coverage": 0.002
+  },
+  {
+   "id": 678,
+   "name": "Autumn Tree Trunk",
+   "box": [
+    150,
+    456,
+    38,
+    90
+   ],
+   "distance": 60.45,
+   "coverage": 0.002
+  },
+  {
+   "id": 680,
+   "name": "Autumn Tree Leaves 2",
+   "box": [
+    132,
+    413,
+    120,
+    76
+   ],
+   "distance": 60.53,
+   "coverage": 0.004
+  },
+  {
+   "id": 579,
+   "name": "Autumn Tree Leaves 4",
+   "box": [
+    1198,
+    356,
+    68,
+    51
+   ],
+   "distance": 60.59,
+   "coverage": 0.002
+  },
+  {
+   "id": 544,
+   "name": "autumn_tree 3",
+   "box": [
+    1625,
+    524,
+    12,
+    12
+   ],
+   "distance": 60.62,
+   "coverage": 0
+  },
+  {
+   "id": 576,
+   "name": "Autumn Tree Leaves 1",
+   "box": [
+    1172,
+    364,
+    110,
+    84
+   ],
+   "distance": 60.73,
+   "coverage": 0.004
+  },
+  {
+   "id": 645,
+   "name": "Autumn Tree Leaves 4",
+   "box": [
+    1799,
+    365,
+    111,
+    74
+   ],
+   "distance": 60.74,
+   "coverage": 0.004
+  },
+  {
+   "id": 677,
+   "name": "autumn_tree 3",
+   "box": [
+    172,
+    537,
+    12,
+    12
+   ],
+   "distance": 60.85,
+   "coverage": 0
+  },
+  {
+   "id": 642,
+   "name": "Autumn Tree Leaves 1",
+   "box": [
+    1753,
+    374,
+    167,
+    124
+   ],
+   "distance": 60.86,
+   "coverage": 0.01
+  },
+  {
+   "id": 575,
+   "name": "Autumn Tree Trunk",
+   "box": [
+    1214,
+    418,
+    18,
+    73
+   ],
+   "distance": 61.2,
+   "coverage": 0.001
+  },
+  {
+   "id": 641,
+   "name": "Autumn Tree Trunk",
+   "box": [
+    1807,
+    451,
+    41,
+    101
+   ],
+   "distance": 61.37,
+   "coverage": 0.002
+  },
+  {
+   "id": 577,
+   "name": "Autumn Tree Leaves 2",
+   "box": [
+    1208,
+    387,
+    75,
+    58
+   ],
+   "distance": 61.57,
+   "coverage": 0.002
+  },
+  {
+   "id": 574,
+   "name": "autumn_tree 8",
+   "box": [
+    1215,
+    483,
+    12,
+    12
+   ],
+   "distance": 61.59,
+   "coverage": 0
+  },
+  {
+   "id": 615,
+   "name": "Autumn Tree Leaves 4",
+   "box": [
+    1380,
+    366,
+    80,
+    52
+   ],
+   "distance": 61.68,
+   "coverage": 0.002
+  },
+  {
+   "id": 631,
+   "name": "Autumn Tree Leaves 2",
+   "box": [
+    1055,
+    373,
+    97,
+    64
+   ],
+   "distance": 61.72,
+   "coverage": 0.003
+  },
+  {
+   "id": 614,
+   "name": "Autumn Tree Leaves 3",
+   "box": [
+    1343,
+    392,
+    94,
+    64
+   ],
+   "distance": 61.74,
+   "coverage": 0.003
+  },
+  {
+   "id": 640,
+   "name": "autumn_tree 19",
+   "box": [
+    1811,
+    542,
+    12,
+    12
+   ],
+   "distance": 61.8,
+   "coverage": 0
+  },
+  {
+   "id": 612,
+   "name": "Autumn Tree Leaves 1",
+   "box": [
+    1350,
+    373,
+    129,
+    87
+   ],
+   "distance": 61.87,
+   "coverage": 0.005
+  },
+  {
+   "id": 643,
+   "name": "Autumn Tree Leaves 2",
+   "box": [
+    1807,
+    407,
+    113,
+    86
+   ],
+   "distance": 61.95,
+   "coverage": 0.005
+  },
+  {
+   "id": 611,
+   "name": "Autumn Tree Trunk",
+   "box": [
+    1397,
+    427,
+    24,
+    72
+   ],
+   "distance": 62.31,
+   "coverage": 0.001
+  },
+  {
+   "id": 613,
+   "name": "Autumn Tree Leaves 2",
+   "box": [
+    1392,
+    397,
+    89,
+    61
+   ],
+   "distance": 62.37,
+   "coverage": 0.003
+  },
+  {
+   "id": 633,
+   "name": "Autumn Tree Leaves 4",
+   "box": [
+    1065,
+    337,
+    85,
+    54
+   ],
+   "distance": 62.59,
+   "coverage": 0.002
+  },
+  {
+   "id": 610,
+   "name": "autumn_tree 14",
+   "box": [
+    1399,
+    491,
+    12,
+    12
+   ],
+   "distance": 62.67,
+   "coverage": 0
+  },
+  {
+   "id": 630,
+   "name": "Autumn Tree Leaves 1",
+   "box": [
+    1041,
+    344,
+    137,
+    89
+   ],
+   "distance": 62.92,
+   "coverage": 0.006
+  },
+  {
+   "id": 629,
+   "name": "Autumn Tree Trunk",
+   "box": [
+    1097,
+    401,
+    20,
+    76
+   ],
+   "distance": 63.39,
+   "coverage": 0.001
+  },
+  {
+   "id": 711,
+   "name": "Autumn Tree Leaves 3",
+   "box": [
+    275,
+    407,
+    83,
+    59
+   ],
+   "distance": 63.79,
+   "coverage": 0.002
+  },
+  {
+   "id": 628,
+   "name": "autumn_tree 17",
+   "box": [
+    1100,
+    469,
+    12,
+    12
+   ],
+   "distance": 63.8,
+   "coverage": 0
+  },
+  {
+   "id": 712,
+   "name": "Autumn Tree Leaves 4",
+   "box": [
+    248,
+    381,
+    71,
+    49
+   ],
+   "distance": 63.84,
+   "coverage": 0.002
+  },
+  {
+   "id": 709,
+   "name": "Autumn Tree Leaves 1",
+   "box": [
+    233,
+    388,
+    115,
+    81
+   ],
+   "distance": 63.91,
+   "coverage": 0.005
+  },
+  {
+   "id": 710,
+   "name": "Autumn Tree Leaves 2",
+   "box": [
+    225,
+    414,
+    81,
+    57
+   ],
+   "distance": 64.08,
+   "coverage": 0.002
+  },
+  {
+   "id": 632,
+   "name": "Autumn Tree Leaves 3",
+   "box": [
+    1068,
+    363,
+    98,
+    65
+   ],
+   "distance": 64.19,
+   "coverage": 0.003
+  },
+  {
+   "id": 708,
+   "name": "Autumn Tree Trunk",
+   "box": [
+    286,
+    441,
+    25,
+    69
+   ],
+   "distance": 64.32,
+   "coverage": 0.001
+  },
+  {
+   "id": 597,
+   "name": "Autumn Tree Leaves 4",
+   "box": [
+    1284,
+    372,
+    66,
+    43
+   ],
+   "distance": 64.46,
+   "coverage": 0.001
+  },
+  {
+   "id": 707,
+   "name": "autumn_tree 8",
+   "box": [
+    298,
+    502,
+    12,
+    12
+   ],
+   "distance": 64.65,
+   "coverage": 0
+  },
+  {
+   "id": 594,
+   "name": "Autumn Tree Leaves 1",
+   "box": [
+    1260,
+    377,
+    106,
+    70
+   ],
+   "distance": 64.66,
+   "coverage": 0.004
+  },
+  {
+   "id": 596,
+   "name": "Autumn Tree Leaves 3",
+   "box": [
+    1255,
+    393,
+    77,
+    51
+   ],
+   "distance": 64.73,
+   "coverage": 0.002
+  },
+  {
+   "id": 608,
+   "name": "Autumn Tree Leaves 3",
+   "box": [
+    911,
+    369,
+    68,
+    56
+   ],
+   "distance": 64.81,
+   "coverage": 0.002
+  },
+  {
+   "id": 595,
+   "name": "Autumn Tree Leaves 2",
+   "box": [
+    1295,
+    397,
+    74,
+    49
+   ],
+   "distance": 64.9,
+   "coverage": 0.002
+  },
+  {
+   "id": 609,
+   "name": "Autumn Tree Leaves 4",
+   "box": [
+    940,
+    341,
+    57,
+    46
+   ],
+   "distance": 65,
+   "coverage": 0.001
+  },
+  {
+   "id": 593,
+   "name": "Autumn Tree Trunk",
+   "box": [
+    1300,
+    421,
+    18,
+    58
+   ],
+   "distance": 65.04,
+   "coverage": 0.001
+  },
+  {
+   "id": 606,
+   "name": "Autumn Tree Leaves 1",
+   "box": [
+    918,
+    349,
+    93,
+    76
+   ],
+   "distance": 65.15,
+   "coverage": 0.003
+  },
+  {
+   "id": 592,
+   "name": "autumn_tree 11",
+   "box": [
+    1301,
+    472,
+    12,
+    12
+   ],
+   "distance": 65.35,
+   "coverage": 0
+  },
+  {
+   "id": 605,
+   "name": "Autumn Tree Trunk",
+   "box": [
+    959,
+    398,
+    12,
+    68
+   ],
+   "distance": 65.59,
+   "coverage": 0
+  },
+  {
+   "id": 607,
+   "name": "Autumn Tree Leaves 2",
+   "box": [
+    953,
+    370,
+    63,
+    52
+   ],
+   "distance": 65.88,
+   "coverage": 0.002
+  },
+  {
+   "id": 604,
+   "name": "autumn_tree 13",
+   "box": [
+    959,
+    459,
+    12,
+    12
+   ],
+   "distance": 65.96,
+   "coverage": 0
+  },
+  {
+   "id": 566,
+   "name": "Autumn Tree Leaves 3",
+   "box": [
+    840,
+    342,
+    86,
+    54
+   ],
+   "distance": 74.22,
+   "coverage": 0.002
+  },
+  {
+   "id": 541,
+   "name": "Autumn Tree Leaves 2",
+   "box": [
+    945,
+    344,
+    81,
+    51
+   ],
+   "distance": 74.53,
+   "coverage": 0.002
+  },
+  {
+   "id": 567,
+   "name": "Autumn Tree Leaves 4",
+   "box": [
+    826,
+    317,
+    73,
+    44
+   ],
+   "distance": 74.72,
+   "coverage": 0.002
+  },
+  {
+   "id": 564,
+   "name": "Autumn Tree Leaves 1",
+   "box": [
+    806,
+    324,
+    118,
+    73
+   ],
+   "distance": 74.73,
+   "coverage": 0.004
+  },
+  {
+   "id": 563,
+   "name": "Autumn Tree Trunk",
+   "box": [
+    858,
+    371,
+    17,
+    64
+   ],
+   "distance": 75.13,
+   "coverage": 0.001
+  },
+  {
+   "id": 565,
+   "name": "Autumn Tree Leaves 2",
+   "box": [
+    804,
+    345,
+    81,
+    51
+   ],
+   "distance": 75.27,
+   "coverage": 0.002
+  },
+  {
+   "id": 543,
+   "name": "Autumn Tree Leaves 4",
+   "box": [
+    952,
+    314,
+    71,
+    44
+   ],
+   "distance": 75.45,
+   "coverage": 0.001
+  },
+  {
+   "id": 562,
+   "name": "autumn_tree 6",
+   "box": [
+    861,
+    428,
+    12,
+    12
+   ],
+   "distance": 75.47,
+   "coverage": 0
+  },
+  {
+   "id": 540,
+   "name": "Autumn Tree Leaves 1",
+   "box": [
+    932,
+    321,
+    115,
+    72
+   ],
+   "distance": 75.76,
+   "coverage": 0.004
+  },
+  {
+   "id": 539,
+   "name": "Autumn Tree Trunk",
+   "box": [
+    982,
+    368,
+    16,
+    63
+   ],
+   "distance": 76.16,
+   "coverage": 0
+  },
+  {
+   "id": 538,
+   "name": "autumn_tree 2",
+   "box": [
+    983,
+    424,
+    12,
+    12
+   ],
+   "distance": 76.5,
+   "coverage": 0
+  },
+  {
+   "id": 542,
+   "name": "Autumn Tree Leaves 3",
+   "box": [
+    955,
+    337,
+    82,
+    52
+   ],
+   "distance": 77.03,
+   "coverage": 0.002
+  },
+  {
+   "id": 650,
+   "name": "Autumn Tree Leaves 3",
+   "box": [
+    662,
+    363,
+    52,
+    39
+   ],
+   "distance": 77.48,
+   "coverage": 0.001
+  },
+  {
+   "id": 651,
+   "name": "Autumn Tree Leaves 4",
+   "box": [
+    682,
+    343,
+    44,
+    32
+   ],
+   "distance": 77.59,
+   "coverage": 0.001
+  },
+  {
+   "id": 648,
+   "name": "Autumn Tree Leaves 1",
+   "box": [
+    667,
+    348,
+    71,
+    52
+   ],
+   "distance": 77.72,
+   "coverage": 0.002
+  },
+  {
+   "id": 647,
+   "name": "Autumn Tree Trunk",
+   "box": [
+    699,
+    383,
+    12,
+    47
+   ],
+   "distance": 78.03,
+   "coverage": 0
+  },
+  {
+   "id": 649,
+   "name": "Autumn Tree Leaves 2",
+   "box": [
+    693,
+    363,
+    48,
+    36
+   ],
+   "distance": 78.24,
+   "coverage": 0.001
+  },
+  {
+   "id": 646,
+   "name": "autumn_tree 20",
+   "box": [
+    700,
+    424,
+    12,
+    12
+   ],
+   "distance": 78.29,
+   "coverage": 0
+  },
+  {
+   "id": 554,
+   "name": "Autumn Tree Leaves 3",
+   "box": [
+    747,
+    360,
+    49,
+    35
+   ],
+   "distance": 79.75,
+   "coverage": 0.001
+  },
+  {
+   "id": 555,
+   "name": "Autumn Tree Leaves 4",
+   "box": [
+    765,
+    343,
+    41,
+    29
+   ],
+   "distance": 80.01,
+   "coverage": 0.001
+  },
+  {
+   "id": 552,
+   "name": "Autumn Tree Leaves 1",
+   "box": [
+    750,
+    347,
+    67,
+    48
+   ],
+   "distance": 80.1,
+   "coverage": 0.002
+  },
+  {
+   "id": 551,
+   "name": "Autumn Tree Trunk",
+   "box": [
+    780,
+    379,
+    10,
+    43
+   ],
+   "distance": 80.39,
+   "coverage": 0
+  },
+  {
+   "id": 550,
+   "name": "autumn_tree 4",
+   "box": [
+    780,
+    415,
+    12,
+    12
+   ],
+   "distance": 80.63,
+   "coverage": 0
+  },
+  {
+   "id": 553,
+   "name": "Autumn Tree Leaves 2",
+   "box": [
+    773,
+    360,
+    46,
+    33
+   ],
+   "distance": 80.72,
+   "coverage": 0.001
+  }
+ ]
+}
