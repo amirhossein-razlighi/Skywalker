@@ -108,6 +108,12 @@ TEST_CASE("ui: anchors, margins and canvas scaling give exact rects") {
     CHECK(rectOf(lay, fill) == ui::Rect{20, 5, 970, 480});
     CHECK(rectOf(lay, bar) == ui::Rect{30, 0, 940, 60});
     CHECK(rectOf(lay, custom) == ui::Rect{230, 210, 40, 40});
+    // Margins also inset an element from the edge it is anchored to on a non-stretching axis.
+    EntityId dlg = element(s, c, "Dialog", R"({"anchor": "bottom_stretch", "size": [0, 120], "margin": [0, 100, 40, 100]})");
+    EntityId badge = element(s, c, "Badge", R"({"anchor": "top_right", "size": [30, 30], "margin": [8, 12, 0, 0]})");
+    lay = ui.computeLayout(s, 1000, 500);
+    CHECK(rectOf(lay, dlg) == ui::Rect{100, 340, 800, 120});
+    CHECK(rectOf(lay, badge) == ui::Rect{958, 8, 30, 30});
     // At twice the reference resolution, everything scales by 2 in screen pixels.
     ui::Layout big = ui.computeLayout(s, 2000, 1000);
     CHECK(big.canvases[0].scale == doctest::Approx(2.f));
