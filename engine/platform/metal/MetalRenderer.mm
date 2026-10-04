@@ -1639,7 +1639,8 @@ private:
         du.outlineColor = lin(s.outlineColor);
         du.material4 = simd_make_float4(s.alphaCutoff, s.textureAlphaOnly ? 1.f : 0.f, 0, 0);
         du.prevModel = du.model;  // static unless drawMesh knows better (velocity buffer)
-        du.motion = simd_make_float4(0, static_cast<float>(d.layers & 0xFFFFFu), 0, 0);  // y = render layers (light masks)
+        // y = render layers (light masks), zw = texture scroll (UV units per second)
+        du.motion = simd_make_float4(0, static_cast<float>(d.layers & 0xFFFFFu), s.uvScroll.x, s.uvScroll.y);
         for (int i = 0; i < 3; ++i) du.character[i] = simd_make_float4(s.model[i].x, s.model[i].y, s.model[i].z, s.model[i].w);
         du.material5 = simd_make_float4(s.clearcoatRoughness, s.flakes, s.flakeSize, 0);
         return du;

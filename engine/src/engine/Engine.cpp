@@ -533,6 +533,11 @@ bool Engine::preloadMesh(const std::string& meshKey) {
     return !pendingMeshes_.count(meshKey);
 }
 
+bool Engine::autoLods(const std::string& file) const {
+    const AssetRecord* rec = assets_->find(file);
+    return !rec || rec->importSettings.get("lods").asBool(true);
+}
+
 void Engine::requestMeshAsync(const std::string& key) {
     if (!pendingMeshes_.insert(key).second) return;
     if (!meshStream_) meshStream_ = std::make_shared<MeshStream>();
@@ -548,20 +553,21 @@ void Engine::requestMeshAsync(const std::string& key) {
         std::shared_ptr<MeshStream> stream;
         std::string key, path;
         mesh::LoadOptions lo;
+        bool lods = true;
     };
     auto run = [](std::unique_ptr<LoadJob> j) {
         MeshStream::Done d{j->key, nullptr, {}};
         auto data = mesh::loadMeshFile(j->path, j->lo);
         if (data) {
             d.mesh = std::make_shared<MeshData>(std::move(data.value()));
-            if (d.mesh->lods.empty() && d.mesh->indices.size() / 3 >= 3000) mesh::buildLods(*d.mesh);
+            if (j->lods && d.mesh->lods.empty() && d.mesh->indices.size() / 3 >= 3000) mesh::buildLods(*d.mesh);
         } else {
             d.error = data.error().message;
         }
         std::lock_guard lock(j->stream->mutex);
         j->stream->done.push_back(std::move(d));
     };
-    auto job = std::make_unique<LoadJob>(LoadJob{meshStream_, key, resolvePath(file), lo});
+    auto job = std::make_unique<LoadJob>(LoadJob{meshStream_, key, resolvePath(file), lo, autoLods(file)});
 #if defined(__APPLE__)
     struct Ctx {
         std::unique_ptr<LoadJob> job;
@@ -608,8 +614,9 @@ void Engine::ensureMeshUploaded(const std::string& meshKey) {
         scene_->assetBounds[meshKey] = {Vec3(-0.5f), Vec3(0.5f)};  // don't retry every frame
         return;
     }
-    // Heavy meshes (photoscans, high-poly imports) get an automatic LOD chain once.
-    if (mesh->lods.empty() && mesh->indices.size() / 3 >= 3000) {
+    // Heavy meshes (photoscans, high-poly imports) get an automatic LOD chain once, unless the
+    // asset opts out (import setting `lods: false`: voxel chunks, modular pieces with exact seams).
+    if (mesh->lods.empty() && mesh->indices.size() / 3 >= 3000 && autoLods(mesh::splitPart(meshKey.substr(6)).first)) {
         auto it = cpuMeshes_.find(meshKey);
         if (it != cpuMeshes_.end() && it->second) mesh::buildLods(*it->second);
     }
@@ -693,6 +700,7 @@ FrameData Engine::buildFrameData(const CaptureOptions& opts) {
     // Effects: simulated particles (+ the light fires cast) and FFT water.
     {
         SKY_PROFILE_SCOPE("particles.gather");
+        if (playState_ == PlayState::Editing) particles_.warm(*scene_);  // stills without an editor loop: prewarmed effects show
         particles_.gather(*scene_, view, f.particles, f.lights);
     }
     {  // [hair+vfx] GPU particles, hair grooms, and the lights GPU effects cast (from a recent frame)
@@ -1495,6 +1503,7 @@ Result<Json> Engine::importMeshAsset(const std::string& path, const MeshImportOp
     }
     refreshAssets();
     Json settings = Json::object({{"normalize", options.normalize}, {"zUp", options.zUp}, {"vertexColors", mesh.hasVertexColors}});
+    if (!options.lods) settings["lods"] = false;
     if (turnAround) settings["turnAround"] = true;
     if (!animPath.empty()) settings["animation"] = animPath;
     if (!materialPath.empty()) settings["material"] = materialPath;

@@ -618,12 +618,6 @@
       "maximum": 10,
       "description": "Brightness where glow starts (lower = more glow)"
      },
-     "bloomClamp": {
-      "type": "number",
-      "minimum": 0.1,
-      "maximum": 64,
-      "description": "Brightest (exposed) value that feeds the glow: 2-8 keeps sun glints, chrome and LED lights crisp instead of blown-out halos; 64 = effectively unlimited"
-     },
      "saturation": {
       "type": "number",
       "minimum": 0,
@@ -2403,6 +2397,10 @@
      "z_up": {
       "type": "boolean",
       "description": "The mesh is Z-up (CAD, scans, some exporters) — rotate to Y-up"
+     },
+     "lods": {
+      "type": "boolean",
+      "description": "Build the automatic level-of-detail chain for meshes of 3,000+ triangles (default true). false for meshes whose edges must stay exact: voxel or terrain chunks, modular pieces that meet seamlessly"
      }
     },
     "additionalProperties": false,
@@ -2633,23 +2631,17 @@
       "maximum": 1,
       "description": "Alpha-tested cutout threshold (foliage, sails, fences); 0 = off"
      },
-     "clearcoatRoughness": {
+     "scrollU": {
       "type": "number",
-      "minimum": 0,
-      "maximum": 1,
-      "description": "Roughness of the clearcoat layer (0.02 mirror lacquer .. 0.3 satin; default 0.06)"
+      "minimum": -100,
+      "maximum": 100,
+      "description": "Texture scroll along U in UV units per second (flowing lava, rivers, conveyor belts); 0 = still"
      },
-     "flakes": {
+     "scrollV": {
       "type": "number",
-      "minimum": 0,
-      "maximum": 1,
-      "description": "Metallic flakes in the base layer (car paint sparkle): share of the base reflection, 0 = none, 0.3-0.6 = metallic paint"
-     },
-     "flakeSize": {
-      "type": "number",
-      "minimum": 5e-05,
-      "maximum": 0.05,
-      "description": "Flake size in meters in the mesh's own space (default 0.0015; real flakes are smaller, a little larger reads better on screen)"
+      "minimum": -100,
+      "maximum": 100,
+      "description": "Texture scroll along V in UV units per second; 0 = still"
      },
      "path": {
       "type": "string",
@@ -2819,23 +2811,17 @@
       "maximum": 1,
       "description": "Alpha-tested cutout threshold (foliage, sails, fences); 0 = off"
      },
-     "clearcoatRoughness": {
+     "scrollU": {
       "type": "number",
-      "minimum": 0,
-      "maximum": 1,
-      "description": "Roughness of the clearcoat layer (0.02 mirror lacquer .. 0.3 satin; default 0.06)"
+      "minimum": -100,
+      "maximum": 100,
+      "description": "Texture scroll along U in UV units per second (flowing lava, rivers, conveyor belts); 0 = still"
      },
-     "flakes": {
+     "scrollV": {
       "type": "number",
-      "minimum": 0,
-      "maximum": 1,
-      "description": "Metallic flakes in the base layer (car paint sparkle): share of the base reflection, 0 = none, 0.3-0.6 = metallic paint"
-     },
-     "flakeSize": {
-      "type": "number",
-      "minimum": 5e-05,
-      "maximum": 0.05,
-      "description": "Flake size in meters in the mesh's own space (default 0.0015; real flakes are smaller, a little larger reads better on screen)"
+      "minimum": -100,
+      "maximum": 100,
+      "description": "Texture scroll along V in UV units per second; 0 = still"
      },
      "path": {
       "type": "string",
@@ -11072,6 +11058,96 @@
    },
    "_meta": {
     "skywalker/category": "physics"
+   }
+  },
+  {
+   "name": "particles2d_create",
+   "title": "Create 2D particles",
+   "description": "Create pixel-art particles for a 2D game from a preset, ready to tweak: rain (streaks over the whole view), drizzle, snow (drifting flakes), leaves and petals (falling, swaying), fireflies (glowing, twinkling, wandering), smoke (chimney puffs), ripples (puddle rings while it rains), dust (motes in sunlight), sparkle (water glints). Weather presets (rain, drizzle, snow, ripples) wrap: their box tiles endlessly so they fill whatever the camera shows, wherever the entity is. Untextured particles are solid pixel rectangles (`pixelSize` texels); give a `texture` sheet (with `columns`/`rows`, `frames`, `animate` random|life|loop) for leaves, flakes or ripple rings. `overrides` patches fields, e.g. {\"rate\": 400, \"color\": \"#9fc4ff\", \"pixelsPerUnit\": 16}. Simulated on fixed ticks while playing (deterministic, reset on stop). Example: particles2d_create {\"preset\": \"fireflies\", \"position\": [12, 4, 0], \"overrides\": {\"area\": [14, 6]}}.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "preset": {
+      "type": "string",
+      "enum": [
+       "rain",
+       "drizzle",
+       "snow",
+       "leaves",
+       "petals",
+       "fireflies",
+       "smoke",
+       "ripples",
+       "dust",
+       "sparkle"
+      ],
+      "description": "Preset"
+     },
+     "name": {
+      "type": "string",
+      "description": "Entity name (default: the preset's name)"
+     },
+     "position": {
+      "type": "array",
+      "items": {
+       "type": "number"
+      },
+      "minItems": 3,
+      "maxItems": 3,
+      "description": "World position (center of the emission box)"
+     },
+     "parent": {
+      "type": [
+       "integer",
+       "string"
+      ],
+      "description": "Parent entity (e.g. a chimney)"
+     },
+     "overrides": {
+      "type": "object",
+      "description": "particles2d fields to change"
+     }
+    },
+    "additionalProperties": false,
+    "required": [
+     "preset"
+    ]
+   },
+   "annotations": {
+    "title": "Create 2D particles",
+    "readOnlyHint": false,
+    "destructiveHint": false,
+    "openWorldHint": false
+   },
+   "_meta": {
+    "skywalker/category": "render"
+   }
+  },
+  {
+   "name": "particles2d_info",
+   "title": "2D particle stats",
+   "description": "Live state of particles2d emitters: particles alive, cap, rate, box, wrap, and the bounds the live particles cover (world units). Use it to check that weather is running while playing, or to find emitters that hit their maxParticles cap. Without `entity` lists every emitter in the scene.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "entity": {
+      "type": [
+       "integer",
+       "string"
+      ],
+      "description": "Emitter (default: all)"
+     }
+    },
+    "additionalProperties": false
+   },
+   "annotations": {
+    "title": "2D particle stats",
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "openWorldHint": false
+   },
+   "_meta": {
+    "skywalker/category": "render"
    }
   }
  ]

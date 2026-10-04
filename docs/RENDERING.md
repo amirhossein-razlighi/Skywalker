@@ -310,6 +310,7 @@ precompiled `.metallib` removes.
 | `shading` | `pbr`, `toon` (banded light, crisp highlight, hemispheric fill), `unlit`, `water`, or a character model: `skin`, `eye`, `cloth`, `hair_card` ([CHARACTERS.md](CHARACTERS.md#material-models-skin-eye-cloth-hair_card)). |
 | `outline` / `outlineColor` | Cartoon outline width in pixels: an inverted hull with constant screen-space width. |
 | `doubleSided`, `castShadows` | Self-explanatory. |
+| `scrollU`, `scrollV` | Material assets: the texture scrolls this many UV units per second with the frame clock (flowing lava, rivers, conveyor belts); movies follow the movie clock. |
 | Specular anti-aliasing | Roughness is widened where normals vary within a pixel, so there is no sparkle on detailed normal maps. |
 
 Color alpha below 1 makes a surface transparent: glass, water, ghosts, god rays. Such
@@ -377,7 +378,10 @@ The `car_paint` preset sets all of it; tune these material fields:
 ### Particles (`particles` component, `fx_create`)
 
 Particles are simulated by the engine, not the GPU, so they are deterministic in play mode
-(seeded per emitter) and agents can count and test them. They preview live while editing.
+(seeded per emitter) and agents can count and test them. They preview live while editing. Stills captured
+while editing without an editor loop (headless agents, `sequence_scrub`, quality gates) start every
+`prewarm` emitter that has not run yet, so fires, smoke and fireflies appear fully developed, exactly as
+on the first played tick.
 With `simulation: "gpu"` a particles component runs on compute shaders instead: millions of
 particles, depth-buffer collisions, sub-emitters, ribbons, mesh particles and flipbooks (visuals
 only) — see [HAIR_AND_VFX.md](HAIR_AND_VFX.md), which also covers strand hair and fur (`groom`).

@@ -507,6 +507,55 @@ TEST_CASE("assets: multi-material glTF imports as parts + a prefab") {
     CHECK(info.get("usedBy").size() == 2);
 }
 
+TEST_CASE("assets: lods=false keeps heavy meshes without an automatic LOD chain") {
+    TempProject p("lods");
+    // A 40 x 40 grid (3,200 triangles): heavy enough for the automatic LOD chain.
+    std::string obj;
+    for (int z = 0; z <= 40; ++z)
+        for (int x = 0; x <= 40; ++x) obj += "v " + std::to_string(x) + " " + std::to_string((x * 7 + z * 3) % 5) + " " + std::to_string(z) + "\n";
+    for (int z = 0; z < 40; ++z)
+        for (int x = 0; x < 40; ++x) {
+            int a = z * 41 + x + 1, b = a + 1, c = a + 41, d = c + 1;
+            obj += "f " + std::to_string(a) + " " + std::to_string(c) + " " + std::to_string(b) + "\n";
+            obj += "f " + std::to_string(b) + " " + std::to_string(c) + " " + std::to_string(d) + "\n";
+        }
+    p.write("models/chunk.obj", obj);
+    p.write("models/hill.obj", obj);
+    {
+        auto e = makeEngine(p);
+        call(*e, "asset_import", R"({"path":"models/chunk.obj","normalize":false,"lods":false})");
+        call(*e, "asset_import", R"({"path":"models/hill.obj","normalize":false})");
+        CHECK_FALSE(e->assets().find("models/chunk.obj")->importSettings.get("lods").asBool(true));
+        CHECK(e->assets().find("models/hill.obj")->importSettings.get("lods").asBool(true));
+    }
+    // A fresh session loads both from disk; only the default one gets LODs.
+    auto e = makeEngine(p);
+    call(*e, "entity_create", R"({"name":"Chunk","mesh":"asset:models/chunk.obj"})");
+    call(*e, "entity_create", R"({"name":"Hill","mesh":"asset:models/hill.obj","position":[60,0,0]})");
+    call(*e, "viewport_capture", R"({"eye":[20,30,-30],"target":[20,0,20],"width":64,"height":64,"samples":1})");
+    const MeshData* chunk = e->cpuMesh("asset:models/chunk.obj");
+    const MeshData* hill = e->cpuMesh("asset:models/hill.obj");
+    REQUIRE(chunk);
+    REQUIRE(hill);
+    CHECK(chunk->indices.size() / 3 == 3200);
+    CHECK(chunk->lods.empty());
+    CHECK_FALSE(hill->lods.empty());
+}
+
+TEST_CASE("assets: material texture scroll reaches the surface (flowing lava, rivers)") {
+    TempProject p("scroll");
+    p.write("materials/lava.mat.json", R"({"color":"#ff6020","scrollU":0.05,"scrollV":-0.02})");
+    auto e = makeEngine(p);
+    const ResolvedMaterial* m = e->resolveMaterial("materials/lava.mat.json");
+    REQUIRE(m);
+    CHECK(m->uvScroll.x == doctest::Approx(0.05f));
+    CHECK(m->uvScroll.y == doctest::Approx(-0.02f));
+    call(*e, "material_update", R"({"path":"materials/lava.mat.json","scrollU":200})");  // clamped to the field range
+    const ResolvedMaterial* fast = e->resolveMaterial("materials/lava.mat.json");
+    REQUIRE(fast);
+    CHECK(fast->uvScroll.x == doctest::Approx(100.f));
+}
+
 TEST_CASE("assets: Radiance .hdr panoramas decode (flat and RLE)") {
     auto header = [](int w, int h) {
         std::string s = "#?RADIANCE\nFORMAT=32-bit_rle_rgbe\n\n-Y " + std::to_string(h) + " +X " + std::to_string(w) + "\n";

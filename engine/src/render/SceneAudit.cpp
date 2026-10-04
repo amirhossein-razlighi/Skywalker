@@ -132,12 +132,13 @@ private:
 };
 
 const MeshData* geometryFor(const DrawItem& d, const Sources& src, std::shared_ptr<const MeshData>& keep) {
-    if (d.skin >= 0 && src.posed) {
-        keep = src.posed(d.entity, d.mesh);
-        if (keep) return keep.get();
-    }
+    // Skinned draws carry a per-instance key ("<mesh>@skin<entity>"); the pose and the mesh are keyed by the mesh.
     std::string key = d.mesh;
     if (auto at = key.find("@skin"); at != std::string::npos) key = key.substr(0, at);
+    if (d.skin >= 0 && src.posed) {
+        keep = src.posed(d.entity, key);
+        if (keep) return keep.get();
+    }
     return src.mesh ? src.mesh(key) : nullptr;
 }
 

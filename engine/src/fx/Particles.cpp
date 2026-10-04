@@ -255,6 +255,21 @@ void ParticleSystem::step(State& s, const ParticleEmitter& em, const Mat4& world
     }
 }
 
+void ParticleSystem::warm(const Scene& scene) {
+    for (EntityId e : scene.entities()) {
+        const ParticleEmitter* em = scene.get<ParticleEmitter>(e);
+        if (!em || em->simulation == "gpu" || !scene.isActive(e) || states_.count(e)) continue;
+        if (!em->prewarm || em->rate <= 0.f || !em->emitting) continue;
+        State& s = states_[e];
+        Mat4 world = scene.worldMatrix(e);
+        s.world = world;
+        s.rng.reseed(static_cast<uint64_t>(e) * 7919u + static_cast<uint64_t>(em->seed) * 104729u + 17u);
+        float warmup = std::min(em->lifetime * (1.f + em->lifetimeJitter), 12.f);
+        for (float t = 0; t < warmup; t += 1.f / 20.f) step(s, *em, world, scene.environment(), 1.f / 20.f);
+        s.started = true;
+    }
+}
+
 void ParticleSystem::update(const Scene& scene, float dt, const ProcessGate* gate) {
     if (dt <= 0.f) return;
     time_ += gate ? dt * (gate->paused() ? 0.f : gate->timeScale()) : dt;

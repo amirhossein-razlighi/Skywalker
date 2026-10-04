@@ -66,6 +66,8 @@ struct MaterialAsset {
     float clearcoatRoughness = 0.06f;
     float flakes = 0.f;           // 0..1: share of the base reflection coming from flakes (sparkle)
     float flakeSize = 0.0015f;    // flake size in meters (object space); smaller than a pixel fades into a sheen
+    float scrollU = 0.f;            // texture scroll in UV units per second (lava, rivers, conveyors)
+    float scrollV = 0.f;
 
     static const TypeInfo& type();
 };

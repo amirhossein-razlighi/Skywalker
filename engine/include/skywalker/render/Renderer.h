@@ -103,6 +103,7 @@ struct Surface {
     /// Character material models (skin, eye, cloth, hair_card), packed as the shaders read them
     /// (DrawUniforms.character[3]; colors already linear). See toSurface() in assets/Material.cpp.
     Vec4 model[3] = {{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}};
+    Vec2 uvScroll{0, 0};      // UV units per second, applied with the frame time (flowing lava, rivers)
 };
 
 struct DrawItem {

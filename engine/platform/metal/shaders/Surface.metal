@@ -16,7 +16,7 @@ vertex MeshOut meshVertex(uint vid [[vertex_id]],
     o.worldPos = world.xyz;
     o.prevWorldPos = d.motion.x > 0.5 ? (d.prevModel * float4(float3(prevVerts[vid].position), 1.0)).xyz : world.xyz;
     o.normal = (d.normalMatrix * float4(float3(v.normal), 0.0)).xyz;
-    o.uv = float2(v.uv);
+    o.uv = float2(v.uv) + d.motion.zw * f.cameraPos.w;  // scrolling textures (frame time in cameraPos.w)
     o.color = float4(v.color);
     o.fade = 0.0;
     return o;

@@ -73,7 +73,7 @@ struct DrawUniforms {
     float4 material4;     // x = alpha cutoff (0 = off)
     // --- appended (velocity buffer) ---
     float4x4 prevModel;   // the object's model matrix in the previous frame (= model when static)
-    float4 motion;        // x = moves (prevModel differs or a previous skinned pose is bound), y = render layers (bits as a float), zw = unused
+    float4 motion;        // x = moves (prevModel differs or a previous skinned pose is bound), y = render layers (bits as a float), zw = texture scroll (UV/s)
     // --- appended (character material models: skin, eye, cloth, hair_card; Characters.metal) ---
     float4 character[3];  // packed per model by toSurface() (assets/Material.cpp)
     // --- appended (car paint) ---

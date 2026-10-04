@@ -336,6 +336,7 @@ Register a file placed in the project (e.g. by a generator) as an asset. Meshes 
 | `tags` | string[] |  | Tags |  |
 | `normalize` | boolean |  | Scale meshes to fit 1 m (default true; rigged characters default to their real size); false keeps real-world units |  |
 | `z_up` | boolean |  | The mesh is Z-up (CAD, scans, some exporters) — rotate to Y-up |  |
+| `lods` | boolean |  | Build the automatic level-of-detail chain for meshes of 3,000+ triangles (default true). false for meshes whose edges must stay exact: voxel or terrain chunks, modular pieces that meet seamlessly |  |
 
 === "Tool call"
 
@@ -522,9 +523,8 @@ Create a reusable material asset (*.mat.json): color, metallic, roughness, emiss
 | `doubleSided` | boolean |  | Render both faces |  |
 | `occlusionStrength` | number |  | Ambient occlusion from the ORM map's red channel | 0 .. 1 |
 | `alphaCutoff` | number |  | Alpha-tested cutout threshold (foliage, sails, fences); 0 = off | 0 .. 1 |
-| `clearcoatRoughness` | number |  | Roughness of the clearcoat layer (0.02 mirror lacquer .. 0.3 satin; default 0.06) | 0 .. 1 |
-| `flakes` | number |  | Metallic flakes in the base layer (car paint sparkle): share of the base reflection, 0 = none, 0.3-0.6 = metallic paint | 0 .. 1 |
-| `flakeSize` | number |  | Flake size in meters in the mesh's own space (default 0.0015; real flakes are smaller, a little larger reads better on screen) | 5e-05 .. 0.05 |
+| `scrollU` | number |  | Texture scroll along U in UV units per second (flowing lava, rivers, conveyor belts); 0 = still | -100 .. 100 |
+| `scrollV` | number |  | Texture scroll along V in UV units per second; 0 = still | -100 .. 100 |
 | `path` | string | yes | Project-relative path ending in .mat.json, e.g. materials/stone.mat.json |  |
 | `preset` | string |  | Start from a built-in material (other fields override it) | `gold` `silver` `copper` `chrome` `brushed_steel` `iron` `plastic` `rubber` `ceramic` `car_paint` `glass` `water` `ice` `skin` `wax` `leaves` `snow` `velvet` `neon` `toon` `toon_metal` `clay` |
 
@@ -589,9 +589,8 @@ Change fields of an existing material; every entity using it updates instantly.
 | `doubleSided` | boolean |  | Render both faces |  |
 | `occlusionStrength` | number |  | Ambient occlusion from the ORM map's red channel | 0 .. 1 |
 | `alphaCutoff` | number |  | Alpha-tested cutout threshold (foliage, sails, fences); 0 = off | 0 .. 1 |
-| `clearcoatRoughness` | number |  | Roughness of the clearcoat layer (0.02 mirror lacquer .. 0.3 satin; default 0.06) | 0 .. 1 |
-| `flakes` | number |  | Metallic flakes in the base layer (car paint sparkle): share of the base reflection, 0 = none, 0.3-0.6 = metallic paint | 0 .. 1 |
-| `flakeSize` | number |  | Flake size in meters in the mesh's own space (default 0.0015; real flakes are smaller, a little larger reads better on screen) | 5e-05 .. 0.05 |
+| `scrollU` | number |  | Texture scroll along U in UV units per second (flowing lava, rivers, conveyor belts); 0 = still | -100 .. 100 |
+| `scrollV` | number |  | Texture scroll along V in UV units per second; 0 = still | -100 .. 100 |
 | `path` | string | yes | Project-relative path ending in .mat.json, e.g. materials/stone.mat.json |  |
 | `preset` | string |  | Start from a built-in material (other fields override it) | `gold` `silver` `copper` `chrome` `brushed_steel` `iron` `plastic` `rubber` `ceramic` `car_paint` `glass` `water` `ice` `skin` `wax` `leaves` `snow` `velvet` `neon` `toon` `toon_metal` `clay` |
 

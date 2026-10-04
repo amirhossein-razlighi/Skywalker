@@ -90,6 +90,9 @@ const TypeInfo& MaterialAsset::type() {
                             "Flake size in meters in the mesh's own space (default 0.0015; real flakes are smaller, a little "
                             "larger reads better on screen)",
                             0.00005f, 0.05f),
+            SKY_FIELD_RANGE(MaterialAsset, scrollU, Float,
+                            "Texture scroll along U in UV units per second (flowing lava, rivers, conveyor belts); 0 = still", -100.f, 100.f),
+            SKY_FIELD_RANGE(MaterialAsset, scrollV, Float, "Texture scroll along V in UV units per second; 0 = still", -100.f, 100.f),
         }};
     return info;
 }
@@ -145,6 +148,7 @@ Surface toSurface(const MaterialAsset& m) {
     s.clearcoatRoughness = m.clearcoatRoughness;
     s.flakes = m.flakes;
     s.flakeSize = m.flakeSize;
+    s.uvScroll = {m.scrollU, m.scrollV};
     return s;
 }
 
