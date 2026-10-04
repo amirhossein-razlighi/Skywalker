@@ -43,7 +43,7 @@ def _grad(H, W, stops):
     return np.broadcast_to(out[:, None, :], (H, W, 3)).copy()
 
 
-def _mass(L, mask, grad, tex, rim=None, rim_dir=(0, 6), rim_sigma=2.5, rim_amt=0.5, ao=0.35, ao_sigma=40, soften=0.0):
+def _mass(L, mask, grad, tex, rim=None, rim_dir=(0, 6), rim_sigma=2.5, rim_amt=0.5, ao=0.35, ao_sigma=40, soften=0.0, rim_ymax=None):
     """Paints a rock/ruin mass: gradient color, painterly texture, interior occlusion and a rim light."""
     m = blur(mask, soften, wrap=True) if soften > 0 else mask
     col = grad * (0.78 + 0.44 * tex[..., None])
@@ -53,6 +53,8 @@ def _mass(L, mask, grad, tex, rim=None, rim_dir=(0, 6), rim_sigma=2.5, rim_amt=0
     L.paint(m, col)
     if rim is not None:
         r = edge_light(mask, rim_dir[0], rim_dir[1], rim_sigma) * m
+        if rim_ymax is not None:
+            r = r * (np.arange(mask.shape[0])[:, None] < rim_ymax)
         L.add(r, rgb(rim), rim_amt)
     return m
 
@@ -170,9 +172,9 @@ def far_city(out):
     L = Layer(W, H)
     tex = _brush(W, H, 160, 13)
     _mass(L, bm, _grad(H, W, [(0, "#2a6e74"), (0.66, "#1b525a"), (1, "#123d45")]), tex, rim="#6ccfc6", rim_dir=(-3, 4),
-          rim_sigma=2, rim_amt=0.25, ao=0.1, soften=1.2)
+          rim_sigma=2, rim_amt=0.25, ao=0.1, soften=1.2, rim_ymax=ground - 34)
     _mass(L, fm, _grad(H, W, [(0, "#1f5a62"), (0.6, "#143f48"), (1, "#0d2e36")]), tex, rim="#5fc4bc", rim_dir=(-3, 5),
-          rim_sigma=2, rim_amt=0.35, ao=0.2, soften=0.8)
+          rim_sigma=2, rim_amt=0.35, ao=0.2, soften=0.8, rim_ymax=ground + 6)
     win = Mask(W, H, ss=2)
     for (x, y, w, h) in wins:
         if rng.random() < 0.45:
@@ -408,19 +410,6 @@ def foreground(out):
     W, H = 2880, 760
     rng = np.random.default_rng(41)
     m = Mask(W, H)
-    for k in range(2):
-        cx = W * (k + rng.uniform(0.1, 0.9)) / 2
-        ln = rng.uniform(0.22, 0.4) * H
-        sway = rng.uniform(-60, 60)
-        pts = cubic((cx, -10), (cx + sway * 0.2, ln * 0.4), (cx + sway * 0.8, ln * 0.7), (cx + sway, ln), 24)
-        w0 = rng.uniform(18, 34)
-        for dx in (0, -W, W):
-            m.tapered([(px + dx, py) for px, py in pts], w0, 2)
-            for j in range(2):
-                i = int(rng.integers(6, 20))
-                px, py = pts[i]
-                side = rng.choice([-1, 1])
-                m.tapered(curve((px + dx, py), (px + dx + side * 30, py + 26), (px + dx + side * 46, py + rng.uniform(50, 110)), 10), w0 * 0.3, 1)
     for k in range(7):
         cx = W * (k + rng.uniform(0.1, 0.9)) / 7
         hgt = rng.uniform(0.16, 0.34) * H
@@ -547,7 +536,7 @@ def _open_points(mask, solid):
     return np.concatenate(pts, 0).astype(np.float32)
 
 
-def _distance(points, maxd=64.0):
+def _distance(points, maxd=128.0):
     """Distance from every tile pixel to the nearest open point, plus the direction to it."""
     yy, xx = np.mgrid[0:T, 0:T].astype(np.float32) + 0.5
     best = np.full((T, T), maxd, np.float32)
@@ -586,10 +575,10 @@ def _paint_tile(mask, tex, variant_tex=None):
     up = np.clip(-uy, 0, 1) ** 1.5
     down = np.clip(uy, 0, 1) ** 1.5
     side = np.clip(np.abs(ux), 0, 1) ** 1.5
-    depth = smoothstep(0, 70, d)
-    rock = mix(rgb("#2a5961"), rgb("#13292f"), depth[..., None])
+    depth = smoothstep(4, 110, d)
+    rock = mix(rgb("#285660"), rgb("#0b1a1f"), depth[..., None])
     rock = rock * (0.78 + 0.4 * base[..., None]) * (0.9 + 0.15 * strata[..., None])
-    rock = rock * (1 - 0.22 * cracks[..., None] * (1 - depth[..., None] * 0.5))
+    rock = rock * (1 - 0.12 * cracks[..., None] * (1 - depth[..., None] * 0.5))
     # Rim light: cool on sides and tops, darker under overhangs.
     band = np.exp(-d / 7.0)
     rock = rock + rgb("#3aa0a0") * (band * (0.6 * side + 0.8 * up))[..., None]
@@ -1244,11 +1233,428 @@ def rope_bridge(out):
 
 
 # ============================================================================================
+# Landmarks: the Sunken Gate, Bellwether's bell, the Choir statue
+# ============================================================================================
+
+
+def _stone(W, H, seed, top="#2f6068", bottom="#10262c", scale=40):
+    yy = np.arange(H, dtype=np.float32)[:, None] * np.ones((1, W), np.float32)
+    col = mix(rgb(top), rgb(bottom), smoothstep(0, H, yy)[..., None])
+    return col * (0.78 + 0.42 * fbm(W, H, scale, 5, seed=seed, wrap_x=False)[..., None])
+
+
+@prop
+def gate_arch(out):
+    W, H = 640, 780
+    m = Mask(W, H)
+    pil = [(70, 170), (470, 570)]
+    for (a, b) in pil:
+        m.poly([(a - 12, H), (a - 12, H - 40), (a, H - 46), (a, 300), (a - 14, 290), (a - 14, 262), (b + 14, 262), (b + 14, 290), (b, 300),
+                (b, H - 46), (b + 12, H - 40), (b + 12, H)])
+    outer, inner = [], []
+    cx, base = W / 2, 270
+    for i in range(41):
+        t = math.pi * i / 40
+        outer.append((cx - math.cos(t) * 270, base - math.sin(t) * 205))
+        inner.append((cx - math.cos(t) * 160, base - math.sin(t) * 120))
+    m.poly(outer + inner[::-1])
+    m.poly([(cx - 30, base - 210), (cx + 30, base - 210), (cx + 22, base - 118), (cx - 22, base - 118)])  # keystone
+    # A broken chunk missing from the right shoulder.
+    m.poly([(cx + 150, base - 160), (cx + 210, base - 120), (cx + 190, base - 175)], 0)
+    mm = m.get()
+    L = Layer(W, H)
+    L.paint(mm, _stone(W, H, 201))
+    # Mortar lines on the pillars and voussoirs on the arch.
+    lines = Mask(W, H)
+    for (a, b) in pil:
+        for y in range(330, H - 40, 54):
+            lines.line([(a + 2, y), (b - 2, y + 2)], 2)
+    for i in range(1, 12):
+        t = math.pi * i / 12
+        lines.line([(cx - math.cos(t) * 165, base - math.sin(t) * 124), (cx - math.cos(t) * 266, base - math.sin(t) * 202)], 2.2)
+    lm = lines.get() * mm
+    L.multiply(1 - 0.55 * lm)
+    L.add(edge_light(mm, -4, 4, 2.5) * mm, rgb("#6fd8cc"), 0.45)
+    L.multiply(1 - 0.35 * edge_light(mm, 3, -5, 4) * mm)
+    # The rune channel along the arch glows.
+    rune = Mask(W, H)
+    pts = [(cx - math.cos(math.pi * i / 60) * 215, base - math.sin(math.pi * i / 60) * 162) for i in range(61)]
+    rune.line(pts, 3.5)
+    rng = np.random.default_rng(203)
+    for i in range(3, 58, 4):
+        x, y = pts[i]
+        a = math.atan2(y - base, x - cx)
+        n = (math.cos(a), math.sin(a))
+        g = rng.integers(0, 3)
+        if g == 0:
+            rune.line([(x - n[0] * 12, y - n[1] * 12), (x + n[0] * 12, y + n[1] * 12)], 2.2)
+        elif g == 1:
+            rune.circle(x, y, 5, 255)
+        else:
+            rune.line([(x - n[0] * 10 - n[1] * 6, y - n[1] * 10 + n[0] * 6), (x + n[0] * 10, y + n[1] * 10), (x - n[0] * 10 + n[1] * 6, y - n[1] * 10 - n[0] * 6)], 2)
+    rm = rune.get() * mm
+    L.add(blur(rm, 8) * mm, rgb("#5ff2e2"), 1.2)
+    L.paint(rm, "#d8fffa")
+    # Moss on the top and hanging vines.
+    moss = Mask(W, H)
+    moss.poly([(cx - math.cos(math.pi * i / 30) * 272, base - math.sin(math.pi * i / 30) * 207 + 2) for i in range(31)] +
+              [(cx - math.cos(math.pi * i / 30) * 262, base - math.sin(math.pi * i / 30) * 190 + 12 + 4 * math.sin(i)) for i in range(30, -1, -1)])
+    L.paint(moss.get() * mm, "#3f9f7c", 0.9)
+    vines = Mask(W, H)
+    for (x0, ln) in ((120, 260), (200, 140), (cx + 40, 110), (cx + 120, 210), (500, 300)):
+        y0 = base - math.sqrt(max(0, 1 - ((x0 - cx) / 270) ** 2)) * 205 + 20
+        pts = cubic((x0, y0), (x0 + 6, y0 + ln * 0.3), (x0 - 8, y0 + ln * 0.7), (x0 + 3, y0 + ln), 16)
+        vines.tapered(pts, 5, 1.5)
+    vm = vines.get()
+    L.paint(vm, "#1f5f4c")
+    L.add(edge_light(vm, -2, 0, 1) * vm, rgb("#8ff0c8"), 0.4)
+    _save_prop(out, "gate_arch", L, _height_of((mm, 12), (vm, 2)), bevel=6)
+
+
+@prop
+def bell(out):
+    """A great temple bell lying on its side, mouth to the left: Bellwether's home."""
+    W, H = 470, 400
+    m = Mask(W, H)
+    mouth_x, crown_x = 70, 420
+    top, bot = [], []
+    for i in range(41):
+        t = i / 40
+        x = mouth_x + (crown_x - mouth_x) * t
+        half = 175 * (1 - t) ** 0.55 * (1 - 0.15 * t) + 70 * t
+        flare = 18 * math.exp(-t * 18)
+        top.append((x, 200 - half - flare))
+        bot.append((x, 200 + half + flare))
+    m.poly(top + bot[::-1])
+    m.ellipse(crown_x + 6, 200, 28, 70)
+    m.poly([(crown_x + 20, 175), (crown_x + 52, 180), (crown_x + 52, 220), (crown_x + 20, 225)])  # crown loop
+    mm = m.get()
+    yy = np.arange(H, dtype=np.float32)[:, None] * np.ones((1, W), np.float32)
+    xx = np.arange(W, dtype=np.float32)[None, :] * np.ones((H, 1), np.float32)
+    bronze = mix(rgb("#6e5632"), rgb("#2a1e10"), smoothstep(60, 380, yy)[..., None])
+    n = fbm(W, H, 50, 5, seed=301, wrap_x=False)
+    patina = smoothstep(0.4, 0.85, fbm(W, H, 36, 5, seed=302, wrap_x=False))
+    col = mix(bronze, rgb("#2f7a6a"), (patina * 0.7)[..., None]) * (0.8 + 0.35 * n[..., None])
+    L = Layer(W, H)
+    L.paint(mm, col)
+    # Rings near the mouth and the crown.
+    rings = Mask(W, H)
+    for x in (mouth_x + 26, mouth_x + 40, crown_x - 40):
+        rings.line([(x, 30), (x + 4, 370)], 5)
+    L.multiply(1 - 0.4 * rings.get() * mm)
+    # Mouth: dark interior with a warm glow deep inside (a tiny hearth).
+    mouth = Mask(W, H)
+    mouth.ellipse(mouth_x + 2, 200, 42, 172)
+    om = mouth.get() * mm
+    L.paint(om, mix(rgb("#06100f"), rgb("#2a1a10"), np.exp(-((yy - 260) / 70) ** 2)[..., None]))
+    L.add(np.exp(-(((xx - mouth_x - 10) / 30) ** 2 + ((yy - 285) / 40) ** 2)) * om, rgb("#ffb050"), 0.7)
+    L.add(edge_light(mm, -3, 5, 2.5) * mm * (1 - om), rgb("#9fe8d0"), 0.55)
+    L.multiply(1 - 0.4 * edge_light(mm, 0, -8, 6) * mm)
+    # Barnacles.
+    rng = np.random.default_rng(303)
+    bar = Mask(W, H)
+    for _ in range(40):
+        x, y = rng.uniform(110, 410), rng.uniform(60, 360)
+        if mm[int(y), int(x)] > 0.9 and om[int(y), int(x)] < 0.1:
+            bar.circle(x, y, rng.uniform(3, 7))
+    bm = bar.get()
+    L.paint(bm, "#8a9a90", 0.7)
+    L.multiply(1 - 0.3 * edge_light(bm, 1, -1, 0.8))
+    _save_prop(out, "bell", L, _height_of((mm, 22), (bm, 2)), bevel=8)
+
+
+@prop
+def statue(out):
+    """The First Lamplighter: a drowned statue in a wide traveller's hat, lantern held out over the shrine."""
+    W, H = 560, 1000
+    rng = np.random.default_rng(401)
+    body, hat, lantern, glass, plinth, staff = (Mask(W, H) for _ in range(6))
+    cx = 270
+    # Plinth with steps.
+    plinth.poly([(30, H), (30, H - 60), (60, H - 60), (60, H - 120), (500, H - 120), (500, H - 60), (530, H - 60), (530, H)])
+    # Robe: a tall cloak falling in folds, slightly flared hem.
+    pts = cubic((cx - 50, 330), (cx - 110, 470), (cx - 150, 700), (cx - 175, H - 125), 20) + \
+        [(cx - 120, H - 115), (cx - 60, H - 128), (cx, H - 118), (cx + 60, H - 130), (cx + 120, H - 116)] + \
+        cubic((cx + 165, H - 125), (cx + 140, 700), (cx + 100, 470), (cx + 55, 330), 20)
+    body.poly(pts)
+    body.ellipse(cx, 330, 64, 40)  # shoulders
+    body.ellipse(cx + 4, 290, 40, 40)  # head (mostly hidden under the hat)
+    # Arm reaching forward holding a staff, lantern hanging from it.
+    body.tapered([(cx + 40, 350), (cx + 110, 420), (cx + 150, 400)], 44, 30)
+    staff.tapered([(cx + 120, 520), (cx + 190, 300), (cx + 230, 262)], 12, 9)
+    lx, ly = cx + 236, 330
+    staff.line([(cx + 230, 262), (lx, ly - 40)], 3)
+    lantern.poly([(lx - 30, ly - 40), (lx + 30, ly - 40), (lx + 24, ly + 40), (lx - 24, ly + 40)])
+    lantern.poly([(lx - 16, ly - 40), (lx + 16, ly - 40), (lx, ly - 62)])
+    glass.poly([(lx - 20, ly - 30), (lx + 20, ly - 30), (lx + 16, ly + 32), (lx - 16, ly + 32)])
+    # Hat: wide and shallow, like Wick's.
+    hb = (cx + 6, 262)
+    hat.poly([(hb[0] + x, hb[1] + y) for x, y in [(-150, 18), (-120, 4), (-60, -34), (-18, -64), (18, -64), (60, -34), (124, 4), (156, 18),
+                                                  (136, 28), (60, 16), (0, 14), (-66, 16), (-130, 28)]])
+    hat.circle(hb[0], hb[1] - 66, 12)
+    bm, hm, km, gm, pm, sm = body.get(), hat.get(), lantern.get(), glass.get(), plinth.get(), staff.get()
+    L = Layer(W, H)
+    stone = _stone(W, H, 402, top="#2c565e", bottom="#0f252c", scale=60)
+    L.paint(pm, _stone(W, H, 403, top="#24474f", bottom="#0e2229", scale=30))
+    L.paint(bm, stone)
+    L.paint(sm, stone * 0.8)
+    L.paint(hm, _stone(W, H, 404, top="#25474f", bottom="#122a31", scale=40))
+    # Robe folds.
+    folds = Mask(W, H)
+    for k in range(7):
+        x0 = cx - 70 + k * 24 + rng.uniform(-6, 6)
+        folds.tapered(cubic((x0, 400), (x0 - 10 - k * 3, 560), (x0 - 20 - k * 6, 720), (x0 - 30 - (3 - k) * 14, H - 130), 16), 3, 12)
+    L.multiply(1 - 0.35 * blur(folds.get(), 3) * bm)
+    allm = np.clip(bm + hm + sm + pm, 0, 1)
+    L.add(edge_light(allm, -5, 5, 3) * allm, rgb("#7fe0d4"), 0.5)
+    L.multiply(1 - 0.4 * edge_light(allm, 4, -6, 6) * allm)
+    # Cracks and moss.
+    cr = Mask(W, H)
+    for _ in range(6):
+        x, y = rng.uniform(cx - 120, cx + 120), rng.uniform(380, 820)
+        pts = [(x, y)]
+        for j in range(6):
+            x, y = x + rng.uniform(-14, 14), y + rng.uniform(10, 26)
+            pts.append((x, y))
+        cr.line(pts, 1.6)
+    L.multiply(1 - 0.5 * cr.get() * bm)
+    moss = smoothstep(0.55, 0.75, fbm(W, H, 50, 5, seed=405, wrap_x=False)) * (allm - pm * 0.5)
+    yy = np.arange(H, dtype=np.float32)[:, None] * np.ones((1, W), np.float32)
+    L.tint(blur(moss, 3) * smoothstep(600, 900, yy) + blur(moss, 3) * hm * 0.6, rgb("#2a6e58"), 0.45)
+    # Runes on the plinth.
+    rune = Mask(W, H)
+    for k in range(9):
+        x = 90 + k * 45
+        y = H - 85
+        g = k % 3
+        if g == 0:
+            rune.line([(x, y - 14), (x, y + 14)], 3)
+            rune.line([(x - 8, y - 4), (x + 8, y - 12)], 3)
+        elif g == 1:
+            rune.circle(x, y, 9, 255)
+            rune.circle(x, y, 5, 0)
+        else:
+            rune.line([(x - 9, y + 12), (x, y - 12), (x + 9, y + 12)], 3)
+    rm = rune.get()
+    L.add(blur(rm, 7) * pm, rgb("#5ff2e2"), 1.1)
+    L.paint(rm, "#d8fffa")
+    # The lantern — rekindled: warm light.
+    L.paint(km, "#3a2c1c")
+    L.add(edge_light(km, -2, 2, 1) * km, rgb("#ffcf8a"), 0.5)
+    L.paint(np.clip(blur(gm, 26) * 1.4, 0, 1) * (1 - km) * (1 - allm), "#ffb860", 0.5)
+    L.paint(gm, "#fff0c8")
+    _save_prop(out, "statue", L, _height_of((pm, 10), (bm, 24), (hm, 10), (km, 4)), bevel=8)
+
+
+# ============================================================================================
+# Animated sheets (cut with sprite_sheet_slice): jellyfish, pool water, Bellwether
+# ============================================================================================
+
+
+def jelly_sheet(out):
+    FW, FH, N = 150, 260, 6
+    sheet = Image.new("RGBA", (FW * N, FH), (0, 0, 0, 0))
+    for i in range(N):
+        p = i / N
+        pulse = math.sin(2 * math.pi * p)
+        L = Layer(FW, FH)
+        bell, core, tent = Mask(FW, FH), Mask(FW, FH), Mask(FW, FH)
+        cx, cy = FW / 2, 70 - pulse * 4
+        rx, ry = 46 - pulse * 7, 34 + pulse * 6
+        pts = [(cx - math.cos(math.pi * k / 30) * rx, cy - math.sin(math.pi * k / 30) * ry) for k in range(31)]
+        pts += [(cx + rx * (1 - k / 10 * 2), cy + 8 + 4 * math.sin(k * 2.2 + p * 6)) for k in range(11)]
+        bell.poly(pts)
+        core.ellipse(cx, cy - 6, rx * 0.45, ry * 0.4)
+        for j in range(6):
+            x0 = cx - rx * 0.7 + j * rx * 0.28
+            pts = []
+            for k in range(14):
+                t = k / 13
+                pts.append((x0 + math.sin(t * 5 + p * 2 * math.pi + j) * 7 * t, cy + 10 + t * (150 + 15 * pulse + j * 6)))
+            tent.tapered(pts, 3.2 if j % 2 else 2.0, 0.6)
+        frills = Mask(FW, FH)
+        for j in range(3):
+            x0 = cx - 16 + j * 16
+            frills.tapered([(x0 + math.sin(p * 6 + j + k * 0.6) * 5, cy + 10 + k * 10) for k in range(8)], 9, 3)
+        bm, cm, tm, fm = bell.get(), core.get(), tent.get(), frills.get()
+        L.paint(np.clip(blur(bm, 16) * 1.0, 0, 1) * (1 - bm), "#4fd6e0", 0.35)
+        L.paint(tm, "#7fe8f0", 0.6)
+        L.paint(fm, "#a8f4ff", 0.7)
+        yy = np.arange(FH, dtype=np.float32)[:, None] * np.ones((1, FW), np.float32)
+        L.paint(bm, mix(rgb("#b8fbff"), rgb("#3fbccc"), smoothstep(cy - ry, cy + 10, yy)[..., None]), 0.82)
+        L.paint(cm, "#f0ffff", 0.9)
+        sheet.paste(L.image(), (i * FW, 0))
+    sheet.save(os.path.join(out, "jelly_sheet.png"), optimize=True)
+
+
+def water_sheet(out):
+    FW, FH, N = 1000, 220, 4
+    sheet = Image.new("RGBA", (FW, FH * N), (0, 0, 0, 0))
+    xs = np.arange(FW, dtype=np.float32)
+    yy = np.arange(FH, dtype=np.float32)[:, None] * np.ones((1, FW), np.float32)
+    caust = [fbm(FW, FH, 40, 4, seed=500 + i, wrap_x=True) for i in range(2)]
+    for i in range(N):
+        p = i / N
+        surf = 48 + 3.5 * np.sin(xs / FW * 2 * math.pi * 6 + p * 2 * math.pi) + 2 * np.sin(xs / FW * 2 * math.pi * 11 - p * 2 * math.pi * 2)
+        below = smoothstep(-1.0, 1.0, yy - surf[None, :])
+        L = Layer(FW, FH)
+        body = mix(rgb("#2fb8b0"), rgb("#06282c"), smoothstep(0, FH, yy - surf[None, :])[..., None])
+        c = caust[0] * (1 - p) + caust[1] * p
+        ridge = 1 - np.abs(c * 2 - 1)
+        body = body + rgb("#7ff6e6") * (blur(smoothstep(0.88, 0.99, ridge), 1.2) * np.exp(-(yy - surf[None, :]) / 50))[..., None] * 0.35
+        L.paint(below, body, 1.0)
+        L.a = L.a * (0.55 + 0.35 * smoothstep(surf[None, :], surf[None, :] + 120, yy))
+        line = np.exp(-((yy - surf[None, :]) / 2.2) ** 2)
+        glow = np.exp(-((yy - surf[None, :]) / 16) ** 2) * (yy < surf[None, :])
+        L.paint(np.clip(glow * 0.6, 0, 1), "#6ff4e4", 0.6)
+        L.paint(np.clip(line, 0, 1), "#e0fffb", 0.95)
+        sheet.paste(L.image(), (0, i * FH))
+    sheet.save(os.path.join(out, "water_sheet.png"), optimize=True)
+
+
+def crab_frame(i, n, W=350, H=250):
+    """Bellwether: an old hermit crab who lives in the drowned temple bell. Faces left."""
+    p = i / n
+    s = math.sin(2 * math.pi * p)
+    c = math.cos(2 * math.pi * p)
+    layers = []
+    body, legs, claw, small, stalks, eyes = (Mask(W, H) for _ in range(6))
+    bx, by = 238, 178
+    # walking legs (behind)
+    for k in range(3):
+        x0 = bx - 20 + k * 30
+        knee = (x0 - 34 - k * 4, by - 18 + k * 2)
+        foot = (x0 - 46 - k * 6, H - 6)
+        legs.tapered([(x0, by + 8), knee, foot], 12, 4)
+    body.ellipse(bx, by, 92, 56)
+    body.ellipse(bx - 62, by - 6, 40, 32)  # face plate
+    # big claw (left, resting on the ground, opens a little)
+    open_a = 8 + 6 * max(0.0, s)
+    cl = [(bx - 70, by + 10), (bx - 120, by + 30), (bx - 175, by + 34), (bx - 200, by + 50), (bx - 168, by + 64), (bx - 110, by + 62), (bx - 66, by + 40)]
+    claw.poly(cl)
+    pin = [(bx - 175, by + 34), (bx - 215, by + 30 - open_a), (bx - 230, by + 36 - open_a), (bx - 196, by + 46)]
+    claw.poly(pin)
+    small.tapered([(bx - 70, by - 4), (bx - 104, by - 2 + c * 3), (bx - 126, by - 14 + c * 3)], 16, 8)
+    small.ellipse(bx - 130, by - 16 + c * 3, 12, 8)
+    # eye stalks + antennae
+    e1 = (bx - 84 + s * 4, by - 92 + c * 2)
+    e2 = (bx - 60 - s * 3, by - 98 - c * 2)
+    for e in (e1, e2):
+        stalks.tapered(curve((bx - 70, by - 26), ((bx - 70 + e[0]) / 2 + 6, (by - 26 + e[1]) / 2), e, 10), 9, 6)
+        eyes.ellipse(e[0], e[1], 8.5, 9.5)
+    ant = Mask(W, H)
+    for k, base in enumerate(((bx - 92, by - 18), (bx - 88, by - 12))):
+        ant.tapered(cubic(base, (base[0] - 40, base[1] - 60), (base[0] - 70 + s * 12 * (1 if k else -1), base[1] - 80), (base[0] - 100 + s * 18, base[1] - 50 + c * 10 * (k + 1)), 16), 3, 1)
+    L = Layer(W, H)
+    yy = np.arange(H, dtype=np.float32)[:, None] * np.ones((1, W), np.float32)
+    shell = mix(rgb("#b4583c"), rgb("#3e140c"), smoothstep(120, 236, yy)[..., None])
+    n = fbm(W, H, 26, 4, seed=601, wrap_x=False)[..., None]
+    L.paint(legs.get(), mix(rgb("#a8452e"), rgb("#4a1c12"), 0.4))
+    L.paint(ant.get(), "#e8a080")
+    L.paint(body.get(), shell * (0.75 + 0.45 * n))
+    L.paint(small.get(), shell * 0.95)
+    L.paint(claw.get(), shell * (0.9 + 0.3 * n))
+    L.paint(stalks.get(), "#c86448")
+    em = eyes.get()
+    L.paint(em, "#0a1418")
+    pup = Mask(W, H)
+    for e in (e1, e2):
+        pup.circle(e[0] - 2.5, e[1] - 1, 4)
+    pm = pup.get()
+    allm = np.clip(L.a, 0, 1)
+    L.add(edge_light(allm, -3, 4, 1.5) * allm, rgb("#ffd0b0"), 0.45)
+    L.multiply(1 - 0.35 * edge_light(allm, 2, -4, 3) * allm)
+    L.paint(pm, "#b8fff4")
+    # barnacle spots and a tiny pair of spectacles
+    spots = Mask(W, H)
+    rng = np.random.default_rng(602)
+    for _ in range(14):
+        spots.circle(bx + rng.uniform(-60, 60), by + rng.uniform(-30, 30), rng.uniform(2, 4))
+    L.paint(spots.get() * body.get(), "#f2d6b8", 0.7)
+    spec = Mask(W, H)
+    spec.ellipse(e1[0] - 2, e1[1] + 16, 9, 7)
+    spec.ellipse(e1[0] - 2, e1[1] + 16, 6.5, 4.5, 0)
+    L.paint(spec.get(), "#d8b060", 0.0)
+    bmask, cmask = body.get(), claw.get()
+    over = np.clip(bmask + cmask, 0, 1)
+    return L, _height_of((legs.get() * (1 - over), 3), (bmask, 14), (cmask * 1.0, 8), (stalks.get(), 3))
+
+
+def crab_sheet(out):
+    N, W, H = 6, 350, 250
+    sheet = Image.new("RGBA", (W * N, H), (0, 0, 0, 0))
+    nsheet = Image.new("RGBA", (W * N, H), (128, 128, 255, 0))
+    for i in range(N):
+        L, h = crab_frame(i, N)
+        sheet.paste(L.image(), (i * W, 0))
+        nsheet.paste(normal_map(L.a, h, bevel=3, strength=1.0, detail=1.0), (i * W, 0))
+    sheet.save(os.path.join(out, "bellwether_sheet.png"), optimize=True)
+    nsheet.save(os.path.join(out, "bellwether_sheet_n.png"), optimize=True)
+
+
+def hud_icons(out):
+    d = os.path.join(out, "ui")
+    os.makedirs(d, exist_ok=True)
+    W, H = 80, 116
+    cage, glass, ring = Mask(W, H), Mask(W, H), Mask(W, H)
+    ring.circle(W / 2, 12, 8)
+    ring.circle(W / 2, 12, 4.5, 0)
+    cage.poly([(14, 30), (66, 30), (60, 100), (20, 100)])
+    cage.poly([(22, 30), (58, 30), (W / 2, 18)])
+    cage.poly([(18, 100), (62, 100), (54, 110), (26, 110)])
+    glass.poly([(21, 38), (59, 38), (55, 94), (25, 94)])
+    gm = glass.get()
+    L = Layer(W, H)
+    L.paint(ring.get(), "#c89a52")
+    L.paint(cage.get(), "#7a5a2c")
+    L.add(edge_light(cage.get(), -2, 2, 1) * cage.get(), rgb("#ffe0a0"), 0.5)
+    yy = np.arange(H, dtype=np.float32)[:, None] * np.ones((1, W), np.float32)
+    L.paint(gm, mix(rgb("#fff4d0"), rgb("#ffa840"), smoothstep(40, 94, yy)[..., None]))
+    bars = Mask(W, H)
+    for x in (33, 47):
+        bars.line([(x, 38), (x, 94)], 2.5)
+    L.paint(bars.get() * gm, "#7a5a2c")
+    L.image().save(os.path.join(d, "lantern_icon.png"))
+    S = 48
+    m = Mask(S, S)
+    m.poly([(S / 2, 4), (S / 2 + 6, S / 2 - 6), (S - 4, S / 2), (S / 2 + 6, S / 2 + 6), (S / 2, S - 4), (S / 2 - 6, S / 2 + 6), (4, S / 2), (S / 2 - 6, S / 2 - 6)])
+    mm = m.get()
+    L = Layer(S, S)
+    L.paint(np.clip(blur(mm, 4) * 1.5, 0, 1), "#7ff4e4", 0.6)
+    L.paint(mm, "#e8fffb")
+    L.image().save(os.path.join(d, "mote_icon.png"))
+
+
+def portraits(out):
+    """Dialogue portraits: painted vignettes cropped from the characters (256x256)."""
+    d = os.path.join(out, "..", "portraits")
+    os.makedirs(d, exist_ok=True)
+    S = 256
+
+    def frame(img, box, tint):
+        crop = img.crop(box).resize((S, S), Image.LANCZOS)
+        bgL = Layer(S, S)
+        yy = np.arange(S, dtype=np.float32)[:, None] * np.ones((1, S), np.float32)
+        xx = np.arange(S, dtype=np.float32)[None, :] * np.ones((S, 1), np.float32)
+        bgL.rgb = mix(rgb(tint), rgb("#05141a"), smoothstep(0, S, yy)[..., None]).astype(np.float32)
+        bgL.add(np.exp(-(((xx - S * 0.45) / 90) ** 2 + ((yy - S * 0.4) / 90) ** 2)), rgb(tint), 0.6)
+        bgL.a[:] = 1
+        out_img = bgL.image(bleed=False)
+        out_img.alpha_composite(crop)
+        return out_img
+    col, _, _ = hero_frame("idle", 0, 8)
+    frame(col.image(), (36, 18, 176, 158), "#2f7a80").save(os.path.join(d, "wick.png"))
+    crab, _ = crab_frame(0, 6)
+    frame(crab.image(), (58, 30, 258, 230), "#3a6a70").save(os.path.join(d, "bellwether.png"))
+
+
+# ============================================================================================
 # Entry
 # ============================================================================================
 
 JOBS = dict(hero=hero, tileset=tileset, backdrop=backdrop, far_city=far_city, deep_cavern=deep_cavern, near_cavern=near_cavern,
-            shafts=shafts, mist=mist, foreground=foreground)
+            shafts=shafts, mist=mist, foreground=foreground, jelly_sheet=jelly_sheet, water_sheet=water_sheet,
+            crab_sheet=crab_sheet, portraits=portraits, hud_icons=hud_icons)
 
 
 def main(out, only=None):

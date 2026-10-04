@@ -1,0 +1,15 @@
+title: Start
+---
+<<declare $blessed = false>>
+Bellwether: Hm? A light... a real one. I had nearly forgotten the colour. #portrait:bellwether
+Bellwether: Few walk the Gloam carrying fire any more, little wick. #portrait:bellwether
+Wick: The lamps below went out. I have come to wake them. #portrait:wick
+-> Do you know the way to the Choir?
+    Bellwether: Past the gallery, where the old lamplighters stand in stone. #portrait:bellwether
+    Bellwether: Hold your lantern up to the first of them. She remembers. #portrait:bellwether
+-> Why do you live in a bell?
+    Bellwether: It rang once for the whole drowned city. Now it rings for me. Mostly when I sneeze. #portrait:bellwether
+Bellwether: Go gently. The dark down here is old, but it is not cruel. #portrait:bellwether
+<<set $blessed = true>>
+<<lantern_blessing>>
+===

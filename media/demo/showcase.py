@@ -22,7 +22,7 @@ from sky import ROOT, Sky  # noqa: E402
 
 GAMES = ["hollow_manor", "abyss", "hearthside", "harvest_fair", "neon_drift", "star_lancer",
          "cloudhopper", "toy_kart_rally", "zen_garden", "cyber_alley", "frostlight", "sky_dash",
-         "smugglers_cove", "hidden_alley", "namaqua_canyon", "tidebreak_isle", "neon_requiem"]
+         "smugglers_cove", "hidden_alley", "namaqua_canyon", "tidebreak_isle", "neon_requiem", "gloamwater"]
 W, H = 1920, 1080
 
 
@@ -63,6 +63,8 @@ def render(game, out, fps=30, stills=False, width=W, height=H):
     for shot in m.shots():
         sky.call("sim_control", action="stop")
         sky.call("sim_control", action="play")
+        if "start" in shot:  # e.g. start the shot's sequence together with the simulation
+            shot["start"](sky)
         warm = shot.get("warmup", 90)
         if warm:
             sky.call("sim_control", action="step", ticks=warm)

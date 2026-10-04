@@ -9538,7 +9538,7 @@
       "components": {
         "transform": {
           "position": [
-            63.5,
+            59.6,
             8.95,
             0
           ],
@@ -9601,7 +9601,7 @@
       "components": {
         "transform": {
           "position": [
-            71.2,
+            72.8,
             8.95,
             0
           ],
@@ -9877,13 +9877,54 @@
           "height": 1,
           "shadows": false,
           "shadowSoftness": 0.4,
-          "halo": 0.5,
+          "halo": 0,
           "flicker": 0.05
         }
       }
     },
     {
       "id": 157,
+      "name": "Lamp Glow 91.0",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            91.78,
+            15.4,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "light2d": {
+          "kind": "point",
+          "color": "#9ff8ee",
+          "intensity": 0.3,
+          "radius": 1,
+          "falloff": 2,
+          "innerAngle": 25,
+          "outerAngle": 45,
+          "height": 1,
+          "shadows": false,
+          "shadowSoftness": 0.4,
+          "halo": 1.4,
+          "flicker": 0.1
+        }
+      }
+    },
+    {
+      "id": 158,
       "name": "Lantern Post 144",
       "parent": 0,
       "enabled": true,
@@ -9946,7 +9987,7 @@
       }
     },
     {
-      "id": 158,
+      "id": 159,
       "name": "Lamp Light 99.5",
       "parent": 0,
       "enabled": true,
@@ -9981,13 +10022,54 @@
           "height": 1,
           "shadows": false,
           "shadowSoftness": 0.4,
-          "halo": 0.5,
+          "halo": 0,
           "flicker": 0.05
         }
       }
     },
     {
-      "id": 159,
+      "id": 160,
+      "name": "Lamp Glow 99.5",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            100.28,
+            15.4,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "light2d": {
+          "kind": "point",
+          "color": "#9ff8ee",
+          "intensity": 0.3,
+          "radius": 1,
+          "falloff": 2,
+          "innerAngle": 25,
+          "outerAngle": 45,
+          "height": 1,
+          "shadows": false,
+          "shadowSoftness": 0.4,
+          "halo": 1.4,
+          "flicker": 0.1
+        }
+      }
+    },
+    {
+      "id": 161,
       "name": "Lantern Post 145",
       "parent": 0,
       "enabled": true,
@@ -10050,7 +10132,7 @@
       }
     },
     {
-      "id": 160,
+      "id": 162,
       "name": "Lamp Light 108.0",
       "parent": 0,
       "enabled": true,
@@ -10085,13 +10167,54 @@
           "height": 1,
           "shadows": false,
           "shadowSoftness": 0.4,
-          "halo": 0.5,
+          "halo": 0,
           "flicker": 0.05
         }
       }
     },
     {
-      "id": 161,
+      "id": 163,
+      "name": "Lamp Glow 108.0",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            108.78,
+            15.4,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "light2d": {
+          "kind": "point",
+          "color": "#9ff8ee",
+          "intensity": 0.3,
+          "radius": 1,
+          "falloff": 2,
+          "innerAngle": 25,
+          "outerAngle": 45,
+          "height": 1,
+          "shadows": false,
+          "shadowSoftness": 0.4,
+          "halo": 1.4,
+          "flicker": 0.1
+        }
+      }
+    },
+    {
+      "id": 164,
       "name": "Hanging Lantern 146",
       "parent": 0,
       "enabled": true,
@@ -10154,7 +10277,7 @@
       }
     },
     {
-      "id": 162,
+      "id": 165,
       "name": "Hanging Light 95.3",
       "parent": 0,
       "enabled": true,
@@ -10189,13 +10312,54 @@
           "height": 1,
           "shadows": false,
           "shadowSoftness": 0.4,
-          "halo": 0.6,
+          "halo": 0,
           "flicker": 0.2
         }
       }
     },
     {
-      "id": 163,
+      "id": 166,
+      "name": "Hanging Glow 95.3",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            95.3,
+            17,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "light2d": {
+          "kind": "point",
+          "color": "#ffc070",
+          "intensity": 0.3,
+          "radius": 1,
+          "falloff": 2,
+          "innerAngle": 25,
+          "outerAngle": 45,
+          "height": 1,
+          "shadows": false,
+          "shadowSoftness": 0.4,
+          "halo": 1.4,
+          "flicker": 0.1
+        }
+      }
+    },
+    {
+      "id": 167,
       "name": "Hanging Lantern 147",
       "parent": 0,
       "enabled": true,
@@ -10258,7 +10422,7 @@
       }
     },
     {
-      "id": 164,
+      "id": 168,
       "name": "Hanging Light 103.7",
       "parent": 0,
       "enabled": true,
@@ -10293,13 +10457,256 @@
           "height": 1,
           "shadows": false,
           "shadowSoftness": 0.4,
-          "halo": 0.6,
+          "halo": 0,
           "flicker": 0.2
         }
       }
     },
     {
-      "id": 165,
+      "id": 169,
+      "name": "Hanging Glow 103.7",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            103.7,
+            17,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "light2d": {
+          "kind": "point",
+          "color": "#ffc070",
+          "intensity": 0.3,
+          "radius": 1,
+          "falloff": 2,
+          "innerAngle": 25,
+          "outerAngle": 45,
+          "height": 1,
+          "shadows": false,
+          "shadowSoftness": 0.4,
+          "halo": 1.4,
+          "flicker": 0.1
+        }
+      }
+    },
+    {
+      "id": 170,
+      "name": "Sunken Gate",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "decor"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            8.6,
+            10.9,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "sprite": {
+          "texture": "art/props.atlas.json",
+          "frame": "gate_arch",
+          "columns": 1,
+          "rows": 1,
+          "region": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "pivot": [
+            0.5,
+            0
+          ],
+          "size": [
+            0,
+            0
+          ],
+          "pixelsPerUnit": 113.6364,
+          "color": "#ffffff",
+          "flipX": false,
+          "flipY": false,
+          "sortingLayer": "default",
+          "order": 4,
+          "filter": "linear",
+          "normalMap": "art/props_n.atlas.png",
+          "emissive": "#000000",
+          "billboard": "none",
+          "lit": true,
+          "castShadows": false,
+          "alphaCutoff": 0,
+          "visible": true
+        }
+      }
+    },
+    {
+      "id": 171,
+      "name": "Title Glyphs",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            14.4,
+            15.5,
+            0.2
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "text": {
+          "text": "G L O A M W A T E R",
+          "font": "serif",
+          "size": 0.6,
+          "color": "#c8fff6",
+          "align": "center",
+          "valign": "middle",
+          "maxWidth": 0,
+          "lineSpacing": 1,
+          "outline": 0.04,
+          "outlineColor": "#0b3b3a",
+          "shadowColor": "#00000000",
+          "shadowOffset": [
+            0.04,
+            -0.04
+          ],
+          "emissive": 2.2,
+          "billboard": "none",
+          "sortingLayer": "default",
+          "order": 6,
+          "visible": true
+        }
+      }
+    },
+    {
+      "id": 172,
+      "name": "Gate Subtitle",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            14.4,
+            14.8,
+            0.2
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "text": {
+          "text": "<i>where the light went down</i>",
+          "font": "serif",
+          "size": 0.3,
+          "color": "#8fe8dc",
+          "align": "center",
+          "valign": "middle",
+          "maxWidth": 0,
+          "lineSpacing": 1,
+          "outline": 0,
+          "outlineColor": "#000000",
+          "shadowColor": "#00000000",
+          "shadowOffset": [
+            0.04,
+            -0.04
+          ],
+          "emissive": 0.8,
+          "billboard": "none",
+          "sortingLayer": "default",
+          "order": 6,
+          "visible": true
+        }
+      }
+    },
+    {
+      "id": 173,
+      "name": "Gate Runes Light",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            8.6,
+            15,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "light2d": {
+          "kind": "point",
+          "color": "#5ff2e2",
+          "intensity": 1.1,
+          "radius": 5,
+          "falloff": 2,
+          "innerAngle": 25,
+          "outerAngle": 45,
+          "height": 1,
+          "shadows": false,
+          "shadowSoftness": 0.4,
+          "halo": 0.25,
+          "flicker": 0
+        }
+      }
+    },
+    {
+      "id": 174,
       "name": "Lore Stone",
       "parent": 0,
       "enabled": true,
@@ -10362,7 +10769,313 @@
       }
     },
     {
-      "id": 166,
+      "id": 175,
+      "name": "Lore Inscription",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            75.5,
+            11.75,
+            0.2
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "text": {
+          "text": "Here the last lamp\nwas lowered into the deep.",
+          "font": "serif",
+          "size": 0.21,
+          "color": "#bdfcf2",
+          "align": "center",
+          "valign": "middle",
+          "maxWidth": 0,
+          "lineSpacing": 1.15,
+          "outline": 0,
+          "outlineColor": "#000000",
+          "shadowColor": "#00000000",
+          "shadowOffset": [
+            0.04,
+            -0.04
+          ],
+          "emissive": 1.2,
+          "billboard": "none",
+          "sortingLayer": "default",
+          "order": 8,
+          "visible": true
+        }
+      }
+    },
+    {
+      "id": 176,
+      "name": "Temple Bell",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "decor"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            68.6,
+            8.75,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "sprite": {
+          "texture": "art/props.atlas.json",
+          "frame": "bell",
+          "columns": 1,
+          "rows": 1,
+          "region": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "pivot": [
+            0.5,
+            0
+          ],
+          "size": [
+            0,
+            0
+          ],
+          "pixelsPerUnit": 100,
+          "color": "#ffffff",
+          "flipX": false,
+          "flipY": false,
+          "sortingLayer": "default",
+          "order": 6,
+          "filter": "linear",
+          "normalMap": "art/props_n.atlas.png",
+          "emissive": "#000000",
+          "billboard": "none",
+          "lit": true,
+          "castShadows": true,
+          "alphaCutoff": 0,
+          "visible": true
+        }
+      }
+    },
+    {
+      "id": 177,
+      "name": "Bell Hearth Light",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            66.6,
+            10,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "light2d": {
+          "kind": "point",
+          "color": "#ffb050",
+          "intensity": 0.9,
+          "radius": 3.2,
+          "falloff": 2,
+          "innerAngle": 25,
+          "outerAngle": 45,
+          "height": 1,
+          "shadows": false,
+          "shadowSoftness": 0.4,
+          "halo": 0.3,
+          "flicker": 0.25
+        }
+      }
+    },
+    {
+      "id": 178,
+      "name": "The First Lamplighter",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "decor"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            133,
+            9.92,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "sprite": {
+          "texture": "art/props.atlas.json",
+          "frame": "statue",
+          "columns": 1,
+          "rows": 1,
+          "region": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "pivot": [
+            0.5,
+            0
+          ],
+          "size": [
+            0,
+            0
+          ],
+          "pixelsPerUnit": 128.2051,
+          "color": "#ffffff",
+          "flipX": false,
+          "flipY": false,
+          "sortingLayer": "default",
+          "order": 5,
+          "filter": "linear",
+          "normalMap": "art/props_n.atlas.png",
+          "emissive": "#000000",
+          "billboard": "none",
+          "lit": true,
+          "castShadows": false,
+          "alphaCutoff": 0,
+          "visible": true
+        }
+      }
+    },
+    {
+      "id": 179,
+      "name": "Shrine Lantern Light",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            134.7628,
+            15.226,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "light2d": {
+          "kind": "point",
+          "color": "#ffc070",
+          "intensity": 1.3,
+          "radius": 7,
+          "falloff": 2,
+          "innerAngle": 25,
+          "outerAngle": 45,
+          "height": 1,
+          "shadows": true,
+          "shadowSoftness": 0.7,
+          "halo": 0.55,
+          "flicker": 0.1
+        }
+      }
+    },
+    {
+      "id": 180,
+      "name": "Shrine Epitaph",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            126.6,
+            15,
+            0.2
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "text": {
+          "text": "THE  DROWNED  CHOIR",
+          "font": "serif",
+          "size": 0.42,
+          "color": "#ffe2b0",
+          "align": "center",
+          "valign": "middle",
+          "maxWidth": 0,
+          "lineSpacing": 1,
+          "outline": 0.03,
+          "outlineColor": "#3a2410",
+          "shadowColor": "#00000000",
+          "shadowOffset": [
+            0.04,
+            -0.04
+          ],
+          "emissive": 1.6,
+          "billboard": "none",
+          "sortingLayer": "default",
+          "order": 6,
+          "visible": true
+        }
+      }
+    },
+    {
+      "id": 181,
       "name": "Rope Bridge",
       "parent": 0,
       "enabled": true,
@@ -10425,7 +11138,2509 @@
       }
     },
     {
-      "id": 167,
+      "id": 182,
+      "name": "Glowing Pool",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            29,
+            8.1,
+            0.1
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "sprite": {
+          "texture": "art/water_sheet.atlas.json",
+          "frame": "water_sheet_0",
+          "columns": 1,
+          "rows": 1,
+          "region": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "pivot": [
+            0.5,
+            1
+          ],
+          "size": [
+            0,
+            0
+          ],
+          "pixelsPerUnit": 100,
+          "color": "#ffffff",
+          "flipX": false,
+          "flipY": false,
+          "sortingLayer": "default",
+          "order": 25,
+          "filter": "linear",
+          "normalMap": "",
+          "emissive": "#000000",
+          "billboard": "none",
+          "lit": false,
+          "castShadows": false,
+          "alphaCutoff": 0,
+          "visible": true
+        },
+        "sprite_anim": {
+          "clips": {
+            "lap": {
+              "frames": [
+                "water_sheet_0",
+                "water_sheet_1",
+                "water_sheet_2",
+                "water_sheet_3"
+              ],
+              "fps": 5,
+              "loop": true
+            }
+          },
+          "clip": "lap",
+          "playing": true,
+          "speed": 1
+        }
+      }
+    },
+    {
+      "id": 183,
+      "name": "Pool Light",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            29,
+            7.4,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "light2d": {
+          "kind": "point",
+          "color": "#5ff2e2",
+          "intensity": 1.3,
+          "radius": 6,
+          "falloff": 1.5,
+          "innerAngle": 25,
+          "outerAngle": 45,
+          "height": 1,
+          "shadows": false,
+          "shadowSoftness": 0.4,
+          "halo": 0,
+          "flicker": 0
+        }
+      }
+    },
+    {
+      "id": 184,
+      "name": "Jellyfish 1",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "jelly"
+      ],
+      "vars": {
+        "k": 0
+      },
+      "components": {
+        "transform": {
+          "position": [
+            30.5,
+            11.5,
+            -0.3
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "sprite": {
+          "texture": "art/jelly_sheet.atlas.json",
+          "frame": "",
+          "columns": 1,
+          "rows": 1,
+          "region": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "pivot": [
+            0.5,
+            0.5
+          ],
+          "size": [
+            0,
+            0
+          ],
+          "pixelsPerUnit": 170,
+          "color": "#ffffffd8",
+          "flipX": false,
+          "flipY": false,
+          "sortingLayer": "default",
+          "order": 14,
+          "filter": "linear",
+          "normalMap": "",
+          "emissive": "#000000",
+          "billboard": "none",
+          "lit": false,
+          "castShadows": false,
+          "alphaCutoff": 0,
+          "visible": true
+        },
+        "sprite_anim": {
+          "clips": {
+            "pulse": {
+              "frames": "0-5",
+              "fps": 5
+            }
+          },
+          "clip": "pulse",
+          "playing": true,
+          "speed": 1
+        }
+      },
+      "behaviors": [
+        {
+          "name": "Drift",
+          "intent": "Pulse upward and sink back, swaying, like breathing light.",
+          "source": "behavior Drift\n  var base = (0, 0, 0)\n  on start\n    base = self.position\n  end\n  on tick\n    let t = time * 0.6 + self.k * 1.7\n    self.position = base + (sin(t * 0.7) * 0.5, sin(t) * 0.45 + sin(t * 0.37) * 0.3, 0)\n    self.rotation = (0, 0, sin(t * 0.9) * 6)\n  end\nend",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 185,
+      "name": "Jellyfish 2",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "jelly"
+      ],
+      "vars": {
+        "k": 1
+      },
+      "components": {
+        "transform": {
+          "position": [
+            40.5,
+            16.2,
+            -0.3
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "sprite": {
+          "texture": "art/jelly_sheet.atlas.json",
+          "frame": "",
+          "columns": 1,
+          "rows": 1,
+          "region": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "pivot": [
+            0.5,
+            0.5
+          ],
+          "size": [
+            0,
+            0
+          ],
+          "pixelsPerUnit": 242.8572,
+          "color": "#ffffffd8",
+          "flipX": false,
+          "flipY": false,
+          "sortingLayer": "default",
+          "order": 3,
+          "filter": "linear",
+          "normalMap": "",
+          "emissive": "#000000",
+          "billboard": "none",
+          "lit": false,
+          "castShadows": false,
+          "alphaCutoff": 0,
+          "visible": true
+        },
+        "sprite_anim": {
+          "clips": {
+            "pulse": {
+              "frames": "0-5",
+              "fps": 6
+            }
+          },
+          "clip": "pulse",
+          "playing": true,
+          "speed": 1
+        }
+      },
+      "behaviors": [
+        {
+          "name": "Drift",
+          "intent": "Pulse upward and sink back, swaying, like breathing light.",
+          "source": "behavior Drift\n  var base = (0, 0, 0)\n  on start\n    base = self.position\n  end\n  on tick\n    let t = time * 0.6 + self.k * 1.7\n    self.position = base + (sin(t * 0.7) * 0.5, sin(t) * 0.45 + sin(t * 0.37) * 0.3, 0)\n    self.rotation = (0, 0, sin(t * 0.9) * 6)\n  end\nend",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 186,
+      "name": "Jellyfish 3",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "jelly"
+      ],
+      "vars": {
+        "k": 2
+      },
+      "components": {
+        "transform": {
+          "position": [
+            53,
+            6,
+            -0.3
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "sprite": {
+          "texture": "art/jelly_sheet.atlas.json",
+          "frame": "",
+          "columns": 1,
+          "rows": 1,
+          "region": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "pivot": [
+            0.5,
+            0.5
+          ],
+          "size": [
+            0,
+            0
+          ],
+          "pixelsPerUnit": 141.6667,
+          "color": "#ffffffd8",
+          "flipX": false,
+          "flipY": false,
+          "sortingLayer": "default",
+          "order": 14,
+          "filter": "linear",
+          "normalMap": "",
+          "emissive": "#000000",
+          "billboard": "none",
+          "lit": false,
+          "castShadows": false,
+          "alphaCutoff": 0,
+          "visible": true
+        },
+        "sprite_anim": {
+          "clips": {
+            "pulse": {
+              "frames": "0-5",
+              "fps": 7
+            }
+          },
+          "clip": "pulse",
+          "playing": true,
+          "speed": 1
+        }
+      },
+      "behaviors": [
+        {
+          "name": "Drift",
+          "intent": "Pulse upward and sink back, swaying, like breathing light.",
+          "source": "behavior Drift\n  var base = (0, 0, 0)\n  on start\n    base = self.position\n  end\n  on tick\n    let t = time * 0.6 + self.k * 1.7\n    self.position = base + (sin(t * 0.7) * 0.5, sin(t) * 0.45 + sin(t * 0.37) * 0.3, 0)\n    self.rotation = (0, 0, sin(t * 0.9) * 6)\n  end\nend",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 187,
+      "name": "Jellyfish 4",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "jelly"
+      ],
+      "vars": {
+        "k": 3
+      },
+      "components": {
+        "transform": {
+          "position": [
+            55.6,
+            9.4,
+            -0.3
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "sprite": {
+          "texture": "art/jelly_sheet.atlas.json",
+          "frame": "",
+          "columns": 1,
+          "rows": 1,
+          "region": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "pivot": [
+            0.5,
+            0.5
+          ],
+          "size": [
+            0,
+            0
+          ],
+          "pixelsPerUnit": 200,
+          "color": "#ffffffd8",
+          "flipX": false,
+          "flipY": false,
+          "sortingLayer": "default",
+          "order": 3,
+          "filter": "linear",
+          "normalMap": "",
+          "emissive": "#000000",
+          "billboard": "none",
+          "lit": false,
+          "castShadows": false,
+          "alphaCutoff": 0,
+          "visible": true
+        },
+        "sprite_anim": {
+          "clips": {
+            "pulse": {
+              "frames": "0-5",
+              "fps": 5
+            }
+          },
+          "clip": "pulse",
+          "playing": true,
+          "speed": 1
+        }
+      },
+      "behaviors": [
+        {
+          "name": "Drift",
+          "intent": "Pulse upward and sink back, swaying, like breathing light.",
+          "source": "behavior Drift\n  var base = (0, 0, 0)\n  on start\n    base = self.position\n  end\n  on tick\n    let t = time * 0.6 + self.k * 1.7\n    self.position = base + (sin(t * 0.7) * 0.5, sin(t) * 0.45 + sin(t * 0.37) * 0.3, 0)\n    self.rotation = (0, 0, sin(t * 0.9) * 6)\n  end\nend",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 188,
+      "name": "Jellyfish 5",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "jelly"
+      ],
+      "vars": {
+        "k": 4
+      },
+      "components": {
+        "transform": {
+          "position": [
+            51.8,
+            12.8,
+            -0.3
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "sprite": {
+          "texture": "art/jelly_sheet.atlas.json",
+          "frame": "",
+          "columns": 1,
+          "rows": 1,
+          "region": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "pivot": [
+            0.5,
+            0.5
+          ],
+          "size": [
+            0,
+            0
+          ],
+          "pixelsPerUnit": 283.3334,
+          "color": "#ffffffd8",
+          "flipX": false,
+          "flipY": false,
+          "sortingLayer": "default",
+          "order": 3,
+          "filter": "linear",
+          "normalMap": "",
+          "emissive": "#000000",
+          "billboard": "none",
+          "lit": false,
+          "castShadows": false,
+          "alphaCutoff": 0,
+          "visible": true
+        },
+        "sprite_anim": {
+          "clips": {
+            "pulse": {
+              "frames": "0-5",
+              "fps": 6
+            }
+          },
+          "clip": "pulse",
+          "playing": true,
+          "speed": 1
+        }
+      },
+      "behaviors": [
+        {
+          "name": "Drift",
+          "intent": "Pulse upward and sink back, swaying, like breathing light.",
+          "source": "behavior Drift\n  var base = (0, 0, 0)\n  on start\n    base = self.position\n  end\n  on tick\n    let t = time * 0.6 + self.k * 1.7\n    self.position = base + (sin(t * 0.7) * 0.5, sin(t) * 0.45 + sin(t * 0.37) * 0.3, 0)\n    self.rotation = (0, 0, sin(t * 0.9) * 6)\n  end\nend",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 189,
+      "name": "Jellyfish 6",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "jelly"
+      ],
+      "vars": {
+        "k": 5
+      },
+      "components": {
+        "transform": {
+          "position": [
+            97,
+            9.5,
+            -0.3
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "sprite": {
+          "texture": "art/jelly_sheet.atlas.json",
+          "frame": "",
+          "columns": 1,
+          "rows": 1,
+          "region": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "pivot": [
+            0.5,
+            0.5
+          ],
+          "size": [
+            0,
+            0
+          ],
+          "pixelsPerUnit": 212.5,
+          "color": "#ffffffd8",
+          "flipX": false,
+          "flipY": false,
+          "sortingLayer": "default",
+          "order": 3,
+          "filter": "linear",
+          "normalMap": "",
+          "emissive": "#000000",
+          "billboard": "none",
+          "lit": false,
+          "castShadows": false,
+          "alphaCutoff": 0,
+          "visible": true
+        },
+        "sprite_anim": {
+          "clips": {
+            "pulse": {
+              "frames": "0-5",
+              "fps": 7
+            }
+          },
+          "clip": "pulse",
+          "playing": true,
+          "speed": 1
+        }
+      },
+      "behaviors": [
+        {
+          "name": "Drift",
+          "intent": "Pulse upward and sink back, swaying, like breathing light.",
+          "source": "behavior Drift\n  var base = (0, 0, 0)\n  on start\n    base = self.position\n  end\n  on tick\n    let t = time * 0.6 + self.k * 1.7\n    self.position = base + (sin(t * 0.7) * 0.5, sin(t) * 0.45 + sin(t * 0.37) * 0.3, 0)\n    self.rotation = (0, 0, sin(t * 0.9) * 6)\n  end\nend",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 190,
+      "name": "Jellyfish 7",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "jelly"
+      ],
+      "vars": {
+        "k": 6
+      },
+      "components": {
+        "transform": {
+          "position": [
+            116,
+            14,
+            -0.3
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "sprite": {
+          "texture": "art/jelly_sheet.atlas.json",
+          "frame": "",
+          "columns": 1,
+          "rows": 1,
+          "region": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "pivot": [
+            0.5,
+            0.5
+          ],
+          "size": [
+            0,
+            0
+          ],
+          "pixelsPerUnit": 188.8889,
+          "color": "#ffffffd8",
+          "flipX": false,
+          "flipY": false,
+          "sortingLayer": "default",
+          "order": 14,
+          "filter": "linear",
+          "normalMap": "",
+          "emissive": "#000000",
+          "billboard": "none",
+          "lit": false,
+          "castShadows": false,
+          "alphaCutoff": 0,
+          "visible": true
+        },
+        "sprite_anim": {
+          "clips": {
+            "pulse": {
+              "frames": "0-5",
+              "fps": 5
+            }
+          },
+          "clip": "pulse",
+          "playing": true,
+          "speed": 1
+        }
+      },
+      "behaviors": [
+        {
+          "name": "Drift",
+          "intent": "Pulse upward and sink back, swaying, like breathing light.",
+          "source": "behavior Drift\n  var base = (0, 0, 0)\n  on start\n    base = self.position\n  end\n  on tick\n    let t = time * 0.6 + self.k * 1.7\n    self.position = base + (sin(t * 0.7) * 0.5, sin(t) * 0.45 + sin(t * 0.37) * 0.3, 0)\n    self.rotation = (0, 0, sin(t * 0.9) * 6)\n  end\nend",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 191,
+      "name": "Jellyfish 8",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "jelly"
+      ],
+      "vars": {
+        "k": 7
+      },
+      "components": {
+        "transform": {
+          "position": [
+            127.5,
+            15.5,
+            -0.3
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "sprite": {
+          "texture": "art/jelly_sheet.atlas.json",
+          "frame": "",
+          "columns": 1,
+          "rows": 1,
+          "region": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "pivot": [
+            0.5,
+            0.5
+          ],
+          "size": [
+            0,
+            0
+          ],
+          "pixelsPerUnit": 242.8572,
+          "color": "#ffffffd8",
+          "flipX": false,
+          "flipY": false,
+          "sortingLayer": "default",
+          "order": 3,
+          "filter": "linear",
+          "normalMap": "",
+          "emissive": "#000000",
+          "billboard": "none",
+          "lit": false,
+          "castShadows": false,
+          "alphaCutoff": 0,
+          "visible": true
+        },
+        "sprite_anim": {
+          "clips": {
+            "pulse": {
+              "frames": "0-5",
+              "fps": 6
+            }
+          },
+          "clip": "pulse",
+          "playing": true,
+          "speed": 1
+        }
+      },
+      "behaviors": [
+        {
+          "name": "Drift",
+          "intent": "Pulse upward and sink back, swaying, like breathing light.",
+          "source": "behavior Drift\n  var base = (0, 0, 0)\n  on start\n    base = self.position\n  end\n  on tick\n    let t = time * 0.6 + self.k * 1.7\n    self.position = base + (sin(t * 0.7) * 0.5, sin(t) * 0.45 + sin(t * 0.37) * 0.3, 0)\n    self.rotation = (0, 0, sin(t * 0.9) * 6)\n  end\nend",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 192,
+      "name": "Bellwether",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "npc"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            65,
+            8.88,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "sprite": {
+          "texture": "art/bellwether_sheet.atlas.json",
+          "frame": "bellwether_sheet_0",
+          "columns": 1,
+          "rows": 1,
+          "region": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "pivot": [
+            0.5,
+            0
+          ],
+          "size": [
+            0,
+            0
+          ],
+          "pixelsPerUnit": 86,
+          "color": "#ffffff",
+          "flipX": false,
+          "flipY": false,
+          "sortingLayer": "default",
+          "order": 31,
+          "filter": "linear",
+          "normalMap": "art/bellwether_sheet_n.png",
+          "emissive": "#000000",
+          "billboard": "none",
+          "lit": true,
+          "castShadows": false,
+          "alphaCutoff": 0,
+          "visible": true
+        },
+        "sprite_anim": {
+          "clips": {
+            "idle": {
+              "frames": [
+                "bellwether_sheet_0",
+                "bellwether_sheet_1",
+                "bellwether_sheet_2",
+                "bellwether_sheet_3",
+                "bellwether_sheet_4",
+                "bellwether_sheet_5"
+              ],
+              "fps": 5,
+              "loop": true
+            }
+          },
+          "clip": "idle",
+          "playing": true,
+          "speed": 1
+        },
+        "dialogue": {
+          "script": "story/bellwether.dialogue",
+          "source": "",
+          "startNode": "Start",
+          "autoStart": false,
+          "ui": "default",
+          "typewriter": 38,
+          "portraits": "portraits",
+          "running": false,
+          "node": "",
+          "speaker": "",
+          "line": "",
+          "choices": [],
+          "tags": {}
+        }
+      }
+    },
+    {
+      "id": 193,
+      "name": "Abyss Glow",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            54,
+            3.2,
+            -0.5
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "light2d": {
+          "kind": "point",
+          "color": "#3fd8d0",
+          "intensity": 0.6,
+          "radius": 5.5,
+          "falloff": 2,
+          "innerAngle": 25,
+          "outerAngle": 45,
+          "height": 1,
+          "shadows": false,
+          "shadowSoftness": 0.4,
+          "halo": 0.7,
+          "flicker": 0
+        }
+      }
+    },
+    {
+      "id": 194,
+      "name": "Grove Spores",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            42,
+            12.5,
+            0.5
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "particles": {
+          "preset": "fireflies",
+          "emitting": true,
+          "look": "glow",
+          "rate": 16,
+          "burst": 0,
+          "maxParticles": 300,
+          "lifetime": 6,
+          "lifetimeJitter": 0.4,
+          "shape": "box",
+          "shapeSize": [
+            16,
+            6,
+            0.5
+          ],
+          "direction": [
+            0,
+            1,
+            0
+          ],
+          "speed": 0.2,
+          "speedJitter": 0.3,
+          "spread": 180,
+          "gravity": -0.05,
+          "drag": 0.8,
+          "turbulence": 0.35,
+          "turbulenceScale": 1.6,
+          "wind": 0.1,
+          "sizeStart": 0.05,
+          "sizeEnd": 0.03,
+          "sizeJitter": 0.2,
+          "colorStart": "#8ffff0",
+          "colorEnd": "#8ffff000",
+          "intensity": 3,
+          "stretch": 0,
+          "spin": 0,
+          "softness": 0.05,
+          "worldSpace": true,
+          "collide": false,
+          "floorHeight": 0,
+          "bounce": 0,
+          "splash": 0,
+          "light": 0,
+          "lightColor": "#ff994d",
+          "lightRange": 8,
+          "prewarm": true,
+          "seed": 0,
+          "simulation": "cpu",
+          "facing": "camera",
+          "mesh": "",
+          "roughness": 0.6,
+          "metallic": 0,
+          "texture": "",
+          "flipbookColumns": 1,
+          "flipbookRows": 1,
+          "flipbookFps": 0,
+          "colorGradient": "",
+          "sizeCurve": "",
+          "opacityCurve": "",
+          "shapeMesh": "",
+          "field": "none",
+          "fieldStrength": 1,
+          "fieldRadius": 2,
+          "fieldCenter": [
+            0,
+            0,
+            0
+          ],
+          "fieldAxis": [
+            0,
+            1,
+            0
+          ],
+          "fieldPull": 0,
+          "fieldLift": 0,
+          "fieldTexture": "",
+          "fieldSize": [
+            4,
+            4,
+            4
+          ],
+          "depthCollision": false,
+          "stick": false,
+          "friction": 0.3,
+          "colliders": "",
+          "subEmitter": "",
+          "subEmitOn": "death",
+          "subEmitCount": 8,
+          "subEmitInherit": 0.3,
+          "trailLength": 0.25,
+          "trailSegments": 12,
+          "sort": true,
+          "hueVariation": 0
+        }
+      }
+    },
+    {
+      "id": 195,
+      "name": "Violet Spores",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            46,
+            11.5,
+            0.5
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "particles": {
+          "preset": "fireflies",
+          "emitting": true,
+          "look": "glow",
+          "rate": 6,
+          "burst": 0,
+          "maxParticles": 300,
+          "lifetime": 6,
+          "lifetimeJitter": 0.4,
+          "shape": "box",
+          "shapeSize": [
+            6,
+            4,
+            0.5
+          ],
+          "direction": [
+            0,
+            1,
+            0
+          ],
+          "speed": 0.2,
+          "speedJitter": 0.3,
+          "spread": 180,
+          "gravity": -0.05,
+          "drag": 0.8,
+          "turbulence": 0.35,
+          "turbulenceScale": 1.6,
+          "wind": 0.1,
+          "sizeStart": 0.05,
+          "sizeEnd": 0.03,
+          "sizeJitter": 0.2,
+          "colorStart": "#c9a8ff",
+          "colorEnd": "#c9a8ff00",
+          "intensity": 3,
+          "stretch": 0,
+          "spin": 0,
+          "softness": 0.05,
+          "worldSpace": true,
+          "collide": false,
+          "floorHeight": 0,
+          "bounce": 0,
+          "splash": 0,
+          "light": 0,
+          "lightColor": "#ff994d",
+          "lightRange": 8,
+          "prewarm": true,
+          "seed": 0,
+          "simulation": "cpu",
+          "facing": "camera",
+          "mesh": "",
+          "roughness": 0.6,
+          "metallic": 0,
+          "texture": "",
+          "flipbookColumns": 1,
+          "flipbookRows": 1,
+          "flipbookFps": 0,
+          "colorGradient": "",
+          "sizeCurve": "",
+          "opacityCurve": "",
+          "shapeMesh": "",
+          "field": "none",
+          "fieldStrength": 1,
+          "fieldRadius": 2,
+          "fieldCenter": [
+            0,
+            0,
+            0
+          ],
+          "fieldAxis": [
+            0,
+            1,
+            0
+          ],
+          "fieldPull": 0,
+          "fieldLift": 0,
+          "fieldTexture": "",
+          "fieldSize": [
+            4,
+            4,
+            4
+          ],
+          "depthCollision": false,
+          "stick": false,
+          "friction": 0.3,
+          "colliders": "",
+          "subEmitter": "",
+          "subEmitOn": "death",
+          "subEmitCount": 8,
+          "subEmitInherit": 0.3,
+          "trailLength": 0.25,
+          "trailSegments": 12,
+          "sort": true,
+          "hueVariation": 0
+        }
+      }
+    },
+    {
+      "id": 196,
+      "name": "Gate Motes",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            10,
+            13,
+            0.5
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "particles": {
+          "preset": "fireflies",
+          "emitting": true,
+          "look": "glow",
+          "rate": 8,
+          "burst": 0,
+          "maxParticles": 300,
+          "lifetime": 6,
+          "lifetimeJitter": 0.4,
+          "shape": "box",
+          "shapeSize": [
+            16,
+            7,
+            0.5
+          ],
+          "direction": [
+            0,
+            1,
+            0
+          ],
+          "speed": 0.2,
+          "speedJitter": 0.3,
+          "spread": 180,
+          "gravity": -0.05,
+          "drag": 0.8,
+          "turbulence": 0.35,
+          "turbulenceScale": 1.6,
+          "wind": 0.1,
+          "sizeStart": 0.05,
+          "sizeEnd": 0.03,
+          "sizeJitter": 0.2,
+          "colorStart": "#9ff8ea",
+          "colorEnd": "#9ff8ea00",
+          "intensity": 3,
+          "stretch": 0,
+          "spin": 0,
+          "softness": 0.05,
+          "worldSpace": true,
+          "collide": false,
+          "floorHeight": 0,
+          "bounce": 0,
+          "splash": 0,
+          "light": 0,
+          "lightColor": "#ff994d",
+          "lightRange": 8,
+          "prewarm": true,
+          "seed": 0,
+          "simulation": "cpu",
+          "facing": "camera",
+          "mesh": "",
+          "roughness": 0.6,
+          "metallic": 0,
+          "texture": "",
+          "flipbookColumns": 1,
+          "flipbookRows": 1,
+          "flipbookFps": 0,
+          "colorGradient": "",
+          "sizeCurve": "",
+          "opacityCurve": "",
+          "shapeMesh": "",
+          "field": "none",
+          "fieldStrength": 1,
+          "fieldRadius": 2,
+          "fieldCenter": [
+            0,
+            0,
+            0
+          ],
+          "fieldAxis": [
+            0,
+            1,
+            0
+          ],
+          "fieldPull": 0,
+          "fieldLift": 0,
+          "fieldTexture": "",
+          "fieldSize": [
+            4,
+            4,
+            4
+          ],
+          "depthCollision": false,
+          "stick": false,
+          "friction": 0.3,
+          "colliders": "",
+          "subEmitter": "",
+          "subEmitOn": "death",
+          "subEmitCount": 8,
+          "subEmitInherit": 0.3,
+          "trailLength": 0.25,
+          "trailSegments": 12,
+          "sort": true,
+          "hueVariation": 0
+        }
+      }
+    },
+    {
+      "id": 197,
+      "name": "Plaza Motes",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            68,
+            12,
+            0.5
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "particles": {
+          "preset": "fireflies",
+          "emitting": true,
+          "look": "glow",
+          "rate": 9,
+          "burst": 0,
+          "maxParticles": 300,
+          "lifetime": 6,
+          "lifetimeJitter": 0.4,
+          "shape": "box",
+          "shapeSize": [
+            22,
+            7,
+            0.5
+          ],
+          "direction": [
+            0,
+            1,
+            0
+          ],
+          "speed": 0.2,
+          "speedJitter": 0.3,
+          "spread": 180,
+          "gravity": -0.05,
+          "drag": 0.8,
+          "turbulence": 0.35,
+          "turbulenceScale": 1.6,
+          "wind": 0.1,
+          "sizeStart": 0.05,
+          "sizeEnd": 0.03,
+          "sizeJitter": 0.2,
+          "colorStart": "#a8fff2",
+          "colorEnd": "#a8fff200",
+          "intensity": 3,
+          "stretch": 0,
+          "spin": 0,
+          "softness": 0.05,
+          "worldSpace": true,
+          "collide": false,
+          "floorHeight": 0,
+          "bounce": 0,
+          "splash": 0,
+          "light": 0,
+          "lightColor": "#ff994d",
+          "lightRange": 8,
+          "prewarm": true,
+          "seed": 0,
+          "simulation": "cpu",
+          "facing": "camera",
+          "mesh": "",
+          "roughness": 0.6,
+          "metallic": 0,
+          "texture": "",
+          "flipbookColumns": 1,
+          "flipbookRows": 1,
+          "flipbookFps": 0,
+          "colorGradient": "",
+          "sizeCurve": "",
+          "opacityCurve": "",
+          "shapeMesh": "",
+          "field": "none",
+          "fieldStrength": 1,
+          "fieldRadius": 2,
+          "fieldCenter": [
+            0,
+            0,
+            0
+          ],
+          "fieldAxis": [
+            0,
+            1,
+            0
+          ],
+          "fieldPull": 0,
+          "fieldLift": 0,
+          "fieldTexture": "",
+          "fieldSize": [
+            4,
+            4,
+            4
+          ],
+          "depthCollision": false,
+          "stick": false,
+          "friction": 0.3,
+          "colliders": "",
+          "subEmitter": "",
+          "subEmitOn": "death",
+          "subEmitCount": 8,
+          "subEmitInherit": 0.3,
+          "trailLength": 0.25,
+          "trailSegments": 12,
+          "sort": true,
+          "hueVariation": 0
+        }
+      }
+    },
+    {
+      "id": 198,
+      "name": "Gallery Motes",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            100,
+            15.5,
+            0.5
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "particles": {
+          "preset": "fireflies",
+          "emitting": true,
+          "look": "glow",
+          "rate": 6,
+          "burst": 0,
+          "maxParticles": 300,
+          "lifetime": 6,
+          "lifetimeJitter": 0.4,
+          "shape": "box",
+          "shapeSize": [
+            22,
+            5,
+            0.5
+          ],
+          "direction": [
+            0,
+            1,
+            0
+          ],
+          "speed": 0.2,
+          "speedJitter": 0.3,
+          "spread": 180,
+          "gravity": -0.05,
+          "drag": 0.8,
+          "turbulence": 0.35,
+          "turbulenceScale": 1.6,
+          "wind": 0.1,
+          "sizeStart": 0.05,
+          "sizeEnd": 0.03,
+          "sizeJitter": 0.2,
+          "colorStart": "#ffe0a8",
+          "colorEnd": "#ffe0a800",
+          "intensity": 3,
+          "stretch": 0,
+          "spin": 0,
+          "softness": 0.05,
+          "worldSpace": true,
+          "collide": false,
+          "floorHeight": 0,
+          "bounce": 0,
+          "splash": 0,
+          "light": 0,
+          "lightColor": "#ff994d",
+          "lightRange": 8,
+          "prewarm": true,
+          "seed": 0,
+          "simulation": "cpu",
+          "facing": "camera",
+          "mesh": "",
+          "roughness": 0.6,
+          "metallic": 0,
+          "texture": "",
+          "flipbookColumns": 1,
+          "flipbookRows": 1,
+          "flipbookFps": 0,
+          "colorGradient": "",
+          "sizeCurve": "",
+          "opacityCurve": "",
+          "shapeMesh": "",
+          "field": "none",
+          "fieldStrength": 1,
+          "fieldRadius": 2,
+          "fieldCenter": [
+            0,
+            0,
+            0
+          ],
+          "fieldAxis": [
+            0,
+            1,
+            0
+          ],
+          "fieldPull": 0,
+          "fieldLift": 0,
+          "fieldTexture": "",
+          "fieldSize": [
+            4,
+            4,
+            4
+          ],
+          "depthCollision": false,
+          "stick": false,
+          "friction": 0.3,
+          "colliders": "",
+          "subEmitter": "",
+          "subEmitOn": "death",
+          "subEmitCount": 8,
+          "subEmitInherit": 0.3,
+          "trailLength": 0.25,
+          "trailSegments": 12,
+          "sort": true,
+          "hueVariation": 0
+        }
+      }
+    },
+    {
+      "id": 199,
+      "name": "Shrine Motes",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            132,
+            13,
+            0.5
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "particles": {
+          "preset": "fireflies",
+          "emitting": true,
+          "look": "glow",
+          "rate": 14,
+          "burst": 0,
+          "maxParticles": 300,
+          "lifetime": 6,
+          "lifetimeJitter": 0.4,
+          "shape": "box",
+          "shapeSize": [
+            22,
+            8,
+            0.5
+          ],
+          "direction": [
+            0,
+            1,
+            0
+          ],
+          "speed": 0.2,
+          "speedJitter": 0.3,
+          "spread": 180,
+          "gravity": -0.05,
+          "drag": 0.8,
+          "turbulence": 0.35,
+          "turbulenceScale": 1.6,
+          "wind": 0.1,
+          "sizeStart": 0.05,
+          "sizeEnd": 0.03,
+          "sizeJitter": 0.2,
+          "colorStart": "#ffe8b8",
+          "colorEnd": "#ffe8b800",
+          "intensity": 3,
+          "stretch": 0,
+          "spin": 0,
+          "softness": 0.05,
+          "worldSpace": true,
+          "collide": false,
+          "floorHeight": 0,
+          "bounce": 0,
+          "splash": 0,
+          "light": 0,
+          "lightColor": "#ff994d",
+          "lightRange": 8,
+          "prewarm": true,
+          "seed": 0,
+          "simulation": "cpu",
+          "facing": "camera",
+          "mesh": "",
+          "roughness": 0.6,
+          "metallic": 0,
+          "texture": "",
+          "flipbookColumns": 1,
+          "flipbookRows": 1,
+          "flipbookFps": 0,
+          "colorGradient": "",
+          "sizeCurve": "",
+          "opacityCurve": "",
+          "shapeMesh": "",
+          "field": "none",
+          "fieldStrength": 1,
+          "fieldRadius": 2,
+          "fieldCenter": [
+            0,
+            0,
+            0
+          ],
+          "fieldAxis": [
+            0,
+            1,
+            0
+          ],
+          "fieldPull": 0,
+          "fieldLift": 0,
+          "fieldTexture": "",
+          "fieldSize": [
+            4,
+            4,
+            4
+          ],
+          "depthCollision": false,
+          "stick": false,
+          "friction": 0.3,
+          "colliders": "",
+          "subEmitter": "",
+          "subEmitOn": "death",
+          "subEmitCount": 8,
+          "subEmitInherit": 0.3,
+          "trailLength": 0.25,
+          "trailSegments": 12,
+          "sort": true,
+          "hueVariation": 0
+        }
+      }
+    },
+    {
+      "id": 200,
+      "name": "Abyss Motes",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            54,
+            4,
+            0.5
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "particles": {
+          "preset": "fireflies",
+          "emitting": true,
+          "look": "glow",
+          "rate": 10,
+          "burst": 0,
+          "maxParticles": 300,
+          "lifetime": 6,
+          "lifetimeJitter": 0.4,
+          "shape": "box",
+          "shapeSize": [
+            8,
+            10,
+            0.5
+          ],
+          "direction": [
+            0,
+            1,
+            0
+          ],
+          "speed": 0.2,
+          "speedJitter": 0.3,
+          "spread": 180,
+          "gravity": -0.05,
+          "drag": 0.8,
+          "turbulence": 0.35,
+          "turbulenceScale": 1.6,
+          "wind": 0.1,
+          "sizeStart": 0.05,
+          "sizeEnd": 0.03,
+          "sizeJitter": 0.2,
+          "colorStart": "#7ff4e4",
+          "colorEnd": "#7ff4e400",
+          "intensity": 3,
+          "stretch": 0,
+          "spin": 0,
+          "softness": 0.05,
+          "worldSpace": true,
+          "collide": false,
+          "floorHeight": 0,
+          "bounce": 0,
+          "splash": 0,
+          "light": 0,
+          "lightColor": "#ff994d",
+          "lightRange": 8,
+          "prewarm": true,
+          "seed": 0,
+          "simulation": "cpu",
+          "facing": "camera",
+          "mesh": "",
+          "roughness": 0.6,
+          "metallic": 0,
+          "texture": "",
+          "flipbookColumns": 1,
+          "flipbookRows": 1,
+          "flipbookFps": 0,
+          "colorGradient": "",
+          "sizeCurve": "",
+          "opacityCurve": "",
+          "shapeMesh": "",
+          "field": "none",
+          "fieldStrength": 1,
+          "fieldRadius": 2,
+          "fieldCenter": [
+            0,
+            0,
+            0
+          ],
+          "fieldAxis": [
+            0,
+            1,
+            0
+          ],
+          "fieldPull": 0,
+          "fieldLift": 0,
+          "fieldTexture": "",
+          "fieldSize": [
+            4,
+            4,
+            4
+          ],
+          "depthCollision": false,
+          "stick": false,
+          "friction": 0.3,
+          "colliders": "",
+          "subEmitter": "",
+          "subEmitOn": "death",
+          "subEmitCount": 8,
+          "subEmitInherit": 0.3,
+          "trailLength": 0.25,
+          "trailSegments": 12,
+          "sort": true,
+          "hueVariation": 0
+        }
+      }
+    },
+    {
+      "id": 201,
+      "name": "Drip 1",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            19.5,
+            19,
+            0.3
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "particles": {
+          "preset": "rain",
+          "emitting": true,
+          "look": "rain",
+          "rate": 0.8,
+          "burst": 0,
+          "maxParticles": 12000,
+          "lifetime": 2.2,
+          "lifetimeJitter": 0.15,
+          "shape": "point",
+          "shapeSize": [
+            36,
+            0,
+            36
+          ],
+          "direction": [
+            0,
+            -1,
+            0
+          ],
+          "speed": 0,
+          "speedJitter": 0.12,
+          "spread": 2,
+          "gravity": 9,
+          "drag": 0,
+          "turbulence": 0,
+          "turbulenceScale": 1,
+          "wind": 0,
+          "sizeStart": 0.035,
+          "sizeEnd": 0.03,
+          "sizeJitter": 0.3,
+          "colorStart": "#cffff8",
+          "colorEnd": "#7ff4e480",
+          "intensity": 2,
+          "stretch": 0.04,
+          "spin": 0,
+          "softness": 0.02,
+          "worldSpace": true,
+          "collide": false,
+          "floorHeight": 0,
+          "bounce": 0,
+          "splash": 0,
+          "light": 0,
+          "lightColor": "#ff994d",
+          "lightRange": 8,
+          "prewarm": true,
+          "seed": 0,
+          "simulation": "cpu",
+          "facing": "camera",
+          "mesh": "",
+          "roughness": 0.6,
+          "metallic": 0,
+          "texture": "",
+          "flipbookColumns": 1,
+          "flipbookRows": 1,
+          "flipbookFps": 0,
+          "colorGradient": "",
+          "sizeCurve": "",
+          "opacityCurve": "",
+          "shapeMesh": "",
+          "field": "none",
+          "fieldStrength": 1,
+          "fieldRadius": 2,
+          "fieldCenter": [
+            0,
+            0,
+            0
+          ],
+          "fieldAxis": [
+            0,
+            1,
+            0
+          ],
+          "fieldPull": 0,
+          "fieldLift": 0,
+          "fieldTexture": "",
+          "fieldSize": [
+            4,
+            4,
+            4
+          ],
+          "depthCollision": false,
+          "stick": false,
+          "friction": 0.3,
+          "colliders": "",
+          "subEmitter": "",
+          "subEmitOn": "death",
+          "subEmitCount": 8,
+          "subEmitInherit": 0.3,
+          "trailLength": 0.25,
+          "trailSegments": 12,
+          "sort": true,
+          "hueVariation": 0
+        }
+      }
+    },
+    {
+      "id": 202,
+      "name": "Drip 2",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            45.5,
+            19,
+            0.3
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "particles": {
+          "preset": "rain",
+          "emitting": true,
+          "look": "rain",
+          "rate": 0.8,
+          "burst": 0,
+          "maxParticles": 12000,
+          "lifetime": 2.2,
+          "lifetimeJitter": 0.15,
+          "shape": "point",
+          "shapeSize": [
+            36,
+            0,
+            36
+          ],
+          "direction": [
+            0,
+            -1,
+            0
+          ],
+          "speed": 0,
+          "speedJitter": 0.12,
+          "spread": 2,
+          "gravity": 9,
+          "drag": 0,
+          "turbulence": 0,
+          "turbulenceScale": 1,
+          "wind": 0,
+          "sizeStart": 0.035,
+          "sizeEnd": 0.03,
+          "sizeJitter": 0.3,
+          "colorStart": "#cffff8",
+          "colorEnd": "#7ff4e480",
+          "intensity": 2,
+          "stretch": 0.04,
+          "spin": 0,
+          "softness": 0.02,
+          "worldSpace": true,
+          "collide": false,
+          "floorHeight": 0,
+          "bounce": 0,
+          "splash": 0,
+          "light": 0,
+          "lightColor": "#ff994d",
+          "lightRange": 8,
+          "prewarm": true,
+          "seed": 0,
+          "simulation": "cpu",
+          "facing": "camera",
+          "mesh": "",
+          "roughness": 0.6,
+          "metallic": 0,
+          "texture": "",
+          "flipbookColumns": 1,
+          "flipbookRows": 1,
+          "flipbookFps": 0,
+          "colorGradient": "",
+          "sizeCurve": "",
+          "opacityCurve": "",
+          "shapeMesh": "",
+          "field": "none",
+          "fieldStrength": 1,
+          "fieldRadius": 2,
+          "fieldCenter": [
+            0,
+            0,
+            0
+          ],
+          "fieldAxis": [
+            0,
+            1,
+            0
+          ],
+          "fieldPull": 0,
+          "fieldLift": 0,
+          "fieldTexture": "",
+          "fieldSize": [
+            4,
+            4,
+            4
+          ],
+          "depthCollision": false,
+          "stick": false,
+          "friction": 0.3,
+          "colliders": "",
+          "subEmitter": "",
+          "subEmitOn": "death",
+          "subEmitCount": 8,
+          "subEmitInherit": 0.3,
+          "trailLength": 0.25,
+          "trailSegments": 12,
+          "sort": true,
+          "hueVariation": 0
+        }
+      }
+    },
+    {
+      "id": 203,
+      "name": "Drip 3",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            71.5,
+            19,
+            0.3
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "particles": {
+          "preset": "rain",
+          "emitting": true,
+          "look": "rain",
+          "rate": 0.8,
+          "burst": 0,
+          "maxParticles": 12000,
+          "lifetime": 2.2,
+          "lifetimeJitter": 0.15,
+          "shape": "point",
+          "shapeSize": [
+            36,
+            0,
+            36
+          ],
+          "direction": [
+            0,
+            -1,
+            0
+          ],
+          "speed": 0,
+          "speedJitter": 0.12,
+          "spread": 2,
+          "gravity": 9,
+          "drag": 0,
+          "turbulence": 0,
+          "turbulenceScale": 1,
+          "wind": 0,
+          "sizeStart": 0.035,
+          "sizeEnd": 0.03,
+          "sizeJitter": 0.3,
+          "colorStart": "#cffff8",
+          "colorEnd": "#7ff4e480",
+          "intensity": 2,
+          "stretch": 0.04,
+          "spin": 0,
+          "softness": 0.02,
+          "worldSpace": true,
+          "collide": false,
+          "floorHeight": 0,
+          "bounce": 0,
+          "splash": 0,
+          "light": 0,
+          "lightColor": "#ff994d",
+          "lightRange": 8,
+          "prewarm": true,
+          "seed": 0,
+          "simulation": "cpu",
+          "facing": "camera",
+          "mesh": "",
+          "roughness": 0.6,
+          "metallic": 0,
+          "texture": "",
+          "flipbookColumns": 1,
+          "flipbookRows": 1,
+          "flipbookFps": 0,
+          "colorGradient": "",
+          "sizeCurve": "",
+          "opacityCurve": "",
+          "shapeMesh": "",
+          "field": "none",
+          "fieldStrength": 1,
+          "fieldRadius": 2,
+          "fieldCenter": [
+            0,
+            0,
+            0
+          ],
+          "fieldAxis": [
+            0,
+            1,
+            0
+          ],
+          "fieldPull": 0,
+          "fieldLift": 0,
+          "fieldTexture": "",
+          "fieldSize": [
+            4,
+            4,
+            4
+          ],
+          "depthCollision": false,
+          "stick": false,
+          "friction": 0.3,
+          "colliders": "",
+          "subEmitter": "",
+          "subEmitOn": "death",
+          "subEmitCount": 8,
+          "subEmitInherit": 0.3,
+          "trailLength": 0.25,
+          "trailSegments": 12,
+          "sort": true,
+          "hueVariation": 0
+        }
+      }
+    },
+    {
+      "id": 204,
+      "name": "Drip 4",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            94.5,
+            20,
+            0.3
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "particles": {
+          "preset": "rain",
+          "emitting": true,
+          "look": "rain",
+          "rate": 0.8,
+          "burst": 0,
+          "maxParticles": 12000,
+          "lifetime": 2.2,
+          "lifetimeJitter": 0.15,
+          "shape": "point",
+          "shapeSize": [
+            36,
+            0,
+            36
+          ],
+          "direction": [
+            0,
+            -1,
+            0
+          ],
+          "speed": 0,
+          "speedJitter": 0.12,
+          "spread": 2,
+          "gravity": 9,
+          "drag": 0,
+          "turbulence": 0,
+          "turbulenceScale": 1,
+          "wind": 0,
+          "sizeStart": 0.035,
+          "sizeEnd": 0.03,
+          "sizeJitter": 0.3,
+          "colorStart": "#cffff8",
+          "colorEnd": "#7ff4e480",
+          "intensity": 2,
+          "stretch": 0.04,
+          "spin": 0,
+          "softness": 0.02,
+          "worldSpace": true,
+          "collide": false,
+          "floorHeight": 0,
+          "bounce": 0,
+          "splash": 0,
+          "light": 0,
+          "lightColor": "#ff994d",
+          "lightRange": 8,
+          "prewarm": true,
+          "seed": 0,
+          "simulation": "cpu",
+          "facing": "camera",
+          "mesh": "",
+          "roughness": 0.6,
+          "metallic": 0,
+          "texture": "",
+          "flipbookColumns": 1,
+          "flipbookRows": 1,
+          "flipbookFps": 0,
+          "colorGradient": "",
+          "sizeCurve": "",
+          "opacityCurve": "",
+          "shapeMesh": "",
+          "field": "none",
+          "fieldStrength": 1,
+          "fieldRadius": 2,
+          "fieldCenter": [
+            0,
+            0,
+            0
+          ],
+          "fieldAxis": [
+            0,
+            1,
+            0
+          ],
+          "fieldPull": 0,
+          "fieldLift": 0,
+          "fieldTexture": "",
+          "fieldSize": [
+            4,
+            4,
+            4
+          ],
+          "depthCollision": false,
+          "stick": false,
+          "friction": 0.3,
+          "colliders": "",
+          "subEmitter": "",
+          "subEmitOn": "death",
+          "subEmitCount": 8,
+          "subEmitInherit": 0.3,
+          "trailLength": 0.25,
+          "trailSegments": 12,
+          "sort": true,
+          "hueVariation": 0
+        }
+      }
+    },
+    {
+      "id": 205,
+      "name": "Drip 5",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            106.5,
+            20,
+            0.3
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "particles": {
+          "preset": "rain",
+          "emitting": true,
+          "look": "rain",
+          "rate": 0.8,
+          "burst": 0,
+          "maxParticles": 12000,
+          "lifetime": 2.2,
+          "lifetimeJitter": 0.15,
+          "shape": "point",
+          "shapeSize": [
+            36,
+            0,
+            36
+          ],
+          "direction": [
+            0,
+            -1,
+            0
+          ],
+          "speed": 0,
+          "speedJitter": 0.12,
+          "spread": 2,
+          "gravity": 9,
+          "drag": 0,
+          "turbulence": 0,
+          "turbulenceScale": 1,
+          "wind": 0,
+          "sizeStart": 0.035,
+          "sizeEnd": 0.03,
+          "sizeJitter": 0.3,
+          "colorStart": "#cffff8",
+          "colorEnd": "#7ff4e480",
+          "intensity": 2,
+          "stretch": 0.04,
+          "spin": 0,
+          "softness": 0.02,
+          "worldSpace": true,
+          "collide": false,
+          "floorHeight": 0,
+          "bounce": 0,
+          "splash": 0,
+          "light": 0,
+          "lightColor": "#ff994d",
+          "lightRange": 8,
+          "prewarm": true,
+          "seed": 0,
+          "simulation": "cpu",
+          "facing": "camera",
+          "mesh": "",
+          "roughness": 0.6,
+          "metallic": 0,
+          "texture": "",
+          "flipbookColumns": 1,
+          "flipbookRows": 1,
+          "flipbookFps": 0,
+          "colorGradient": "",
+          "sizeCurve": "",
+          "opacityCurve": "",
+          "shapeMesh": "",
+          "field": "none",
+          "fieldStrength": 1,
+          "fieldRadius": 2,
+          "fieldCenter": [
+            0,
+            0,
+            0
+          ],
+          "fieldAxis": [
+            0,
+            1,
+            0
+          ],
+          "fieldPull": 0,
+          "fieldLift": 0,
+          "fieldTexture": "",
+          "fieldSize": [
+            4,
+            4,
+            4
+          ],
+          "depthCollision": false,
+          "stick": false,
+          "friction": 0.3,
+          "colliders": "",
+          "subEmitter": "",
+          "subEmitOn": "death",
+          "subEmitCount": 8,
+          "subEmitInherit": 0.3,
+          "trailLength": 0.25,
+          "trailSegments": 12,
+          "sort": true,
+          "hueVariation": 0
+        }
+      }
+    },
+    {
+      "id": 206,
+      "name": "Drip 6",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            131.5,
+            20,
+            0.3
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "particles": {
+          "preset": "rain",
+          "emitting": true,
+          "look": "rain",
+          "rate": 0.8,
+          "burst": 0,
+          "maxParticles": 12000,
+          "lifetime": 2.2,
+          "lifetimeJitter": 0.15,
+          "shape": "point",
+          "shapeSize": [
+            36,
+            0,
+            36
+          ],
+          "direction": [
+            0,
+            -1,
+            0
+          ],
+          "speed": 0,
+          "speedJitter": 0.12,
+          "spread": 2,
+          "gravity": 9,
+          "drag": 0,
+          "turbulence": 0,
+          "turbulenceScale": 1,
+          "wind": 0,
+          "sizeStart": 0.035,
+          "sizeEnd": 0.03,
+          "sizeJitter": 0.3,
+          "colorStart": "#cffff8",
+          "colorEnd": "#7ff4e480",
+          "intensity": 2,
+          "stretch": 0.04,
+          "spin": 0,
+          "softness": 0.02,
+          "worldSpace": true,
+          "collide": false,
+          "floorHeight": 0,
+          "bounce": 0,
+          "splash": 0,
+          "light": 0,
+          "lightColor": "#ff994d",
+          "lightRange": 8,
+          "prewarm": true,
+          "seed": 0,
+          "simulation": "cpu",
+          "facing": "camera",
+          "mesh": "",
+          "roughness": 0.6,
+          "metallic": 0,
+          "texture": "",
+          "flipbookColumns": 1,
+          "flipbookRows": 1,
+          "flipbookFps": 0,
+          "colorGradient": "",
+          "sizeCurve": "",
+          "opacityCurve": "",
+          "shapeMesh": "",
+          "field": "none",
+          "fieldStrength": 1,
+          "fieldRadius": 2,
+          "fieldCenter": [
+            0,
+            0,
+            0
+          ],
+          "fieldAxis": [
+            0,
+            1,
+            0
+          ],
+          "fieldPull": 0,
+          "fieldLift": 0,
+          "fieldTexture": "",
+          "fieldSize": [
+            4,
+            4,
+            4
+          ],
+          "depthCollision": false,
+          "stick": false,
+          "friction": 0.3,
+          "colliders": "",
+          "subEmitter": "",
+          "subEmitOn": "death",
+          "subEmitCount": 8,
+          "subEmitInherit": 0.3,
+          "trailLength": 0.25,
+          "trailSegments": 12,
+          "sort": true,
+          "hueVariation": 0
+        }
+      }
+    },
+    {
+      "id": 207,
       "name": "Wick",
       "parent": 0,
       "enabled": true,
@@ -10540,23 +13755,23 @@
         {
           "name": "Wanderer",
           "intent": "Run with A/D or arrows, jump with Space/W. Lands on stone tiles. Without input an autopilot walks the level (for the film) and stops at the shrine.",
-          "source": "behavior Wanderer\n  intent \"Platformer movement against the Level tilemap: run, jump, land; an autopilot tours the level until a key is pressed.\"\n  param speed = 5.0 in 1..10 \"run speed (units/s)\"\n  param jump = 9.6 in 4..16 \"jump take-off speed\"\n  param gravity = 25 in 5..60 \"fall acceleration\"\n  var vx = 0\n  var vy = 0\n  var grounded = true\n  var facing = 1\n  var autopilot = true\n  var hold = 0\n  var safe = (6.5, 11, 0)\n  var air = 0\n\n  fn solid(p) -> bool\n    return tile_at(find(\"Level\"), p) != 0\n  end\n\n  fn blocked(x, y) -> bool\n    return solid((x, y + 0.15, 0)) or solid((x, y + 0.7, 0)) or solid((x, y + 1.25, 0))\n  end\n\n  on start\n    play_anim(self, \"idle\")\n  end\n\n  on tick\n    let p = self.position\n    let left = key(\"a\") or key(\"left\")\n    let right = key(\"d\") or key(\"right\")\n    let want_jump = key(\"space\") or key(\"w\") or key(\"up\")\n    if left or right or want_jump then\n      autopilot = false\n    end\n    let dir = 0\n    if autopilot then\n      if hold > 0 then\n        hold -= dt\n      elif p.x < 141 then\n        dir = 1\n        -- jump at walls ahead and at ledges\n        if grounded and (blocked(p.x + 0.55, p.y) or not solid((p.x + 0.45, p.y - 0.4, 0))) then\n          want_jump = true\n        end\n      end\n    else\n      if right then\n        dir = 1\n      end\n      if left then\n        dir = -1\n      end\n    end\n    -- horizontal\n    let target = dir * speed\n    let accel = 40\n    if not grounded then\n      accel = 22\n    end\n    if vx < target then\n      vx = min(target, vx + accel * dt)\n    elif vx > target then\n      vx = max(target, vx - accel * dt)\n    end\n    if dir != 0 then\n      facing = dir\n    end\n    let nx = p.x + vx * dt\n    let edge = nx + 0.28 * sign(vx)\n    if vx != 0 and blocked(edge, p.y) then\n      vx = 0\n      nx = p.x\n    end\n    -- vertical\n    if grounded and want_jump then\n      vy = jump\n      grounded = false\n      play_anim(self, \"rise\", true)\n    end\n    vy = max(-22, vy - gravity * dt)\n    let ny = p.y + vy * dt\n    if vy <= 0 then\n      if solid((nx - 0.22, ny, 0)) or solid((nx + 0.22, ny, 0)) then\n        if not grounded and air > 0.25 then\n          play_anim(self, \"land\", true)\n        end\n        ny = floor(ny) + 1\n        vy = 0\n        grounded = true\n        air = 0\n      else\n        grounded = false\n      end\n    elif solid((nx, ny + 1.4, 0)) then\n      vy = 0\n    end\n    if not grounded then\n      air += dt\n    end\n    if ny < -3 then\n      nx = safe.x\n      ny = safe.y\n      vx = 0\n      vy = 0\n    end\n    if grounded and solid((nx - 0.25, ny - 0.5, 0)) and solid((nx + 0.25, ny - 0.5, 0)) then\n      safe = (nx, ny, 0)\n    end\n    self.position = (nx, ny, 0)\n    self.sprite.flipX = facing < 0\n    -- animation\n    if grounded then\n      if abs(vx) > 0.6 then\n        play_anim(self, \"run\")\n      elif self.sprite_anim.clip != \"land\" or air == 0 and state_time > 0 then\n        if self.sprite_anim.clip != \"land\" then\n          play_anim(self, \"idle\")\n        end\n      end\n    elif vy > 3 then\n      play_anim(self, \"rise\")\n    elif vy > -2 then\n      play_anim(self, \"apex\")\n    else\n      play_anim(self, \"fall\")\n    end\n  end\n\n  on anim \"finished\"\n    if self.sprite_anim.clip == \"land\" then\n      play_anim(self, \"idle\")\n    end\n  end\nend\n",
+          "source": "behavior Wanderer\n  intent \"Platformer movement against the Level tilemap: run, jump, land, talk to Bellwether (E); the pool is deadly. An autopilot tours the level (for the film) until a key is pressed.\"\n  param speed = 5.0 in 1..10 \"run speed (units/s)\"\n  param jump = 9.6 in 4..16 \"jump take-off speed\"\n  param gravity = 25 in 5..60 \"fall acceleration\"\n  var vx = 0\n  var vy = 0\n  var grounded = true\n  var facing = 1\n  var autopilot = true\n  var hold = 1.2\n  var safe = (6.5, 11, 0)\n  var air = 0\n  var met = false\n  var talk_t = 0\n\n  fn solid(p) -> bool\n    return tile_at(find(\"Level\"), p) != 0\n  end\n\n  fn blocked(x, y) -> bool\n    return solid((x, y + 0.15, 0)) or solid((x, y + 0.7, 0)) or solid((x, y + 1.25, 0))\n  end\n\n  fn talking() -> bool\n    return find(\"Bellwether\").dialogue.running\n  end\n\n  on start\n    play_anim(self, \"idle\")\n  end\n\n  on key \"e\"\n    if not talking() and distance(self.position, find(\"Bellwether\").position) < 3.5 then\n      start_dialogue(find(\"Bellwether\"), \"Start\")\n    end\n  end\n\n  on tick\n    let p = self.position\n    let left = key(\"a\") or key(\"left\")\n    let right = key(\"d\") or key(\"right\")\n    let want_jump = key(\"space\") or key(\"w\") or key(\"up\")\n    if left or right or want_jump or key(\"e\") then\n      autopilot = false\n    end\n    let dir = 0\n    let chat = talking()\n    let cam = find(\"Camera\")\n    if chat then\n      cam.camera2d.offset = (1.4, 0.7)\n    else\n      cam.camera2d.offset = (2.2 * facing, 2.4)\n    end\n    if chat then\n      want_jump = false\n      if autopilot then\n        talk_t += dt\n        if talk_t > 2.9 then\n          talk_t = 0\n          if find(\"Bellwether\").dialogue.choices.length > 0 then\n            dialogue_choose(0)\n          else\n            dialogue_advance()\n          end\n        end\n      end\n    elif autopilot then\n      if hold > 0 then\n        hold -= dt\n      elif not met and p.x > 61.5 then\n        met = true\n        talk_t = 0\n        start_dialogue(find(\"Bellwether\"), \"Start\")\n      elif p.x < 128.4 then\n        dir = 1\n        if grounded and (blocked(p.x + 0.55, p.y) or not solid((p.x + 0.45, p.y - 0.4, 0))) then\n          want_jump = true\n        end\n      end\n    else\n      if right then\n        dir = 1\n      end\n      if left then\n        dir = -1\n      end\n    end\n    -- horizontal\n    let target = dir * speed\n    let accel = 40\n    if not grounded then\n      accel = 22\n    end\n    if vx < target then\n      vx = min(target, vx + accel * dt)\n    elif vx > target then\n      vx = max(target, vx - accel * dt)\n    end\n    if dir != 0 then\n      facing = dir\n    end\n    let nx = p.x + vx * dt\n    let edge = nx + 0.28 * sign(vx)\n    if vx != 0 and blocked(edge, p.y) then\n      vx = 0\n      nx = p.x\n    end\n    -- vertical\n    if grounded and want_jump then\n      vy = jump\n      grounded = false\n      play_anim(self, \"rise\", true)\n    end\n    vy = max(-22, vy - gravity * dt)\n    let ny = p.y + vy * dt\n    if vy <= 0 then\n      if solid((nx - 0.22, ny, 0)) or solid((nx + 0.22, ny, 0)) then\n        if not grounded and air > 0.25 then\n          play_anim(self, \"land\", true)\n        end\n        ny = floor(ny) + 1\n        vy = 0\n        grounded = true\n        air = 0\n      else\n        grounded = false\n      end\n    elif solid((nx, ny + 1.4, 0)) then\n      vy = 0\n    end\n    if not grounded then\n      air += dt\n    end\n    -- the glowing pool and the abyss send you back to the last safe ledge\n    if ny < -3 or (ny < 7.3 and nx > 24.05 and nx < 33.95) then\n      nx = safe.x\n      ny = safe.y\n      vx = 0\n      vy = 0\n    end\n    if grounded and solid((nx - 0.25, ny - 0.5, 0)) and solid((nx + 0.25, ny - 0.5, 0)) then\n      safe = (nx, ny, 0)\n    end\n    self.position = (nx, ny, 0)\n    self.sprite.flipX = facing < 0\n    -- the lantern light, its glow and embers follow the lantern hand\n    let lamp = (nx + 0.42 * facing, ny + 0.62, 0)\n    find(\"Lantern Light\").position = lamp\n    find(\"Lantern Glow\").position = lamp\n    find(\"Lantern Embers\").position = lamp + (0, 0, 0.2)\n    -- animation\n    if grounded then\n      if abs(vx) > 0.6 then\n        play_anim(self, \"run\")\n      elif self.sprite_anim.clip != \"land\" then\n        play_anim(self, \"idle\")\n      end\n    elif vy > 3 then\n      play_anim(self, \"rise\")\n    elif vy > -2 then\n      play_anim(self, \"apex\")\n    else\n      play_anim(self, \"fall\")\n    end\n  end\n\n  on anim \"finished\"\n    if self.sprite_anim.clip == \"land\" then\n      play_anim(self, \"idle\")\n    end\n  end\n\n  on dialogue \"end\"\n    hold = 0.8\n  end\nend\n",
           "enabled": true
         }
       ]
     },
     {
-      "id": 168,
+      "id": 208,
       "name": "Lantern Light",
-      "parent": 167,
+      "parent": 0,
       "enabled": true,
       "tags": [],
       "vars": {},
       "components": {
         "transform": {
           "position": [
-            0.42,
-            0.62,
+            6.92,
+            11.62,
             0
           ],
           "rotation": [
@@ -10587,17 +13802,17 @@
       }
     },
     {
-      "id": 169,
+      "id": 209,
       "name": "Lantern Glow",
-      "parent": 167,
+      "parent": 0,
       "enabled": true,
       "tags": [],
       "vars": {},
       "components": {
         "transform": {
           "position": [
-            0.42,
-            0.62,
+            6.92,
+            11.62,
             0
           ],
           "rotation": [
@@ -10628,7 +13843,128 @@
       }
     },
     {
-      "id": 170,
+      "id": 210,
+      "name": "Lantern Embers",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            6.92,
+            11.62,
+            0.2
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "particles": {
+          "preset": "embers",
+          "emitting": true,
+          "look": "glow",
+          "rate": 5,
+          "burst": 0,
+          "maxParticles": 60,
+          "lifetime": 1.4,
+          "lifetimeJitter": 0.5,
+          "shape": "disc",
+          "shapeSize": [
+            0.5,
+            0,
+            0.5
+          ],
+          "direction": [
+            0,
+            1,
+            0
+          ],
+          "speed": 0.35,
+          "speedJitter": 0.5,
+          "spread": 25,
+          "gravity": -0.4,
+          "drag": 0.7,
+          "turbulence": 0.3,
+          "turbulenceScale": 0.7,
+          "wind": 1,
+          "sizeStart": 0.03,
+          "sizeEnd": 0.01,
+          "sizeJitter": 0.2,
+          "colorStart": "#ffd08a",
+          "colorEnd": "#ff803000",
+          "intensity": 3,
+          "stretch": 0.02,
+          "spin": 0,
+          "softness": 0.05,
+          "worldSpace": true,
+          "collide": false,
+          "floorHeight": 0,
+          "bounce": 0,
+          "splash": 0,
+          "light": 0,
+          "lightColor": "#ff994d",
+          "lightRange": 8,
+          "prewarm": true,
+          "seed": 0,
+          "simulation": "cpu",
+          "facing": "camera",
+          "mesh": "",
+          "roughness": 0.6,
+          "metallic": 0,
+          "texture": "",
+          "flipbookColumns": 1,
+          "flipbookRows": 1,
+          "flipbookFps": 0,
+          "colorGradient": "",
+          "sizeCurve": "",
+          "opacityCurve": "",
+          "shapeMesh": "",
+          "field": "none",
+          "fieldStrength": 1,
+          "fieldRadius": 2,
+          "fieldCenter": [
+            0,
+            0,
+            0
+          ],
+          "fieldAxis": [
+            0,
+            1,
+            0
+          ],
+          "fieldPull": 0,
+          "fieldLift": 0,
+          "fieldTexture": "",
+          "fieldSize": [
+            4,
+            4,
+            4
+          ],
+          "depthCollision": false,
+          "stick": false,
+          "friction": 0.3,
+          "colliders": "",
+          "subEmitter": "",
+          "subEmitOn": "death",
+          "subEmitCount": 8,
+          "subEmitInherit": 0.3,
+          "trailLength": 0.25,
+          "trailSegments": 12,
+          "sort": true,
+          "hueVariation": 0
+        }
+      }
+    },
+    {
+      "id": 211,
       "name": "Camera",
       "parent": 0,
       "enabled": true,
@@ -10676,7 +14012,7 @@
           ],
           "offset": [
             2.2,
-            1.8
+            2.4
           ],
           "bounds": [
             0,
@@ -10688,7 +14024,2172 @@
       }
     },
     {
-      "id": 171,
+      "id": 212,
+      "name": "Dialogue UI",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "ui_canvas": {
+          "mode": "screen",
+          "referenceResolution": [
+            1920,
+            1080
+          ],
+          "scaleMode": "scale_with_screen",
+          "match": 0.5,
+          "sortOrder": 100,
+          "theme": "dark",
+          "styleSheet": "ui/gloam.uistyle.json",
+          "worldScale": 0.01,
+          "interactable": true
+        }
+      }
+    },
+    {
+      "id": 213,
+      "name": "Dialogue Box",
+      "parent": 212,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "ui": {
+          "widget": "panel",
+          "anchor": "bottom_stretch",
+          "anchorMin": [
+            0,
+            0
+          ],
+          "anchorMax": [
+            0,
+            0
+          ],
+          "pivot": [
+            0,
+            0
+          ],
+          "position": [
+            0,
+            0
+          ],
+          "size": [
+            0,
+            196
+          ],
+          "margin": [
+            0,
+            300,
+            34,
+            300
+          ],
+          "layout": "row",
+          "gap": 24,
+          "padding": [
+            18,
+            26,
+            18,
+            18
+          ],
+          "align": "stretch",
+          "justify": "start",
+          "columns": 2,
+          "fit": "none",
+          "flex": 0,
+          "ignoreLayout": false,
+          "text": "",
+          "image": "",
+          "value": 0,
+          "minValue": 0,
+          "maxValue": 1,
+          "placeholder": "",
+          "style": "dialogue_box",
+          "styleOverrides": {},
+          "event": "",
+          "interactable": true,
+          "visible": false,
+          "scroll": 0
+        }
+      }
+    },
+    {
+      "id": 214,
+      "name": "Dialogue Portrait",
+      "parent": 213,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "ui": {
+          "widget": "image",
+          "anchor": "top_left",
+          "anchorMin": [
+            0,
+            0
+          ],
+          "anchorMax": [
+            0,
+            0
+          ],
+          "pivot": [
+            0,
+            0
+          ],
+          "position": [
+            0,
+            0
+          ],
+          "size": [
+            158,
+            158
+          ],
+          "margin": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "layout": "none",
+          "gap": 0,
+          "padding": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "align": "start",
+          "justify": "start",
+          "columns": 2,
+          "fit": "none",
+          "flex": 0,
+          "ignoreLayout": false,
+          "text": "",
+          "image": "",
+          "value": 0,
+          "minValue": 0,
+          "maxValue": 1,
+          "placeholder": "",
+          "style": "dialogue_portrait",
+          "styleOverrides": {},
+          "event": "",
+          "interactable": true,
+          "visible": false,
+          "scroll": 0
+        }
+      }
+    },
+    {
+      "id": 215,
+      "name": "Dialogue Body",
+      "parent": 213,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "ui": {
+          "widget": "panel",
+          "anchor": "top_left",
+          "anchorMin": [
+            0,
+            0
+          ],
+          "anchorMax": [
+            0,
+            0
+          ],
+          "pivot": [
+            0,
+            0
+          ],
+          "position": [
+            0,
+            0
+          ],
+          "size": [
+            160,
+            40
+          ],
+          "margin": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "layout": "column",
+          "gap": 8,
+          "padding": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "align": "stretch",
+          "justify": "start",
+          "columns": 2,
+          "fit": "both",
+          "flex": 1,
+          "ignoreLayout": false,
+          "text": "",
+          "image": "",
+          "value": 0,
+          "minValue": 0,
+          "maxValue": 1,
+          "placeholder": "",
+          "style": "",
+          "styleOverrides": {},
+          "event": "",
+          "interactable": true,
+          "visible": true,
+          "scroll": 0
+        }
+      }
+    },
+    {
+      "id": 216,
+      "name": "Dialogue Speaker",
+      "parent": 215,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "ui": {
+          "widget": "text",
+          "anchor": "top_left",
+          "anchorMin": [
+            0,
+            0
+          ],
+          "anchorMax": [
+            0,
+            0
+          ],
+          "pivot": [
+            0,
+            0
+          ],
+          "position": [
+            0,
+            0
+          ],
+          "size": [
+            160,
+            40
+          ],
+          "margin": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "layout": "none",
+          "gap": 0,
+          "padding": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "align": "start",
+          "justify": "start",
+          "columns": 2,
+          "fit": "height",
+          "flex": 0,
+          "ignoreLayout": false,
+          "text": "Speaker",
+          "image": "",
+          "value": 0,
+          "minValue": 0,
+          "maxValue": 1,
+          "placeholder": "",
+          "style": "dialogue_name",
+          "styleOverrides": {},
+          "event": "",
+          "interactable": true,
+          "visible": true,
+          "scroll": 0
+        }
+      }
+    },
+    {
+      "id": 217,
+      "name": "Dialogue Line",
+      "parent": 215,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "ui": {
+          "widget": "text",
+          "anchor": "top_left",
+          "anchorMin": [
+            0,
+            0
+          ],
+          "anchorMax": [
+            0,
+            0
+          ],
+          "pivot": [
+            0,
+            0
+          ],
+          "position": [
+            0,
+            0
+          ],
+          "size": [
+            160,
+            40
+          ],
+          "margin": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "layout": "none",
+          "gap": 0,
+          "padding": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "align": "start",
+          "justify": "start",
+          "columns": 2,
+          "fit": "both",
+          "flex": 1,
+          "ignoreLayout": false,
+          "text": "The line being spoken appears here.",
+          "image": "",
+          "value": 0,
+          "minValue": 0,
+          "maxValue": 1,
+          "placeholder": "",
+          "style": "dialogue_text",
+          "styleOverrides": {},
+          "event": "",
+          "interactable": true,
+          "visible": true,
+          "scroll": 0
+        }
+      }
+    },
+    {
+      "id": 218,
+      "name": "Dialogue Hint",
+      "parent": 215,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "ui": {
+          "widget": "text",
+          "anchor": "top_left",
+          "anchorMin": [
+            0,
+            0
+          ],
+          "anchorMax": [
+            0,
+            0
+          ],
+          "pivot": [
+            0,
+            0
+          ],
+          "position": [
+            0,
+            0
+          ],
+          "size": [
+            160,
+            40
+          ],
+          "margin": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "layout": "none",
+          "gap": 0,
+          "padding": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "align": "start",
+          "justify": "start",
+          "columns": 2,
+          "fit": "height",
+          "flex": 0,
+          "ignoreLayout": false,
+          "text": "Click or press Space",
+          "image": "",
+          "value": 0,
+          "minValue": 0,
+          "maxValue": 1,
+          "placeholder": "",
+          "style": "dialogue_hint",
+          "styleOverrides": {},
+          "event": "",
+          "interactable": true,
+          "visible": true,
+          "scroll": 0
+        }
+      }
+    },
+    {
+      "id": 219,
+      "name": "Dialogue Choices",
+      "parent": 212,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "ui": {
+          "widget": "panel",
+          "anchor": "bottom_right",
+          "anchorMin": [
+            0,
+            0
+          ],
+          "anchorMax": [
+            0,
+            0
+          ],
+          "pivot": [
+            0,
+            0
+          ],
+          "position": [
+            -320,
+            -250
+          ],
+          "size": [
+            560,
+            0
+          ],
+          "margin": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "layout": "column",
+          "gap": 8,
+          "padding": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "align": "stretch",
+          "justify": "start",
+          "columns": 2,
+          "fit": "height",
+          "flex": 0,
+          "ignoreLayout": false,
+          "text": "",
+          "image": "",
+          "value": 0,
+          "minValue": 0,
+          "maxValue": 1,
+          "placeholder": "",
+          "style": "",
+          "styleOverrides": {},
+          "event": "",
+          "interactable": true,
+          "visible": false,
+          "scroll": 0
+        }
+      }
+    },
+    {
+      "id": 220,
+      "name": "HUD",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "ui_canvas": {
+          "mode": "screen",
+          "referenceResolution": [
+            1920,
+            1080
+          ],
+          "scaleMode": "scale_with_screen",
+          "match": 0.5,
+          "sortOrder": 10,
+          "theme": "dark",
+          "styleSheet": "ui/gloam.uistyle.json",
+          "worldScale": 0.01,
+          "interactable": true
+        }
+      },
+      "behaviors": [
+        {
+          "name": "HudKeeper",
+          "intent": "Area name, oil and motes follow the world.",
+          "source": "behavior HudKeeper\n  intent \"Keeps the HUD true to the world: area name from Wick's position, lantern oil breathing, light motes found.\"\n  on tick\n    let x = find(\"Wick\").position.x\n    let area = \"The Sunken Gate\"\n    if x > 118 then\n      area = \"The Drowned Choir\"\n    elif x > 88 then\n      area = \"Lantern Gallery\"\n    elif x > 57 then\n      area = \"Bellwether's Rest\"\n    elif x > 33 then\n      area = \"Lumen Grove\"\n    elif x > 21 then\n      area = \"The Glowing Pool\"\n    end\n    find(\"Area Name\").ui.text = area\n    find(\"Oil\").ui.value = 0.74 + sin(time * 0.8) * 0.03\n    find(\"Mote Count\").ui.text = str(12 + floor(x / 7))\n  end\n  on event \"hud_hide\"\n    for n in [\"Vitals\", \"Whereabouts\", \"Controls Hint\"]\n      find(n).ui.visible = false\n    end\n  end\n  on event \"hud_show\"\n    for n in [\"Vitals\", \"Whereabouts\", \"Controls Hint\"]\n      find(n).ui.visible = true\n    end\n  end\nend",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "id": 221,
+      "name": "Vitals",
+      "parent": 220,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "ui": {
+          "widget": "panel",
+          "anchor": "top_left",
+          "anchorMin": [
+            0,
+            0
+          ],
+          "anchorMax": [
+            0,
+            0
+          ],
+          "pivot": [
+            0,
+            0
+          ],
+          "position": [
+            44,
+            36
+          ],
+          "size": [
+            160,
+            40
+          ],
+          "margin": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "layout": "row",
+          "gap": 16,
+          "padding": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "align": "center",
+          "justify": "start",
+          "columns": 2,
+          "fit": "both",
+          "flex": 0,
+          "ignoreLayout": false,
+          "text": "",
+          "image": "",
+          "value": 0,
+          "minValue": 0,
+          "maxValue": 1,
+          "placeholder": "",
+          "style": "hud",
+          "styleOverrides": {},
+          "event": "",
+          "interactable": true,
+          "visible": true,
+          "scroll": 0
+        }
+      }
+    },
+    {
+      "id": 222,
+      "name": "Lantern Icon",
+      "parent": 221,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "ui": {
+          "widget": "image",
+          "anchor": "top_left",
+          "anchorMin": [
+            0,
+            0
+          ],
+          "anchorMax": [
+            0,
+            0
+          ],
+          "pivot": [
+            0,
+            0
+          ],
+          "position": [
+            0,
+            0
+          ],
+          "size": [
+            40,
+            58
+          ],
+          "margin": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "layout": "none",
+          "gap": 0,
+          "padding": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "align": "start",
+          "justify": "start",
+          "columns": 2,
+          "fit": "none",
+          "flex": 0,
+          "ignoreLayout": false,
+          "text": "",
+          "image": "art/ui/lantern_icon.png",
+          "value": 0,
+          "minValue": 0,
+          "maxValue": 1,
+          "placeholder": "",
+          "style": "",
+          "styleOverrides": {},
+          "event": "",
+          "interactable": true,
+          "visible": true,
+          "scroll": 0
+        }
+      }
+    },
+    {
+      "id": 223,
+      "name": "Vitals Column",
+      "parent": 221,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "ui": {
+          "widget": "panel",
+          "anchor": "top_left",
+          "anchorMin": [
+            0,
+            0
+          ],
+          "anchorMax": [
+            0,
+            0
+          ],
+          "pivot": [
+            0,
+            0
+          ],
+          "position": [
+            0,
+            0
+          ],
+          "size": [
+            160,
+            40
+          ],
+          "margin": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "layout": "column",
+          "gap": 7,
+          "padding": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "align": "start",
+          "justify": "start",
+          "columns": 2,
+          "fit": "both",
+          "flex": 0,
+          "ignoreLayout": false,
+          "text": "",
+          "image": "",
+          "value": 0,
+          "minValue": 0,
+          "maxValue": 1,
+          "placeholder": "",
+          "style": "",
+          "styleOverrides": {},
+          "event": "",
+          "interactable": true,
+          "visible": true,
+          "scroll": 0
+        }
+      }
+    },
+    {
+      "id": 224,
+      "name": "Oil Label",
+      "parent": 223,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "ui": {
+          "widget": "text",
+          "anchor": "top_left",
+          "anchorMin": [
+            0,
+            0
+          ],
+          "anchorMax": [
+            0,
+            0
+          ],
+          "pivot": [
+            0,
+            0
+          ],
+          "position": [
+            0,
+            0
+          ],
+          "size": [
+            160,
+            40
+          ],
+          "margin": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "layout": "none",
+          "gap": 0,
+          "padding": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "align": "start",
+          "justify": "start",
+          "columns": 2,
+          "fit": "both",
+          "flex": 0,
+          "ignoreLayout": false,
+          "text": "Lantern oil",
+          "image": "",
+          "value": 0,
+          "minValue": 0,
+          "maxValue": 1,
+          "placeholder": "",
+          "style": "label",
+          "styleOverrides": {},
+          "event": "",
+          "interactable": true,
+          "visible": true,
+          "scroll": 0
+        }
+      }
+    },
+    {
+      "id": 225,
+      "name": "Oil",
+      "parent": 223,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "ui": {
+          "widget": "progress",
+          "anchor": "top_left",
+          "anchorMin": [
+            0,
+            0
+          ],
+          "anchorMax": [
+            0,
+            0
+          ],
+          "pivot": [
+            0,
+            0
+          ],
+          "position": [
+            0,
+            0
+          ],
+          "size": [
+            230,
+            8
+          ],
+          "margin": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "layout": "none",
+          "gap": 0,
+          "padding": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "align": "start",
+          "justify": "start",
+          "columns": 2,
+          "fit": "none",
+          "flex": 0,
+          "ignoreLayout": false,
+          "text": "",
+          "image": "",
+          "value": 0.76,
+          "minValue": 0,
+          "maxValue": 1,
+          "placeholder": "",
+          "style": "",
+          "styleOverrides": {},
+          "event": "",
+          "interactable": true,
+          "visible": true,
+          "scroll": 0
+        }
+      }
+    },
+    {
+      "id": 226,
+      "name": "Pips",
+      "parent": 223,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "ui": {
+          "widget": "panel",
+          "anchor": "top_left",
+          "anchorMin": [
+            0,
+            0
+          ],
+          "anchorMax": [
+            0,
+            0
+          ],
+          "pivot": [
+            0,
+            0
+          ],
+          "position": [
+            0,
+            0
+          ],
+          "size": [
+            160,
+            40
+          ],
+          "margin": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "layout": "row",
+          "gap": 9,
+          "padding": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "align": "start",
+          "justify": "start",
+          "columns": 2,
+          "fit": "both",
+          "flex": 0,
+          "ignoreLayout": false,
+          "text": "",
+          "image": "",
+          "value": 0,
+          "minValue": 0,
+          "maxValue": 1,
+          "placeholder": "",
+          "style": "",
+          "styleOverrides": {},
+          "event": "",
+          "interactable": true,
+          "visible": true,
+          "scroll": 0
+        }
+      }
+    },
+    {
+      "id": 227,
+      "name": "Pip 1",
+      "parent": 226,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "ui": {
+          "widget": "panel",
+          "anchor": "top_left",
+          "anchorMin": [
+            0,
+            0
+          ],
+          "anchorMax": [
+            0,
+            0
+          ],
+          "pivot": [
+            0,
+            0
+          ],
+          "position": [
+            0,
+            0
+          ],
+          "size": [
+            14,
+            14
+          ],
+          "margin": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "layout": "none",
+          "gap": 0,
+          "padding": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "align": "start",
+          "justify": "start",
+          "columns": 2,
+          "fit": "none",
+          "flex": 0,
+          "ignoreLayout": false,
+          "text": "",
+          "image": "",
+          "value": 0,
+          "minValue": 0,
+          "maxValue": 1,
+          "placeholder": "",
+          "style": "pip",
+          "styleOverrides": {},
+          "event": "",
+          "interactable": true,
+          "visible": true,
+          "scroll": 0
+        }
+      }
+    },
+    {
+      "id": 228,
+      "name": "Pip 2",
+      "parent": 226,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "ui": {
+          "widget": "panel",
+          "anchor": "top_left",
+          "anchorMin": [
+            0,
+            0
+          ],
+          "anchorMax": [
+            0,
+            0
+          ],
+          "pivot": [
+            0,
+            0
+          ],
+          "position": [
+            0,
+            0
+          ],
+          "size": [
+            14,
+            14
+          ],
+          "margin": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "layout": "none",
+          "gap": 0,
+          "padding": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "align": "start",
+          "justify": "start",
+          "columns": 2,
+          "fit": "none",
+          "flex": 0,
+          "ignoreLayout": false,
+          "text": "",
+          "image": "",
+          "value": 0,
+          "minValue": 0,
+          "maxValue": 1,
+          "placeholder": "",
+          "style": "pip",
+          "styleOverrides": {},
+          "event": "",
+          "interactable": true,
+          "visible": true,
+          "scroll": 0
+        }
+      }
+    },
+    {
+      "id": 229,
+      "name": "Pip 3",
+      "parent": 226,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "ui": {
+          "widget": "panel",
+          "anchor": "top_left",
+          "anchorMin": [
+            0,
+            0
+          ],
+          "anchorMax": [
+            0,
+            0
+          ],
+          "pivot": [
+            0,
+            0
+          ],
+          "position": [
+            0,
+            0
+          ],
+          "size": [
+            14,
+            14
+          ],
+          "margin": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "layout": "none",
+          "gap": 0,
+          "padding": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "align": "start",
+          "justify": "start",
+          "columns": 2,
+          "fit": "none",
+          "flex": 0,
+          "ignoreLayout": false,
+          "text": "",
+          "image": "",
+          "value": 0,
+          "minValue": 0,
+          "maxValue": 1,
+          "placeholder": "",
+          "style": "pip",
+          "styleOverrides": {},
+          "event": "",
+          "interactable": true,
+          "visible": true,
+          "scroll": 0
+        }
+      }
+    },
+    {
+      "id": 230,
+      "name": "Pip 4",
+      "parent": 226,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "ui": {
+          "widget": "panel",
+          "anchor": "top_left",
+          "anchorMin": [
+            0,
+            0
+          ],
+          "anchorMax": [
+            0,
+            0
+          ],
+          "pivot": [
+            0,
+            0
+          ],
+          "position": [
+            0,
+            0
+          ],
+          "size": [
+            14,
+            14
+          ],
+          "margin": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "layout": "none",
+          "gap": 0,
+          "padding": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "align": "start",
+          "justify": "start",
+          "columns": 2,
+          "fit": "none",
+          "flex": 0,
+          "ignoreLayout": false,
+          "text": "",
+          "image": "",
+          "value": 0,
+          "minValue": 0,
+          "maxValue": 1,
+          "placeholder": "",
+          "style": "pip_dim",
+          "styleOverrides": {},
+          "event": "",
+          "interactable": true,
+          "visible": true,
+          "scroll": 0
+        }
+      }
+    },
+    {
+      "id": 231,
+      "name": "Pip 5",
+      "parent": 226,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "ui": {
+          "widget": "panel",
+          "anchor": "top_left",
+          "anchorMin": [
+            0,
+            0
+          ],
+          "anchorMax": [
+            0,
+            0
+          ],
+          "pivot": [
+            0,
+            0
+          ],
+          "position": [
+            0,
+            0
+          ],
+          "size": [
+            14,
+            14
+          ],
+          "margin": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "layout": "none",
+          "gap": 0,
+          "padding": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "align": "start",
+          "justify": "start",
+          "columns": 2,
+          "fit": "none",
+          "flex": 0,
+          "ignoreLayout": false,
+          "text": "",
+          "image": "",
+          "value": 0,
+          "minValue": 0,
+          "maxValue": 1,
+          "placeholder": "",
+          "style": "pip_dim",
+          "styleOverrides": {},
+          "event": "",
+          "interactable": true,
+          "visible": true,
+          "scroll": 0
+        }
+      }
+    },
+    {
+      "id": 232,
+      "name": "Whereabouts",
+      "parent": 220,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "ui": {
+          "widget": "panel",
+          "anchor": "top_right",
+          "anchorMin": [
+            0,
+            0
+          ],
+          "anchorMax": [
+            0,
+            0
+          ],
+          "pivot": [
+            0,
+            0
+          ],
+          "position": [
+            -44,
+            36
+          ],
+          "size": [
+            160,
+            40
+          ],
+          "margin": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "layout": "column",
+          "gap": 4,
+          "padding": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "align": "end",
+          "justify": "start",
+          "columns": 2,
+          "fit": "both",
+          "flex": 0,
+          "ignoreLayout": false,
+          "text": "",
+          "image": "",
+          "value": 0,
+          "minValue": 0,
+          "maxValue": 1,
+          "placeholder": "",
+          "style": "hud",
+          "styleOverrides": {},
+          "event": "",
+          "interactable": true,
+          "visible": true,
+          "scroll": 0
+        }
+      }
+    },
+    {
+      "id": 233,
+      "name": "Area Name",
+      "parent": 232,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "ui": {
+          "widget": "text",
+          "anchor": "top_left",
+          "anchorMin": [
+            0,
+            0
+          ],
+          "anchorMax": [
+            0,
+            0
+          ],
+          "pivot": [
+            0,
+            0
+          ],
+          "position": [
+            0,
+            0
+          ],
+          "size": [
+            160,
+            40
+          ],
+          "margin": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "layout": "none",
+          "gap": 0,
+          "padding": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "align": "start",
+          "justify": "start",
+          "columns": 2,
+          "fit": "both",
+          "flex": 0,
+          "ignoreLayout": false,
+          "text": "The Sunken Gate",
+          "image": "",
+          "value": 0,
+          "minValue": 0,
+          "maxValue": 1,
+          "placeholder": "",
+          "style": "area",
+          "styleOverrides": {},
+          "event": "",
+          "interactable": true,
+          "visible": true,
+          "scroll": 0
+        }
+      }
+    },
+    {
+      "id": 234,
+      "name": "Motes Row",
+      "parent": 232,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "ui": {
+          "widget": "panel",
+          "anchor": "top_left",
+          "anchorMin": [
+            0,
+            0
+          ],
+          "anchorMax": [
+            0,
+            0
+          ],
+          "pivot": [
+            0,
+            0
+          ],
+          "position": [
+            0,
+            0
+          ],
+          "size": [
+            160,
+            40
+          ],
+          "margin": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "layout": "row",
+          "gap": 8,
+          "padding": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "align": "center",
+          "justify": "start",
+          "columns": 2,
+          "fit": "both",
+          "flex": 0,
+          "ignoreLayout": false,
+          "text": "",
+          "image": "",
+          "value": 0,
+          "minValue": 0,
+          "maxValue": 1,
+          "placeholder": "",
+          "style": "",
+          "styleOverrides": {},
+          "event": "",
+          "interactable": true,
+          "visible": true,
+          "scroll": 0
+        }
+      }
+    },
+    {
+      "id": 235,
+      "name": "Mote Icon",
+      "parent": 234,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "ui": {
+          "widget": "image",
+          "anchor": "top_left",
+          "anchorMin": [
+            0,
+            0
+          ],
+          "anchorMax": [
+            0,
+            0
+          ],
+          "pivot": [
+            0,
+            0
+          ],
+          "position": [
+            0,
+            0
+          ],
+          "size": [
+            18,
+            18
+          ],
+          "margin": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "layout": "none",
+          "gap": 0,
+          "padding": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "align": "start",
+          "justify": "start",
+          "columns": 2,
+          "fit": "none",
+          "flex": 0,
+          "ignoreLayout": false,
+          "text": "",
+          "image": "art/ui/mote_icon.png",
+          "value": 0,
+          "minValue": 0,
+          "maxValue": 1,
+          "placeholder": "",
+          "style": "",
+          "styleOverrides": {},
+          "event": "",
+          "interactable": true,
+          "visible": true,
+          "scroll": 0
+        }
+      }
+    },
+    {
+      "id": 236,
+      "name": "Mote Count",
+      "parent": 234,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "ui": {
+          "widget": "text",
+          "anchor": "top_left",
+          "anchorMin": [
+            0,
+            0
+          ],
+          "anchorMax": [
+            0,
+            0
+          ],
+          "pivot": [
+            0,
+            0
+          ],
+          "position": [
+            0,
+            0
+          ],
+          "size": [
+            160,
+            40
+          ],
+          "margin": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "layout": "none",
+          "gap": 0,
+          "padding": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "align": "start",
+          "justify": "start",
+          "columns": 2,
+          "fit": "both",
+          "flex": 0,
+          "ignoreLayout": false,
+          "text": "12",
+          "image": "",
+          "value": 0,
+          "minValue": 0,
+          "maxValue": 1,
+          "placeholder": "",
+          "style": "label",
+          "styleOverrides": {},
+          "event": "",
+          "interactable": true,
+          "visible": true,
+          "scroll": 0
+        }
+      }
+    },
+    {
+      "id": 237,
+      "name": "Mote Label",
+      "parent": 234,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "ui": {
+          "widget": "text",
+          "anchor": "top_left",
+          "anchorMin": [
+            0,
+            0
+          ],
+          "anchorMax": [
+            0,
+            0
+          ],
+          "pivot": [
+            0,
+            0
+          ],
+          "position": [
+            0,
+            0
+          ],
+          "size": [
+            160,
+            40
+          ],
+          "margin": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "layout": "none",
+          "gap": 0,
+          "padding": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "align": "start",
+          "justify": "start",
+          "columns": 2,
+          "fit": "both",
+          "flex": 0,
+          "ignoreLayout": false,
+          "text": "light motes",
+          "image": "",
+          "value": 0,
+          "minValue": 0,
+          "maxValue": 1,
+          "placeholder": "",
+          "style": "label",
+          "styleOverrides": {},
+          "event": "",
+          "interactable": true,
+          "visible": true,
+          "scroll": 0
+        }
+      }
+    },
+    {
+      "id": 238,
+      "name": "Controls Hint",
+      "parent": 220,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "ui": {
+          "widget": "text",
+          "anchor": "top_left",
+          "anchorMin": [
+            0,
+            0
+          ],
+          "anchorMax": [
+            0,
+            0
+          ],
+          "pivot": [
+            0,
+            0
+          ],
+          "position": [
+            48,
+            132
+          ],
+          "size": [
+            160,
+            40
+          ],
+          "margin": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "layout": "none",
+          "gap": 0,
+          "padding": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "align": "start",
+          "justify": "start",
+          "columns": 2,
+          "fit": "both",
+          "flex": 0,
+          "ignoreLayout": false,
+          "text": "A / D  move     Space  jump     E  talk",
+          "image": "",
+          "value": 0,
+          "minValue": 0,
+          "maxValue": 1,
+          "placeholder": "",
+          "style": "hint",
+          "styleOverrides": {},
+          "event": "",
+          "interactable": true,
+          "visible": true,
+          "scroll": 0
+        }
+      }
+    },
+    {
+      "id": 239,
       "name": "Ambient Water Light",
       "parent": 0,
       "enabled": true,
@@ -10725,6 +16226,606 @@
           "shadowSoftness": 0.4,
           "halo": 0,
           "flicker": 0
+        }
+      }
+    },
+    {
+      "id": 240,
+      "name": "Cam Title",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "shot"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            9.4,
+            13.5,
+            20
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "camera": {
+          "fov": 60,
+          "nearPlane": 0.1,
+          "farPlane": 300,
+          "orthographic": true,
+          "orthoSize": 4.3,
+          "primary": false,
+          "aperture": 0,
+          "focusDistance": 0,
+          "motionBlur": 0
+        }
+      }
+    },
+    {
+      "id": 241,
+      "name": "Cam Pool",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "shot"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            23.5,
+            11.6,
+            20
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "camera": {
+          "fov": 60,
+          "nearPlane": 0.1,
+          "farPlane": 300,
+          "orthographic": true,
+          "orthoSize": 4.6,
+          "primary": false,
+          "aperture": 0,
+          "focusDistance": 0,
+          "motionBlur": 0
+        }
+      }
+    },
+    {
+      "id": 242,
+      "name": "Cam Grove",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "shot"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            37.5,
+            12.6,
+            20
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "camera": {
+          "fov": 60,
+          "nearPlane": 0.1,
+          "farPlane": 300,
+          "orthographic": true,
+          "orthoSize": 5.3,
+          "primary": false,
+          "aperture": 0,
+          "focusDistance": 0,
+          "motionBlur": 0
+        }
+      }
+    },
+    {
+      "id": 243,
+      "name": "Cam Bridge",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "shot"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            50.5,
+            9.3,
+            20
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "camera": {
+          "fov": 60,
+          "nearPlane": 0.1,
+          "farPlane": 300,
+          "orthographic": true,
+          "orthoSize": 5,
+          "primary": false,
+          "aperture": 0,
+          "focusDistance": 0,
+          "motionBlur": 0
+        }
+      }
+    },
+    {
+      "id": 244,
+      "name": "Cam Bellwether",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "shot"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            64.4,
+            10.9,
+            20
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "camera": {
+          "fov": 60,
+          "nearPlane": 0.1,
+          "farPlane": 300,
+          "orthographic": true,
+          "orthoSize": 4.4,
+          "primary": false,
+          "aperture": 0,
+          "focusDistance": 0,
+          "motionBlur": 0
+        }
+      }
+    },
+    {
+      "id": 245,
+      "name": "Cam Plaza",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "shot"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            66.5,
+            12,
+            20
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "camera": {
+          "fov": 60,
+          "nearPlane": 0.1,
+          "farPlane": 300,
+          "orthographic": true,
+          "orthoSize": 5,
+          "primary": false,
+          "aperture": 0,
+          "focusDistance": 0,
+          "motionBlur": 0
+        }
+      }
+    },
+    {
+      "id": 246,
+      "name": "Cam Gallery",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "shot"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            90,
+            15.6,
+            20
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "camera": {
+          "fov": 60,
+          "nearPlane": 0.1,
+          "farPlane": 300,
+          "orthographic": true,
+          "orthoSize": 4.6,
+          "primary": false,
+          "aperture": 0,
+          "focusDistance": 0,
+          "motionBlur": 0
+        }
+      }
+    },
+    {
+      "id": 247,
+      "name": "Cam Shrine",
+      "parent": 0,
+      "enabled": true,
+      "tags": [
+        "shot"
+      ],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            128.8,
+            12.9,
+            20
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "camera": {
+          "fov": 60,
+          "nearPlane": 0.1,
+          "farPlane": 300,
+          "orthographic": true,
+          "orthoSize": 3.9,
+          "primary": false,
+          "aperture": 0,
+          "focusDistance": 0,
+          "motionBlur": 0
+        }
+      }
+    },
+    {
+      "id": 248,
+      "name": "Shot Title",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "sequencer": {
+          "sequence": "cinematics/title.sequence.json",
+          "playOnStart": false,
+          "loop": false,
+          "speed": 1,
+          "preview": false,
+          "time": 0
+        }
+      }
+    },
+    {
+      "id": 249,
+      "name": "Shot Pool",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "sequencer": {
+          "sequence": "cinematics/pool.sequence.json",
+          "playOnStart": false,
+          "loop": false,
+          "speed": 1,
+          "preview": false,
+          "time": 0
+        }
+      }
+    },
+    {
+      "id": 250,
+      "name": "Shot Grove",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "sequencer": {
+          "sequence": "cinematics/grove.sequence.json",
+          "playOnStart": false,
+          "loop": false,
+          "speed": 1,
+          "preview": false,
+          "time": 0
+        }
+      }
+    },
+    {
+      "id": 251,
+      "name": "Shot Bridge",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "sequencer": {
+          "sequence": "cinematics/bridge.sequence.json",
+          "playOnStart": false,
+          "loop": false,
+          "speed": 1,
+          "preview": false,
+          "time": 0
+        }
+      }
+    },
+    {
+      "id": 252,
+      "name": "Shot Bellwether",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "sequencer": {
+          "sequence": "cinematics/bellwether.sequence.json",
+          "playOnStart": false,
+          "loop": false,
+          "speed": 1,
+          "preview": false,
+          "time": 0
+        }
+      }
+    },
+    {
+      "id": 253,
+      "name": "Shot Plaza",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "sequencer": {
+          "sequence": "cinematics/plaza.sequence.json",
+          "playOnStart": false,
+          "loop": false,
+          "speed": 1,
+          "preview": false,
+          "time": 0
+        }
+      }
+    },
+    {
+      "id": 254,
+      "name": "Shot Gallery",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "sequencer": {
+          "sequence": "cinematics/gallery.sequence.json",
+          "playOnStart": false,
+          "loop": false,
+          "speed": 1,
+          "preview": false,
+          "time": 0
+        }
+      }
+    },
+    {
+      "id": 255,
+      "name": "Shot Shrine",
+      "parent": 0,
+      "enabled": true,
+      "tags": [],
+      "vars": {},
+      "components": {
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "sequencer": {
+          "sequence": "cinematics/shrine.sequence.json",
+          "playOnStart": false,
+          "loop": false,
+          "speed": 1,
+          "preview": false,
+          "time": 0
         }
       }
     }

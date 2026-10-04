@@ -1,0 +1,69 @@
+{
+  "format": "skywalker.sequence",
+  "version": 1,
+  "name": "grove",
+  "duration": 10.6,
+  "tracks": [
+    {
+      "type": "property",
+      "entity": "Cam Grove",
+      "property": "transform.position",
+      "keys": [
+        {
+          "t": 7,
+          "value": [
+            37.5,
+            12.6,
+            20
+          ],
+          "ease": "smooth"
+        },
+        {
+          "t": 10.6,
+          "value": [
+            46.5,
+            12.2,
+            20
+          ],
+          "ease": "smooth"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "entity": "Cam Grove",
+      "property": "camera.orthoSize",
+      "keys": [
+        {
+          "t": 7,
+          "value": 5.3,
+          "ease": "smooth"
+        },
+        {
+          "t": 10.6,
+          "value": 5.1,
+          "ease": "smooth"
+        }
+      ]
+    },
+    {
+      "type": "camera",
+      "keys": [
+        {
+          "t": 0,
+          "camera": "Cam Grove"
+        }
+      ]
+    },
+    {
+      "type": "event",
+      "keys": [
+        {
+          "t": 0,
+          "event": "hud_show",
+          "target": "HUD"
+        }
+      ]
+    }
+  ]
+}
