@@ -5,6 +5,8 @@
 #include <cstring>
 
 #include "MetalFxInternal.h"
+#include "MetalProfiler.h"     // [profiler] per-pass GPU timing
+#include "MetalShaderCache.h"  // [shader cache] pipelines through the binary archive
 #include "skywalker/core/Log.h"
 #include "skywalker/render/MeshData.h"
 
@@ -81,7 +83,7 @@ bool MetalGpuParticles::build(id<MTLLibrary> lib, const FxFormats& fmt) {
     for (const char* k : {"gpuInit", "gpuEmitArgs", "gpuEmit", "gpuSimArgs", "gpuSimulate", "gpuFinalize", "gpuSortKeys",
                           "gpuBitonicLocal", "gpuBitonicGlobal", "gpuLightReduce"}) {
         id<MTLFunction> f = [lib newFunctionWithName:[NSString stringWithUTF8String:k]];
-        id<MTLComputePipelineState> ps = f ? [device_ newComputePipelineStateWithFunction:f error:&err] : nil;
+        id<MTLComputePipelineState> ps = f ? newComputePipeline(device_, f, &err) : nil;
         if (!ps) {
             log::warn("render", std::string("GPU particles disabled: missing or invalid kernel ") + k +
                                     (err ? ": " + std::string(err.localizedDescription.UTF8String) : ""));
@@ -109,7 +111,7 @@ bool MetalGpuParticles::build(id<MTLLibrary> lib, const FxFormats& fmt) {
         c1.destinationRGBBlendFactor = MTLBlendFactorOne;
         c1.sourceAlphaBlendFactor = MTLBlendFactorOne;
         c1.destinationAlphaBlendFactor = MTLBlendFactorOne;
-        return [device_ newRenderPipelineStateWithDescriptor:d error:&err];
+        return newRenderPipeline(device_, d, &err);
     };
     quadPipeline_ = effect("gpuParticleVertex");
     ribbonPipeline_ = effect("gpuRibbonVertex");
@@ -121,11 +123,11 @@ bool MetalGpuParticles::build(id<MTLLibrary> lib, const FxFormats& fmt) {
     md.colorAttachments[1].pixelFormat = fmt.gbufA;
     md.colorAttachments[2].pixelFormat = fmt.gbufB;
     md.depthAttachmentPixelFormat = fmt.depth;
-    meshPipeline_ = md.vertexFunction && md.fragmentFunction ? [device_ newRenderPipelineStateWithDescriptor:md error:&err] : nil;
+    meshPipeline_ = md.vertexFunction && md.fragmentFunction ? newRenderPipeline(device_, md, &err) : nil;
     MTLRenderPipelineDescriptor* sd = [MTLRenderPipelineDescriptor new];
     sd.vertexFunction = fn("gpuMeshParticleShadowVertex");
     sd.depthAttachmentPixelFormat = fmt.depth;
-    meshShadowPipeline_ = sd.vertexFunction ? [device_ newRenderPipelineStateWithDescriptor:sd error:&err] : nil;
+    meshShadowPipeline_ = sd.vertexFunction ? newRenderPipeline(device_, sd, &err) : nil;
     if (!quadPipeline_ || !ribbonPipeline_ || !meshPipeline_ || !meshShadowPipeline_) {
         log::warn("render", "GPU particles disabled: " + (err ? std::string(err.localizedDescription.UTF8String) : std::string("missing shaders")));
         return false;
@@ -364,8 +366,7 @@ void MetalGpuParticles::simulate(id<MTLCommandBuffer> cmd, const FrameData& fram
     base.prevInvViewProj = simdMat(prevViewProj.inverse());
     base.eye = simd_make_float4(frame.camera.eye.x, frame.camera.eye.y, frame.camera.eye.z, prevValid && prevDepth ? 1.f : 0.f);
 
-    id<MTLComputeCommandEncoder> enc = [cmd computeCommandEncoder];
-    enc.label = @"GPU particles";
+    id<MTLComputeCommandEncoder> enc = profiledCompute(cmd, "GPU particles simulate", "particles");
     [enc setTexture:prevDepth atIndex:0];
     [enc setTexture:prevNormals atIndex:1];
     const double now = frame.time;
@@ -558,6 +559,7 @@ void MetalGpuParticles::encodeTransparent(id<MTLCommandBuffer> cmd, const FrameD
     rp.colorAttachments[1].loadAction = MTLLoadActionClear;
     rp.colorAttachments[1].clearColor = MTLClearColorMake(0, 0, 0, 0);
     rp.colorAttachments[1].storeAction = MTLStoreActionStore;
+    profileRenderPass(rp, "GPU particles", "particles");
     id<MTLRenderCommandEncoder> enc = [cmd renderCommandEncoderWithDescriptor:rp];
     enc.label = @"GPU particles";
     [enc setCullMode:MTLCullModeNone];

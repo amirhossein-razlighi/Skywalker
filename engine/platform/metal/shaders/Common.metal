@@ -47,7 +47,9 @@ struct FrameUniforms {
     float4 clouds2;        // x = scale, y = drift speed (m/s), z = mode (0 volumetric, 1 flat), w = wind angle (rad)
     float4 cluster;        // x = tiles x, y = tiles y, z = depth slices, w = log(far / near)
     float4 cluster2;       // x = near (m), y = directional light count, zw = unused
+    float4 debug;          // x = surface debug view id (DebugViews.h; 0 = off), yzw = unused
 };
+static_assert(sizeof(FrameUniforms) == 832, "FrameUniforms must match MetalRenderer.mm (grow only at the end)");
 
 // Clustered lighting: which cluster a pixel at `fragXY` (pixels) / `worldPos` belongs to.
 static uint clusterOf(constant FrameUniforms& f, float2 fragXY, float3 worldPos) {

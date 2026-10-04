@@ -442,7 +442,8 @@ fragment float4 compositeFragment(FullscreenOut in [[stage_in]], texture2d<float
 }
 
 // Buffer visualization (agents and artists debugging lighting): 1 albedo, 2 normals,
-// 3 roughness/metallic, 4 GI, 5 reflections, 6 ambient occlusion, 7 depth, 8 direct+sky lighting.
+// 3 roughness/metallic, 4 GI, 5 reflections, 6 ambient occlusion, 7 depth, 8 direct+sky lighting,
+// 9 sketch; 11+ surface debug views (Debug.metal) shown untonemapped, 12 overdraw as a heat map.
 fragment float4 debugViewFragment(FullscreenOut in [[stage_in]], constant PostUniforms& p [[buffer(0)]],
                                   texture2d<float> gbufA [[texture(0)]], texture2d<float> gbufB [[texture(1)]],
                                   texture2d<float> gi [[texture(2)]], texture2d<float> ssr [[texture(3)]],
@@ -484,6 +485,14 @@ fragment float4 debugViewFragment(FullscreenOut in [[stage_in]], constant PostUn
         float3 paper = float3(0.965, 0.955, 0.93) - paperGrain;
         float3 ink = float3(0.16, 0.17, 0.2);
         c = mix(paper, ink, saturate(edge * 0.95 + (d0 < 1.0 ? hatch : 0.0)));
+    }
+    else if (mode == kDbgOverdraw) {
+        // Fragments per pixel (MSAA resolves partial coverage to fractions: round to the nearest count).
+        c = debugHeat(floor(hdr.sample(pointClamp, uv).r + 0.4));
+    } else if (mode >= kDbgWireframe) {
+        // Surface debug views: the main pass color as is (no tonemap), a neutral backdrop for the sky.
+        float d = depthTex.sample(pointClamp, uv);
+        c = d >= 1.0 ? float3(0.04, 0.045, 0.055) + float3(0.02) * (1.0 - uv.y) : saturate(hdr.sample(pointClamp, uv).rgb);
     }
     else c = tonemapACES(hdr.sample(linearClamp, uv).rgb);
     return float4(c, 1.0);
