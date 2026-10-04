@@ -6,11 +6,14 @@
 #include <doctest/doctest.h>
 
 #include <filesystem>
+#include <fstream>
 #include <string>
 #include <vector>
 
 #include "skywalker/assets/AssetDatabase.h"
 #include "skywalker/engine/Engine.h"
+#include "skywalker/game/SaveGame.h"
+#include "skywalker/game/SceneFlow.h"
 #include "skywalker/wander/Debugger.h"
 
 using namespace sky;
@@ -327,4 +330,56 @@ TEST_CASE("wander debugger tools: pause, set variables, stop while paused") {
     CHECK((f.engine->playState() == PlayState::Editing));
     CHECK_FALSE(f.engine->scene().record(f.calc)->vars.contains("total"));
     f.call("wander_break_list", "{}");
+}
+
+TEST_CASE("wander debugger: debugged ticks still run the save game and scene flow hooks, identically") {
+    // A menu whose logic saves and changes scene on its third tick; the save and the change happen at the
+    // end of the tick (Engine::runTicks), also when that tick ran on the debugger's thread.
+    const fs::path dir = fs::temp_directory_path() / ("skywalker-dbg-flow-" + AssetDatabase::newGuid().substr(0, 8));
+    fs::create_directories(dir / "scenes");
+    auto write = [&](const std::string& rel, const std::string& text) { std::ofstream(dir / rel, std::ios::binary) << text; };
+    write("game.json", R"({"id": "dbg-flow", "scenes": {"menu": "scenes/menu.sky.json", "level": "scenes/level.sky.json"}})");
+    const std::string logic = "var n = 0\non tick\n  n += 1\n  if n == 3 then\n    save_game(\"dbg\")\n    change_scene(\"level\", {transition: \"none\"})\n  end\nend";
+    write("scenes/menu.sky.json", R"({"format": "skywalker.scene", "version": 1, "name": "Menu", "seed": 3, "entities": [
+        {"id": 1, "name": "Logic", "behaviors": [{"name": "Logic", "source": )" + Json(logic).dump() + R"(}]}]})");
+    write("scenes/level.sky.json", R"({"format": "skywalker.scene", "version": 1, "name": "Level", "seed": 4, "entities": [
+        {"id": 1, "name": "Ground"}, {"id": 2, "name": "Gate"}]})");
+    auto make = [&] {
+        EngineConfig cfg;
+        cfg.renderer = RendererBackend::Null;
+        cfg.audio = audio::AudioMode::Null;
+        cfg.projectDir = dir.string();
+        auto e = std::make_unique<Engine>(cfg);
+        REQUIRE(e->loadScene("scenes/menu.sky.json"));
+        e->play();
+        return e;
+    };
+    auto plain = make();
+    plain->step(10);
+    REQUIRE(plain->sceneFlow().current() == "level");
+    REQUIRE(plain->saves().has("dbg"));
+    REQUIRE(plain->saves().remove("dbg"));
+
+    auto debugged = make();
+    wander::Breakpoint b;
+    b.script = "Logic";
+    b.line = 5;  // save_game("dbg")
+    REQUIRE(debugged->runtime().debugger().setBreakpoint(b));
+    debugged->step(10);
+    REQUIRE(debugged->debugHolding());
+    CHECK(debugged->sceneFlow().current() == "menu");
+    int guard = 0;
+    while (debugged->debugHolding() && guard++ < 20) {
+        ToolResult r = debugged->callTool("wander_continue", Json::object(), "agent:test");
+        CHECK_FALSE(r.isError);
+    }
+    CHECK_FALSE(debugged->debugHolding());
+    CHECK(debugged->saves().has("dbg"));
+    CHECK(debugged->sceneFlow().current() == "level");
+    CHECK(debugged->runtime().frame() == plain->runtime().frame());
+    CHECK(debugged->scene().toJson() == plain->scene().toJson());
+    debugged.reset();
+    plain.reset();
+    std::error_code ec;
+    fs::remove_all(dir, ec);
 }
