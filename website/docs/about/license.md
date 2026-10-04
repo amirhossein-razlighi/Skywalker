@@ -51,6 +51,7 @@ permissive licenses.
 |---|---|---|---|
 | [Jolt Physics](https://github.com/jrouwe/JoltPhysics) | v5.6.0 | MIT | Rigid bodies, colliders, character controller, joints, queries |
 | [Recast & Detour](https://github.com/recastnavigation/recastnavigation) | v1.6.0 | zlib | Navigation meshes, path finding, crowd steering |
+| [Box2D](https://github.com/erincatto/box2d) | v3.1.1 | MIT | 2D rigid bodies, shapes, joints, sensors, queries, platformer characters |
 | [miniaudio](https://github.com/mackron/miniaudio) | 0.11.22 | Public domain or MIT-0 | Mixing, spatialization, decoding, output devices |
 | [stb](https://github.com/nothings/stb) (`stb_truetype`, `stb_image`, `stb_rect_pack`) | pinned commit | Public domain or MIT | SDF glyphs, image decoding, atlas packing |
 | [Inter](https://github.com/rsms/inter), [EB Garamond](https://github.com/octaviopardo/EBGaramond12), [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono) | google/fonts | SIL OFL 1.1 | Built-in UI, serif and monospace fonts |

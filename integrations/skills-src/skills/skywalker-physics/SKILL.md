@@ -99,7 +99,7 @@ Tag the player `player` and goals/hazards so `playtest_run` can measure the game
 - **Door**: `body` + `joint {kind:"hinge", anchor:[-0.5,0,0], limitMin:-100, limitMax:0}`. **Moving platform**: `physics_add kinematic_platform` and `move self by ...` in Wander; things on top ride along.
 - **Pickups / checkpoints**: invisible box + `trigger_zone` + `on trigger_enter "player"`.
 - **Launch**: `impulse(self, forward(self) * 8 + (0, 4, 0))`; explosions: `overlap_sphere` + `impulse` away from the center.
-- **2D side-scroller**: bodies with `lockPosition:"z"` and `lockRotation:"xy"`; colliders from `tilemap_inspect` rects (see skywalker-2d-ui).
+- **2D games** (sprites, tilemaps): use the 2D physics set instead (`body2d`, `collider2d`, `character2d`, `joint2d`; `physics2d_add` presets incl. `tilemap_collision` and `platformer_player`), see skywalker-2d-ui. 3D bodies locked to the plane (`lockPosition:"z"`, `lockRotation:"xy"`) remain for 2.5D scenes.
 
 ## Vehicles (cars, trucks, karts)
 
