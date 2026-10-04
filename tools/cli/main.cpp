@@ -384,7 +384,7 @@ int main(int argc, char** argv) {
     if (cmd == "build") return runBuild(args.raw);
     if (cmd == "movie") return runMovie(args.raw);
     if (cmd == "version" || cmd == "--version") {
-        std::printf("skywalker %s\n", SKY_VERSION_STRING);
+        std::printf("skywalker %s\nDeveloped by: AmirHossein (Amir) Razlighi\n", SKY_VERSION_STRING);
         return 0;
     }
     return usage();

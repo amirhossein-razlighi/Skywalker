@@ -7,6 +7,8 @@
 
 <p align="center"><b>A game engine built from the ground up for AI agents — and the people who work with them.</b></p>
 
+<p align="center">Developed by: AmirHossein (Amir) Razlighi</p>
+
 ---
 
 Skywalker is a C++20 game engine with a native macOS editor, designed so that AI agents
@@ -166,3 +168,5 @@ It is **free** for individuals, for companies under US$1M in annual revenue and 
 funding, and for non-profits, education and non-commercial use, including shipping and selling
 your games. Larger organizations need a commercial license. Games you make are yours, and each
 version becomes Apache-2.0 four years after release. See [docs/LICENSING.md](docs/LICENSING.md).
+
+Developed by: AmirHossein (Amir) Razlighi.
