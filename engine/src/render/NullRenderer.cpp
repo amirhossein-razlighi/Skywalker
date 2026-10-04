@@ -8,6 +8,7 @@
 #include "skywalker/core/Log.h"
 #include "skywalker/render/MeshData.h"
 #include "skywalker/render/Renderer.h"
+#include "skywalker/render/ShadowAtlas.h"
 #include "skywalker/render2d/Raster2D.h"
 
 namespace sky {
@@ -26,8 +27,12 @@ uint8_t toByte(float v) {
 class NullRenderer final : public Renderer {
 public:
     RendererInfo info() const override { return {"null", "cpu"}; }
+    Json localShadowInfo() const override { return shadows_.info(); }
+    void invalidateLocalShadows() override { shadows_.invalidate(); }
 
     Status render(const FrameData& frame) override {
+        // Local shadows are planned on the CPU like on the GPU backends (shadow_atlas_info works headless).
+        shadows_.plan(frame, shadows::settingsFor(frame.environment, frame.quality, frame.samples > 1 || frame.offline.enabled));
         image_ = Image(frame.width, frame.height);
         const Environment& env = frame.environment;
         for (int y = 0; y < frame.height; ++y) {
@@ -95,6 +100,7 @@ public:
 
 private:
     Image image_;
+    shadows::LocalShadowPlanner shadows_;
     render2d::ImageCache textures_;  // decoded sprite/UI images
 };
 

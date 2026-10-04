@@ -93,6 +93,9 @@ struct GPULight {
     float4 colorIntensity;  // rgb, w = intensity
     float4 directionCone;   // xyz, w = cos(cone)
     float4 kind;            // x: 0 directional, 1 point, 2 spot
+    // Local shadows (Shadows.metal, render/ShadowAtlas.h gpuShadowParams):
+    float4 shadow;          // xy = slot origin, z = slot size (uv of a quadrant slice), w = projection + 4 * quadrant (0 = none)
+    float4 shadow2;         // x = strength, y = bias (m), z = normal bias (texels), w = tan(half fov) / paraboloid uv scale
 };
 
 struct Vertex {

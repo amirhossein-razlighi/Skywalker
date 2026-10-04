@@ -335,7 +335,7 @@ static float3 hairShade(constant HairParams& H, constant FrameUniforms& f, const
                         const device uint2* clusterCells, const device uint* clusterIndices, HairShadeIn s,
                         float2 pixel, depth2d<float> shadowAtlas, texturecube<float> envTex, depth2d<float> domDepth,
                         depth2d<float> domOpaque, texture2d<float> domDensity, thread float3& albedoOut,
-                        thread float3& normalOut) {
+                        thread float3& normalOut, depth2d_array<float> localShadows) {
     float3 V = normalize(f.cameraPos.xyz - s.worldPos);
     if (f.cameraForward.w > 0.5) V = -f.cameraForward.xyz;
     float3 Tt = normalize(s.tangent);
@@ -358,7 +358,7 @@ static float3 hairShade(constant HairParams& H, constant FrameUniforms& f, const
     for (int k = 0; k < total; ++k) {
         int i = k < dirCount ? k : int(clusterIndices[cell.x + uint(k - dirCount)]);
         float3 Ll;
-        float3 rad = pointLightAt(lights[i], s.worldPos, T, Ll);
+        float3 rad = localLightAt(lights[i], s.worldPos, float3(0.0), Ll, localShadows, pixel, 4, f.extra.y);
         color += hairBSDF(T, V, Ll, C, rough, radial, tilt, specular, scatter, 1.0) * rad;
     }
     // Sky light: diffuse around the strand plus a glossy reflection, occluded inside the groom.
@@ -460,12 +460,13 @@ fragment HairOut hairFragment(HairVOut in [[stage_in]], constant HairParams& H [
                               const device uint* clusterIndices [[buffer(4)]],
                               depth2d<float> shadowAtlas [[texture(1)]], texturecube<float> envTex [[texture(5)]],
                               depth2d<float> domDepth [[texture(9)]], depth2d<float> domOpaque [[texture(10)]],
-                              texture2d<float> domDensity [[texture(11)]]) {
+                              texture2d<float> domDensity [[texture(11)]],
+                              depth2d_array<float> localShadows [[texture(32)]]) {
     uint mask = hairSampleMask(in.coverage, in.position.xy, in.rand, f.temporal.z * 7.0 + f.temporal.w);
     if (mask == 0u) discard_fragment();
     HairShadeIn s{in.worldPos, in.tangent, in.t, in.rand};
     float3 albedo, N;
-    float3 c = hairShade(H, f, lights, clusterCells, clusterIndices, s, in.position.xy, shadowAtlas, envTex, domDepth, domOpaque, domDensity, albedo, N);
+    float3 c = hairShade(H, f, lights, clusterCells, clusterIndices, s, in.position.xy, shadowAtlas, envTex, domDepth, domOpaque, domDensity, albedo, N, localShadows);
     HairOut o;
     o.color = float4(c, 1.0);
     o.gbufA = float4(albedo, 1.0);
@@ -515,7 +516,8 @@ fragment HairOut hairCardFragment(HairCardOut in [[stage_in]], constant HairPara
                                   const device uint* clusterIndices [[buffer(4)]],
                                   depth2d<float> shadowAtlas [[texture(1)]], texturecube<float> envTex [[texture(5)]],
                                   depth2d<float> domDepth [[texture(9)]], depth2d<float> domOpaque [[texture(10)]],
-                                  texture2d<float> domDensity [[texture(11)]]) {
+                                  texture2d<float> domDensity [[texture(11)]],
+                                  depth2d_array<float> localShadows [[texture(32)]]) {
     // Procedural strand pattern across the card, thinning toward the tip and the edges.
     float strands = H.cards.y;
     float x = in.u * strands + in.rand * 13.0;
@@ -527,7 +529,7 @@ fragment HairOut hairCardFragment(HairCardOut in [[stage_in]], constant HairPara
     if (mask == 0u) discard_fragment();
     HairShadeIn s{in.worldPos, in.tangent, in.t, fract(floor(x) * 0.618)};
     float3 albedo, N;
-    float3 c = hairShade(H, f, lights, clusterCells, clusterIndices, s, in.position.xy, shadowAtlas, envTex, domDepth, domOpaque, domDensity, albedo, N);
+    float3 c = hairShade(H, f, lights, clusterCells, clusterIndices, s, in.position.xy, shadowAtlas, envTex, domDepth, domOpaque, domDensity, albedo, N, localShadows);
     HairOut o;
     o.color = float4(c, 1.0);
     o.gbufA = float4(albedo, 1.0);
@@ -556,7 +558,7 @@ vertex HairShadowOut hairShadowVertex(uint vid [[vertex_id]], uint iid [[instanc
     float3 world = hairExpand(H, pos, children, iid * stride, vid, float3(0.0), lightInfo.xyz, true, lightInfo.w, T, cov, t, rnd);
     cov *= float(stride);
     HairShadowOut o;
-    o.position = lightViewProj * float4(world, 1.0);
+    o.position = shadowClip(lightViewProj, world);
     o.coverage = cov;
     o.rand = rnd;
     return o;

@@ -113,6 +113,7 @@ private:
         int facing = 0;
         Vec3 position{0, 0, 0};
         float light = 0, lightRange = 8, expected = 1;
+        bool lightShadows = false;  // the cast lights opt into local shadows
         Vec3 lightColor{1, 1, 1};
     };
     void ensure(Emitter& e, const GpuEmitterItem& item, id<MTLCommandBuffer> cmd);

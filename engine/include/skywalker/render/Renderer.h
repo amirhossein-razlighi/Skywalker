@@ -130,7 +130,18 @@ struct LightItem {
     float intensity = 1;
     float range = 10;
     float cosCone = 0.8f;
+    // Local shadows (point / spot; render/ShadowAtlas.h).
+    uint64_t id = 0;                // stable identity across frames (lightId); 0 = none (no shadow caching)
+    bool shadows = false;
+    int shadowMode = 0;             // point lights: 0 cube, 1 dual paraboloid
+    float shadowBias = 0.02f;       // m
+    float shadowNormalBias = 1.f;   // shadow-map texels
+    int shadowResolution = 0;       // slot size hint (px), 0 = from screen coverage
+    float shadowMaxDistance = 0.f;  // no shadow beyond this camera distance (m), 0 = no limit
 };
+/// Stable light identity: the entity, tagged by what cast the light (0 light component, 1 fluid
+/// fire, 2 CPU particles, 3 GPU particles).
+constexpr uint64_t lightId(EntityId entity, int source) { return (static_cast<uint64_t>(source) << 56) | entity; }
 
 /// Unlit geometry drawn on top of the scene (gizmos, editor helpers).
 struct OverlayItem {
@@ -281,7 +292,8 @@ struct FrameData {
     bool resetHistory = false;
     /// Buffer visualization instead of the final image: 0 off, 1 albedo, 2 normals,
     /// 3 roughness/metallic, 4 GI, 5 reflections, 6 AO, 7 depth, 8 lighting before GI, 9 sketch,
-    /// 10 impostors (the final image with foliage meshes tinted green and impostors magenta).
+    /// 10 impostors (the final image with foliage meshes tinted green and impostors magenta),
+    /// kDebugViewShadowAtlas (20) the local shadow atlas (point / spot shadow maps, one outline per light).
     int debugView = 0;
     /// Viewport quality: 0 full (play, captures), 1 balanced, 2 fast (editing a heavy world).
     /// Lower tiers pick coarser LODs and cheaper shadows; the engine also trims the environment.
@@ -297,6 +309,7 @@ struct FrameData {
         float exposureDt = 0.f;
     } offline;
 
+    static constexpr int kDebugViewShadowAtlas = 20;  // debugView: the local shadow atlas
     static constexpr size_t kMaxLights = 1024;       // clustered lighting on surfaces
     static constexpr size_t kMaxEffectLights = 16;   // the most important ones also light water, particles, fog
     Mat4 viewProjection() const { return projection * view; }
@@ -371,6 +384,10 @@ public:
     virtual std::vector<LightItem> effectLights() const { return {}; }
     /// Backend statistics of the last completed frame (GPU time in ms, items drawn, effects...).
     virtual Json stats() const { return Json::object(); }
+    /// Local (point / spot) shadows of the last frame: atlas, slots, shadowed lights, budgets
+    /// (shadow_atlas_info). `invalidate` makes every shadow re-render on the next frame.
+    virtual Json localShadowInfo() const { return Json(); }
+    virtual void invalidateLocalShadows() {}
     /// Bakes the impostors of these models now (or loads them from their cache files unless
     /// `force`). Returns one entry per model: key, label, atlas size, frames, tile, bake time,
     /// whether it came from the cache, and the cache path.

@@ -62,6 +62,13 @@ struct Light {
     float intensity = 1.f;
     float range = 10.f;
     float spotAngle = 35.f;
+    // Shadows of point / spot lights (the sun's come from the environment); see docs/RENDERING.md.
+    bool castShadows = true;            // occluders block this light (no light through walls)
+    float shadowBias = 0.02f;           // m: raise if surfaces shadow themselves (acne), lower if shadows detach
+    float shadowNormalBias = 1.f;       // shadow-map texels along the surface normal (acne on slopes)
+    int shadowResolution = 0;           // atlas slot hint in px (128..2048), 0 = automatic from screen size
+    float shadowMaxDistance = 0.f;      // m from the camera beyond which the shadow fades out, 0 = no limit
+    std::string shadowMode = "cube";    // point lights: cube (6 views, exact) | dual_paraboloid (2 views, cheaper)
 
     static const TypeInfo& type();
 };
@@ -161,6 +168,7 @@ struct ParticleEmitter {
     int trailSegments = 12;           // facing "ribbon": history samples (2..32)
     bool sort = true;                 // blended looks: GPU sort back to front
     float hueVariation = 0.f;         // random hue rotation per particle (per burst for sub-emitted ones)
+    bool lightShadows = false;        // the cast light (`light` > 0) casts shadows (local shadow atlas)
 
     static const TypeInfo& type();
 };
@@ -196,6 +204,7 @@ struct FluidVolume {
     float lightRange = 10.f;
     float burst = 0.f;              // seconds of heavy fuel injection at start (explosions)
     int seed = 0;
+    bool lightShadows = false;      // the fire's light casts shadows (caves, rooms; local shadow atlas)
 
     static const TypeInfo& type();
 };
@@ -311,6 +320,10 @@ struct Environment {
     float haze = 0.02f;                // density of the air for volumetric light (dust, mist)
     float windSpeed = 2.f;             // m/s: carries smoke, rain, snow and particles
     float windDirection = 60.f;        // degrees, 0 = blowing toward +Z
+    // Point / spot light shadows (render/ShadowAtlas.h)
+    int localShadowAtlas = 4096;       // shadow atlas edge in px (1024..8192; 4096 = 64 MB)
+    int localShadowLights = 16;        // most shadowed point/spot lights per frame (others light without shadows)
+    int localShadowUpdates = 24;       // shadow views re-rendered per frame (cube light = 6, spot = 1); stills: all
 
     Vec3 sunDirection() const;  // direction light travels (from sun towards ground)
     static const TypeInfo& type();

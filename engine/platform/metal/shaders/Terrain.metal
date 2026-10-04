@@ -77,7 +77,7 @@ vertex float4 terrainShadowVertex(uint vid [[vertex_id]], uint iid [[instance_id
     float2 local = n.node.xy + grid[vid] * n.node.z;
     float2 uv = local / tu.origin.w + 0.5;
     float h = terrainHeight(heightTex, uv, tu.grid.x);
-    return lightViewProj * float4(tu.origin.x + local.x, tu.origin.y + h, tu.origin.z + local.y, 1.0);
+    return shadowClip(lightViewProj, float3(tu.origin.x + local.x, tu.origin.y + h, tu.origin.z + local.y));
 }
 
 struct LayerSample {
@@ -151,7 +151,8 @@ fragment MainOut terrainFragment(TerrainOut in [[stage_in]],
                                  texture2d<float> l5a [[texture(22)]], texture2d<float> l5n [[texture(23)]], texture2d<float> l5o [[texture(24)]],
                                  texture2d<float> l6a [[texture(25)]], texture2d<float> l6n [[texture(26)]], texture2d<float> l6o [[texture(27)]],
                                  texture2d<float> l7a [[texture(28)]], texture2d<float> l7n [[texture(29)]], texture2d<float> l7o [[texture(30)]],
-                                 texture2d<float> overlayTex [[texture(31)]]) {
+                                 texture2d<float> overlayTex [[texture(31)]],
+                                 depth2d_array<float> localShadows [[texture(32)]]) {
     float3 wp = in.worldPos;
     float3 V = normalize(f.cameraPos.xyz - wp);
     if (f.cameraForward.w > 0.5) V = -f.cameraForward.xyz;
@@ -257,7 +258,7 @@ fragment MainOut terrainFragment(TerrainOut in [[stage_in]],
     s.subsurface = 0.0;
     s.N = N;
     float3 color = shadeSurface(s, Ngeo, wp, in.position.xy, V, false, 0.0, f, lights, clusterCells, clusterIndices, shadowAtlas,
-                                envTex, brdfLut, cloudShape) + overlayGlow;
+                                envTex, brdfLut, cloudShape, localShadows) + overlayGlow;
     if (tu.water.z > 0.5) color = mix(color, float3(1.0, 0.5, 0.1), 0.15);  // selection tint
     color = applyFog(color, wp, V, f);
     return mainOut(float4(color, 1.0), s.albedo, s.ao, N, s.roughness, s.metallic);
@@ -359,7 +360,7 @@ vertex float4 foliageShadowVertex(uint vid [[vertex_id]], uint iid [[instance_id
                                   const device uint* visible [[buffer(5)]]) {
     float h01;
     float3 world = foliageWorld((fu.part * float4(float3(verts[vid].position), 1.0)).xyz, instances[visible[iid]], fu, h01);
-    return lightViewProj * float4(world, 1.0);
+    return shadowClip(lightViewProj, world);
 }
 
 // Alpha-tested foliage (leaf cards, grass cards) casts shadows only where it is solid.
@@ -373,7 +374,7 @@ vertex ShadowAlphaOut foliageShadowAlphaVertex(uint vid [[vertex_id]], uint iid 
     float h01;
     float3 world = foliageWorld((fu.part * float4(float3(verts[vid].position), 1.0)).xyz, instances[visible[iid]], fu, h01);
     ShadowAlphaOut o;
-    o.position = lightViewProj * float4(world, 1.0);
+    o.position = shadowClip(lightViewProj, world);
     o.uv = float2(verts[vid].uv) * d.material2.xy;
     return o;
 }
@@ -726,7 +727,8 @@ fragment ImpostorFragmentOut impostorFragment(ImpostorOut in [[stage_in]],
                                               texture2d<float> atlasB [[texture(2)]],
                                               texturecube<float> envTex [[texture(5)]],
                                               texture2d<float> brdfLut [[texture(6)]],
-                                              texture3d<float> cloudShape [[texture(7)]]) {
+                                              texture3d<float> cloudShape [[texture(7)]],
+                                              depth2d_array<float> localShadows [[texture(32)]]) {
     const bool ortho = f.cameraForward.w > 0.5;
     const float3 ray = ortho ? in.eyeModel : normalize(in.modelPos - in.eyeModel);
     ImpostorSample smp = sampleImpostor(atlasA, atlasB, ic, in.modelPos, ray, in.frames, in.weights);
@@ -753,7 +755,7 @@ fragment ImpostorFragmentOut impostorFragment(ImpostorOut in [[stage_in]],
     s.roughness = clamp(sqrt(a), 0.045, 1.0);
     float3 V = ortho ? -f.cameraForward.xyz : normalize(f.cameraPos.xyz - worldPos);
     float3 color = shadeSurface(s, N, worldPos, in.position.xy, V, false, 0.0, f, lights, clusterCells, clusterIndices, shadowAtlas,
-                                envTex, brdfLut, cloudShape);
+                                envTex, brdfLut, cloudShape, localShadows);
     color = applyFog(color, worldPos, V, f);
     MainOut m = mainOut(float4(color, alpha), s.albedo, 1.0, N, s.roughness, 0.0);
     ImpostorFragmentOut o;

@@ -716,7 +716,8 @@ struct GpuEffectOut {
 fragment GpuEffectOut gpuParticleFragment(GpuParticleOut in [[stage_in]], constant GpuEmitterParams& P [[buffer(0)]],
                                           constant FrameUniforms& f [[buffer(1)]], constant GPULight* lights [[buffer(2)]],
                                           depth2d<float> shadowAtlas [[texture(1)]], texturecube<float> envTex [[texture(5)]],
-                                          depth2d<float> sceneDepth [[texture(7)]], texture2d<float> sheet [[texture(8)]]) {
+                                          depth2d<float> sceneDepth [[texture(7)]], texture2d<float> sheet [[texture(8)]],
+                                          depth2d_array<float> localShadows [[texture(32)]]) {
     float2 suv = in.position.xy * f.viewport.zw;
     float sd = sceneDepth.sample(pointClamp, suv);
     float camDist = distance(f.cameraPos.xyz, in.worldPos);
@@ -741,7 +742,7 @@ fragment GpuEffectOut gpuParticleFragment(GpuParticleOut in [[stage_in]], consta
     if (facing == 3) {  // ribbon: soft across, already faded along
         float across = exp(-p.x * p.x * 3.0);
         if (look == 2 || look == 6 || look == 4 || look == 5) {
-            float3 lit = particleLighting(f, lights, shadowAtlas, envTex, in.worldPos, toCam, in.position.xy, 0.5);
+            float3 lit = particleLighting(f, lights, shadowAtlas, localShadows, envTex, in.worldPos, toCam, in.position.xy, 0.5);
             a = in.color.a * across;
             rgb = in.color.rgb * lit * a;
         } else {
@@ -757,7 +758,7 @@ fragment GpuEffectOut gpuParticleFragment(GpuParticleOut in [[stage_in]], consta
             rgb = s.rgb * in.color.rgb * a;  // emissive (intensity > 1)
         } else {
             float3 n3 = normalize(right * p.x + up * p.y + toCam * sqrt(max(0.0, 1.0 - r2)));
-            float3 lit = particleLighting(f, lights, shadowAtlas, envTex, in.worldPos, n3, in.position.xy, 0.5);
+            float3 lit = particleLighting(f, lights, shadowAtlas, localShadows, envTex, in.worldPos, n3, in.position.xy, 0.5);
             rgb = s.rgb * in.color.rgb * lit * a;
         }
     } else if (look == 1) {  // flame tongue
@@ -783,17 +784,17 @@ fragment GpuEffectOut gpuParticleFragment(GpuParticleOut in [[stage_in]], consta
         float density = saturate(sphere * (0.35 + n * 1.25) - 0.12);
         a = density * in.color.a;
         float3 n3 = normalize(right * p.x + up * p.y + toCam * sqrt(max(0.0, 1.0 - r2)) + float3(0, (n - 0.5) * 0.6, 0));
-        float3 lit = particleLighting(f, lights, shadowAtlas, envTex, in.worldPos, n3, in.position.xy, mist ? 0.8 : 0.5);
+        float3 lit = particleLighting(f, lights, shadowAtlas, localShadows, envTex, in.worldPos, n3, in.position.xy, mist ? 0.8 : 0.5);
         rgb = in.color.rgb * lit * (0.75 + 0.25 * n) * a;
     } else if (look == 4 || look == 7) {  // rain streak / droplet
         float across = exp(-p.x * p.x * 4.0);
         float along = smoothstep(1.0, 0.55, abs(p.y));
         a = in.color.a * across * along;
-        float3 lit = particleLighting(f, lights, shadowAtlas, envTex, in.worldPos, toCam, in.position.xy, 0.6);
+        float3 lit = particleLighting(f, lights, shadowAtlas, localShadows, envTex, in.worldPos, toCam, in.position.xy, 0.6);
         rgb = in.color.rgb * (lit * 0.55 + 0.02) * a;
     } else if (look == 5) {  // snow
         a = smoothstep(1.0, 0.25, sqrt(r2)) * in.color.a;
-        float3 lit = particleLighting(f, lights, shadowAtlas, envTex, in.worldPos, toCam, in.position.xy, 0.3);
+        float3 lit = particleLighting(f, lights, shadowAtlas, localShadows, envTex, in.worldPos, toCam, in.position.xy, 0.3);
         rgb = in.color.rgb * lit * 0.8 * a;
     } else if (look == 3) {  // spark streak
         float g = exp(-p.x * p.x * 5.0) * (1.0 - smoothstep(0.6, 1.0, abs(p.y)));
@@ -868,5 +869,5 @@ vertex float4 gpuMeshParticleShadowVertex(uint vid [[vertex_id]], uint iid [[ins
     float t = p.posAge.w / p.velLife.w;
     float size = particleSizeAt(P, t) * p.misc.z;
     float3x3 R = particleRotation(p.misc.x + p.misc.y * 6.2831853, p.misc.y);
-    return lightViewProj * float4(p.posAge.xyz + R * (float3(verts[vid].position) * size), 1.0);
+    return shadowClip(lightViewProj, p.posAge.xyz + R * (float3(verts[vid].position) * size));
 }

@@ -638,10 +638,13 @@ void addViewTools(Engine& engine, ToolRegistry& reg) {
                      {"samples", integer("Supersampling: jittered sub-frames accumulated (default 4; 1 = fastest preview, "
                                          "16-32 = final-quality stills with noise-free GI and reflections)")},
                      {"clay", boolean("Render every surface as matte white clay (judge form and light; film 'sketch to fill' beats)")},
-                     {"debug_view", enumeration({"final", "albedo", "normals", "material", "gi", "reflections", "ao", "depth", "lighting", "sketch", "impostors"},
+                     {"debug_view", enumeration({"final", "albedo", "normals", "material", "gi", "reflections", "ao", "depth", "lighting", "sketch", "impostors",
+                                                 "shadow_atlas"},
                                                 "Buffer visualization for diagnosing looks: material = roughness (red) / metallic (green), "
                                                 "gi = bounce light, lighting = before screen-space GI/reflections, impostors = the final image "
-                                                "with foliage meshes tinted green and distant impostors magenta")},
+                                                "with foliage meshes tinted green and distant impostors magenta, shadow_atlas = the point/spot "
+                                                "light shadow maps (4 quadrants; outlines: green re-rendered this frame, blue cached, orange "
+                                                "waiting for the update budget; see shadow_atlas_info)")},
                      {"quality", enumeration({"full", "balanced", "fast"}, "Viewport quality tier (default full; fast/balanced preview what the editor shows while editing)")},
                      {"include_image", boolean("Return the image (default true); false = only the entity list")},
                      {"save_path", string("Also write the PNG to this project-relative path")}}),
@@ -673,6 +676,7 @@ void addViewTools(Engine& engine, ToolRegistry& reg) {
                      static const char* kViews[] = {"final", "albedo", "normals", "material", "gi", "reflections", "ao", "depth", "lighting", "sketch", "impostors"};
                      std::string dv = a.get("debug_view").asString();
                      for (int i = 0; i < 11; ++i) if (dv == kViews[i]) o.debugView = i;
+                     if (dv == "shadow_atlas") o.debugView = FrameData::kDebugViewShadowAtlas;
                      o.clay = a.get("clay").asBool(false);
                      std::string q = a.get("quality").asString();
                      o.quality = q == "fast" ? 2 : q == "balanced" ? 1 : 0;
@@ -1057,6 +1061,7 @@ void registerEngineTools(Engine& engine) {
     tools::addImpostorTools(engine, reg);
     tools::addGameTools(engine, reg);  // engine/src/agent/GameTools.cpp
     tools::addMovieTools(engine, reg);  // engine/src/agent/MovieTools.cpp (movie render queue)
+    tools::addShadowTools(engine, reg);  // engine/src/agent/ShadowTools.cpp (point / spot light shadows)
 }
 
 }  // namespace sky

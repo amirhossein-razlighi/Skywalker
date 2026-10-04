@@ -11,6 +11,7 @@
 
 #include "skywalker/core/Log.h"
 #include "skywalker/render/Impostor.h"
+#include "skywalker/render/ShadowAtlas.h"
 
 namespace sky {
 
@@ -644,6 +645,43 @@ void MetalFoliage::encodeShadows(id<MTLRenderCommandEncoder> enc, const FrameDat
             [enc setFragmentTexture:c.imp->albedo atIndex:0];
             [enc setFragmentTexture:c.imp->normal atIndex:2];
             [enc drawPrimitives:MTLPrimitiveTypeTriangleStrip indirectBuffer:args_[ring_] indirectBufferOffset:args + impostorArgsOffset(c.parts)];
+        }
+    }
+}
+
+void MetalFoliage::encodeLocalShadows(id<MTLRenderCommandEncoder> enc, simd_float4x4 lvp, Vec3 center, float radius) {
+    if (debugSkip_ & 4u) return;
+    bool any = false;
+    for (Chunk& c : chunks_) {
+        // The camera view's lists (view 0): what is on screen casts; off-screen foliage does not.
+        if (!(c.viewMask & 1u) || (c.D > 0.f && c.dmin >= c.D)) continue;
+        if (!shadows::sphereTouches(center, radius, c.batch->bounds)) continue;
+        if (!any) {
+            [enc setCullMode:MTLCullModeNone];
+            [enc setVertexBytes:&lvp length:sizeof(lvp) atIndex:2];
+            any = true;
+        }
+        for (uint32_t pi = 0; pi < c.parts; ++pi) {
+            const InstancePart& part = (*c.batch->parts)[pi];
+            const GpuMesh* m = meshes_(part.mesh);
+            if (!m) continue;
+            bool cut = false;
+            bindPart(enc, part, true, cut);
+            [enc setRenderPipelineState:cut ? meshShadowAlpha_ : meshShadow_];
+            c.uniforms.part = toSimd(part.local);
+            [enc setVertexBuffer:m->vertices offset:0 atIndex:0];
+            [enc setVertexBuffer:c.instances offset:0 atIndex:3];
+            [enc setVertexBytes:&c.uniforms length:sizeof(c.uniforms) atIndex:4];
+            [enc setVertexBuffer:lists_[ring_] offset:c.listOffset atIndex:5];
+            for (int band = 0; band < kBands; ++band) {
+                if (!c.bandOverlaps(band)) continue;
+                [enc drawIndexedPrimitives:MTLPrimitiveTypeTriangle
+                                 indexType:MTLIndexTypeUInt32
+                               indexBuffer:m->indices
+                         indexBufferOffset:0
+                            indirectBuffer:args_[ring_]
+                      indirectBufferOffset:c.argsOffset + meshArgsOffset(pi, band)];
+            }
         }
     }
 }

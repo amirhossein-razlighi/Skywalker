@@ -83,6 +83,24 @@ const TypeInfo& Light::type() {
             SKY_FIELD_RANGE(Light, intensity, Float, "Brightness multiplier", 0.f, 1000.f),
             SKY_FIELD_RANGE(Light, range, Float, "Falloff distance in meters (point/spot)", 0.01f, 10000.f),
             SKY_FIELD_RANGE(Light, spotAngle, Float, "Cone half-angle in degrees (spot)", 1.f, 89.f),
+            SKY_FIELD(Light, castShadows, Bool,
+                      "Point/spot: occluders block the light (no light through walls). Rendered in the local shadow atlas, "
+                      "cached while nothing in range moves; see shadow_atlas_info"),
+            SKY_FIELD_RANGE(Light, shadowBias, Float,
+                            "Shadow depth bias in meters: raise if lit surfaces show dark speckles (acne), lower if "
+                            "shadows detach from their casters (peter-panning)", 0.f, 1.f),
+            SKY_FIELD_RANGE(Light, shadowNormalBias, Float, "Shadow offset along the surface normal in shadow-map texels "
+                            "(acne on surfaces at grazing angles)", 0.f, 8.f),
+            SKY_FIELD_RANGE(Light, shadowResolution, Int,
+                            "Shadow map slot hint in px (256 small, 1024 hero light, 2048 max); 0 = automatic from the "
+                            "light's size on screen", 0.f, 4096.f),
+            SKY_FIELD_RANGE(Light, shadowMaxDistance, Float,
+                            "Camera distance (m) beyond which this light's shadow fades out (saves atlas space); 0 = no limit",
+                            0.f, 100000.f),
+            SKY_FIELD_ENUM(Light, shadowMode,
+                           "Point light shadow projection: cube = 6 exact views; dual_paraboloid = 2 views, cheaper to "
+                           "update but approximate for large flat polygons",
+                           "cube", "dual_paraboloid"),
         }};
     return info;
 }
@@ -212,6 +230,8 @@ const TypeInfo& ParticleEmitter::type() {
             SKY_FIELD_RANGE(ParticleEmitter, trailLength, Float, "Ribbon trail length (seconds of history)", 0.01f, 10.f),
             SKY_FIELD_RANGE(ParticleEmitter, trailSegments, Int, "Ribbon history samples", 2.f, 32.f),
             SKY_FIELD(ParticleEmitter, sort, Bool, "gpu blended looks: sort back to front on the GPU (off = faster)"),
+            SKY_FIELD(ParticleEmitter, lightShadows, Bool,
+                      "The cast light (light > 0) is blocked by occluders (torches in caves; costs a cube shadow map)"),
             SKY_FIELD_RANGE(ParticleEmitter, hueVariation, Float,
                             "gpu: random hue rotation per particle; sub-emitted particles share their event's hue (fireworks)",
                             0.f, 1.f),
@@ -252,6 +272,8 @@ const TypeInfo& FluidVolume::type() {
             SKY_FIELD_RANGE(FluidVolume, lightRange, Float, "Reach of the cast light (m)", 0.1f, 300.f),
             SKY_FIELD_RANGE(FluidVolume, burst, Float, "Seconds of heavy fuel at start (explosions, fireballs)", 0.f, 10.f),
             SKY_FIELD(FluidVolume, seed, Int, "Random seed (variation)"),
+            SKY_FIELD(FluidVolume, lightShadows, Bool,
+                      "The fire's light is blocked by occluders (campfires in caves and rooms; costs a cube shadow map)"),
         }};
     return info;
 }
@@ -422,6 +444,15 @@ const TypeInfo& Environment::type() {
             SKY_FIELD_RANGE(Environment, haze, Float, "Air density for volumetric light, extinction per meter: 0.0003 clear landscape, 0.002 hazy valley, 0.01-0.03 misty alley or interior", 0.f, 1.f),
             SKY_FIELD_RANGE(Environment, windSpeed, Float, "Wind (m/s) that carries smoke, rain, snow and particles", 0.f, 60.f),
             SKY_FIELD(Environment, windDirection, Float, "Direction the wind blows toward (degrees, 0 = +Z)"),
+            SKY_FIELD_RANGE(Environment, localShadowAtlas, Int,
+                            "Point/spot shadow atlas size in px: 2048 (16 MB), 4096 (64 MB, default), 8192 (256 MB)",
+                            1024.f, 8192.f),
+            SKY_FIELD_RANGE(Environment, localShadowLights, Int,
+                            "Most point/spot lights with shadows per frame (the most important on screen); the rest light "
+                            "without shadows. 0 = no local shadows", 0.f, 64.f),
+            SKY_FIELD_RANGE(Environment, localShadowUpdates, Int,
+                            "Point/spot shadow views re-rendered per frame when lights or casters move (cube light = 6, "
+                            "spot = 1); later updates wait a frame. Stills render all", 1.f, 384.f),
         }};
     return info;
 }

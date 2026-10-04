@@ -42,6 +42,7 @@
 #include "MetalFoliage.h"  // [foliage] GPU-driven foliage and impostors
 #include "MetalFx.h"  // [hair+vfx] GPU particles and strand hair
 #include "MetalMesh.h"
+#include "MetalShadows.h"  // [local shadows] point / spot light shadow atlas
 #include "skywalker/core/Log.h"
 #include "skywalker/render/ColorGrading.h"
 #include "skywalker/render/Hdr.h"
@@ -194,7 +195,10 @@ struct GPULight {
     simd_float4 colorIntensity;
     simd_float4 directionCone;
     simd_float4 kind;
+    simd_float4 shadow;   // local shadows (shadows::gpuShadowParams; Common.metal)
+    simd_float4 shadow2;
 };
+static_assert(sizeof(GPULight) == 96, "GPULight must match Common.metal");
 
 constexpr MTLPixelFormat kColorFormat = MTLPixelFormatBGRA8Unorm_sRGB;  // final LDR image
 constexpr MTLPixelFormat kHDRFormat = MTLPixelFormatRGBA16Float;     // scene, ambient, bloom, env
@@ -353,6 +357,7 @@ public:
                 std::memcpy(&out, &du, sizeof(du));
                 return out;
             });
+        shadows_ = std::make_unique<MetalShadows>(device_);  // [local shadows]
         Status s = buildPipelines(kDefaultShaderSource);
         if (!s) {
             log::error("render", "built-in shaders failed to compile: " + s.error().message);
@@ -440,6 +445,7 @@ public:
             for (const auto& [k, v] : f.members()) j[k] = v;
             j["instancesDrawn"] = f.get("meshInstances").asInt() + f.get("impostorInstances").asInt();
         }
+        if (shadows_) j["localShadows"] = shadows_->stats();  // [local shadows]
         if (fx_) {  // [hair+vfx] frame/simulation GPU times, emitters, grooms
             const Json fx = fx_->stats();
             for (const auto& [k, v] : fx.members()) j[k] = v;
@@ -457,6 +463,10 @@ public:
 
     std::string shaderSource() const override { return source_; }
     std::vector<LightItem> effectLights() const override { return fx_->effectLights(); }  // [hair+vfx]
+    Json localShadowInfo() const override { return shadows_ ? shadows_->info() : Json(); }  // [local shadows]
+    void invalidateLocalShadows() override {
+        if (shadows_) shadows_->invalidate();
+    }
 
     Status reloadShaders(const std::string& source) override {
         @autoreleasepool {
@@ -503,6 +513,14 @@ public:
             // All lights shade surfaces through clusters; the most important few also light
             // water, particles, fluids and the volumetric fog.
             std::vector<GPULight> allLights = gpuLights(frame);
+            {  // [local shadows] which point / spot lights cast shadows this frame, and where in the atlas
+                shadows_->plan(frame, accumulateFrame);
+                for (size_t i = 0; i < allLights.size() && i < frame.lights.size(); ++i) {
+                    auto sp = shadows_->lightParams(i);
+                    allLights[i].shadow = sp[0];
+                    allLights[i].shadow2 = sp[1];
+                }
+            }
             std::vector<GPULight> lights(allLights.begin(),
                                          allLights.begin() + static_cast<std::ptrdiff_t>(std::min(allLights.size(), FrameData::kMaxEffectLights)));
             const LightGrid grid = buildLightGrid(frame);
@@ -548,6 +566,24 @@ public:
                 foliage_->prepare(cmd, frame, fv, frameIndex_);
             }
             encodeShadows(cmd, frame, base, cascades);
+            if (shadows_->hasWork()) {  // [local shadows] faces whose casters or light changed (own, timed command buffer)
+                [cmd commit];
+                id<MTLCommandBuffer> sc = [queue_ commandBuffer];
+                sc.label = @"Local shadows";
+                shadows_->encode(sc, frame, [&](id<MTLRenderCommandEncoder> enc, const shadows::ShadowFace& face) {
+                    drawLocalShadowCasters(enc, frame, face);
+                });
+                auto slot = shadows_->gpuMsSlot();
+                auto faults = gpuFaults_;
+                [sc addCompletedHandler:^(id<MTLCommandBuffer> done) {
+                    double ms = (done.GPUEndTime - done.GPUStartTime) * 1000.0;
+                    if (ms > 0.0) slot->store(ms);
+                    if (done.status == MTLCommandBufferStatusError) faults->fetch_add(1);
+                }];
+                [sc commit];
+                cmd = [queue_ commandBuffer];
+                cmd.label = @"Skywalker Frame (lit)";
+            }
             if (r2d_) r2d_->encodeOccluders(cmd, frame);  // 2D shadow casters
             for (int i = 0; i < samples; ++i) {
                 // Sub-pixel jitter (Halton 2,3): TAA spreads it over frames, stills over sub-samples.
@@ -586,7 +622,9 @@ public:
             if (spatialUpscale) encodeSpatialUpscale(cmd);
             postSource_ = upscale || spatialUpscale ? upscaled_ : taa_[taaCurrent_];
             encodePost(cmd, frame, accumulate, base);
-            if (frame.debugView > 0 && frame.debugView != 10) {  // 10 (impostors) tints the final image instead
+            if (frame.debugView == FrameData::kDebugViewShadowAtlas) {  // [local shadows]
+                shadows_->encodeDebug(cmd, resolve_);
+            } else if (frame.debugView > 0 && frame.debugView != 10) {  // 10 (impostors) tints the final image instead
                 PostUniforms pu{};
                 pu.params = simd_make_float4(static_cast<float>(frame.debugView), 0, 0, 0);
                 pu.texel = simd_make_float4(1.f / std::max(frame.width, 1), 1.f / std::max(frame.height, 1), 0, 0);
@@ -850,6 +888,7 @@ private:
         }
         // [foliage] GPU-driven foliage and impostor pipelines (same shader library).
         if (Status fs = foliage_->build(lib, FoliageFormats{kHDRFormat, kGbufAFormat, kGbufBFormat, kDepthFormat, kSamples}); !fs) return fs;
+        if (Status ls = shadows_->build(lib, kColorFormat); !ls) return ls;  // [local shadows]
         skyPipeline_ = sky;
         meshPipeline_ = mesh;
         meshBlendPipeline_ = meshBlend;
@@ -1431,6 +1470,45 @@ private:
         [enc endEncoding];
     }
 
+    // [local shadows] Every caster of one point / spot shadow view: meshes (alpha-tested too) and
+    // terrain inside the light's range, the camera's foliage near the light, hair and mesh particles.
+    void drawLocalShadowCasters(id<MTLRenderCommandEncoder> enc, const FrameData& frame, const shadows::ShadowFace& face) {
+        simd_float4x4 lvp = toSimd(face.viewProj);
+        const Vec3 c = face.center;
+        const float r = face.radius;
+        // Culling frustum: the view itself, or the light's bounding box for paraboloids.
+        const Mat4 cullVP = face.projection == shadows::Projection::DualParaboloid
+                                ? Mat4::orthographic(r, 1.f, 0.f, 2.f * r) * Mat4::lookAt(c + Vec3{0, 0, r}, c, {0, 1, 0})
+                                : face.viewProj;
+        const Frustum fr(cullVP);
+        [enc setRenderPipelineState:shadowPipeline_];
+        [enc setVertexBytes:&lvp length:sizeof(lvp) atIndex:2];
+        bool alphaBound = false;
+        for (const DrawItem& d : frame.draws) {
+            if (!shadows::castsLocalShadow(d, c, r) || !shadows::sphereTouches(c, r, d.worldBounds) || !fr.intersects(d.worldBounds)) continue;
+            const GpuMesh* m = mesh(d.mesh);
+            if (!m) continue;
+            DrawUniforms du = drawUniforms(d);
+            id<MTLTexture> cutTex = d.surface.alphaCutoff > 0.f ? texture(d.surface.texture, true) : nil;
+            if ((cutTex != nil) != alphaBound) {
+                [enc setRenderPipelineState:cutTex ? shadowAlphaPipeline_ : shadowPipeline_];
+                alphaBound = cutTex != nil;
+            }
+            if (cutTex) {
+                [enc setFragmentBytes:&du length:sizeof(du) atIndex:0];
+                [enc setFragmentTexture:cutTex atIndex:0];
+            }
+            [enc setVertexBuffer:m->vertices offset:0 atIndex:0];
+            [enc setVertexBytes:&du length:sizeof(du) atIndex:1];
+            drawLod(enc, *m, lodForDraw(*m, d, 1));
+        }
+        drawTerrainShadows(enc, frame, fr, lvp);
+        foliage_->encodeLocalShadows(enc, lvp, c, r);  // [foliage]
+        [enc setRenderPipelineState:shadowPipeline_];
+        [enc setCullMode:MTLCullModeNone];
+        fx_->encodeShadowCaster(enc, frame, lvp);  // [hair+vfx] hair and mesh particles
+    }
+
     // --- Transient per-frame data ----------------------------------------------------------
     struct Alloc {
         id<MTLBuffer> buffer;
@@ -1848,6 +1926,7 @@ private:
         [enc setFragmentTexture:envCube_ atIndex:5];
         [enc setFragmentTexture:brdfLut_ atIndex:6];
         [enc setFragmentTexture:cloudShape_ atIndex:7];
+        [enc setFragmentTexture:shadows_->atlas() atIndex:32];  // [local shadows] meshes, terrain, foliage, hair
         [enc setRenderPipelineState:meshPipeline_];
         [enc setDepthStencilState:depthWrite_];
         std::vector<const DrawItem*> blended, outlined;
@@ -2288,6 +2367,7 @@ private:
             [enc setFragmentTexture:sceneCopy_ atIndex:6];
             [enc setFragmentTexture:depthCopy_ atIndex:7];
             [enc setFragmentTexture:(hdri_ ?: white_) atIndex:14];
+            [enc setFragmentTexture:shadows_->atlas() atIndex:32];  // [local shadows]
             std::vector<EntityId> live;
             for (const WaterItem& w : frame.water) {
                 if (!w.ocean || w.ocean->resolution == 0) continue;
@@ -2357,15 +2437,16 @@ private:
             [enc setFragmentTexture:shadowMap_ atIndex:1];
             [enc setFragmentTexture:envCube_ atIndex:5];
             [enc setFragmentTexture:depthCopy_ atIndex:7];
+            [enc setFragmentTexture:shadows_->atlas() atIndex:32];  // [local shadows]
             [enc drawPrimitives:MTLPrimitiveTypeTriangle
                     vertexStart:0
                     vertexCount:6
                   instanceCount:frame.particles.size()];
             [enc endEncoding];
         }
-        fx_->encodeTransparent(cmd, frame,  // [hair+vfx] GPU particles
-                               FxSceneInputs{shadowMap_, envCube_, depthCopy_, lit_, &fu, sizeof(fu), lights.data(),
-                                             lights.size() * sizeof(GPULight)});
+        FxSceneInputs fxIn{shadowMap_, envCube_, depthCopy_, lit_, &fu, sizeof(fu), lights.data(), lights.size() * sizeof(GPULight)};
+        fxIn.localShadows = shadows_->atlas();  // [local shadows]
+        fx_->encodeTransparent(cmd, frame, fxIn);  // [hair+vfx] GPU particles
     }
 
     void encodeVolumetrics(id<MTLCommandBuffer> cmd, const FrameData& frame, const FrameUniforms& fu,
@@ -2387,6 +2468,7 @@ private:
         [enc setFragmentBytes:lights.data() length:lights.size() * sizeof(GPULight) atIndex:2];
         [enc setFragmentTexture:depthResolved_ atIndex:0];
         [enc setFragmentTexture:shadowMap_ atIndex:1];
+        [enc setFragmentTexture:shadows_->atlas() atIndex:32];  // [local shadows] shadowed lamp cones
         [enc drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:3];
         [enc endEncoding];
     }
@@ -2804,6 +2886,7 @@ private:
     std::unique_ptr<MetalRenderer2D> r2d_;  // 2D world quads + UI
     std::unique_ptr<MetalFx> fx_;  // [hair+vfx]
     std::unique_ptr<MetalFoliage> foliage_;  // [foliage]
+    std::unique_ptr<MetalShadows> shadows_;  // [local shadows]
 };
 
 }  // namespace

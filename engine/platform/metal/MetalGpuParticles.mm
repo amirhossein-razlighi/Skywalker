@@ -241,6 +241,7 @@ void MetalGpuParticles::ensure(Emitter& e, const GpuEmitterItem& item, id<MTLCom
     e.position = item.world.translation();
     e.light = em.light;
     e.lightRange = em.lightRange;
+    e.lightShadows = em.lightShadows;
     e.lightColor = em.lightColor.xyz();
     e.expected = em.rate > 0.f ? std::max(1.f, em.rate * em.lifetime * 0.6f) : 300.f;
 }
@@ -567,6 +568,7 @@ void MetalGpuParticles::encodeTransparent(id<MTLCommandBuffer> cmd, const FrameD
     [enc setFragmentTexture:in.shadowAtlas atIndex:1];
     [enc setFragmentTexture:in.envCube atIndex:5];
     [enc setFragmentTexture:in.sceneDepth atIndex:7];
+    [enc setFragmentTexture:in.localShadows atIndex:32];
     for (EntityId id : drawOrder_) {
         Emitter& e = emitters_[id];
         if (e.facing == static_cast<int>(fx::GpuFacing::Mesh) || !e.drawable || e.steps == 0) continue;
@@ -602,6 +604,8 @@ std::vector<LightItem> MetalGpuParticles::lights() const {
             li.color = e.lightColor;
             li.intensity = strength * v[k].w / total;
             li.range = e.lightRange;
+            li.id = lightId(id, 3) | (static_cast<uint64_t>(k) << 48);
+            li.shadows = e.lightShadows;
             out.push_back(li);
         }
     }
