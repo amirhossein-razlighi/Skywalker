@@ -306,6 +306,7 @@ precompiled `.metallib` removes.
 | `shading` | `pbr`, `toon` (banded light, crisp highlight, hemispheric fill) or `unlit`. |
 | `outline` / `outlineColor` | Cartoon outline width in pixels: an inverted hull with constant screen-space width. |
 | `doubleSided`, `castShadows` | Self-explanatory. |
+| `scrollU`, `scrollV` | Material assets: the texture scrolls this many UV units per second with the frame clock (flowing lava, rivers, conveyor belts); movies follow the movie clock. |
 | Specular anti-aliasing | Roughness is widened where normals vary within a pixel, so there is no sparkle on detailed normal maps. |
 
 Color alpha below 1 makes a surface transparent: glass, water, ghosts, god rays. Such

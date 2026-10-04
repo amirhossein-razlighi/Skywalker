@@ -96,6 +96,7 @@ struct Surface {
     float occlusionStrength = 1.f;
     float alphaCutoff = 0.f;  // > 0: alpha-tested cutout
     bool textureAlphaOnly = false;  // use the base-color texture for its alpha (cut-out) only (clay renders)
+    Vec2 uvScroll{0, 0};      // UV units per second, applied with the frame time (flowing lava, rivers)
 };
 
 struct DrawItem {

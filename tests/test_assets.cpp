@@ -479,6 +479,20 @@ TEST_CASE("assets: lods=false keeps heavy meshes without an automatic LOD chain"
     CHECK_FALSE(hill->lods.empty());
 }
 
+TEST_CASE("assets: material texture scroll reaches the surface (flowing lava, rivers)") {
+    TempProject p("scroll");
+    p.write("materials/lava.mat.json", R"({"color":"#ff6020","scrollU":0.05,"scrollV":-0.02})");
+    auto e = makeEngine(p);
+    const ResolvedMaterial* m = e->resolveMaterial("materials/lava.mat.json");
+    REQUIRE(m);
+    CHECK(m->uvScroll.x == doctest::Approx(0.05f));
+    CHECK(m->uvScroll.y == doctest::Approx(-0.02f));
+    call(*e, "material_update", R"({"path":"materials/lava.mat.json","scrollU":200})");  // clamped to the field range
+    const ResolvedMaterial* fast = e->resolveMaterial("materials/lava.mat.json");
+    REQUIRE(fast);
+    CHECK(fast->uvScroll.x == doctest::Approx(100.f));
+}
+
 TEST_CASE("assets: Radiance .hdr panoramas decode (flat and RLE)") {
     auto header = [](int w, int h) {
         std::string s = "#?RADIANCE\nFORMAT=32-bit_rle_rgbe\n\n-Y " + std::to_string(h) + " +X " + std::to_string(w) + "\n";

@@ -41,6 +41,9 @@ const TypeInfo& MaterialAsset::type() {
             SKY_FIELD_RANGE(MaterialAsset, occlusionStrength, Float, "Ambient occlusion from the ORM map's red channel", 0.f, 1.f),
             SKY_FIELD_RANGE(MaterialAsset, alphaCutoff, Float, "Alpha-tested cutout threshold (foliage, sails, fences); 0 = off",
                             0.f, 1.f),
+            SKY_FIELD_RANGE(MaterialAsset, scrollU, Float,
+                            "Texture scroll along U in UV units per second (flowing lava, rivers, conveyor belts); 0 = still", -100.f, 100.f),
+            SKY_FIELD_RANGE(MaterialAsset, scrollV, Float, "Texture scroll along V in UV units per second; 0 = still", -100.f, 100.f),
         }};
     return info;
 }
@@ -67,6 +70,7 @@ Surface toSurface(const MaterialAsset& m) {
     s.doubleSided = m.doubleSided;
     s.occlusionStrength = m.occlusionStrength;
     s.alphaCutoff = m.alphaCutoff;
+    s.uvScroll = {m.scrollU, m.scrollV};
     return s;
 }
 

@@ -36,6 +36,8 @@ struct MaterialAsset {
     bool doubleSided = false;
     float occlusionStrength = 1.f;  // how much the ORM map's red channel darkens indirect light
     float alphaCutoff = 0.f;        // > 0: alpha-tested cutout (foliage, sails, fences)
+    float scrollU = 0.f;            // texture scroll in UV units per second (lava, rivers, conveyors)
+    float scrollV = 0.f;
 
     static const TypeInfo& type();
 };
