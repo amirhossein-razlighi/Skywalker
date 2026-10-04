@@ -237,6 +237,8 @@ FrameData buildFrame(const Scene& scene, const ViewCamera& camera, int width, in
                 li.color = v->lightColor.xyz();
                 li.intensity = v->light * flicker;
                 li.range = v->lightRange;
+                li.id = lightId(e, 1);
+                li.shadows = v->lightShadows;
                 f.lights.push_back(li);
             }
         }
@@ -267,6 +269,13 @@ FrameData buildFrame(const Scene& scene, const ViewCamera& camera, int width, in
             li.inverseSquare = l->attenuation == "inverse_square";
             li.size = std::max(l->size, 0.001f);
             li.negative = l->negative;
+            li.id = lightId(e, 0);
+            li.shadows = l->castShadows;
+            li.shadowMode = l->shadowMode == "dual_paraboloid" ? 1 : 0;
+            li.shadowBias = l->shadowBias;
+            li.shadowNormalBias = l->shadowNormalBias;
+            li.shadowResolution = l->shadowResolution;
+            li.shadowMaxDistance = l->shadowMaxDistance;
             f.lights.push_back(li);
         }
     }

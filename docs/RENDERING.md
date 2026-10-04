@@ -50,6 +50,8 @@ jitter; the previous frame's model matrix per entity (for motion vectors) is in
 - **Reflections** (`ssr`): glossy surfaces (wet streets, floors, metal, still water)
   reflect the scene. Rough surfaces fall back to the probe.
 - **Cloud shadows:** drifting cloud shadows dim the sun on every surface.
+- **Point and spot light shadows:** every lamp casts shadows from a cached shadow atlas
+  (see [Point and spot light shadows](#point-and-spot-light-shadows)).
 
 ### Sky, atmosphere and clouds
 
@@ -135,6 +137,7 @@ returns every view with its color legend. Unknown names fail with a did-you-mean
 | `sketch` | pencil contours and hatching |
 | `impostors` | the final image with foliage meshes tinted green and impostors magenta |
 | `motion` | the velocity buffer over a dimmed gray image: hue = direction, strength = speed on a log scale (faint at 0.25 px, full at 15 px per frame). Capture with `samples: 1` right after something moved (a `sim_control` step) |
+| `shadow_atlas` | the point and spot light shadow maps (4 quadrants), outlined per light: green re-rendered this frame, blue cached, orange waiting for the update budget (see [Point and spot light shadows](#point-and-spot-light-shadows)) |
 
 Surface views (`unshaded` … `light_complexity`) replace each lit surface's color in the
 shaders (`FrameUniforms.debug`, `shaders/Debug.metal`) and are shown without tonemapping,
@@ -357,7 +360,102 @@ embers or shrapnel on top.
 | Pixel-art 2D | `shading: unlit`, orthographic camera, `tonemap: none`, bloom off. |
 | Golden-hour coast | `skyMode: hdri` with a sunset panorama + `align_sun_to_hdri`, `fx_create calm_sea`, `tonemap: agx`, a `campfire` on the beach. |
 | Light shafts | `godRays: 1`, `haze: 0.01`–`0.03`, a low sun behind trees, pillars or canyon walls; lamps get visible cones in misty air. |
+| Lamp-lit interior | Night sky, low `ambient`, one warm point light per lamp (shadows are on by default), `shadowResolution: 1024` on the hero lamp, `godRays: 0.5` with `haze: 0.02` so the window and door throw light shafts. |
 | Rainy neon street | Night `hdri` or gradient sky, `fx_create rain` 12 m up with `floorHeight` at the street, wet materials (`roughness` 0.1–0.2), emissive signs, `mist` at street level. |
+
+## Point and spot light shadows
+
+Every point and spot light casts shadows by default (`light.castShadows`), so lamps, torches
+and fires no longer shine through walls, floors and furniture. The sun keeps its own four
+cascades; these shadows live in a separate **local shadow atlas**.
+
+| Piece | What it does |
+|---|---|
+| Atlas | One depth texture of `Environment.localShadowAtlas` px (default 4096, 64 MB; 2048 = 16 MB, 8192 = 256 MB), split into 4 quadrants of 1, 4, 16 and 64 slots (2048 to 256 px for a 4096 atlas). |
+| Slots | Each frame the lights that touch the view are ranked by size on screen and brightness. The most important get the biggest slots; a light keeps its slot while its size changes less than 2x. `shadowResolution` (px) overrides the automatic size. |
+| Spot lights | One perspective view of the cone. Cones wider than 65 degrees use a cube instead. |
+| Point lights | `shadowMode: cube` (default): six 90-degree views in a 3x2 grid of the slot, exact. `dual_paraboloid`: two hemispheres, 3x fewer views to update, but large flat polygons (a floor made of two triangles) are approximate, so use it for small props, not architecture. |
+| Casters | Meshes (alpha-tested cut-outs too), terrain, foliage near the camera, hair and mesh particles. A small mesh around the light or within 0.3 m of it (a bulb, a lamp head with its glass, a sign box) does not shadow its own light. |
+| Static cache | A slot re-renders only when its light moves or a caster in its range moves, changes mesh or animates. A street of static lamps costs nothing after its first frame. Hair and mesh particles in range re-render the light every frame. |
+| Filtering | Rotated Poisson PCF with a new rotation every frame, so temporal anti-aliasing (or the samples of a still) smooths the penumbra. `Environment.shadowSoftness` widens it. |
+| Receivers | Lit surfaces, terrain, foliage, impostors and hair; water reflections of lamps; lit particles and smoke; volumetric lamp cones in fog (`godRays`), which are cut by the same shadows. |
+
+### Budgets (the GPU work stays bounded)
+
+- `Environment.localShadowLights` (default 16, max 64): shadowed lights per frame. Lights
+  beyond it still light the scene, without shadows. `0` turns local shadows off.
+- `Environment.localShadowUpdates` (default 24): views re-rendered per frame (a cube light
+  is 6, a spot 1, a paraboloid light 2). When more change at once, the rest keep last
+  frame's shadow and update over the next frames. A light that has just appeared lights
+  without a shadow until its first render. Stills (`samples` > 1) and movie frames render
+  everything they need.
+- The `fast` editor tier halves both budgets.
+
+### Seeing it (agents)
+
+- `shadow_atlas_info {view}` renders one real-time frame and reports every shadow-casting
+  light: its projection, slot and face resolution, whether it re-rendered or came from the
+  cache, and why it has no shadow (`disabled`, `out_of_view`, `beyond_max_distance`,
+  `over_light_budget`, `atlas_full`, `pending`). It also reports the atlas memory, the slots
+  used per quadrant, the budgets and warnings. With `entity`, it also lists that light's
+  casters and the fixtures that are ignored. `invalidate: true` re-renders every cached
+  shadow.
+- `viewport_capture {debug_view: "shadow_atlas"}` shows the atlas: 4 quadrants with the
+  distance from the light (white = near), outlined per light. Green outlines re-rendered
+  this frame, blue ones came from the cache, orange ones wait for the update budget.
+- `perf_stats` reports `gpu.localShadows`: shadowed lights, cached lights, views rendered,
+  views deferred, CPU planning time and the GPU time of the last shadow pass.
+- `light_shadows {lights, enabled, resolution, mode, bias, normal_bias, max_distance}`
+  sets shadow fields on one light, a list, or `"all"` (optionally one `kind`) as one undo
+  step.
+
+### Light fields
+
+| Field | Meaning |
+|---|---|
+| `castShadows` | Occluders block the light (default true). |
+| `shadowBias` | Depth bias in meters (0.02). Raise it if lit surfaces show dark speckles (acne); lower it if shadows detach from their casters. |
+| `shadowNormalBias` | Offset along the surface normal in shadow-map texels (1). Raise it against acne on surfaces lit at grazing angles. |
+| `shadowResolution` | Slot hint in px: 256 for small lights, 1024 for a hero light, 0 = automatic. |
+| `shadowMaxDistance` | Camera distance (m) where this light's shadow fades out, which frees atlas space in big levels. 0 = no limit. |
+| `shadowMode` | Point lights: `cube` or `dual_paraboloid`. |
+
+Effect lights opt in: `particles.lightShadows` and `fluid.lightShadows` (a torch in a cave,
+a campfire in a room). They are off by default because a flickering emitter moves its light
+every frame, so its shadow re-renders every frame.
+
+### Recipe: lamps that respect walls
+
+```
+light_shadows {lights: "all", enabled: true}               # the default; turns it back on everywhere
+shadow_atlas_info {view: "scene"}                           # who has a shadow, what was over budget
+light_shadows {lights: ["Desk Lamp"], resolution: 1024}    # the hero light gets a sharp shadow
+light_shadows {lights: "all", kind: "point", max_distance: 40}   # big open levels: distant lamps drop theirs
+viewport_capture {debug_view: "shadow_atlas"}               # look at the maps themselves
+```
+
+If light still leaks, check `shadow_atlas_info {entity: "Lamp"}`. A wall missing from
+`casters` either has `castShadows: false`, is transparent (`color` alpha < 0.5), or is a
+small mesh right next to the light (it is then listed under `ignoredFixtures`). Move the
+light 0.3 m away from it, or make the wall bigger. If the lamp's own shade blocks it, move
+the light out of the shade.
+
+### Cost (M1 Pro, 1280x720, `perf_stats {frames: 90}`, same binary with local shadows on and off)
+
+| Scene | Off | On | Notes |
+|---|---|---|---|
+| `examples/render_tests/local_shadows/room` (1 cube light) | 4.6 ms | 5.2 ms | The first frame also renders 6 views (about 2 ms); after that the shadow comes from the cache. |
+| `examples/hidden_alley` (9 lights, all shadowed) | 13.4 ms | 14.3 ms | |
+| `examples/neon_requiem` (593 lights, 16 shadowed, god rays) | 15.5 ms | 17.5 ms | About 1 ms is the volumetric lamp cones (16 lights x 28 steps); the rest is the surfaces. |
+
+Times are average GPU frame times; the static cache keeps the shadow pass itself at 0 ms
+while nothing moves.
+
+Reference scenes: `examples/render_tests/local_shadows/scenes/room.sky.json` (a closed room
+with one window, a hanging bulb and furniture; nothing outside may be lit except through the
+window) and `corridor.sky.json` (a stone corridor lit by a torch fire with `lightShadows`,
+pillars, barrels and side rooms behind the walls). `python3 tools/render_checks/local_shadows.py`
+renders them and checks for leaks.
 
 ## Foliage impostors
 
@@ -523,14 +621,18 @@ Name layers in `game.json` and use the names everywhere:
 | `attenuation`, `size` | `smooth` (default, soft, reaches 0 at `range`) or `inverse_square` (physical 1/d², peak capped by the emitter radius `size`, still windowed to `range`) |
 | `distanceFade`, `fadeBegin`, `fadeLength` | Fade out with distance from the camera; faded-out lights are not sent to the GPU at all |
 
-`perf_stats` reports `gpu.lights`: `total`, `layerMasked`, `negative`, `inverseSquare`. Not yet: per-light shadows (point and spot
-lights don't cast them), bake modes (no lightmaps yet) and caster masks.
+`perf_stats` reports `gpu.lights`: `total`, `layerMasked`, `negative`, `inverseSquare`. Point and spot light
+shadows have their own fields (`castShadows`, `shadowBias`, ...; see
+[Point and spot light shadows](#point-and-spot-light-shadows)). Not yet: bake modes (no
+lightmaps yet) and caster masks.
 
 ## Limits and next steps
 
-- Point and spot lights don't cast shadows yet. Toon outlines and distant hair cards write no object motion (they reproject with
-  the camera only). The sun casts four cascades; clouds and
-  hair cast their own.
+- Local light shadows use fixed-radius PCF (no contact-hardening penumbrae yet). Directional
+  lights other than the sun don't cast shadows. Foliage casts local shadows only where it is
+  on screen, and impostors don't cast them.
+- Toon outlines and distant hair cards write no object motion (they reproject with the camera
+  only).
 - GI and reflections are screen-space: what is off screen comes from the sky probe. There
   are no reflection probes or world-space GI yet.
 - Transparent meshes don't refract (water does). Particles and fluid volumes render after

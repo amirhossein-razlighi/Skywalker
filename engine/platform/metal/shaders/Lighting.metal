@@ -334,7 +334,8 @@ struct VolumetricUniforms {
 
 fragment float4 volumetricFragment(FullscreenOut in [[stage_in]], constant FrameUniforms& f [[buffer(0)]],
                                    constant VolumetricUniforms& vu [[buffer(1)]], constant GPULight* lights [[buffer(2)]],
-                                   depth2d<float> depthTex [[texture(0)]], depth2d<float> atlas [[texture(1)]]) {
+                                   depth2d<float> depthTex [[texture(0)]], depth2d<float> atlas [[texture(1)]],
+                                   depth2d_array<float> localShadows [[texture(32)]]) {
     float2 uv = uvOf(in);
     float d = depthTex.sample(pointClamp, uv);
     float3 eye = f.cameraPos.xyz;
@@ -354,6 +355,12 @@ fragment float4 volumetricFragment(FullscreenOut in [[stage_in]], constant Frame
     int count = int(f.params.y);
     float3 acc = float3(0.0);
     float T = 1.0;
+    // Shadowed lamp cones: each light's shadow is looked up every other step (alternating with the
+    // light index) and held in between; the jittered, temporally accumulated march hides it and the
+    // atlas fetches halve.
+    float lampVis[16];
+    for (int k = 0; k < 16; ++k) lampVis[k] = 1.0;
+    count = min(count, 16);
     for (int i = 0; i < steps; ++i) {
         float t = (float(i) + jitter) * ds;
         float3 p = eye + dir * t;
@@ -364,6 +371,10 @@ fragment float4 volumetricFragment(FullscreenOut in [[stage_in]], constant Frame
             if (l.kind.x < 0.5) continue;
             float3 Ll;
             float3 rad = pointLightAt(l, p, -dir, Ll);
+            if (l.shadow.w > 0.5 && any(rad != 0.0)) {
+                if (((i ^ k) & 1) == 0) lampVis[k] = localShadow(l, p, float3(0.0), 0.0, localShadows, 1, 0.0);
+                rad *= lampVis[k];
+            }
             li += rad * 0.12 * l.params2.z;  // near-isotropic for lamps; Light.volumetric scales it
         }
         float a = exp(-density * ds);

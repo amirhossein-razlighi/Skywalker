@@ -13,7 +13,8 @@ the rubric below, change again. Do not set 30 fields at once: you cannot tell wh
 | Layer | Tool | Fields |
 |---|---|---|
 | Scene lighting and post | `environment_update` (merge; `environment_get` reads back) | see the table below |
-| Lights | `entity_create`/`entity_update` with `components.light` | `kind: directional\|point\|spot, color, intensity (0..1000), range (m), spotAngle`; v2: `temperature` (Kelvin, 0 = off), `innerAngle` (spot hard core), `specular` (0 = no glints), `volumetric` (god-ray strength), `negative` (subtracts light), `attenuation: smooth\|inverse_square` + `size`, `distanceFade` + `fadeBegin`/`fadeLength`, `cullMask` (layers it lights) |
+| Lights | `entity_create`/`entity_update` with `components.light` | `kind: directional\|point\|spot, color, intensity (0..1000), range (m), spotAngle`; v2: `temperature` (Kelvin, 0 = off), `innerAngle` (spot hard core), `specular` (0 = no glints), `volumetric` (god-ray strength), `negative` (subtracts light), `attenuation: smooth\|inverse_square` + `size`, `distanceFade` + `fadeBegin`/`fadeLength`, `cullMask` (layers it lights); shadows: `castShadows` (default true), `shadowResolution`, `shadowBias`, `shadowNormalBias`, `shadowMaxDistance`, `shadowMode: cube\|dual_paraboloid` |
+| Light shadows | `light_shadows` (one light, a list or `"all"`), `shadow_atlas_info` | budgets in the environment: `localShadowLights` (16), `localShadowUpdates` (24 views/frame), `localShadowAtlas` (4096 px) |
 | Render layers | `render_layers` | name layers (`action:"name"`), put meshes on layers (`layers`) and give cameras / lights a `cull_mask`, by name |
 | Camera lens | `components.camera` | `fov, aperture (f-stop, 0 = DOF off), focusDistance (m, 0 = autofocus), motionBlur (0..1, 0.5 film-like: camera and moving objects), primary, cullMask` |
 | Surfaces | `material_create` / `material_update` / `texture_generate`, or `components.mesh` | `color, metallic, roughness, emissive (alpha = strength, HDR), normalMap, ormMap, clearcoat, subsurface, triplanar, shading: pbr\|toon\|unlit\|water` |
@@ -96,6 +97,13 @@ The live editor viewport renders at a **tier** so heavy worlds stay responsive w
 - **Blown neon**: point lights at intensity 40 over a big range plus bloom plus `godRays` white out the frame. Start lights around 8-25,
   `bloomThreshold` above 1, measure.
 - **Too dark**: `intensity` below ~8 on a point light barely lights walls; raise, or raise `gi`.
+- **A lamp went dark, or light still leaks through a wall**: point and spot lights cast shadows, so a lamp placed inside
+  its own shade or behind a sign is blocked. Run `shadow_atlas_info {entity: "Lamp"}`: `casters` lists what blocks it,
+  `ignoredFixtures` the small meshes within 0.3 m that are skipped, and `reason` says why a light has no shadow
+  (`over_light_budget`: raise `localShadowLights` or turn off minor lights with `light_shadows`). Move the light out of
+  the shade, or set `castShadows:false` on the blocking mesh. Look at the maps with `debug_view:"shadow_atlas"`.
+- **Many lamps, slow frames**: shadows are cached while nothing in range moves; `shadowMaxDistance` (e.g. 40) frees
+  distant lamps in big levels, and `particles.lightShadows` / `fluid.lightShadows` stay off unless a fire needs them.
 - **Camera inside terrain** gives a flat orange/brown frame: check the camera height against the ground.
 - **Judging at `samples:1`**: noise and missing GI will mislead you.
 - **Grid and id labels in the "final" shot**: pass `overlays:false, annotate:false`.

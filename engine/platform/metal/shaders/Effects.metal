@@ -128,7 +128,8 @@ fragment EffectOut waterFragment(WaterOut in [[stage_in]],
                                texture2d<float> j0 [[texture(11)]],
                                texture2d<float> j1 [[texture(12)]],
                                texture2d<float> j2 [[texture(13)]],
-                               texture2d<float> pano [[texture(14)]]) {
+                               texture2d<float> pano [[texture(14)]],
+                               depth2d_array<float> localShadows [[texture(32)]]) {
     bool endless = w.params2.z > 0.5;
     float2 xz = in.baseXZ;
     if (!endless) {
@@ -210,7 +211,7 @@ fragment EffectOut waterFragment(WaterOut in [[stage_in]],
     int count = int(f.params.y);
     for (int i = 0; i < count; ++i) {
         float3 Ll;
-        float3 rad = pointLightAt(lights[i], in.worldPos, N, Ll);
+        float3 rad = localLightAt(lights[i], in.worldPos, N, Ll, localShadows, in.position.xy, 4, f.extra.y);
         float3 Hl = normalize(Ll + V);
         float nl = saturate(dot(N, Ll));
         float sp = D_GGX(saturate(dot(N, Hl)), max(a2, 0.004)) * V_SmithGGX(NdotV, nl, max(a2, 0.004)) * nl;
@@ -319,7 +320,7 @@ vertex ParticleOut particleVertex(uint vid [[vertex_id]], uint iid [[instance_id
 }
 
 static float3 particleLighting(constant FrameUniforms& f, constant GPULight* lights, depth2d<float> atlas,
-                               texturecube<float> env, float3 pos, float3 n, float2 pixel, float phaseAmount) {
+                               depth2d_array<float> localShadows, texturecube<float> env, float3 pos, float3 n, float2 pixel, float phaseAmount) {
     float3 L = -f.sunDir.xyz;
     float sh = L.y > -0.08 ? shadowFactor(pos, float3(0.0, 1.0, 0.0), pixel, f, atlas) : 0.0;
     float3 V = normalize(f.cameraPos.xyz - pos);
@@ -332,7 +333,7 @@ static float3 particleLighting(constant FrameUniforms& f, constant GPULight* lig
     int count = int(f.params.y);
     for (int i = 0; i < count; ++i) {
         float3 Ll;
-        float3 rad = pointLightAt(lights[i], pos, n, Ll);
+        float3 rad = localLightAt(lights[i], pos, float3(0.0), Ll, localShadows, pixel, 1, 0.0);
         lit += rad * (saturate(dot(n, Ll)) * 0.6 + 0.4);
     }
     return lit;
@@ -343,7 +344,8 @@ fragment EffectOut particleFragment(ParticleOut in [[stage_in]],
                                   constant GPULight* lights [[buffer(2)]],
                                   depth2d<float> shadowAtlas [[texture(1)]],
                                   texturecube<float> envTex [[texture(5)]],
-                                  depth2d<float> sceneDepth [[texture(7)]]) {
+                                  depth2d<float> sceneDepth [[texture(7)]],
+                                  depth2d_array<float> localShadows [[texture(32)]]) {
     float2 suv = in.position.xy * f.viewport.zw;
     float sd = sceneDepth.sample(pointClamp, suv);
     float camDist = distance(f.cameraPos.xyz, in.worldPos);
@@ -390,17 +392,17 @@ fragment EffectOut particleFragment(ParticleOut in [[stage_in]],
         float density = saturate(sphere * (0.35 + n * 1.25) - 0.12);
         a = density * in.color.a * smoothstep(0.0, mist ? 0.25 : 0.1, in.age);
         float3 n3 = normalize(right * p.x + up * p.y + toCam * sqrt(max(0.0, 1.0 - r2)) + float3(0, (n - 0.5) * 0.6, 0));
-        float3 lit = particleLighting(f, lights, shadowAtlas, envTex, in.worldPos, n3, in.position.xy, mist ? 0.8 : 0.5);
+        float3 lit = particleLighting(f, lights, shadowAtlas, localShadows, envTex, in.worldPos, n3, in.position.xy, mist ? 0.8 : 0.5);
         rgb = in.color.rgb * lit * (0.75 + 0.25 * n) * a;
     } else if (look == 4 || look == 7) {  // rain streak / splash droplet: lit by lamps and sky
         float across = exp(-p.x * p.x * (look == 4 ? 4.0 : 2.0));
         float along = look == 4 ? smoothstep(1.0, 0.55, abs(p.y)) : saturate(1.0 - r2);
         a = in.color.a * across * along * (look == 7 ? 0.8 : 1.0);
-        float3 lit = particleLighting(f, lights, shadowAtlas, envTex, in.worldPos, toCam, in.position.xy, 0.6);
+        float3 lit = particleLighting(f, lights, shadowAtlas, localShadows, envTex, in.worldPos, toCam, in.position.xy, 0.6);
         rgb = in.color.rgb * (lit * 0.55 + 0.02) * a;
     } else if (look == 5) {  // snow flake
         a = smoothstep(1.0, 0.25, sqrt(r2)) * in.color.a;
-        float3 lit = particleLighting(f, lights, shadowAtlas, envTex, in.worldPos, toCam, in.position.xy, 0.3);
+        float3 lit = particleLighting(f, lights, shadowAtlas, localShadows, envTex, in.worldPos, toCam, in.position.xy, 0.3);
         rgb = in.color.rgb * lit * 0.8 * a;
     } else if (look == 3) {  // spark streak
         float g = exp(-p.x * p.x * 5.0) * (1.0 - smoothstep(0.6, 1.0, abs(p.y)));

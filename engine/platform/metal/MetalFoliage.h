@@ -15,6 +15,7 @@
 //   prepare()        once per frame, before the shadow pass: bakes or loads impostors within the
 //                    frame's budget, then encodes the cull pass into the frame's command buffer
 //   encodeShadows()  inside each sun cascade
+//   encodeLocalShadows()  inside each local light shadow view (MetalShadows)
 //   encodeMain()     inside the main MSAA pass (opaque geometry)
 //   trackFrame()     after the frame is encoded (reads the GPU counters when it completes)
 //
@@ -75,6 +76,9 @@ public:
 
     void prepare(id<MTLCommandBuffer> cmd, const FrameData& frame, const FoliageView& view, uint64_t frameIndex);
     void encodeShadows(id<MTLRenderCommandEncoder> enc, const FrameData& frame, int cascade, simd_float4x4 lightViewProj);
+    /// Point / spot light shadows: the camera's culled mesh instances inside the light's sphere
+    /// (impostors do not cast local shadows).
+    void encodeLocalShadows(id<MTLRenderCommandEncoder> enc, simd_float4x4 lightViewProj, Vec3 center, float radius);
     void encodeMain(id<MTLRenderCommandEncoder> enc, const FrameData& frame);
     void trackFrame(id<MTLCommandBuffer> cmd);
     void evict(uint64_t frameIndex);

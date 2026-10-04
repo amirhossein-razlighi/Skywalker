@@ -64,5 +64,6 @@ void addRenderLayerTools(Engine& engine, ToolRegistry& reg);  // RenderLayerTool
 void addProcessTools(Engine& engine, ToolRegistry& reg);  // ProcessTools.cpp: process_info, sim_teleport, sim_display
 /// Reads a property path ("transform.position", "vars.score", "name", "enabled") for traces (WorldTools.cpp).
 Json readPropertyPath(const Scene& s, EntityId id, const std::string& path);
+void addShadowTools(Engine& engine, ToolRegistry& reg);  // ShadowTools.cpp: shadow_atlas_info, light_shadows
 
 }  // namespace sky::tools

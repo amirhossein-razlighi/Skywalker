@@ -45,6 +45,9 @@ const std::vector<DebugViewInfo>& debugViews() {
         {kMotion, "motion", "gbuffer",
          "the velocity buffer TAA, MetalFX and motion blur use: hue = direction, strength = speed on a log scale "
          "(faint at 0.25 px, full at 15 px per frame) over a dimmed scene; capture twice (samples 1) while something moves"},
+        {kShadowAtlas, "shadow_atlas", "final",
+         "the local (point / spot) shadow atlas: 4 quadrants of shadow maps (near white, far dark), one outline per "
+         "light view: green re-rendered this frame, blue cached, orange waiting for the update budget (shadow_atlas_info)"},
     };
     return kViews;
 }

@@ -18,6 +18,7 @@ set(SKY_TEST_SOURCES
     test_wander_compiler.cpp
     test_wander_runtime.cpp
     test_render.cpp
+    test_shadows.cpp
     test_tools.cpp
     test_mcp.cpp
     test_assets.cpp

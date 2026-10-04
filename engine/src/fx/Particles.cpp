@@ -341,6 +341,8 @@ void ParticleSystem::gather(const Scene& scene, const ViewCamera& camera, std::v
             float flicker = 0.86f + 0.08f * std::sin(time_ * 17.f + static_cast<float>(id)) + 0.06f * std::sin(time_ * 31.7f);
             li.intensity = em->light * std::min(s.energy, 1.6f) * flicker;
             li.range = em->lightRange;
+            li.id = lightId(id, 2);
+            li.shadows = em->lightShadows;
             lights.push_back(li);
         }
     }

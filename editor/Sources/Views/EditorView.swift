@@ -429,7 +429,7 @@ struct DebugViewMenu: View {
                      ("specular", "Specular")]),
         ("Geometry", [("wireframe", "Wireframe"), ("overdraw", "Overdraw"), ("lod", "LOD"), ("uv_checker", "UV Checker"),
                       ("texel_density", "Texel Density")]),
-        ("Lights", [("shadow_cascades", "Shadow Cascades"), ("light_complexity", "Light Complexity")]),
+        ("Lights", [("shadow_cascades", "Shadow Cascades"), ("light_complexity", "Light Complexity"), ("shadow_atlas", "Shadow Atlas")]),
         ("Buffers", [("albedo", "Albedo"), ("normals", "Normals"), ("material", "Roughness / Metallic"), ("gi", "GI"),
                      ("reflections", "Reflections"), ("ao", "Ambient Occlusion"), ("depth", "Depth"), ("lighting", "Direct Lighting")]),
         ("Looks", [("sketch", "Sketch"), ("impostors", "Impostors")]),

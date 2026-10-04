@@ -39,6 +39,7 @@ set(SKY_ENGINE_SOURCES
     src/render/Vegetation.cpp
     src/render/ColorGrading.cpp
     src/render/LightClusters.cpp
+    src/render/ShadowAtlas.cpp
     src/render/MeshLod.cpp
     src/render/Impostor.cpp
     src/fx/Groom.cpp
@@ -55,6 +56,7 @@ set(SKY_ENGINE_SOURCES
     src/agent/WorldTools.cpp
     src/agent/NetworkTools.cpp
     src/agent/FxTools.cpp
+    src/agent/ShadowTools.cpp
     src/agent/WanderTools.cpp
     src/agent/NativeTools.cpp
     src/agent/WorldBuildTools.cpp
@@ -281,7 +283,7 @@ if(SKY_HAS_METAL)
     # by agents and does not require the offline Metal toolchain).
     # The standard shader library is several modules concatenated in dependency order.
     set(_shader_dir ${CMAKE_CURRENT_SOURCE_DIR}/platform/metal/shaders)
-    set(_shader_modules Common.metal Debug.metal Clouds.metal Sky.metal Surface.metal Terrain.metal Lighting.metal Effects.metal Post.metal GpuParticles.metal Hair.metal)
+    set(_shader_modules Common.metal Debug.metal Shadows.metal Clouds.metal Sky.metal Surface.metal Terrain.metal Lighting.metal Effects.metal Post.metal GpuParticles.metal Hair.metal)
     list(TRANSFORM _shader_modules PREPEND ${_shader_dir}/ OUTPUT_VARIABLE _shader_src)
     string(REPLACE ";" "," _shader_list "${_shader_modules}")
     set(_shader_inc ${CMAKE_CURRENT_BINARY_DIR}/generated/ShaderSource.inc)
@@ -316,6 +318,7 @@ if(SKY_HAS_METAL)
     target_sources(skywalker_engine PRIVATE platform/metal/MetalRenderer.mm platform/metal/MetalRenderer2D.mm
         platform/metal/MetalFx.mm platform/metal/MetalGpuParticles.mm platform/metal/MetalHair.mm platform/metal/MetalFoliage.mm
         platform/metal/MetalProfiler.mm platform/metal/MetalShaderCache.mm
+        platform/metal/MetalShadows.mm
         ${_shader_inc} ${_skin_inc} ${_extra_shader_incs})
     # Precompiled shader library: with the offline Metal toolchain installed, the standard library is
     # compiled to a .metallib at build time and embedded (#embed), so startup skips the MSL compile.

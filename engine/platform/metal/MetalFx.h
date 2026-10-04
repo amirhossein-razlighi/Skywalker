@@ -53,6 +53,7 @@ struct FxSceneInputs {
     size_t frameUniformsSize = 0;
     const void* lights = nullptr;
     size_t lightsSize = 0;
+    id<MTLTexture> localShadows = nil;  // point / spot light shadow atlas (fragment texture 32)
 };
 
 class MetalGpuParticles;

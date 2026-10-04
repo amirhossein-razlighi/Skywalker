@@ -59,6 +59,15 @@ File › Open Project… (⌘O) switches projects; the editor reopens the last o
 ctest --preset debug --output-on-failure
 ```
 
+GPU output is never checked in `ctest` (CI has no GPU). Shader math that matters is mirrored in
+C++ and unit-tested instead (for example `render/ShadowAtlas.h` for local light shadows). Opt-in
+GPU checks under `tools/render_checks/` render reference scenes from `examples/render_tests/` on
+macOS and assert image statistics, not pixel goldens:
+
+```bash
+python3 tools/render_checks/local_shadows.py   # point/spot light shadows: no light through walls
+```
+
 ## Memory safety and profiling
 
 | Tool | How |

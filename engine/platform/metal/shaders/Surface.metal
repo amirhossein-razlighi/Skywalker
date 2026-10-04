@@ -75,7 +75,8 @@ static float3 triplanarNormal(texture2d<float> tex, Triplanar t, float3 N, float
 static float3 shadeSurface(SurfaceData s, float3 Ngeo, float3 worldPos, float2 fragXY, float3 V, bool toon, float rim,
                            constant FrameUniforms& f, const device GPULight* lights, const device uint2* clusterCells,
                            const device uint* clusterIndices, depth2d<float> shadowAtlas, texturecube<float> envTex,
-                           texture2d<float> brdfLut, texture3d<float> cloudShape, uint layers = 1u) {
+                           texture2d<float> brdfLut, texture3d<float> cloudShape, depth2d_array<float> localShadows,
+                           uint layers = 1u) {
     // Sun
     float3 L = -f.sunDir.xyz;
     float sunVisible = L.y > -0.08 ? shadowFactor(worldPos, Ngeo, fragXY, f, shadowAtlas) : 0.0;
@@ -87,12 +88,18 @@ static float3 shadeSurface(SurfaceData s, float3 Ngeo, float3 worldPos, float2 f
     int dirCount = int(f.cluster2.y);
     uint2 cell = clusterCells[clusterOf(f, fragXY, worldPos)];
     int total = dirCount + int(cell.y);
+    const float shadowNoise = ditherNoise(fragXY, f.temporal);  // PCF rotation, new every frame / sub-sample
     for (int k = 0; k < total; ++k) {
         int i = k < dirCount ? k : int(clusterIndices[cell.x + uint(k - dirCount)]);
         GPULight l = lights[i];
         if (!lightAffects(l, layers)) continue;  // render layers: the light's cullMask excludes this surface
         float3 Ll;
         float3 rad = lightRadiance(l, worldPos, Ll);
+        // Occluders block point / spot light (local shadow atlas, rotated 4-tap PCF). Surfaces facing
+        // away receive nothing from it anyway (unless light wraps through them): no lookup.
+        if (l.kind.x > 0.5 && l.shadow.w > 0.5 && any(rad != 0.0) && (dot(s.N, Ll) > -0.05 || s.subsurface > 0.0)) {
+            rad *= localShadow(l, worldPos, Ngeo, shadowNoise, localShadows, 4, f.extra.y);
+        }
         color += toon ? toonLight(s, V, Ll, rad, l.params.x) : directLight(s, V, Ll, rad, l.params.x);
     }
     color = max(color, 0.0);  // negative lights darken, never below black
@@ -224,7 +231,8 @@ fragment MainOut meshFragment(MeshOut in [[stage_in]],
                               texture2d<float> emissiveTex [[texture(4)]],
                               texturecube<float> envTex [[texture(5)]],
                               texture2d<float> brdfLut [[texture(6)]],
-                              texture3d<float> cloudShape [[texture(7)]]) {
+                              texture3d<float> cloudShape [[texture(7)]],
+                              depth2d_array<float> localShadows [[texture(32)]]) {
     // Foliage crossfading into its impostor: complementary dither (the impostor keeps the rest).
     if (in.fade > 0.0 && ditherNoise(in.position.xy, f.temporal) < in.fade) discard_fragment();
     float3 V = normalize(f.cameraPos.xyz - in.worldPos);
@@ -300,7 +308,7 @@ fragment MainOut meshFragment(MeshOut in [[stage_in]],
     // Render layers of this draw (DrawUniforms.motion.y; 0 = unset, e.g. mesh particles: layer 1).
     const uint layers = d.motion.y > 0.5 ? uint(d.motion.y) : 1u;
     float3 color = shadeSurface(s, Ngeo, in.worldPos, in.position.xy, V, toon, d.material3.z, f, lights, clusterCells,
-                                clusterIndices, shadowAtlas, envTex, brdfLut, cloudShape, layers) + emissive;
+                                clusterIndices, shadowAtlas, envTex, brdfLut, cloudShape, localShadows, layers) + emissive;
     color = applyFog(color, in.worldPos, V, f);
 
 
@@ -354,7 +362,7 @@ vertex float4 shadowVertex(uint vid [[vertex_id]],
                            const device Vertex* verts [[buffer(0)]],
                            constant DrawUniforms& d [[buffer(1)]],
                            constant float4x4& lightViewProj [[buffer(2)]]) {
-    return lightViewProj * (d.model * float4(float3(verts[vid].position), 1.0));
+    return shadowClip(lightViewProj, (d.model * float4(float3(verts[vid].position), 1.0)).xyz);
 }
 
 struct ShadowAlphaOut {
@@ -367,7 +375,7 @@ vertex ShadowAlphaOut shadowAlphaVertex(uint vid [[vertex_id]],
                                         constant DrawUniforms& d [[buffer(1)]],
                                         constant float4x4& lightViewProj [[buffer(2)]]) {
     ShadowAlphaOut o;
-    o.position = lightViewProj * (d.model * float4(float3(verts[vid].position), 1.0));
+    o.position = shadowClip(lightViewProj, (d.model * float4(float3(verts[vid].position), 1.0)).xyz);
     o.uv = float2(verts[vid].uv) * d.material2.xy;
     return o;
 }

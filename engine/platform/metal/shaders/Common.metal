@@ -102,8 +102,11 @@ struct GPULight {
     // --- appended (light v2) ---
     float4 params;          // x = specular, y = layer mask (20 bits as a float), z = cos(inner cone) (0 = auto), w = 1 inverse square
     float4 params2;         // x = emitter radius (m), y = indirect, z = volumetric, w = unused
+    // --- appended (local shadows: Shadows.metal, render/ShadowAtlas.h gpuShadowParams) ---
+    float4 shadow;          // xy = slot origin, z = slot size (uv of a quadrant slice), w = projection + 4 * quadrant (0 = none)
+    float4 shadow2;         // x = strength, y = bias (m), z = normal bias (texels), w = tan(half fov) / paraboloid uv scale
 };
-static_assert(sizeof(GPULight) == 96, "GPULight must match MetalRenderer.mm");
+static_assert(sizeof(GPULight) == 128, "GPULight must match MetalRenderer.mm");
 
 // Render layers: does light `l` light a surface on `layers`? Surfaces without a layers field
 // (terrain, foliage, water, particles, hair) are on layer 1.

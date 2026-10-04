@@ -28,7 +28,8 @@ full descriptions; `component_schema` and each tool's input schema list every fi
 | Pixel to entity | `viewport_pick {x*, y*, width, height}` |
 | Editor viewport tier | `viewport_quality {quality: fast\|balanced\|full}` (omit to read; the human's live view, captures stay `full` unless `quality` is passed) |
 | Performance | `perf_stats {frames, width, height, view, quality, passes}` (draw calls, lights, GPU/CPU ms; `passes:true` adds `profile.passes` / `groups` / `cpu`) |
-| Debug views | `viewport_capture {debug_view}` or live `viewport_debug_view {view, list}`: wireframe, overdraw, unshaded, lighting_only, shadow_cascades, light_complexity, lod, emission, specular, uv_checker, texel_density, albedo, normals, material, gi, reflections, ao, depth, lighting, sketch, impostors |
+| Debug views | `viewport_capture {debug_view}` or live `viewport_debug_view {view, list}`: wireframe, overdraw, unshaded, lighting_only, shadow_cascades, light_complexity, lod, emission, specular, uv_checker, texel_density, albedo, normals, material, gi, reflections, ao, depth, lighting, sketch, impostors, motion, shadow_atlas |
+| Light shadows | `shadow_atlas_info {view, entity}` (which lamps have shadows, cache, budgets, casters), `light_shadows {lights, enabled, resolution, mode, max_distance}`, `viewport_capture {debug_view: "shadow_atlas"}` |
 
 ## World
 

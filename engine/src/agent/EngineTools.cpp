@@ -696,7 +696,9 @@ void addViewTools(Engine& engine, ToolRegistry& reg) {
                                                 "metallic green), gi, reflections, ao, depth, lighting. Shading: unshaded, lighting_only (white "
                                                 "material), emission, specular. Geometry: wireframe, overdraw (heat map), lod (green 0 .. red 3), "
                                                 "uv_checker, texel_density (green = 512 texels/m). Lights: shadow_cascades (red/green/blue/yellow), "
-                                                "light_complexity (lights per pixel heat map). Motion: the velocity buffer (hue = direction, strength = speed). Also sketch, impostors. Full legend: "
+                                                "light_complexity (lights per pixel heat map), shadow_atlas (point/spot shadow maps, outlined per light: green "
+                                                "re-rendered, blue cached, orange waiting; see shadow_atlas_info). Motion: the velocity buffer (hue = "
+                                                "direction, strength = speed). Also sketch, impostors. Full legend: "
                                                 "viewport_debug_view {\"list\": true}")},
                      {"quality", enumeration({"full", "balanced", "fast"}, "Viewport quality tier (default full; fast/balanced preview what the editor shows while editing)")},
                      {"include_image", boolean("Return the image (default true); false = only the entity list")},
@@ -1152,6 +1154,7 @@ void registerEngineTools(Engine& engine) {
     tools::addMovieTools(engine, reg);  // engine/src/agent/MovieTools.cpp (movie render queue)
     tools::addRenderLayerTools(engine, reg);  // engine/src/agent/RenderLayerTools.cpp (render layers, cull masks)
     tools::addProcessTools(engine, reg);  // ProcessTools.cpp: process_info, sim_teleport, sim_display
+    tools::addShadowTools(engine, reg);  // engine/src/agent/ShadowTools.cpp (point / spot light shadows)
 }
 
 }  // namespace sky

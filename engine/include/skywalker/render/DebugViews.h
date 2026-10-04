@@ -43,7 +43,8 @@ constexpr int kSpecular = 19;
 constexpr int kUvChecker = 20;
 constexpr int kTexelDensity = 21;
 constexpr int kMotion = 22;
-constexpr int kCount = 23;
+constexpr int kShadowAtlas = 23;
+constexpr int kCount = 24;
 }  // namespace debugview
 
 struct DebugViewInfo {
