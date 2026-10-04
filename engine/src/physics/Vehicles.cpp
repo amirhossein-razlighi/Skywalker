@@ -66,8 +66,9 @@ Vec3 divide(Vec3 a, Vec3 b) {
     return {a.x / safe(b.x), a.y / safe(b.y), a.z / safe(b.z)};
 }
 
-/// World-space bounds of the meshes in a subtree (wheel visuals), or nullopt.
-std::optional<Aabb> subtreeMeshBounds(const Scene& s, EntityId root, const MeshProvider& meshes) {
+/// Bounds of the meshes in a subtree (wheel visuals) in the space `frame` maps world space into (the vehicle's
+/// body space), or nullopt. Measuring each mesh in that space keeps the box tight on a rotated vehicle.
+std::optional<Aabb> subtreeMeshBounds(const Scene& s, EntityId root, const MeshProvider& meshes, const Mat4& frame) {
     std::vector<EntityId> stack{root};
     Aabb box{Vec3(1e30f), Vec3(-1e30f)};
     bool any = false;
@@ -76,7 +77,7 @@ std::optional<Aabb> subtreeMeshBounds(const Scene& s, EntityId root, const MeshP
         stack.pop_back();
         if (const MeshRenderer* mr = s.get<MeshRenderer>(e)) {
             const MeshData* md = meshes && str::startsWith(mr->mesh, "asset:") ? meshes(mr->mesh) : nullptr;
-            Aabb b = (md ? md->bounds : s.localBounds(e)).transformed(s.worldMatrix(e));
+            Aabb b = (md ? md->bounds : s.localBounds(e)).transformed(frame * s.worldMatrix(e));
             if (b.min.x <= b.max.x) {
                 box.min = vmin(box.min, b.min);
                 box.max = vmax(box.max, b.max);
@@ -181,17 +182,7 @@ Fit fitWheels(const Scene& s, EntityId e, const Vehicle& v, const MeshProvider& 
         }
         std::optional<Aabb> measured;
         if (w.visual != kNoEntity) {
-            if (auto world = subtreeMeshBounds(s, w.visual, meshes)) {
-                Aabb local{Vec3(1e30f), Vec3(-1e30f)};
-                for (int i = 0; i < 8; ++i) {
-                    Vec3 corner{(i & 1) ? world->max.x : world->min.x, (i & 2) ? world->max.y : world->min.y,
-                                (i & 4) ? world->max.z : world->min.z};
-                    Vec3 p = worldToBody.transformPoint(corner);
-                    local.min = vmin(local.min, p);
-                    local.max = vmax(local.max, p);
-                }
-                measured = local;
-            }
+            measured = subtreeMeshBounds(s, w.visual, meshes, worldToBody);
         }
         Vec3 pos;
         if (Vec3 given; reflect::jsonToVec3(entry.get("position"), given)) {
