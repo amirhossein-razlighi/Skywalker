@@ -159,7 +159,7 @@ fragment float4 ssgiFragment(FullscreenOut in [[stage_in]], constant FrameUnifor
     float3 origin = p + N * (0.015 + dist * 0.002);
     float lod = max(f.extra.z - 1.0, 0.0);
     // Rays that leave the screen see the reflection probes around the point (rooms stay rooms), else the sky.
-    const uint cluster = clusterOf(f, uv * f.viewport.xy, p);
+    const uint cluster = probes.info.x > 0.5 ? clusterOf(f, uv * f.viewport.xy, p) : 0u;
     float3 sum = 0.0;
     float hits = 0.0;
     for (int r = 0; r < rays; ++r) {
@@ -305,7 +305,8 @@ fragment float4 lightingResolveFragment(FullscreenOut in [[stage_in]], constant 
 
     // The image-based light the surface added in the main pass (reflection probes over the sky), so
     // screen-space GI and reflections replace exactly that: SSR first, then probes, then the sky.
-    EnvLight env = environmentLight(f, probes, probeClusters, probeAtlas, envTex, clusterOf(f, uv * f.viewport.xy, p), p, N,
+    const uint cluster = probes.info.x > 0.5 ? clusterOf(f, uv * f.viewport.xy, p) : 0u;
+    EnvLight env = environmentLight(f, probes, probeClusters, probeAtlas, envTex, cluster, p, N,
                                     reflect(-V, N), rough);
     // Diffuse: probe / sky light -> screen-space GI (blended by strength), times SSAO.
     float3 envIrr = env.irr;

@@ -52,6 +52,7 @@ set(SKY_TEST_SOURCES
     test_movie.cpp
     test_profiler.cpp
     test_render_layers.cpp
+    test_probes.cpp
     test_process.cpp
     test_prefab.cpp
     test_legal.cpp
