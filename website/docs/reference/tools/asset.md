@@ -541,7 +541,7 @@ Create a reusable material asset (*.mat.json): color, metallic, roughness, emiss
 | `fuzz` | number |  | cloth: extra rim of loose fibers | 0 .. 2 |
 | `hairShift` | number |  | hair_card: primary highlight shift along the strand | -1 .. 1 |
 | `hairSpecular` | number |  | hair_card: highlight strength | 0 .. 4 |
-| `hairDirection` | string |  | hair_card: strand direction in the card's UVs (root to tip) | `v` `-v` `u` `-u` |
+| `hairDirection` | string |  | hair_card: strand direction in the card's UVs (root to tip); auto = found per pixel from the strand pattern of the texture (atlases whose cards run either way) | `auto` `v` `-v` `u` `-u` |
 | `alphaMode` | string |  | hair_card: dither = stochastic transparency that resolves to soft strands under TAA and stills; coverage = alpha to coverage (MSAA) | `dither` `coverage` |
 | `path` | string | yes | Project-relative path ending in .mat.json, e.g. materials/stone.mat.json |  |
 | `preset` | string |  | Start from a built-in material (other fields override it) | `gold` `silver` `copper` `chrome` `brushed_steel` `iron` `plastic` `rubber` `ceramic` `car_paint` `glass` `water` `ice` `skin` `wax` `leaves` `snow` `velvet` `neon` `toon` `toon_metal` `clay` `eye` `cloth` `hair_card` |
@@ -625,7 +625,7 @@ Change fields of an existing material; every entity using it updates instantly.
 | `fuzz` | number |  | cloth: extra rim of loose fibers | 0 .. 2 |
 | `hairShift` | number |  | hair_card: primary highlight shift along the strand | -1 .. 1 |
 | `hairSpecular` | number |  | hair_card: highlight strength | 0 .. 4 |
-| `hairDirection` | string |  | hair_card: strand direction in the card's UVs (root to tip) | `v` `-v` `u` `-u` |
+| `hairDirection` | string |  | hair_card: strand direction in the card's UVs (root to tip); auto = found per pixel from the strand pattern of the texture (atlases whose cards run either way) | `auto` `v` `-v` `u` `-u` |
 | `alphaMode` | string |  | hair_card: dither = stochastic transparency that resolves to soft strands under TAA and stills; coverage = alpha to coverage (MSAA) | `dither` `coverage` |
 | `path` | string | yes | Project-relative path ending in .mat.json, e.g. materials/stone.mat.json |  |
 | `preset` | string |  | Start from a built-in material (other fields override it) | `gold` `silver` `copper` `chrome` `brushed_steel` `iron` `plastic` `rubber` `ceramic` `car_paint` `glass` `water` `ice` `skin` `wax` `leaves` `snow` `velvet` `neon` `toon` `toon_metal` `clay` `eye` `cloth` `hair_card` |
