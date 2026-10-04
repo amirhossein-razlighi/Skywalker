@@ -163,11 +163,12 @@ MetalFoliage::MetalFoliage(id<MTLDevice> device, id<MTLCommandQueue> queue, Mesh
       surfaceUniforms_(std::move(surfaceUniforms)),
       counters_(std::make_shared<Counters>()) {
     if (const char* env = std::getenv("SKY_GPU_CULL"); env && std::string(env) == "0") gpuCull_ = false;
-    // Developer switch for profiling: SKY_FOLIAGE_DEBUG=nomesh,noimpostors,noshadows.
+    // Developer switch for profiling: SKY_FOLIAGE_DEBUG=nomesh,noimpostors,noshadows,noimpostorshadows,nomeshshadows.
     if (const char* env = std::getenv("SKY_FOLIAGE_DEBUG")) {
         const std::string d = env;
         debugSkip_ = (d.find("nomesh") != std::string::npos ? 1u : 0u) | (d.find("noimpostors") != std::string::npos ? 2u : 0u) |
-                     (d.find("noshadows") != std::string::npos ? 4u : 0u);
+                     (d.find("noshadows") != std::string::npos ? 4u : 0u) | (d.find("noimpostorshadows") != std::string::npos ? 8u : 0u) |
+                     (d.find("nomeshshadows") != std::string::npos ? 16u : 0u);
     }
     MTLTextureDescriptor* wd = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA8Unorm width:1 height:1 mipmapped:NO];
     white_ = [device_ newTextureWithDescriptor:wd];
@@ -447,7 +448,8 @@ void MetalFoliage::prepare(id<MTLCommandBuffer> cmd, const FrameData& frame, con
         const GpuMesh* m = meshes_(ip.mesh);
         if (!m) return 0;
         const float nearEdge = band == 0 ? 0.f : c.bandFar[band - 1];
-        const int bias = table + (frame.quality >= 2 ? 1 : 0) + budgetBias_;
+        // Shadows: two levels coarser (a cascade texel is much larger than a screen pixel).
+        const int bias = table * 2 + (frame.quality >= 2 ? 1 : 0) + budgetBias_;
         // Foliage tolerates a few pixels of simplification error (leaves flutter, TAA resolves it):
         // photoscanned trees of millions of triangles are unaffordable at the 1 px bar of props.
         int lod = m->lodFor(pixelsPerUnit(nearEdge) * c.batch->maxScale * kFoliageLodScale) + bias;
@@ -607,7 +609,7 @@ void MetalFoliage::encodeShadows(id<MTLRenderCommandEncoder> enc, const FrameDat
             any = true;
         }
         const NSUInteger list = c.listOffset + v * c.listStride, args = c.argsOffset + v * c.viewArgs;
-        if (!impostorOnly) {
+        if (!impostorOnly && !(debugSkip_ & 16u)) {
             for (uint32_t pi = 0; pi < c.parts; ++pi) {
                 const InstancePart& part = (*c.batch->parts)[pi];
                 const GpuMesh* m = meshes_(part.mesh);
@@ -631,7 +633,7 @@ void MetalFoliage::encodeShadows(id<MTLRenderCommandEncoder> enc, const FrameDat
                 }
             }
         }
-        if (impostors && c.imp) {
+        if (impostors && c.imp && !(debugSkip_ & 8u)) {
             [enc setRenderPipelineState:impostorShadow_];
             [enc setVertexBuffer:c.instances offset:0 atIndex:3];
             [enc setVertexBuffer:lists_[ring_] offset:list atIndex:5];

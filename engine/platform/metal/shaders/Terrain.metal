@@ -780,12 +780,23 @@ fragment ImpostorShadowDepth impostorShadowFragment(ImpostorShadowOut in [[stage
                                                     const device FoliageInstanceGpu* instances [[buffer(5)]],
                                                     texture2d<float> atlasA [[texture(0)]],
                                                     texture2d<float> atlasB [[texture(2)]]) {
-    ImpostorSample smp = sampleImpostor(atlasA, atlasB, ic, in.modelPos, in.ray, in.frames, in.weights);
-    if (smp.alpha < 0.5) discard_fragment();
+    // Shadows only need coverage and depth: the single frame nearest to the light direction, no
+    // parallax steps (the light looks almost straight along that frame), two texture reads.
+    const uint k = in.weights.x >= in.weights.y ? (in.weights.x >= in.weights.z ? 0u : 2u) : (in.weights.y >= in.weights.z ? 1u : 2u);
+    const uint Fi = uint(ic.grid.x), fx = in.frames[k] % Fi, fy = in.frames[k] / Fi;
+    const float3 c = ic.center.xyz;
+    const float R = ic.center.w;
+    ImpBasis b = impFrameBasis(impFrameDirection(fx, fy, ic.grid.x, ic.grid.z > 0.5));
+    float denom = min(dot(in.ray, b.forward), -1e-3);
+    float3 q = in.modelPos + in.ray * (dot(c - in.modelPos, b.forward) / denom) - c;
+    bool inside;
+    float2 uv = impAtlasUV(q, b, R, fx, fy, ic.grid.y, 0.5 * ic.grid.w, inside);
+    if (!inside || atlasA.sample(impostorSampler, uv).a < 0.5) discard_fragment();
+    float h = (atlasB.sample(impostorSampler, uv).z * 2.0 - 1.0) * R;
     FoliageInstanceGpu inst = instances[in.inst];
-    // Depth of the reconstructed surface, pushed slightly away from the light (shader-written
-    // depth gets no rasterizer slope bias).
-    float3 worldPos = instanceBasis(inst) * smp.position + instanceOrigin(inst) + ic.light.xyz * ic.surface.z;
+    // Depth of the baked surface along the light ray, pushed slightly away from the light
+    // (shader-written depth gets no rasterizer slope bias).
+    float3 worldPos = instanceBasis(inst) * (c + q + in.ray * (h / denom)) + instanceOrigin(inst) + ic.light.xyz * ic.surface.z;
     ImpostorShadowDepth o;
     o.depth = max((lightViewProj * float4(worldPos, 1.0)).z, in.position.z);
     return o;
