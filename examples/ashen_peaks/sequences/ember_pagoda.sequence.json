@@ -1,0 +1,325 @@
+{
+  "format": "skywalker.sequence",
+  "version": 1,
+  "name": "Ashen Peaks — ember_pagoda",
+  "duration": 7,
+  "tracks": [
+    {
+      "type": "property",
+      "property": "environment.sunElevation",
+      "keys": [
+        {
+          "t": 0,
+          "value": 4.5,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.sunAzimuth",
+      "keys": [
+        {
+          "t": 0,
+          "value": 20,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.sunIntensity",
+      "keys": [
+        {
+          "t": 0,
+          "value": 4,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.sunColor",
+      "keys": [
+        {
+          "t": 0,
+          "value": "#ff9c5c",
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.ambient",
+      "keys": [
+        {
+          "t": 0,
+          "value": 0.34,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.clouds",
+      "keys": [
+        {
+          "t": 0,
+          "value": 0.74,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.cloudHeight",
+      "keys": [
+        {
+          "t": 0,
+          "value": 1800,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.cloudThickness",
+      "keys": [
+        {
+          "t": 0,
+          "value": 2200,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.cloudDensity",
+      "keys": [
+        {
+          "t": 0,
+          "value": 1.5,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.fogColor",
+      "keys": [
+        {
+          "t": 0,
+          "value": "#7d7a8c",
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.fogDensity",
+      "keys": [
+        {
+          "t": 0,
+          "value": 0.0018,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.fogHeight",
+      "keys": [
+        {
+          "t": 0,
+          "value": 0.04,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.godRays",
+      "keys": [
+        {
+          "t": 0,
+          "value": 0.9,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.haze",
+      "keys": [
+        {
+          "t": 0,
+          "value": 4e-04,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.exposureCompensation",
+      "keys": [
+        {
+          "t": 0,
+          "value": -0.1,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.look",
+      "keys": [
+        {
+          "t": 0,
+          "value": "teal_orange",
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.lookStrength",
+      "keys": [
+        {
+          "t": 0,
+          "value": 0.4,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.saturation",
+      "keys": [
+        {
+          "t": 0,
+          "value": 1.1,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.contrast",
+      "keys": [
+        {
+          "t": 0,
+          "value": 1.14,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.bloomIntensity",
+      "keys": [
+        {
+          "t": 0,
+          "value": 0.45,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.vignette",
+      "keys": [
+        {
+          "t": 0,
+          "value": 0.3,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.shadowSoftness",
+      "keys": [
+        {
+          "t": 0,
+          "value": 1,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.windSpeed",
+      "keys": [
+        {
+          "t": 0,
+          "value": 7,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.temperature",
+      "keys": [
+        {
+          "t": 0,
+          "value": 0.1,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "shot",
+      "camera": "Cam ember_pagoda",
+      "keys": [
+        {
+          "t": 0,
+          "shot": "path",
+          "duration": 7,
+          "target": [
+            -362,
+            103,
+            -146
+          ],
+          "points": [
+            [
+              -352.729,
+              89.8,
+              -117.468
+            ],
+            [
+              -347.456,
+              89.8,
+              -119.761
+            ],
+            [
+              -342.716,
+              89.8,
+              -123.019
+            ],
+            [
+              -338.686,
+              89.8,
+              -127.12
+            ],
+            [
+              -335.512,
+              89.8,
+              -131.916
+            ]
+          ],
+          "fov": 46
+        }
+      ]
+    },
+    {
+      "type": "camera",
+      "keys": [
+        {
+          "t": 0,
+          "camera": "Cam ember_pagoda"
+        }
+      ]
+    }
+  ]
+}

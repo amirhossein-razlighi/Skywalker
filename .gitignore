@@ -101,3 +101,6 @@ examples/ashen_peaks/dcc/
 # Gloamwater art is painted by media/demo/games/gloamwater_art.py (regenerated on build)
 examples/gloamwater/art/
 examples/gloamwater/portraits/
+examples/ashen_peaks/agents/
+examples/ashen_peaks/studio/
+examples/*/.skywalker/cache/

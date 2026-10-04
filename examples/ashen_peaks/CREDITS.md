@@ -2,9 +2,6 @@
 
 Third-party assets used in this project (maintained by `asset_download`).
 
-- **forest_leaves_04_diff_2k** by Rob Tuytel — CC0-1.0 — https://polyhaven.com/a/forest_leaves_04 (`downloads/forest_leaves_04`, 2026-10-03)
-- **sparse_grass_diff_2k** by Amal Kumar — CC0-1.0 — https://polyhaven.com/a/sparse_grass (`downloads/sparse_grass`, 2026-10-03)
-- **rock_ground_02_diff_2k** by Rob Tuytel — CC0-1.0 — https://polyhaven.com/a/rock_ground_02 (`downloads/rock_ground_02`, 2026-10-03)
 - **rock_face_03_diff_2k** by Dario Barresi, Rico Cilliers — CC0-1.0 — https://polyhaven.com/a/rock_face_03 (`downloads/rock_face_03`, 2026-10-03)
 - **snow_02_diff_2k** by Rob Tuytel — CC0-1.0 — https://polyhaven.com/a/snow_02 (`downloads/snow_02`, 2026-10-03)
 - **fir_sapling_medium_1k** by Rob Tuytel, Rico Cilliers — CC0-1.0 — https://polyhaven.com/a/fir_sapling_medium (`downloads/fir_sapling_medium`, 2026-10-03)
@@ -41,7 +38,3 @@ Third-party assets used in this project (maintained by `asset_download`).
 - **japanese_stone_wall_diff_2k** by Rico Cilliers, Charlotte Baglioni, Dario Barresi — CC0-1.0 — https://polyhaven.com/a/japanese_stone_wall (`downloads/japanese_stone_wall`, 2026-10-03)
 - **rock_boulder_dry_diff_2k** by Dimitrios Savva, Rico Cilliers — CC0-1.0 — https://polyhaven.com/a/rock_boulder_dry (`downloads/rock_boulder_dry`, 2026-10-03)
 - **grey_stone_path_diff_2k** by Amal Kumar — CC0-1.0 — https://polyhaven.com/a/grey_stone_path (`downloads/grey_stone_path`, 2026-10-03)
-- **rock_face_01_2k** by Dario Barresi — CC0-1.0 — https://polyhaven.com/a/rock_face_01 (`downloads/rock_face_01`, 2026-10-03)
-- **rock_face_02_2k** by Dario Barresi, Rico Cilliers — CC0-1.0 — https://polyhaven.com/a/rock_face_02 (`downloads/rock_face_02`, 2026-10-03)
-- **mountainside_2k** by Dario Barresi, Rico Cilliers — CC0-1.0 — https://polyhaven.com/a/mountainside (`downloads/mountainside`, 2026-10-03)
-- **coastal_cliff_02_2k** by Rob Tuytel — CC0-1.0 — https://polyhaven.com/a/coastal_cliff_02 (`downloads/coastal_cliff_02`, 2026-10-03)

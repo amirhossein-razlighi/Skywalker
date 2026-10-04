@@ -670,6 +670,41 @@ def flags_world(cfg):
     return A
 
 
+def crane_body():
+    """A red-crowned crane in flight (body, neck, head, trailing legs), facing +z."""
+    A = Asset("cranebody")
+    white, black, red, beak = (0.92, 0.92, 0.9), (0.08, 0.08, 0.09), (0.7, 0.08, 0.06), (0.45, 0.42, 0.3)
+    cyl(A["feather"], (0, 0, -0.45), 0.13, 0.9, seg=10, r1=0.09, axis=(0, 0.05, 1), bulge=0.05, rings=4, col=white)
+    cyl(A["feather"], (0, 0.03, 0.42), 0.07, 0.75, seg=8, r1=0.035, axis=(0, 0.12, 1), col=black)
+    cyl(A["feather"], (0, 0.12, 1.15), 0.05, 0.12, seg=8, r1=0.045, axis=(0, 0, 1), col=red)
+    cyl(A["feather"], (0, 0.12, 1.26), 0.035, 0.22, seg=6, r1=0.004, axis=(0, -0.08, 1), col=beak)
+    cyl(A["feather"], (0, 0.0, -0.55), 0.09, 0.3, seg=8, r1=0.03, axis=(0, 0.1, -1), col=black)  # tail
+    for sx in (-0.05, 0.05):
+        cyl(A["feather"], (sx, -0.04, -0.5), 0.018, 0.85, seg=5, r1=0.012, axis=(0, -0.06, -1), col=black)
+    return A
+
+
+def crane_wing():
+    """One wing extending along +x from the shoulder: white, black-tipped primaries."""
+    A = Asset("cranewing")
+    white, black = (0.93, 0.93, 0.91), (0.06, 0.06, 0.07)
+    span = 1.15
+    for k in range(10):
+        x0, x1 = span * k / 10, span * (k + 1) / 10
+        c = white if k < 6 else black
+        chord0 = 0.42 - 0.18 * (k / 10) ** 1.5
+        chord1 = 0.42 - 0.18 * ((k + 1) / 10) ** 1.5
+        sweep0, sweep1 = -0.12 * (k / 10) ** 2, -0.12 * ((k + 1) / 10) ** 2
+        q = [(x0, 0, 0.12 + sweep0), (x1, 0, 0.12 + sweep1), (x1, 0, 0.12 + sweep1 - chord1), (x0, 0, 0.12 + sweep0 - chord0)]
+        A["feather"].face(A["feather"].verts(q), [(x0, 0), (x1, 0), (x1, 1), (x0, 1)], c, outward=(0, 1, 0))
+        if k >= 6:  # fingered primaries
+            for f in range(3):
+                fz = 0.12 + sweep1 - chord1 * (0.2 + 0.3 * f)
+                q = [(x1, 0, fz), (x1 + 0.09, 0, fz - 0.03), (x1 + 0.09, 0, fz - 0.09), (x1, 0, fz - 0.12)]
+                A["feather"].face(A["feather"].verts(q), [(0, 0), (1, 0), (1, 1), (0, 1)], black, outward=(0, 1, 0))
+    return A
+
+
 def brazier():
     A = Asset("brazier")
     for k in range(3):
@@ -715,23 +750,23 @@ def stairs(points, width=3.6):
         step_run = (run - land) / n
         # landing slab
         lc = (x0 + d[0] * land / 2, y0 - 0.2, z0 + d[2] * land / 2)
-        box(s, lc, mul(d, land / 2 + 0.02), (0, 0.2, 0), mul(side, width / 2 + 0.4), col=tint(0.95, 0.06))
+        box(s, add(lc, (0, -0.6, 0)), mul(d, land / 2 + 0.02), (0, 0.8, 0), mul(side, width / 2 + 0.4), col=tint(0.95, 0.06))
         for k in range(n):
             t0 = land + step_run * k
             yk = y0 + rise * (k + 1) / n
-            c = (x0 + d[0] * (t0 + step_run / 2), yk - 0.35, z0 + d[2] * (t0 + step_run / 2))
+            c = (x0 + d[0] * (t0 + step_run / 2), yk - 1.0, z0 + d[2] * (t0 + step_run / 2))
             jitter = R.uniform(-0.04, 0.04)
             dd = rot_y(d, math.degrees(jitter) * 0.3)
             ss = rot_y(side, math.degrees(jitter) * 0.3)
-            box(s, c, mul(dd, step_run / 2 + 0.06), (0, 0.35, 0), mul(ss, width / 2 + R.uniform(-0.08, 0.08)), col=tint(1.0, 0.12))
+            box(s, c, mul(dd, step_run / 2 + 0.06), (0, 1.0, 0), mul(ss, width / 2 + R.uniform(-0.08, 0.08)), col=tint(1.0, 0.12))
         # curbs: sloping stones on both sides
         for sgn in (-1, 1):
             off = mul(side, sgn * (width / 2 + 0.3))
             a = add((x0 + d[0] * land, y0 + 0.05, z0 + d[2] * land), off)
             b = add((x1, y1 + 0.05, z1), off)
-            beam(A["stone"], add(a, (0, 0.1, 0)), add(b, (0, 0.1, 0)), 0.5, 0.55)
+            beam(A["stone"], add(a, (0, -0.5, 0)), add(b, (0, -0.5, 0)), 0.5, 1.8)
             a2 = add((x0, y0 + 0.05, z0), off)
-            beam(A["stone"], add(a2, (0, 0.1, 0)), add(add((x0 + d[0] * land, y0 + 0.05, z0 + d[2] * land), off), (0, 0.1, 0)), 0.5, 0.55)
+            beam(A["stone"], add(a2, (0, -0.5, 0)), add(add((x0 + d[0] * land, y0 + 0.05, z0 + d[2] * land), off), (0, -0.5, 0)), 0.5, 1.8)
     return A
 
 
@@ -815,7 +850,7 @@ def export(asset):
 B.reset_scene()
 result = {}
 builders = [("hall", main_hall), ("pagoda", pagoda), ("gate", gate), ("bell", bell_pavilion), ("lantern", stone_lantern),
-            ("paperlantern", paper_lantern), ("banner", banner), ("flags", flag_line), ("brazier", brazier),
+            ("paperlantern", paper_lantern), ("banner", banner), ("flags", flag_line), ("brazier", brazier), ("cranebody", crane_body), ("cranewing", crane_wing),
             ("parapet", wall_segment), ("terracewall", terrace_wall), ("bridge", bridge)]
 only = ARGS.get("only")
 for key, fn in builders:

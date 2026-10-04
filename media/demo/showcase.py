@@ -22,7 +22,8 @@ from sky import ROOT, Sky  # noqa: E402
 
 GAMES = ["hollow_manor", "abyss", "hearthside", "harvest_fair", "neon_drift", "star_lancer",
          "cloudhopper", "toy_kart_rally", "zen_garden", "cyber_alley", "frostlight", "sky_dash",
-         "smugglers_cove", "hidden_alley", "namaqua_canyon", "tidebreak_isle", "neon_requiem", "gloamwater"]
+         "smugglers_cove", "hidden_alley", "namaqua_canyon", "tidebreak_isle", "neon_requiem", "gloamwater",
+         "ashen_peaks"]
 W, H = 1920, 1080
 
 
