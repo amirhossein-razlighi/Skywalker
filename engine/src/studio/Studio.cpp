@@ -674,12 +674,17 @@ bool targetsMet(const Json& metrics, const Json& targets, std::string* unmet) {
     return true;
 }
 
+// Wall-clock metrics depend on the machine and its load, so they only count when asked for (a "performance"
+// category, explicit metrics or targets); otherwise two identical runs could read as a regression.
+static bool isTimingMetric(std::string_view k) { return k.ends_with("_ms") || k == "est_fps"; }
+
 std::string effectVerdict(const Json& comparison, const std::vector<std::string>& metrics, const Json& targets) {
     int better = 0, worse = 0, considered = 0;
     Json after = Json::object();
     for (const auto& [k, row] : comparison.members()) {
         after[k] = row.get("after");
-        bool relevant = metrics.empty() ? metricDirection(k) != 0 : contains(metrics, k) || targets.contains(k);
+        bool relevant = metrics.empty() ? metricDirection(k) != 0 && (!isTimingMetric(k) || targets.contains(k))
+                                        : contains(metrics, k) || targets.contains(k);
         if (!relevant) continue;
         ++considered;
         const std::string& v = row.get("verdict").asString();

@@ -331,6 +331,14 @@ TEST_CASE("studio: metrics comparison, effect verdicts and targets") {
     CHECK_FALSE(studio::targetsMet(before, J(R"({"completion_rate":{"min":0.8}})"), &unmet));
     CHECK(unmet.find("completion_rate") != std::string::npos);
     CHECK(studio::targetsMet(after, J(R"({"completion_rate":{"min":0.8},"deaths":2})")));
+
+    // Machine load only shows up in timing metrics: they don't decide the default verdict, but do for performance.
+    Json slower = studio::compareMetrics(J(R"({"deaths":1,"avg_tick_ms":2.0,"est_fps":60})"),
+                                         J(R"({"deaths":1,"avg_tick_ms":9.0,"est_fps":30})"));
+    CHECK(slower.get("avg_tick_ms").get("verdict").asString() == "worse");
+    CHECK(studio::effectVerdict(slower, {}, Json::object()) == "unchanged");
+    CHECK(studio::effectVerdict(slower, studio::metricsForCategory("performance"), Json::object()) == "regressed");
+    CHECK(studio::effectVerdict(slower, {}, J(R"({"avg_tick_ms":{"max":5}})")) == "regressed");
 }
 
 TEST_CASE("studio: playtest goal seeker reaches the goal deterministically, scene untouched") {

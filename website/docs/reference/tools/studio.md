@@ -1176,7 +1176,7 @@ Play the game with a bot in a sandbox copy of the scene (the scene you edit is u
 
 **Compare playtests** <span class="sky-badge sky-badge--mut" title="Changes the project; undoable and attributed">mutating</span>
 
-Before/after comparison of two playtests (ids like P-3): every metric with its delta and whether it got better or worse (direction-aware: fewer deaths is better, higher completion is better). Pass feedback to record the result as that feedback's measured effect: improved → verified, regressed → regressed (its tasks reopen).
+Before/after comparison of two playtests (ids like P-3): every metric with its delta and whether it got better or worse (direction-aware: fewer deaths is better, higher completion is better). Pass feedback to record the result as that feedback's measured effect: improved → verified, regressed → regressed (its tasks reopen). Timing metrics (*_ms, est_fps) depend on the machine's load, so they only decide the verdict for performance feedback or when a target names them; they are always listed.
 
 | Argument | Type | Required | Description | Values |
 |---|---|---|---|---|

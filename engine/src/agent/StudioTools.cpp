@@ -901,7 +901,8 @@ void addStudioTools(Engine& engine, ToolRegistry& reg) {
              "Before/after comparison of two playtests (ids like P-3): every metric with its delta and whether it got "
              "better or worse (direction-aware: fewer deaths is better, higher completion is better). Pass feedback to "
              "record the result as that feedback's measured effect: improved → verified, regressed → regressed (its "
-             "tasks reopen).",
+             "tasks reopen). Timing metrics (*_ms, est_fps) depend on the machine's load, so they only decide the "
+             "verdict for performance feedback or when a target names them; they are always listed.",
              "studio",
              object({{"before", string("Earlier playtest id")},
                      {"after", string("Later playtest id")},
