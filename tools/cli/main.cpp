@@ -13,6 +13,7 @@
 //   skywalker studio status|agents|board|feedback|loops|run --project DIR ...   (StudioCommand.cpp)
 //   skywalker build --project DIR --out DIR [--name N --icon F --release --all-assets]   package a macOS app (BuildCommand.cpp)
 //   skywalker movie SCENE [JSON] -o out.mp4 [...]    render a cinematic to video / PNG frames (MovieCommand.cpp)
+//   skywalker legal [terms|privacy|license|licensing] [--accept] [--status] [--json]   terms, privacy notice, license
 //   skywalker version
 
 #include <sys/socket.h>
@@ -33,6 +34,7 @@
 #include "skywalker/core/Log.h"
 #include "skywalker/core/Strings.h"
 #include "skywalker/engine/Engine.h"
+#include "skywalker/legal/Legal.h"
 #include "skywalker/wander/Compiler.h"
 #include "skywalker/wander/Parser.h"
 #include "skywalker/wander/Runtime.h"
@@ -107,6 +109,8 @@ int usage() {
                  "  skywalker build --project DIR --out DIR [--name N] [--icon F.png] [--release] [--all-assets]   package a macOS app\n"
                  "  skywalker movie SCENE [JSON] -o out.mp4 [--sequence S] [--resolution 1080p] [--fps N] [--samples N]\n"
                  "                    [--shutter F] [--simulate] [--clay|--sketch] [--resume] ...   render a cinematic (movie --help)\n"
+                 "  skywalker legal [terms|privacy|license|licensing] [--accept] [--status] [--json]\n"
+                 "                                                 Terms of Use, Privacy Notice, license; --accept records acceptance\n"
                  "  skywalker version\n",
                  SKY_VERSION_STRING);
     return 2;
@@ -383,6 +387,13 @@ int main(int argc, char** argv) {
     if (cmd == "setup") return runSetup(args.raw);
     if (cmd == "build") return runBuild(args.raw);
     if (cmd == "movie") return runMovie(args.raw);
+    if (cmd == "legal") {
+        std::string out, err;
+        int code = legal::runCommand({args.raw.begin() + 1, args.raw.end()}, legal::defaultRecordPath(), out, err);
+        std::fputs(out.c_str(), stdout);
+        std::fputs(err.c_str(), stderr);
+        return code;
+    }
     if (cmd == "version" || cmd == "--version") {
         std::printf("skywalker %s\n", SKY_VERSION_STRING);
         return 0;

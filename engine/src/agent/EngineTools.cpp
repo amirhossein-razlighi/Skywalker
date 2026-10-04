@@ -1099,6 +1099,7 @@ void registerEngineTools(Engine& engine) {
     tools::addGameTools(engine, reg);  // engine/src/agent/GameTools.cpp
     tools::addMovieTools(engine, reg);  // engine/src/agent/MovieTools.cpp (movie render queue)
     tools::addRenderLayerTools(engine, reg);  // engine/src/agent/RenderLayerTools.cpp (render layers, cull masks)
+    tools::addLegalTools(engine, reg);  // engine/src/agent/LegalTools.cpp (terms, privacy, acceptance state)
 }
 
 }  // namespace sky

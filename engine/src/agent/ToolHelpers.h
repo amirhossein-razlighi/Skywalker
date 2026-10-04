@@ -61,5 +61,6 @@ void addImpostorTools(Engine& engine, ToolRegistry& reg);  // ImpostorTools.cpp:
 void addGameTools(Engine& engine, ToolRegistry& reg);  // GameTools.cpp: game_build, game_run, game_settings
 void addMovieTools(Engine& engine, ToolRegistry& reg);  // MovieTools.cpp: movie_render (docs/MOVIE_RENDER.md)
 void addRenderLayerTools(Engine& engine, ToolRegistry& reg);  // RenderLayerTools.cpp: render_layers
+void addLegalTools(Engine& engine, ToolRegistry& reg);  // LegalTools.cpp: legal_info (docs/legal/)
 
 }  // namespace sky::tools

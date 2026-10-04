@@ -147,6 +147,9 @@ set(SKY_ENGINE_SOURCES
     src/render/RenderLayers.cpp
     src/agent/RenderLayerTools.cpp
     src/engine/RenderBuiltins.cpp
+    # Terms of Use, Privacy Notice and the local acceptance record (docs/legal/)
+    src/legal/Legal.cpp
+    src/agent/LegalTools.cpp
 )
 
 # DCC bridge: the Python helper library and the Blender add-on are embedded so the engine can
