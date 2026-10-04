@@ -84,7 +84,9 @@ export const SketchReveal: React.FC<{
   wipeAngle?: number;
   /** shared camera move over the whole reveal */
   move?: { from: [number, number, number]; to: [number, number, number]; duration: number };
-}> = ({ slot, t, look = "luminous", origin = [62, 30], wipeAngle = 100, move }) => {
+  /** Frame at which the three matched clips start to move together (the strokes draw over their first frame). */
+  playAt?: number;
+}> = ({ slot, t, look = "luminous", origin = [62, 30], wipeAngle = 100, move, playAt = 0 }) => {
   const frame = useCurrentFrame();
   const lines = useLinework(slot);
   const drawP = interpolate(frame, t.draw, [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
@@ -104,7 +106,9 @@ export const SketchReveal: React.FC<{
   // Final: a radial bloom from the light source.
   const r = interpolate(finalP, [0, 1], [0, 170]);
   const finalMask = `radial-gradient(circle at ${origin[0]}% ${origin[1]}%, black ${Math.max(0, r - 28)}%, transparent ${r}%)`;
-  const linesFade = 1 - prog(frame, t.clay[0], t.clay[0] + (t.clay[1] - t.clay[0]) * 0.7);
+  // Once the camera moves, the traced strokes (drawn over the first frame) hand over to the moving sketch render.
+  const moving = playAt > 0 ? prog(frame, playAt + 6, playAt + 54, EASE.inOut) : 0;
+  const linesFade = Math.min(1 - prog(frame, t.clay[0], t.clay[0] + (t.clay[1] - t.clay[0]) * 0.7), 1 - moving);
   const stack: React.CSSProperties = { transform: `translate(${tx}%, ${ty}%) scale(${ts})`, transformOrigin: "50% 50%" };
   const still = { from: [0, 0, 1] as [number, number, number], to: [0, 0, 1] as [number, number, number] };
 
@@ -118,12 +122,12 @@ export const SketchReveal: React.FC<{
         {hasSlot(`${slot}_sketch`) && sketchP > 0 && (
           <AbsoluteFill
             style={{
-              opacity: sketchP * (luminous ? 0.36 : 1),
+              opacity: sketchP * (luminous ? 0.36 + 0.5 * moving : 1),
               filter: luminous ? "invert(1) sepia(0.3) hue-rotate(190deg) saturate(1.6) brightness(0.9)" : undefined,
               mixBlendMode: luminous ? "screen" : "multiply",
             }}
           >
-            <Footage slot={`${slot}_sketch`} kb={still} placeholderLabel={false} />
+            <Footage slot={`${slot}_sketch`} kb={still} playAt={playAt} placeholderLabel={false} />
           </AbsoluteFill>
         )}
         {lines && linesFade > 0 && (
@@ -133,7 +137,7 @@ export const SketchReveal: React.FC<{
         )}
         {clayP > 0 && (
           <AbsoluteFill style={{ WebkitMaskImage: clayMask, maskImage: clayMask }}>
-            <Footage slot={`${slot}_clay`} kb={still} placeholderLabel={false} />
+            <Footage slot={`${slot}_clay`} kb={still} playAt={playAt} placeholderLabel={false} />
           </AbsoluteFill>
         )}
         {clayP > 0 && clayP < 1 && (
@@ -146,7 +150,7 @@ export const SketchReveal: React.FC<{
         )}
         {finalP > 0 && (
           <AbsoluteFill style={{ WebkitMaskImage: finalMask, maskImage: finalMask }}>
-            <Footage slot={slot} kb={still} placeholderLabel={false} />
+            <Footage slot={slot} kb={still} playAt={playAt} placeholderLabel={false} />
           </AbsoluteFill>
         )}
         {finalP > 0 && finalP < 1 && (

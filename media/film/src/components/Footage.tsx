@@ -1,5 +1,5 @@
 import React from "react";
-import { AbsoluteFill, getStaticFiles, Img, interpolate, OffthreadVideo, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
+import { AbsoluteFill, Freeze, getStaticFiles, Img, interpolate, OffthreadVideo, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
 import { SLOT } from "../footage";
 import { C, EASE, FONT } from "../theme";
 
@@ -25,6 +25,9 @@ export const hasSlot = (slot: string) => resolveSlot(slot).kind !== "none";
 /** First slot in the chain that has media (so pending flagship shots borrow an existing one in drafts). */
 export const pickSlot = (slot: string, fallback: string[] = []) => [slot, ...fallback].find(hasSlot) ?? slot;
 
+/** Start offset that centers a shot of `shown` frames inside the slot's clip (the middle of a move reads best). */
+export const clipOffset = (slot: string, shown: number) => Math.max(0, Math.floor(((SLOT[slot]?.frames ?? shown) - shown) / 2));
+
 /** Ken Burns move for stills: scale and drift in normalized units, over the sequence. */
 export interface KenBurns {
   from?: [number, number, number]; // [x%, y%, scale]
@@ -38,13 +41,19 @@ export const Footage: React.FC<{
   kb?: KenBurns;
   /** Start offset into a video clip, in frames. */
   offset?: number;
+  /** Sequence frame at which a video clip starts to play; before it, the clip holds on frame `offset`. */
+  playAt?: number;
+  /** Playback speed of a video clip (0.5 = half-speed slow motion). */
+  rate?: number;
+  /** Also apply the Ken Burns move to video clips (they move on their own, so by default it only applies to stills). */
+  moveVideo?: boolean;
   style?: React.CSSProperties;
   /** Fit inside a smaller frame (e.g. a UI window). */
   fit?: "cover" | "contain";
   placeholderLabel?: boolean;
   /** Slots to use, in order, while this one has no media yet. */
   fallback?: string[];
-}> = ({ slot: wanted, duration, kb, offset = 0, style, fit = "cover", placeholderLabel = true, fallback }) => {
+}> = ({ slot: wanted, duration, kb, offset = 0, playAt = 0, rate = 1, moveVideo = false, style, fit = "cover", placeholderLabel = true, fallback }) => {
   const slot = pickSlot(wanted, fallback);
   const frame = useCurrentFrame();
   const { durationInFrames } = useVideoConfig();
@@ -58,9 +67,23 @@ export const Footage: React.FC<{
   const s = interpolate(t, [0, 1], [from[2], to[2]]);
 
   if (r.kind === "video") {
+    // Frame-exact control: hold before playAt, play at `rate`, then hold on the clip's last frame.
+    const len = SLOT[slot]?.frames ?? 1e6;
+    const vf = Math.max(0, Math.min(len - 1, Math.floor(offset + Math.max(0, frame - playAt) * rate)));
     return (
-      <AbsoluteFill style={{ background: C.void, ...style }}>
-        <OffthreadVideo src={r.src} muted startFrom={offset} style={{ width: "100%", height: "100%", objectFit: fit }} />
+      <AbsoluteFill style={{ background: C.void, overflow: "hidden", ...style }}>
+        <Freeze frame={vf}>
+          <OffthreadVideo
+            src={r.src}
+            muted
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: fit,
+              transform: moveVideo ? `translate(${x}%, ${y}%) scale(${s})` : undefined,
+            }}
+          />
+        </Freeze>
       </AbsoluteFill>
     );
   }
