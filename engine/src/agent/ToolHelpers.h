@@ -82,5 +82,6 @@ Json characterPerfStats(Engine& engine, double groomRenderMs = -1.0);
 void addSaveTools(Engine& engine, ToolRegistry& reg);    // SaveTools.cpp: save_game, load_game, save_list, save_inspect, save_delete
 void addLocaleTools(Engine& engine, ToolRegistry& reg);  // LocaleTools.cpp: locale_list, locale_set, locale_check, locale_extract, locale_pseudo
 void addSceneFlowTools(Engine& engine, ToolRegistry& reg);  // SceneFlowTools.cpp: scene_flow_info, scene_change, scene_additive_*
+void addWanderDebugTools(Engine& engine, ToolRegistry& reg);  // WanderDebugTools.cpp: wander_break_*, wander_step, wander_stack...
 
 }  // namespace sky::tools

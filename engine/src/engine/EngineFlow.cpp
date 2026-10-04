@@ -17,6 +17,7 @@ namespace sky {
 // ---------------------------------------------------------------------------
 
 int Engine::advance(double seconds) {
+    if (debugHolding()) return 0;  // paused at a Wander breakpoint: time stands still
     if (playState_ != PlayState::Playing || seconds <= 0.0) return 0;
     realSinceFrame_ += seconds;
     accumulator_ += std::min(seconds, 0.25);  // avoid spiral of death after stalls
@@ -108,7 +109,8 @@ FrameData Engine::frame(const CaptureOptions& opts) {
         }
     }
     flowStats_.frameHandlerRuns = 0;
-    if (opts.frameHandlers && live) {
+    // Not while a tick is held in the Wander debugger: the paused frames own the VM's registers.
+    if (opts.frameHandlers && live && !debugHolding()) {
         wander::Runtime::FrameInfo info;
         info.dt = std::max(0.f, opts.frameDt);
         info.alpha = alpha;

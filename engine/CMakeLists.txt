@@ -218,6 +218,10 @@ set(SKY_ENGINE_SOURCES
     src/game/SceneFlow.cpp
     src/game/SceneFlowBuiltins.cpp
     src/agent/SceneFlowTools.cpp
+    # Wander debugger: breakpoints, stepping, inspection; debugged ticks on a handoff thread (docs/WANDER.md)
+    src/wander/Debugger.cpp
+    src/engine/EngineDebug.cpp
+    src/agent/WanderDebugTools.cpp
 )
 
 # DCC bridge: the Python helper library and the Blender add-on are embedded so the engine can

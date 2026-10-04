@@ -13,6 +13,7 @@
 
 #include "RuntimeInternal.h"
 #include "skywalker/core/Strings.h"
+#include "skywalker/wander/Debugger.h"
 #include "skywalker/ecs/Reflection.h"
 #include "skywalker/wander/Aot.h"
 
@@ -864,7 +865,9 @@ void markVarDirty(ExecState& st, int var) {
 
 // Single = true executes from pc until it leaves [pc, stopPc) (one instruction, or a
 // straight-line range for native code); false runs until the proto ends.
-template <bool Single>
+// Debug = true (only while the debugger is active) tells the debugger before every statement: a new
+// line, or the same line again after a backward jump (a loop). The normal instantiation has no hook.
+template <bool Single, bool Debug = false>
 bool interpret(ExecState& st, int protoIndex, Value* R, size_t& pc, Outcome& out, size_t stopPc = 0) {
     [[maybe_unused]] const size_t startPc = pc;
     const Program& prog = *st.prog;
@@ -872,8 +875,19 @@ bool interpret(ExecState& st, int protoIndex, Value* R, size_t& pc, Outcome& out
     const Ins* code = P.code.data();
     const Value* K = prog.constants.data();
     const SourceLoc* locs = P.locs.data();
+    [[maybe_unused]] Debugger* debugger = Debug ? &st.rt.debugger() : nullptr;
+    [[maybe_unused]] int lastLine = -1;
+    [[maybe_unused]] size_t lastPc = 0;
 #define LOC (locs[pc - 1])
     for (;;) {
+        if constexpr (Debug) {
+            if (locs[pc].line != lastLine || pc <= lastPc) {
+                lastLine = locs[pc].line;
+                // A plain jump (a loop's way back) is not a statement: its target is.
+                if (code[pc].op != Op::Jmp) debugger->statement(st, protoIndex, pc);
+            }
+            lastPc = pc;
+        }
         const Ins in = code[pc++];
         switch (in.op) {
             case Op::Nop: break;
@@ -1277,8 +1291,35 @@ bool interpret(ExecState& st, int protoIndex, Value* R, size_t& pc, Outcome& out
 
 }  // namespace
 
+namespace {
+
+/// A proto run under the debugger: its frame is on the debugger's stack while it runs, and a runtime
+/// error stops at the failing statement (break on error) before it unwinds.
+void runDebugged(ExecState& st, int proto, Value* regs, size_t& pc, Outcome& out) {
+    Debugger& d = st.rt.debugger();
+    struct FrameScope {
+        Debugger& d;
+        ~FrameScope() { d.leaveFrame(); }
+    } scope{d};
+    d.enterFrame(st, proto, regs, &pc);
+    try {
+        interpret<false, true>(st, proto, regs, pc, out);
+    } catch (const RuntimeError& err) {
+        if (pc > 0) --pc;  // the frame shows the failing statement
+        d.runtimeError(st, proto, pc, err.message);
+        throw;
+    }
+}
+
+}  // namespace
+
 Outcome runProto(ExecState& st, int proto, Value* regs, size_t pc) {
     Outcome out;
+    // The only cost of the debugger when idle: this check, once per handler / function run.
+    if (st.rt.debugger().active() && !st.cosmetic) [[unlikely]] {
+        runDebugged(st, proto, regs, pc, out);
+        return out;
+    }
     if (st.native) {
         if (aotRun(st, proto, regs, pc, out)) return out;
     }
@@ -1302,11 +1343,16 @@ Runtime::Runtime(Scene& scene, const BuiltinRegistry* registry)
     : scene_(scene),
       registry_(registry ? registry : &BuiltinRegistry::global()),
       impl_(std::make_unique<Impl>()),
-      rng_(scene.seed) {}
+      rng_(scene.seed) {
+    debugger_ = std::make_unique<Debugger>(*this);
+}
 
 Runtime::~Runtime() = default;
 
 void Runtime::reset(bool keepQueuedEvents) {
+    debugger_->onReset();
+    ticking_ = false;      // a tick the debugger abandoned (play stopped while paused) never finished
+    impl_->stackTop = 0;
     rng_.reseed(scene_.seed);
     time_ = 0;
     frame_ = 0;

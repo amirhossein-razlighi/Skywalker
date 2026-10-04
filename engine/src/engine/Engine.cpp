@@ -3,6 +3,7 @@
 #include "skywalker/game/GameSettings.h"
 #include "skywalker/game/SaveGame.h"
 #include "skywalker/game/SceneFlow.h"
+#include "EngineDebug.h"  // Wander debugger runs (complete type for the destructor)
 
 #include <algorithm>
 #include <atomic>
@@ -212,11 +213,13 @@ Engine::Engine(EngineConfig config)
     registerEngineTools(*this);
     mainThread_ = std::this_thread::get_id();
     customTools_ = std::make_unique<CustomTools>(*this);  // after the built-in tools: custom ones never shadow them
+    initDebugger();  // Wander debugger host (EngineDebug.cpp)
     log::info("engine", std::string("Skywalker ") + SKY_VERSION_STRING + " ready (renderer: " + renderer_->info().backend +
                             " " + renderer_->info().device + ")");
 }
 
 Engine::~Engine() {
+    abortDebugRun();  // a VM paused in the Wander debugger unwinds first
     movie_.reset();  // a running movie render restores the scene and closes its files first
     {
         // Refuse new jobs and release any thread waiting on a queued one, *then* join the
@@ -241,6 +244,7 @@ ToolResult Engine::callTool(std::string_view name, const Json& args, const std::
 }
 
 ToolResult Engine::callTool(std::string_view name, const Json& args, ToolContext ctx) {
+    if (ToolResult held = debugGuard(name); held.isError) return held;
     ToolResult result = tools_.call(name, args, ctx);
     recordToolEvent(name, result, ctx.actor);
     return result;
@@ -250,7 +254,8 @@ Engine::PendingCall Engine::beginTool(std::string_view name, const Json& args, c
     PendingCall call{std::string(name), actor, {}};
     ToolContext ctx;
     ctx.actor = actor;
-    call.result = tools_.invoke(name, args, ctx);
+    call.result = debugGuard(name);
+    if (!call.result.isError) call.result = tools_.invoke(name, args, ctx);
     if (!call.result.deferred) recordToolEvent(name, call.result, actor);
     return call;
 }
@@ -361,6 +366,7 @@ void Engine::pause() {
 
 void Engine::stop() {
     if (playState_ == PlayState::Editing) return;
+    abortDebugRun();  // a tick held at a Wander breakpoint is abandoned
     playState_ = PlayState::Editing;
     ChangeObserver* obs = scene_->observer();
     (void)scene_->loadJson(playSnapshot_);
@@ -388,6 +394,11 @@ void Engine::step(int ticks) {
         play();
         pause();
     }
+    if (debugStep(ticks)) return;  // the Wander debugger runs these ticks on its thread (EngineDebug.cpp)
+    runTicks(ticks);
+}
+
+void Engine::runTicks(int ticks) {
     SKY_PROFILE_SCOPE("sim.step");
     for (int i = 0; i < ticks; ++i) {
         // Game pause / time scale requests apply here; the gate says which entities run (process modes).
@@ -1890,7 +1901,8 @@ Json Engine::callToolFromConnection(const std::string& tool, const Json& args, c
         [this, tool, args, callCtx, abandoned, pending, actor]() -> Json {
             if (abandoned->load()) return ToolResult::error(Error::make("timeout", "request abandoned")).toMcp();
             ToolContext ctx = callCtx;
-            ToolResult r = tools_.invoke(tool, args, ctx);
+            ToolResult r = debugGuard(tool);
+            if (!r.isError) r = tools_.invoke(tool, args, ctx);
             *actor = ctx.actor;  // a callback is attributed to whoever called the external tool
             if (r.deferred) {
                 *pending = std::move(r);

@@ -59,6 +59,7 @@ struct BehaviorScope {
 struct Local {
     std::string name;
     int reg = 0;
+    size_t startPc = 0;  // debug info: where the local comes into scope
     TypeSet type = kTAny;
     bool isConst = false;
     bool annotated = false;
@@ -771,6 +772,7 @@ private:
         Local l;
         l.name = name;
         l.reg = allocReg(loc);
+        l.startPc = pc();
         l.type = type;
         l.isConst = isConst;
         l.annotated = annotated;
@@ -778,7 +780,14 @@ private:
         return fn_->blocks.back().back();
     }
     void pushBlock() { fn_->blocks.emplace_back(); }
+    /// Debug info: the named locals of a block that ends here.
+    void recordLocals(const std::vector<Local>& block) {
+        for (const auto& l : block) {
+            if (!l.name.empty()) P().locals.push_back({l.name, l.reg, l.startPc, pc()});
+        }
+    }
     void popBlock() {
+        recordLocals(fn_->blocks.back());
         fn_->blocks.pop_back();
         fn_->freeReg = localsEnd();
     }
@@ -809,6 +818,7 @@ private:
         } else {
             emit(Op::Stop, 0, 0, 0, loc);
         }
+        for (const auto& b : fn_->blocks) recordLocals(b);
     }
 
     void compileFn(const FnDecl& f, int fnIndex, const DeclScope* decl, BehaviorScope* bs) {

@@ -121,6 +121,26 @@ vars are mirrored into `entity_get` after every tick; replacing a behavior while
 ## Debugging a running behavior
 
 `wander_inspect {entity}` (while playing): current state and its age for each state machine, handlers waiting in `wait`, and vars. Then `logs`, `sim_trace`, `sim_control step` a few ticks at a time.
+When logs and traces are not enough, use the **debugger** (while playing): it stops the game *inside* a handler with the world frozen mid-tick.
+
+- `wander_break_set {script, line, condition, hit_count, log, entity}`: `script` is the behavior name from `behavior_set`; `condition` is a Wander expression (`"hp <= 0"`); `hit_count` `"5"`, `">=5"`, `"%10"`;
+  `log` makes a logpoint (`"hp={hp}"`, never stops). `wander_break_set {on_error:true}` stops at the failing statement of any runtime error. `wander_break_list`, `wander_break_clear {id | script}` (no arguments clears all).
+- Let ticks run (`sim_control step` or play), then `wander_debug_state {wait_ms}` says whether and where it stopped. `wander_stack` shows frames, args, locals, the entity's vars and globals;
+  `wander_eval {expression, frame}` evaluates in a frame (read-only); `wander_set_var {name, value}` changes a local or var to try a fix.
+- `wander_step {mode: over|into|out}`, `wander_continue`, `wander_pause`. While paused, world-changing tools answer `paused_in_debugger`: continue first, or `sim_control stop` (abandons the tick).
+- Resuming replays identically, so breakpoints never change the outcome. Clear them when done: an idle debugger costs nothing.
+
+```text
+wander_break_set {script:"Guard", line:12, condition:"hp <= 0"}
+sim_control {action:"step", ticks:60}
+wander_debug_state {wait_ms:2000}
+wander_stack {}
+wander_eval {expression:"distance(self, target)"}
+wander_step {mode:"into"}
+wander_continue {}
+wander_break_clear {}
+```
+
 Emit events and tags that `playtest_run` understands (`death`, `fail`, `damage`, `objective`, `checkpoint`, `pickup`; tags `player goal hazard enemy`) so bots can measure the game (skywalker-studio).
 
 ## Save games (checkpoints, autosave, Continue)
