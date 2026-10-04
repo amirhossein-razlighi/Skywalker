@@ -640,6 +640,7 @@ void addViewTools(Engine& engine, ToolRegistry& reg) {
                                                 "Buffer visualization for diagnosing looks: material = roughness (red) / metallic (green), "
                                                 "gi = bounce light, lighting = before screen-space GI/reflections, impostors = the final image "
                                                 "with foliage meshes tinted green and distant impostors magenta")},
+                     {"quality", enumeration({"full", "balanced", "fast"}, "Viewport quality tier (default full; fast/balanced preview what the editor shows while editing)")},
                      {"include_image", boolean("Return the image (default true); false = only the entity list")},
                      {"save_path", string("Also write the PNG to this project-relative path")}}),
              false, false, [&engine](const Json& a, ToolContext&) {
@@ -670,6 +671,8 @@ void addViewTools(Engine& engine, ToolRegistry& reg) {
                      std::string dv = a.get("debug_view").asString();
                      for (int i = 0; i < 11; ++i) if (dv == kViews[i]) o.debugView = i;
                      o.clay = a.get("clay").asBool(false);
+                     std::string q = a.get("quality").asString();
+                     o.quality = q == "fast" ? 2 : q == "balanced" ? 1 : 0;
                  }
                  auto cap = engine.capture(o);
                  if (!cap) return ToolResult::error(cap.error());
@@ -772,7 +775,7 @@ void addViewTools(Engine& engine, ToolRegistry& reg) {
 
     reg.add({"viewport_quality", "Viewport quality",
              "How the live editor viewport renders while editing: fast (default; lower internal resolution, no "
-             "screen-space GI/reflections, flat clouds, near foliage shadows, coarser LODs) keeps heavy worlds "
+             "screen-space GI/reflections or light shafts, near foliage shadows, coarser LODs) keeps heavy worlds "
              "responsive; balanced; full (what the game and captures show). Play mode always renders full.",
              "view", object({{"quality", enumeration({"fast", "balanced", "full"}, "Editing quality (omit to read)")}}),
              false, false, [&engine](const Json& a, ToolContext&) {
@@ -970,7 +973,16 @@ void addAssetAndRenderTools(Engine& engine, ToolRegistry& reg) {
                      } else if (req->kind == "texture") {
                          patch = Json::object({{"texture", req->path}});
                      } else if (req->kind == "sprite") {
-                         patch = Json::object({{"mesh", "quad"}, {"texture", req->path}, {"billboard", true}, {"color", "#ffffff"}});
+                         // The target becomes a sprite (camera-facing in 3D scenes; flat when it already was a 2D sprite).
+                         EntityId target = req->target;
+                         Scene& sc = engine.scene();
+                         Json sprite = Json::object({{"texture", req->path}, {"frame", ""}, {"color", "#ffffff"}});
+                         if (!sc.get<Sprite>(target)) sprite["billboard"] = "y";
+                         Status st = engine.edit(ctx.actor, "Apply generated sprite", [&]() -> Status {
+                             if (Status r = sc.patchComponent(target, "sprite", sprite); !r) return r;
+                             return sc.get<MeshRenderer>(target) ? sc.patchComponent(target, "mesh", Json()) : Status{};
+                         });
+                         if (!st) return fail(st);
                      }
                      if (patch.isObject()) {
                          EntityId target = req->target;
@@ -1028,6 +1040,9 @@ void registerEngineTools(Engine& engine) {
     tools::addWorldTools(engine, reg);
     tools::addNetworkTools(engine, reg);
     tools::addFxTools(engine, reg);
+    tools::addTools2D(engine, reg);
+    tools::addUiTools(engine, reg);
+    tools::addDialogueTools(engine, reg);
     tools::addWorldBuildTools(engine, reg);
     tools::addAudioTools(engine, reg);
     tools::addInputTools(engine, reg);
@@ -1037,6 +1052,7 @@ void registerEngineTools(Engine& engine) {
     tools::addAnimationTools(engine, reg);
     tools::addHairTools(engine, reg);
     tools::addImpostorTools(engine, reg);
+    tools::addGameTools(engine, reg);  // engine/src/agent/GameTools.cpp
 }
 
 }  // namespace sky

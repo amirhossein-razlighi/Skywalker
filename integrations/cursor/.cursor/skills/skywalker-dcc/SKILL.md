@@ -11,7 +11,7 @@ if you use them. These tools run code on the human's computer: **the human appro
 
 ## First call: what is available
 
-`dcc_list {}` lists installed apps, versions, running jobs, the live session and the procedural recipes. If Blender is missing,
+`dcc_list {}` lists installed apps, versions, running jobs, the live session and the procedural recipes. `dcc_session_status {}` answers "is a live Blender session connected, and what is in it?" (version, open file, object counts, selection, or why it is not connected and how to connect). If Blender is missing,
 tell the human to install it or set `SKY_BLENDER` / `~/.skywalker/dcc/paths.json`; do not try to fake it.
 
 ## Choose the right tool
@@ -84,6 +84,7 @@ decimate, bevel, merge_by_distance, triangulate, shade_smooth, smart_uv, apply_m
 
 ```text
 dcc_install_addon {}                                               # once; human clicks N panel > Skywalker > Start Bridge
+dcc_session_status {}                                              # connected? version, open file, selection; not connected: says how to connect
 dcc_session_start {headless:false, open:"props/lantern.glb"}       # or headless:true for a windowless session
 dcc_session_exec {code:"bpy.ops.object.modifier_add(type='SUBSURF')"}        # state persists like a REPL, short calls only
 dcc_session_pull_selection {name:"Lantern", origin:"bottom_center"}  # first call imports and places

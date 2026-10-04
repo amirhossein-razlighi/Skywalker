@@ -22,11 +22,12 @@ full descriptions; `component_schema` and each tool's input schema list every fi
 
 | Task | Tool |
 |---|---|
-| Render | `viewport_capture {width, height, view:editor\|scene, camera_entity, eye, target, fov, aperture, focus_distance, annotate, overlays, samples, debug_view, include_image, save_path}` |
+| Render | `viewport_capture {width, height, view:editor\|scene, camera_entity, eye, target, fov, aperture, focus_distance, annotate, overlays, samples, clay, debug_view, quality:full\|balanced\|fast, include_image, save_path}` |
 | Four views | `viewport_multi {focus, size}` |
 | Editor camera | `camera_set {frame, eye, target, yaw, pitch, distance}` |
 | Pixel to entity | `viewport_pick {x*, y*, width, height}` |
-| Performance | `perf_stats` (draw calls, lights, frame build ms) |
+| Editor viewport tier | `viewport_quality {quality: fast\|balanced\|full}` (omit to read; the human's live view, captures stay `full` unless `quality` is passed) |
+| Performance | `perf_stats {frames, width, height, view, quality}` (draw calls, lights, GPU/CPU ms) |
 
 ## World
 
@@ -54,7 +55,38 @@ full descriptions; `component_schema` and each tool's input schema list every fi
 
 ## Behavior and simulation
 
-`wander_reference`, `wander_check {source*}`, `behavior_set {entity*, name*, intent, source, enabled, allow_errors}`, `behavior_remove {entity*, name*}`, `sim_control {action*: play\|pause\|stop\|step\|status, ticks}`, `sim_input {press, hold, release, actions, axes, gamepad, mouse, click, event, target}`, `sim_trace {entities*, properties*, ticks, every, press, hold, restore}`, `logs {limit}`, `input_map`.
+`wander_reference {topic}`, `wander_check {source*, format, disassemble}`, `behavior_set {entity*, name*, intent, spec, source, enabled, allow_errors}`, `behavior_remove {entity*, name*}`, `behavior_spec {entity*, name*}`,
+`wander_test {entity, name, source, filter, mode:entity\|scene\|isolated, max_seconds}`, `behavior_graph {entity, name, source, palette}` / `behavior_from_graph {graph*, entity, name, allow_errors}`, `wander_inspect {entity*}`,
+`sim_control {action*: play\|pause\|stop\|step\|status, ticks}`, `sim_input {press, hold, release, actions, axes, gamepad, mouse, click, event, data, target}`, `sim_trace {entities*, properties*, ticks, every, press, hold, restore}`, `logs {limit}`, `input_map`.
+Native code: `wander_compile_native {entity, force, auto}`, `native_template {name, overwrite}`, `native_build {force, load}`, `native_list`. See skywalker-wander.
+
+## Physics and navigation
+
+`physics_add {entity\|entities, preset*: prop\|static_level\|kinematic_platform\|player_character\|npc_character\|trigger_zone\|debris\|projectile\|remove, overrides}`, `physics_settle {entities, seconds, freeze_others}`,
+`physics_query {type*: raycast\|raycast_all\|shapecast\|overlap, origin*, direction, max_distance, shape, radius, height, half_extents, exclude, include_triggers, layers}`, `physics_debug {view: editor\|scene\|top, focus, show_static, include_image}`,
+`physics_settings {gravity, substeps, ignorePairs, allowSleep, enabled}`, `nav_build {agent_radius, agent_height, max_climb, max_slope, cell_size, geometry, save, path}`, `nav_path {from*, to*}`, `nav_debug {focus, from, to, size}`. See skywalker-physics.
+
+## 2D, UI and dialogue
+
+`sprite_sheet_slice {image*, cell, columns, rows, names, animations, entity}`, `sprite_atlas_pack {folder, inputs, output, padding, trim, extrude, fps}`, `tilemap_from_ascii {map*, legend*, entity, name, tileset, tile_size, autotile, solid, solid_tiles, position}`,
+`tilemap_paint {entity*, action*: set\|fill\|flood\|clear, tile, cells, rect, at, layer}`, `tilemap_inspect {entity*, layer, max_rects}`, `ui_create {root, elements, template, parent, canvas, width, height}`, `ui_inspect {canvas, element, width, height}`,
+`ui_interact {element, at, action: click\|set_value\|type\|scroll\|focus, value, text}`, `ui_style {canvas, theme, path, rules, vars, element, style, css, list}`, `dialogue_check {path, source, entity, start}`,
+`dialogue_preview {path, source, entity, start, choices, vars}`, `dialogue_control {action*: start\|advance\|choose\|stop\|state, entity, node, choice}`. See skywalker-2d-ui.
+
+## Animation and sequences
+
+`animation_list {entity, model, bones}`, `animator_setup {entity*, preset, clips, controller, path, library, root_motion}`, `animator_set {entity*, params, trigger, play, fade, look_at, preview, time}`, `animation_preview {entity*, clip, times, params, view, save_path}`,
+`bone_attach {entity*, to*, bone*, offset, rotation}`, `bone_ik {character*, bone*, entity, position, pole, weight}`, `sequence_create {path*, duration, entity}`, `sequence_key {sequence*, keys, camera_cuts, events, animations}`,
+`sequence_camera_shot {sequence*, shot*, duration*, camera, target, start, ...}`, `sequence_get {sequence*, time}`, `sequence_scrub {sequence*, times, fps, from, to, save_dir}`, `sequence_play {sequence*, action, from}`. See skywalker-animation.
+
+## Effects and hair
+
+`fx_create {effect*, name, position, parent, overrides}`, `fx_burst {entity*, count}`, `fx_stats`, `fx_benchmark {width, height, frames, eye, target, serial}`, `groom_create {entity*, preset, overrides}`, `groom_update {entity*, preset, fields}`,
+`groom_info {entity}`, `groom_export {entity*, path*}`. See skywalker-vfx.
+
+## Shipping
+
+`game_settings {operation: get\|set, settings}`, `game_build {out, name, icon, version, bundle_id, scene, release, all_assets, sign, build_native, dry_run}`, `game_run {action: start\|stop\|status, scene, app, capture, frames, seconds, width, height, fullscreen, quality, wait, pid}`. See skywalker-ship.
 
 ## Audio
 
@@ -62,13 +94,13 @@ full descriptions; `component_schema` and each tool's input schema list every fi
 
 ## DCC (Blender)
 
-`dcc_list`, `dcc_generate`, `dcc_run_script`, `dcc_convert`, `dcc_export`, `dcc_edit_asset`, `dcc_install_addon`, `dcc_session_*`, `dcc_receive`, `dcc_cancel`. See skywalker-dcc.
+`dcc_list`, `dcc_generate`, `dcc_run_script`, `dcc_convert`, `dcc_export`, `dcc_edit_asset`, `dcc_install_addon`, `dcc_session_start` / `dcc_session_status` / `dcc_session_exec` / `dcc_session_pull_selection` / `dcc_session_send` / `dcc_session_stop`, `dcc_receive`, `dcc_cancel`. See skywalker-dcc.
 
 ## Studio
 
-`studio_overview`, `studio_agent_*`, `studio_team_template`, `studio_memory`, `studio_task_*`, `studio_feedback_*`, `studio_decide`, `studio_loop_*`, `studio_message_send`, `studio_inbox`, `playtest_run`, `playtest_compare`. See skywalker-studio.
+`studio_overview`, `studio_agent_*`, `studio_team_template`, `studio_memory`, `studio_usage_report`, `studio_task_*`, `studio_feedback_*`, `studio_decide`, `studio_loop_*`, `studio_message_send`, `studio_inbox`, `playtest_run`, `playtest_compare`. See skywalker-studio.
 
 ## Approvals
 
 Tools with `openWorld` reach outside the project and need the human's approval in MCP clients: `asset_download`
-(network) and the script-running `dcc_*` tools. Everything else is local, undoable and attributed.
+(network), the script-running `dcc_*` tools, and `game_build` / `game_run` (files and processes outside the project). The native-code tools (`native_build`, `wander_compile_native`) are local but run compiled C++ in the engine process, so MCP clients and the in-editor crew ask for them too: review the code first. Everything else is local, undoable and attributed.

@@ -90,3 +90,4 @@ examples/*/terrain/*.r16
 
 # Project caches (impostor atlases, native builds): rebuilt on demand
 .skywalker/cache/
+examples/*/studio/usage.json

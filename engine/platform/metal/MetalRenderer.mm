@@ -48,6 +48,7 @@
 #include "skywalker/render/LightClusters.h"
 #include "skywalker/render/MeshData.h"
 #include "skywalker/render/Renderer.h"
+#include "MetalRenderer2D.h"  // 2D world quads + UI (Frame2D)
 
 namespace sky {
 
@@ -399,6 +400,8 @@ public:
         bd.storageMode = MTLStorageModePrivate;
         brdfLut_ = [device_ newTextureWithDescriptor:bd];
         bakeBrdf();
+        r2d_ = std::make_unique<MetalRenderer2D>(device_);  // 2D + UI
+        if (!r2d_->init()) r2d_.reset();
         for (auto& r : ring_) r = [device_ newBufferWithLength:kRingSize options:MTLResourceStorageModeShared | MTLResourceCPUCacheModeWriteCombined];
         buildTerrainPatch();
         auto volume3D = [&](NSUInteger n) {
@@ -474,6 +477,7 @@ public:
         meshes_.erase(key);
         textures_.erase(key + "#srgb");
         textures_.erase(key + "#linear");
+        if (r2d_) r2d_->invalidate(key);  // 2D
     }
 
     Status render(const FrameData& frame) override {
@@ -481,7 +485,11 @@ public:
             const bool accumulateFrame = std::clamp(frame.samples, 1, 256) > 1;
             const float renderScale = accumulateFrame ? 1.f : std::clamp(frame.environment.renderScale, 0.33f, 1.f);
             ensureTargets(frame.width, frame.height, renderScale);
-            const bool upscale = !accumulateFrame && renderScale < 0.999f && temporalScaler() != nil;
+            // Upscaling: interactive editor tiers use the GPU-only MetalFX spatial scaler after our
+            // own TAA (cheap, robust under load); full-quality frames use the temporal scaler.
+            const bool scaled = !accumulateFrame && renderScale < 0.999f;
+            const bool spatialUpscale = scaled && frame.quality > 0 && spatialScaler() != nil;
+            const bool upscale = scaled && !spatialUpscale && temporalScaler() != nil;
             ensureHdri(frame.environment);
             const Environment& env = frame.environment;
             Cascades cascades = computeCascades(frame);
@@ -509,15 +517,12 @@ public:
             dispatch_semaphore_wait(inFlight_, DISPATCH_TIME_FOREVER);
             ringIndex_ = (ringIndex_ + 1) % kFramesInFlight;
             ringOffset_ = 0;
+            // Accumulated stills commit one command buffer per sub-sample: a single multi-second
+            // command buffer trips the GPU watchdog ("progress timeout") and starves the window
+            // server, while short ones let the system interleave its own work.
             id<MTLCommandBuffer> cmd = [queue_ commandBuffer];
             cmd.label = @"Skywalker Frame";
-            dispatch_semaphore_t sem = inFlight_;
-            auto gpuMs = gpuMs_;
-            [cmd addCompletedHandler:^(id<MTLCommandBuffer> done) {
-                double ms = (done.GPUEndTime - done.GPUStartTime) * 1000.0;
-                if (ms > 0.0) gpuMs->store(ms);
-                dispatch_semaphore_signal(sem);
-            }];
+            id<MTLCommandBuffer> firstCmd = cmd;
             lightsBuf_ = transient(allLights.data(), allLights.size() * sizeof(GPULight));
             clusterCellsBuf_ = transient(grid.cells.data(), grid.cells.size() * sizeof(uint32_t));
             clusterIndexBuf_ = transient(grid.indices.data(), grid.indices.size() * sizeof(uint32_t));
@@ -535,6 +540,7 @@ public:
                 foliage_->prepare(cmd, frame, fv, frameIndex_);
             }
             encodeShadows(cmd, frame, base, cascades);
+            if (r2d_) r2d_->encodeOccluders(cmd, frame);  // 2D shadow casters
             for (int i = 0; i < samples; ++i) {
                 // Sub-pixel jitter (Halton 2,3): TAA spreads it over frames, stills over sub-samples.
                 Vec2 j = jittered ? halton23(accumulate ? static_cast<uint64_t>(i) : frameIndex_) : Vec2{0, 0};
@@ -562,9 +568,15 @@ public:
                 [blit copyFromTexture:depthResolved_ toTexture:depthPrev_];
                 [blit endEncoding];
                 if (!accumulate) historyValid_ = true;
+                if (accumulate && i + 1 < samples) {
+                    [cmd commit];
+                    cmd = [queue_ commandBuffer];
+                    cmd.label = @"Skywalker Frame (sub-sample)";
+                }
             }
             if (accumulate) historyValid_ = true;  // the converged still seeds later TAA frames
-            postSource_ = upscale ? upscaled_ : taa_[taaCurrent_];
+            if (spatialUpscale) encodeSpatialUpscale(cmd);
+            postSource_ = upscale || spatialUpscale ? upscaled_ : taa_[taaCurrent_];
             encodePost(cmd, frame, accumulate, base);
             if (frame.debugView > 0 && frame.debugView != 10) {  // 10 (impostors) tints the final image instead
                 PostUniforms pu{};
@@ -573,9 +585,19 @@ public:
                 fullscreen(cmd, debugViewPipeline_, resolve_, {gbufA_, gbufB_, giOut_, ssrOut_, aoBlurred_, depthResolved_, hdr_},
                            &pu, sizeof(pu), false, @"Debug view");
             }
+            if (r2d_) r2d_->encodeUI(cmd, frame, resolve_, depthResolved_);  // UI at output resolution
             encodeOverlays(cmd, frame, base);
             fx_->trackFrame(cmd);  // [hair+vfx] GPU frame time
             foliage_->trackFrame(cmd);  // [foliage] GPU-counted instances and triangles
+            {
+                dispatch_semaphore_t sem = inFlight_;
+                auto gpuMs = gpuMs_;
+                [cmd addCompletedHandler:^(id<MTLCommandBuffer> done) {
+                    double ms = (done.GPUEndTime - firstCmd.GPUStartTime) * 1000.0;  // whole frame, all sub-samples
+                    if (ms > 0.0) gpuMs->store(ms);
+                    dispatch_semaphore_signal(sem);
+                }];
+            }
             [cmd commit];
             lastCommand_ = cmd;
             evictWorldCaches();
@@ -943,7 +965,35 @@ private:
         for (auto& t : ssrHist_) t = target2D(kHDRFormat, hw, hh, rt);
         cloudRaw_ = target2D(kHDRFormat, hw, hh, rt);
         for (auto& t : cloudHist_) t = target2D(kHDRFormat, hw, hh, rt);
-        scaler_ = nil;  // rebuilt for the new sizes on demand
+        // Rebuilt for the new sizes on demand. MetalFX encodes asynchronously (on the Neural
+        // Engine for the ML scaler), so the old scaler must outlive work already queued with it.
+        if (scaler_) retiredScalers_.push_back({scaler_, frameIndex_});
+        scaler_ = nil;
+        spatialScaler_ = nil;
+    }
+
+    /// MetalFX spatial upscaler (GPU only) from the anti-aliased internal image to the output.
+    id<MTLFXSpatialScaler> spatialScaler() {
+        if (spatialScaler_) return spatialScaler_;
+        if (![MTLFXSpatialScalerDescriptor supportsDevice:device_]) return nil;
+        MTLFXSpatialScalerDescriptor* d = [MTLFXSpatialScalerDescriptor new];
+        d.colorTextureFormat = kHDRFormat;
+        d.outputTextureFormat = kHDRFormat;
+        d.inputWidth = hdr_.width;
+        d.inputHeight = hdr_.height;
+        d.outputWidth = upscaled_.width;
+        d.outputHeight = upscaled_.height;
+        d.colorProcessingMode = MTLFXSpatialScalerColorProcessingModeHDR;
+        spatialScaler_ = [d newSpatialScalerWithDevice:device_];
+        return spatialScaler_;
+    }
+
+    void encodeSpatialUpscale(id<MTLCommandBuffer> cmd) {
+        id<MTLFXSpatialScaler> sc = spatialScaler();
+        sc.colorTexture = taa_[taaCurrent_];
+        sc.outputTexture = upscaled_;
+        [sc encodeToCommandBuffer:cmd];
+        [cmd addCompletedHandler:^(id<MTLCommandBuffer>) { (void)sc; }];
     }
 
     /// MetalFX temporal upscaler from the internal to the output resolution (nil if unsupported).
@@ -1782,6 +1832,7 @@ private:
             [enc drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:6];
         }
 
+        if (r2d_) r2d_->encodeWorld(enc, rp, frame);  // 2D: sprites, tiles, world text (depth-tested)
         [enc endEncoding];
     }
 
@@ -2366,6 +2417,8 @@ private:
         sc.reset = !historyValid_;
         sc.depthReversed = NO;
         [sc encodeToCommandBuffer:cmd];
+        [cmd addCompletedHandler:^(id<MTLCommandBuffer>) { (void)sc; }];  // keep it alive until the GPU is done
+        std::erase_if(retiredScalers_, [&](const RetiredScaler& r) { return frameIndex_ - r.frame > 30; });
     }
 
     void encodeAO(id<MTLCommandBuffer> cmd, const FrameData& frame) {
@@ -2573,6 +2626,12 @@ private:
         dofBlurPipeline_, dofCombinePipeline_;
     id<MTLTexture> lum_, exposure_[2], postA_, postB_, dofCoc_, dofBlur_, lut_, upscaled_, motion_, postSource_;
     id<MTLFXTemporalScaler> scaler_;
+    id<MTLFXSpatialScaler> spatialScaler_;
+    struct RetiredScaler {
+        id<MTLFXTemporalScaler> scaler;
+        uint64_t frame = 0;
+    };
+    std::vector<RetiredScaler> retiredScalers_;
     id<MTLRenderPipelineState> motionPipeline_;
     std::vector<id<MTLTexture>> lumViews_;
     int exposureCurrent_ = 0;
@@ -2633,6 +2692,7 @@ private:
     uint64_t frameIndex_ = 0;
     bool aoActive_ = false;
     bool volumetricActive_ = false;
+    std::unique_ptr<MetalRenderer2D> r2d_;  // 2D world quads + UI
     std::unique_ptr<MetalFx> fx_;  // [hair+vfx]
     std::unique_ptr<MetalFoliage> foliage_;  // [foliage]
 };

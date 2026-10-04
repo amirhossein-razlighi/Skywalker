@@ -42,6 +42,7 @@
 namespace sky {
 
 class SocketServer;
+class World2D;
 class NativeModules;
 namespace studio {
 class Studio;
@@ -236,6 +237,8 @@ public:
 
     // --- Effects: particles and water -----------------------------------------------
     fx::ParticleSystem& particles() { return particles_; }
+    /// 2D, text, UI and dialogue (sprites, tilemaps, 2D lights, canvases, conversations).
+    World2D& world2d() { return *world2d_; }
     fx::GroomSystem& grooms() { return grooms_; }  // hair & fur (generated grooms, cached)
     /// Seconds on the effects clock: simulation time while playing, a live preview clock while editing.
     double effectsTime() const;
@@ -253,6 +256,14 @@ public:
     Status setActionMap(input::ActionMap map);
     /// Re-reads input.json / audio.json if they changed on disk (called periodically).
     void reloadProjectSettings(bool force = false);
+    // --- Platform requests from the game (honored by the player runtime, ignored by the editor) ----------
+    /// `cursor_lock(true)` in Wander: the game wants a hidden, captured mouse (first-person look). Cleared on stop.
+    bool cursorLocked() const { return cursorLocked_; }
+    void setCursorLocked(bool on) { cursorLocked_ = on; }
+    /// `quit_game()` in Wander: the game asks to close (a "Quit" menu button). The player exits.
+    bool quitRequested() const { return quitRequested_; }
+    void requestQuit() { quitRequested_ = true; }
+    void clearQuitRequest() { quitRequested_ = false; }
     // --- Studio (multi-agent roster, board, feedback, loops; docs/STUDIO.md) -----------
     /// Created on first use from the project's agents/ and studio/ folders. Main thread only.
     studio::Studio& studio();
@@ -357,6 +368,8 @@ private:
         Vec3 offset;
     } drag_;
 
+    bool cursorLocked_ = false;
+    bool quitRequested_ = false;
     std::deque<Json> events_;
     std::mutex jobsMutex_;
     bool shuttingDown_ = false;   // guarded by jobsMutex_
@@ -369,6 +382,7 @@ private:
     int editDepth_ = 0;
     std::deque<std::pair<std::function<Json()>, std::promise<Json>>> jobs_;
     std::unique_ptr<SocketServer> server_;
+    std::unique_ptr<World2D> world2d_;
     std::unique_ptr<studio::Studio> studio_;
 };
 

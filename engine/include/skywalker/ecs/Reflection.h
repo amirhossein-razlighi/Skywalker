@@ -18,7 +18,8 @@ namespace sky {
 
 /// Json fields hold structured data (lists of layers, clips, curves...) as a sky::Json member;
 /// `jsonSchema` (JSON text) describes it to agents and the editor.
-enum class FieldType { Float, Int, Bool, String, Vec3, Color, Enum, Json };
+/// Vec2/Vec4 store sky::Vec2/Vec4 (Vec4 accepts CSS-style shorthand for paddings/margins).
+enum class FieldType { Float, Int, Bool, String, Vec3, Color, Enum, Json, Vec2, Vec4 };
 
 const char* toString(FieldType t);
 
@@ -66,6 +67,12 @@ Json vec3ToJson(Vec3 v);
 /// Accepts [r,g,b], [r,g,b,a] or a hex string.
 bool jsonToColor(const Json& j, Vec4& out);
 Json colorToJson(Vec4 c);
+/// Accepts [x, y] (or [x, y, z], z ignored) or a number (uniform).
+bool jsonToVec2(const Json& j, Vec2& out);
+Json vec2ToJson(Vec2 v);
+/// Accepts [a, b, c, d], a number (uniform), or CSS shorthand [v, h] / [top, h, bottom].
+bool jsonToVec4(const Json& j, Vec4& out);
+Json vec4ToJson(Vec4 v);
 
 }  // namespace reflect
 

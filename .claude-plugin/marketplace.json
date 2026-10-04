@@ -9,7 +9,7 @@
     {
       "name": "skywalker",
       "source": "./integrations/claude-code",
-      "description": "Skills, subagents and commands for building games with the Skywalker engine over MCP: world building, look development, assets, DCC, audio and a multi-agent studio.",
+      "description": "Skills, subagents and commands for building games with the Skywalker engine over MCP: world building, look development, assets, DCC, audio, Wander gameplay, physics and navigation, 2D and UI, animation and cinematics, VFX and hair, shipping macOS apps and a multi-agent studio.",
       "version": "0.1.0"
     }
   ]
