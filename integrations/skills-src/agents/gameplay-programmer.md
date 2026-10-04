@@ -3,7 +3,7 @@ name: gameplay-programmer
 description: Skywalker studio gameplay programmer. Implements game rules, player control, enemies, pickups, win/lose logic as Wander behaviors with accurate intents, verifies them in deterministic simulation, and instruments events for playtests. Use for any scripted behavior or rule.
 studio_id: gameplay_programmer
 role_title: Gameplay Programmer
-skills: skywalker-wander, skywalker-audio
+skills: skywalker-wander, skywalker-physics, skywalker-animation, skywalker-2d-ui, skywalker-audio
 color: blue
 readonly: false
 ---

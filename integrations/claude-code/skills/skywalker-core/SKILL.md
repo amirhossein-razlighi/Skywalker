@@ -1,12 +1,12 @@
 ---
 name: skywalker-core
-description: "Use whenever you build, edit, inspect or test a game with the Skywalker engine through its MCP tools (engine_info, scene_overview, entity_create, batch, viewport_capture, history). The core agent loop, conventions and pitfalls. Load this first, then the specialised skywalker-* skills."
+description: "Use whenever you build, edit, inspect or test a game with the Skywalker engine through its MCP tools (engine_info, scene_overview, entity_create, batch, viewport_capture, history). The core agent loop, conventions and pitfalls, and the router to the specialised skywalker-* skills (world-building, look-dev, assets, dcc, studio, audio, wander, physics, 2d-ui, animation, vfx, ship). Load this first."
 ---
 
 # Skywalker core: the agent loop
 
-Skywalker is a game engine whose entire surface is MCP tools (about 110, grouped in categories
-scene, entity, render, wander, sim, view, history, asset, world, network, dcc, studio). Everything a
+Skywalker is a game engine whose entire surface is MCP tools (about 160, grouped in categories
+scene, entity, view, render, sim, wander, code, physics, animation, ui, dialogue, asset, world, network, dcc, studio, files, history). Everything a
 human can do in the editor, you can do through tools, and everything is undoable and attributed to you.
 
 If no `skywalker` tools are visible in your tool list, the MCP server is not connected: ask the human to
@@ -52,6 +52,8 @@ viewport_capture {annotate:true}     # ids are drawn on the image
   `scene_overview {max_entities}` limits output.
 - Iterate cheap, finish expensive: `viewport_capture {width:640, height:360, samples:1}` while exploring,
   then `samples:16` and a larger size for the final judgement. `include_image:false` returns only the entity list.
+- `viewport_capture` and `perf_stats` take `quality` (`full` default, `balanced`, `fast`): captures are `full` unless you ask otherwise. The human's live editor viewport has its own tier (`viewport_quality`, `fast` by default:
+  half-resolution, no GI/reflections/god rays), so it can look flatter than your capture; see skywalker-look-dev.
 - Keep captures purposeful: one overview shot, then targeted `camera_entity` / `eye`+`target` shots.
 - Read tool errors: they carry a code, a hint and did-you-mean suggestions (`unknown entity 'Tnet' - did you mean 'Tent'`).
 
@@ -88,22 +90,28 @@ of the project's studio (tasks, feedback, loops) read skywalker-studio; pass `as
 - **Do not paste the same warm tone into sun + fog + grade + sky**: the image turns monochrome orange.
 - **Mutating while playing.** Changes during play are restored on stop. Stop, edit, play again.
 - **Large outputs.** `entity_get` on a heavy entity and unbounded `scene_overview` cost context; query narrowly.
-- **Approvals.** `asset_download` (network) and `dcc_*` script runners need the human's approval. Ask for it up
+- **Approvals.** `asset_download` (network), `dcc_*` script runners, `game_build` / `game_run` and the native-code tools need the human's approval. Ask for it up
   front instead of retrying in a loop.
 - **Do not hand-write scene JSON** for things tools can do; tool calls validate and are undoable.
 
 ## Where to go next
 
-| Task | Skill |
-|---|---|
-| Terrain, foliage, water, placing things on ground | skywalker-world-building |
-| Lighting, sky, post, camera lens, judging renders | skywalker-look-dev |
-| Models, textures, downloads, licenses | skywalker-assets |
-| Blender / DCC round trips, procedural models | skywalker-dcc |
-| Team of agents, tasks, feedback, playtests, loops | skywalker-studio |
-| Sound, music, input maps | skywalker-audio |
-| Gameplay scripts | skywalker-wander |
-| Physics, 2D/UI, animation, hair/VFX | skywalker-physics, skywalker-2d-ui, skywalker-animation, skywalker-vfx |
+Load the specialist skill **before** the first call in its area; each has the workflow, exact example calls and the pitfalls.
+
+| Task | Skill | Main tools |
+|---|---|---|
+| Terrain, foliage, water, placing things on ground | skywalker-world-building | `terrain_*`, `foliage_add`, `scatter`, `place_on_surface`, `water_query` |
+| Lighting, sky, post, camera lens, judging renders, viewport quality tiers | skywalker-look-dev | `environment_update`, `material_*`, `viewport_capture`, `viewport_quality`, `perf_stats` |
+| Models, textures, downloads, licenses | skywalker-assets | `asset_*`, `texture_generate` |
+| Blender / DCC round trips, procedural models | skywalker-dcc | `dcc_*` |
+| Sound, music, input maps | skywalker-audio | `audio_*`, `input_map` |
+| Gameplay scripts, AI, game rules, native speedups | skywalker-wander | `wander_*`, `behavior_*`, `native_*` |
+| Rigid bodies, characters, triggers, joints, navmesh pathfinding | skywalker-physics | `physics_*`, `nav_*` |
+| Sprites, tilemaps, 2D lights, HUD/menus/UI, dialogue | skywalker-2d-ui | `sprite_*`, `tilemap_*`, `ui_*`, `dialogue_*` |
+| Characters, state machines, IK, props on bones, cutscenes and cameras | skywalker-animation | `animation_*`, `animator_*`, `bone_*`, `sequence_*` |
+| Fire, smoke, weather, GPU particles, hair and fur, effect cost | skywalker-vfx | `fx_*`, `groom_*` |
+| Packaging a macOS app, testing as a player, release settings | skywalker-ship | `game_settings`, `game_build`, `game_run` |
+| Team of agents, tasks, feedback, playtests, loops, token usage | skywalker-studio | `studio_*`, `playtest_*` |
 
 Full tool catalogue by task: [references/tools-by-task.md](references/tools-by-task.md). The server also exposes the
 engine docs as MCP resources (`skywalker://docs/...`) and the tool catalogue (`skywalker://tools`).

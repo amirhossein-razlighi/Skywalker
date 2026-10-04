@@ -54,13 +54,15 @@ playtester, critic) use studio ids equal to their role names (`creative_director
 Good tasks are small and checkable: a clear title and **acceptance criteria that can be verified** ("bridge is 3 m wide", "deaths <= 1 per
 run"). `assignee` is an agent id or `"@role"` (least busy agent with that role). Status flows `backlog > todo > doing > review > done` (or
 `dropped`); `studio_task_update {task, status, comment}`; `studio_task_claim {as}` takes your highest-priority todo (or unassigned in your discipline).
-Moving to doing/done checks dependencies. Finishing the last task of a feedback item moves it to `fixed`.
+Moving to doing/done checks dependencies. Finishing the last task of a feedback item moves it to `fixed`. Read the board with `studio_task_list {status:"open", assignee:"level_designer"}`
+(filters: `status` incl. `open`/`all`, `assignee`, `discipline`, `limit`; `mine:true` needs a roster identity, pass `as`) before creating duplicates.
 
 ## 4. Feedback, decisions, measured effects
 
 - **File feedback** (playtesters, critics, anyone): `studio_feedback_submit {category: fun|difficulty|clarity|visuals|audio|performance|bug|narrative|accessibility,
   severity, summary, details, target, evidence:{playtest, captures, metrics, positions, repro}, fingerprint}`. Be specific: where (entity/position), what you
   felt or measured, why it matters, repro steps. A stable `fingerprint` dedups repeats (occurrences++ instead of a duplicate).
+- **Read the backlog** with `studio_feedback_list {status:"open", category:"bug"}` before filing, so you add evidence to an existing item instead of duplicating it.
 - **Decide** (director/producer or the human): `studio_decide {feedback, verdict: act|drop|defer|merge_into, rationale, tasks:[{title, assignee, acceptance}],
   targets:{"deaths":{"max":1}}}`. `act` creates linked tasks and stores the current playtest metrics as a baseline. Always give a rationale: everyone reads it.
   Never decide your own feedback as a non-director; ask the director via `studio_message_send`.
@@ -99,6 +101,16 @@ You collect the reports and call `studio_loop_advance` (reports may arrive one a
 (ask the human, then `approve:true`). Details and custom stage design: [references/loops.md](references/loops.md).
 
 Unattended: `skywalker studio run --project DIR --loop NAME --iterations 3` (needs an API key in the environment) runs the same loop with its own models.
+
+## Reporting token usage
+
+Tool calls are counted automatically. Tokens spent with your **own** model (a custom runner, a subagent) are not visible to the engine: report them so budgets and cost tracking are real.
+
+```text
+studio_usage_report {agent:"level_designer", model:"claude-sonnet-5-5", input_tokens:12000, output_tokens:3400, cache_read_tokens:80000}
+```
+
+`agent` (or `as`) is required and must be on the roster (`studio_agent_list`; otherwise `not_found`). Report real numbers or nothing; loop reports can carry the same `usage` object (see `studio_loop_advance` above).
 
 ## Rules of the road
 

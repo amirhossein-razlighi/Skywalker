@@ -528,15 +528,12 @@ public:
             dispatch_semaphore_wait(inFlight_, DISPATCH_TIME_FOREVER);
             ringIndex_ = (ringIndex_ + 1) % kFramesInFlight;
             ringOffset_ = 0;
+            // Accumulated stills commit one command buffer per sub-sample: a single multi-second
+            // command buffer trips the GPU watchdog ("progress timeout") and starves the window
+            // server, while short ones let the system interleave its own work.
             id<MTLCommandBuffer> cmd = [queue_ commandBuffer];
             cmd.label = @"Skywalker Frame";
-            dispatch_semaphore_t sem = inFlight_;
-            auto gpuMs = gpuMs_;
-            [cmd addCompletedHandler:^(id<MTLCommandBuffer> done) {
-                double ms = (done.GPUEndTime - done.GPUStartTime) * 1000.0;
-                if (ms > 0.0) gpuMs->store(ms);
-                dispatch_semaphore_signal(sem);
-            }];
+            id<MTLCommandBuffer> firstCmd = cmd;
             lightsBuf_ = transient(allLights.data(), allLights.size() * sizeof(GPULight));
             clusterCellsBuf_ = transient(grid.cells.data(), grid.cells.size() * sizeof(uint32_t));
             clusterIndexBuf_ = transient(grid.indices.data(), grid.indices.size() * sizeof(uint32_t));
@@ -545,6 +542,7 @@ public:
             encodeEnvironment(cmd, frame, base);
             lodFrame_ = &frame;
             trianglesDrawn_ = 0;
+            chooseFoliageBudgetBias(frame);
             fx_->simulate(frame, depthPrev_, gbufB_, prevViewProj_, historyValid_);  // [hair+vfx]
             encodeShadows(cmd, frame, base, cascades);
             if (r2d_) r2d_->encodeOccluders(cmd, frame);  // 2D shadow casters
@@ -575,6 +573,11 @@ public:
                 [blit copyFromTexture:depthResolved_ toTexture:depthPrev_];
                 [blit endEncoding];
                 if (!accumulate) historyValid_ = true;
+                if (accumulate && i + 1 < samples) {
+                    [cmd commit];
+                    cmd = [queue_ commandBuffer];
+                    cmd.label = @"Skywalker Frame (sub-sample)";
+                }
             }
             if (accumulate) historyValid_ = true;  // the converged still seeds later TAA frames
             if (spatialUpscale) encodeSpatialUpscale(cmd);
@@ -590,6 +593,15 @@ public:
             if (r2d_) r2d_->encodeUI(cmd, frame, resolve_, depthResolved_);  // UI at output resolution
             encodeOverlays(cmd, frame, base);
             fx_->trackFrame(cmd);  // [hair+vfx] GPU frame time
+            {
+                dispatch_semaphore_t sem = inFlight_;
+                auto gpuMs = gpuMs_;
+                [cmd addCompletedHandler:^(id<MTLCommandBuffer> done) {
+                    double ms = (done.GPUEndTime - firstCmd.GPUStartTime) * 1000.0;  // whole frame, all sub-samples
+                    if (ms > 0.0) gpuMs->store(ms);
+                    dispatch_semaphore_signal(sem);
+                }];
+            }
             [cmd commit];
             lastCommand_ = cmd;
             evictWorldCaches();
@@ -1068,11 +1080,11 @@ private:
         const Vec3 e = lodFrame_->camera.eye;
         Vec3 c{std::clamp(e.x, b.bounds.min.x, b.bounds.max.x), std::clamp(e.y, b.bounds.min.y, b.bounds.max.y),
                std::clamp(e.z, b.bounds.min.z, b.bounds.max.z)};
-        bias += lodFrame_->quality >= 2 ? 1 : 0;  // fast editing view
+        bias += (lodFrame_->quality >= 2 ? 1 : 0) + foliageBudgetBias_;  // fast editing view, triangle budget
         int lod = std::min(m.lodFor(pixelsPerUnit(*lodFrame_, distance(e, c)) * 1.3f) + bias, m.lodCount - 1);
         // Leaf/grass cards thin out badly when simplified hard: keep the canopy readable
-        // (distant forests should use impostors).
-        if (b.surface.alphaCutoff > 0.f && lodFrame_->quality < 2) lod = std::min(lod, 1 + bias);
+        // (distant forests should use impostors) unless the triangle budget forbids it.
+        if (b.surface.alphaCutoff > 0.f && lodFrame_->quality < 2 && foliageBudgetBias_ == 0) lod = std::min(lod, 1 + bias);
         return lod;
     }
 
@@ -1698,6 +1710,32 @@ private:
         u.params = simd_make_float4(b.cullDistance, b.meshHeight, 0, frame.time);
         u.part = toSimd(b.part);
         return u;
+    }
+
+    /// Hard safety net for instanced foliage: if the visible instances would exceed the
+    /// triangle budget at the chosen LODs, coarsen them until they fit. Very long GPU frames
+    /// trip the system GPU watchdog and stall the whole desktop.
+    static constexpr uint64_t kFoliageTriangleBudget = 120'000'000;
+    void chooseFoliageBudgetBias(const FrameData& frame) {
+        foliageBudgetBias_ = 0;
+        if (frame.instances.empty()) return;
+        const Frustum fr(frame.viewProjection());
+        for (int bias = 0; bias <= 4; ++bias) {
+            foliageBudgetBias_ = bias;
+            uint64_t total = 0;
+            for (const InstanceBatch& b : frame.instances) {
+                if (!b.instances || b.instances->empty() || !fr.intersects(b.bounds)) continue;
+                Vec3 c{std::clamp(frame.camera.eye.x, b.bounds.min.x, b.bounds.max.x),
+                       std::clamp(frame.camera.eye.y, b.bounds.min.y, b.bounds.max.y),
+                       std::clamp(frame.camera.eye.z, b.bounds.min.z, b.bounds.max.z)};
+                if (distance(c, frame.camera.eye) > b.cullDistance) continue;
+                const GpuMesh* m = mesh(b.mesh);
+                if (!m) continue;
+                int lod = std::clamp(lodForChunk(*m, b), 0, m->lodCount - 1);
+                total += static_cast<uint64_t>(m->lodCount_[lod] / 3) * b.instances->size();
+            }
+            if (total <= kFoliageTriangleBudget) return;
+        }
     }
 
     void drawFoliage(id<MTLRenderCommandEncoder> enc, const FrameData& frame, const Frustum& fr) {
@@ -2739,6 +2777,7 @@ private:
         cloudsPipeline_, cloudTemporalPipeline_, lumaPipeline_, exposurePipeline_, motionBlurPipeline_, dofCocPipeline_,
         dofBlurPipeline_, dofCombinePipeline_;
     id<MTLTexture> lum_, exposure_[2], postA_, postB_, dofCoc_, dofBlur_, lut_, upscaled_, motion_, postSource_;
+    int foliageBudgetBias_ = 0;
     id<MTLFXTemporalScaler> scaler_;
     id<MTLFXSpatialScaler> spatialScaler_;
     struct RetiredScaler {
