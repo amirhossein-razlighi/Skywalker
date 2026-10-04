@@ -391,6 +391,22 @@ TEST_CASE("rendering: car paint materials carry a coat roughness and metallic fl
     call(*e, "viewport_capture", R"({"width":64,"height":36,"samples":1,"debug_view":"material","include_image":false})");
 }
 
+TEST_CASE("rendering: bloomClamp limits what feeds the glow and round-trips with the scene") {
+    TempProject p("bloomclamp");
+    auto e = makeEngine(p);
+    CHECK(e->scene().environment().bloomClamp == doctest::Approx(64));  // default: effectively unlimited
+    call(*e, "environment_update", R"({"bloomClamp":3.5,"bloomIntensity":0.4})");
+    CHECK(e->scene().environment().bloomClamp == doctest::Approx(3.5));
+    call(*e, "environment_update", R"({"bloomClamp":500})");  // clamped to the field's range
+    CHECK(e->scene().environment().bloomClamp == doctest::Approx(64));
+    call(*e, "environment_update", R"({"bloomClamp":2})");
+    call(*e, "scene_save", R"({"path":"scenes/b.sky.json"})");
+    call(*e, "scene_load", R"({"path":"scenes/b.sky.json"})");
+    CHECK(e->scene().environment().bloomClamp == doctest::Approx(2));
+    Json r = call(*e, "viewport_capture", R"({"width":64,"height":36,"samples":1,"annotate":false,"include_image":false})");
+    CHECK(r.get("width").asInt() == 64);
+}
+
 TEST_CASE("rendering: texture_generate writes a PBR set and a ready material") {
     TempProject p("texgen-tool");
     auto e = makeEngine(p);

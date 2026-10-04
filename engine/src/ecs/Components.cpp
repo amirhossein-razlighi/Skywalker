@@ -426,6 +426,10 @@ const TypeInfo& Environment::type() {
             SKY_FIELD(Environment, showGrid, Bool, "Draw the editor ground grid"),
             SKY_FIELD_RANGE(Environment, bloomIntensity, Float, "Glow around bright/emissive things (0 = off)", 0.f, 5.f),
             SKY_FIELD_RANGE(Environment, bloomThreshold, Float, "Brightness where glow starts (lower = more glow)", 0.f, 10.f),
+            SKY_FIELD_RANGE(Environment, bloomClamp, Float,
+                            "Brightest (exposed) value that feeds the glow: 2-8 keeps sun glints, chrome and LED lights crisp instead "
+                            "of blown-out halos; 64 = effectively unlimited",
+                            0.1f, 64.f),
             SKY_FIELD_RANGE(Environment, saturation, Float, "Color saturation (1 = neutral)", 0.f, 2.f),
             SKY_FIELD_RANGE(Environment, contrast, Float, "Contrast (1 = neutral)", 0.5f, 2.f),
             SKY_FIELD_RANGE(Environment, vignette, Float, "Darken the image corners", 0.f, 1.f),

@@ -295,6 +295,7 @@ struct Environment {
     // Post-processing (HDR pipeline)
     float bloomIntensity = 0.55f;
     float bloomThreshold = 1.0f;
+    float bloomClamp = 64.f;  // brightest value that feeds the glow (keeps sun glints and LEDs crisp)
     float saturation = 1.05f;
     float contrast = 1.05f;
     float vignette = 0.22f;

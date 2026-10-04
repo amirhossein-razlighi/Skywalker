@@ -27,7 +27,12 @@ fragment float4 bloomPrefilter(FullscreenOut in [[stage_in]], texture2d<float> s
     float soft = clamp(brightness - p.params.z + knee, 0.0, 2.0 * knee);
     soft = soft * soft / (4.0 * knee + 1e-4);
     float contribution = max(soft, brightness - p.params.z) / max(brightness, 1e-4);
-    return float4(min(c * contribution, float3(64.0)), 1.0);
+    // Clamp what feeds the glow by its brightest channel (texel.z = Environment.bloomClamp), keeping the hue: a sun
+    // glint or an LED blooms as a tight halo instead of a blown-out blob.
+    float3 b = c * contribution;
+    float limit = p.texel.z > 0.0 ? p.texel.z : 64.0;
+    b *= min(1.0, limit / max(max(b.r, max(b.g, b.b)), 1e-4));
+    return float4(b, 1.0);
 }
 
 fragment float4 bloomDown(FullscreenOut in [[stage_in]], texture2d<float> src [[texture(0)]],

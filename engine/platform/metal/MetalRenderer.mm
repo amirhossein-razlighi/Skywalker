@@ -3282,7 +3282,7 @@ private:
         pu.grade = simd_make_float4(env.temperature, env.tint, sharpen, autoExp ? 1.f : 0.f);
         const size_t levels = bloomViews_.size();
         if (env.bloomIntensity > 0.001f && levels > 0) {
-            pu.texel = simd_make_float4(1.f / src.width, 1.f / src.height, 0, 0);
+            pu.texel = simd_make_float4(1.f / src.width, 1.f / src.height, env.bloomClamp, 0);  // z = bloom clamp
             fullscreen(cmd, bloomPrefilterPipeline_, bloomViews_[0], {src, exposureTex}, &pu, sizeof(pu), false, @"Bloom prefilter");
             for (size_t i = 1; i < levels; ++i) {
                 pu.texel = simd_make_float4(1.f / bloomViews_[i - 1].width, 1.f / bloomViews_[i - 1].height, 0, 0);
