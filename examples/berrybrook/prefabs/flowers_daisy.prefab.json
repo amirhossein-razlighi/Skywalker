@@ -1,8 +1,9 @@
 {
   "format": "skywalker.prefab",
-  "version": 1,
+  "version": 2,
   "name": "Prefab flowers_daisy",
   "root": {
+    "pid": 1,
     "name": "Prefab flowers_daisy",
     "enabled": true,
     "tags": [],
@@ -28,6 +29,7 @@
     },
     "children": [
       {
+        "pid": 2,
         "name": "Prefab flowers_daisy stem",
         "enabled": true,
         "tags": [],
@@ -80,6 +82,7 @@
         }
       },
       {
+        "pid": 3,
         "name": "Prefab flowers_daisy petals",
         "enabled": true,
         "tags": [],

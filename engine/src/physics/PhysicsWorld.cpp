@@ -210,7 +210,7 @@ struct PhysicsWorld::Impl final : public JPH::ContactListener {
     std::map<std::pair<EntityId, int>, BodyEntry> bodies;
     std::map<EntityId, CharEntry> chars;
     std::map<EntityId, JointEntry> joints;
-    std::unordered_map<EntityId, std::pair<std::string, EntityId>> jointTargets;  // joint -> (target text, entity)
+    std::unordered_map<EntityId, std::pair<EntityLink, EntityId>> jointTargets;  // joint -> (target link, entity)
     std::unordered_map<uint32_t, EntityId> bodyEntity;  // BodyID (incl. character inner bodies) -> entity
     std::vector<std::pair<uint32_t, uint32_t>> noCollide;  // sorted body pairs joined without collideConnected
 
@@ -863,20 +863,23 @@ struct PhysicsWorld::Impl final : public JPH::ContactListener {
             JPH::BodyID bId = JPH::BodyID();
             EntityId target = kNoEntity;
             if (!j->target.empty()) {
-                // Name lookups scan the scene: cache the resolution while the name still matches.
+                // Links bound to an id resolve directly; name-only links scan the scene, so cache them while the
+                // name still matches.
                 auto& cached = jointTargets[e];
                 const EntityRecord* cr = cached.second ? s.record(cached.second) : nullptr;
-                if (cached.first != j->target || !cr || !(cr->name == j->target || formatEntityRef(cr->id) == j->target)) {
-                    cached = {j->target, s.find(j->target)};
+                if (cached.first != j->target || !cr || (!j->target.id && cr->name != j->target.name)) {
+                    cached = {j->target, s.resolve(j->target, e)};
                 }
                 target = cached.second;
+                const std::string label = j->target.name.empty() ? formatEntityRef(j->target.id) : j->target.name;
                 if (target == kNoEntity) {
-                    warn("joint on entity #" + std::to_string(e) + ": target \"" + j->target + "\" not found");
+                    warn("joint on entity #" + std::to_string(e) + ": target \"" + label +
+                         "\" not found (entity_refs lists broken links)");
                     continue;
                 }
                 const BodyEntry* b = bodyFor(s, target);
                 if (!b) {
-                    warn("joint on entity #" + std::to_string(e) + ": target \"" + j->target + "\" has no body");
+                    warn("joint on entity #" + std::to_string(e) + ": target \"" + label + "\" has no body");
                     continue;
                 }
                 if (b->id == a->id) {

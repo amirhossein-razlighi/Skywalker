@@ -108,3 +108,7 @@ examples/*/.skywalker/cache/
 examples/berrybrook/dcc/
 examples/berrybrook/textures/
 examples/berrybrook/lookdev/
+
+# iCloud conflict duplicates ("name 2.ext")
+* [0-9].*
+* [0-9]

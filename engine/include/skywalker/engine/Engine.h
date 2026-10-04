@@ -19,6 +19,8 @@
 #include <string>
 #include <vector>
 
+#include "skywalker/agent/EventLog.h"
+#include "skywalker/agent/ToolHost.h"
 #include "skywalker/agent/ToolRegistry.h"
 #include "skywalker/anim/AnimationSystem.h"
 #include "skywalker/assets/AssetDatabase.h"
@@ -271,6 +273,10 @@ public:
     const ResolvedMaterial* resolveMaterial(const std::string& path);
     Result<Json> loadPrefabAsset(const std::string& path);
     Result<EntityId> instantiatePrefabAsset(const std::string& path, const PrefabPlacement& placement);
+    /// Template of a prefab file ("path" or "guid:..."), cached until the file changes (linked prefabs).
+    Result<std::shared_ptr<const PrefabTemplate>> prefabTemplateAsset(const std::string& ref);
+    /// Re-expands linked instances whose prefab changed (after refreshAssets; deferred while playing).
+    void syncPrefabInstances();
     /// Renders an isolated preview of an asset (mesh, material, texture, prefab) to an image.
     Result<Image> assetPreview(const std::string& ref, int size = 256);
     /// Rewrites references to `from` in the scene (mesh, texture, material fields).
@@ -357,6 +363,14 @@ public:
     bool agentServerRunning() const;
     static std::string defaultSocketPath();
 
+    // --- Agent link: external agent processes (docs/PYTHON_AGENTS.md) -------------------------
+    /// Every emitted event, sequence-numbered and followable by many readers (events_poll). Thread-safe.
+    EventLog& eventLog() { return *eventLog_; }
+    std::shared_ptr<EventLog> eventLogShared() { return eventLog_; }
+    /// Tools served by external processes as py_* tools (tool_host_*). Thread-safe.
+    ToolHost& toolHost() { return *toolHost_; }
+    std::shared_ptr<ToolHost> toolHostShared() { return toolHost_; }
+
 private:
     void ensureMeshUploaded(const std::string& meshKey);
     void frameSceneView();
@@ -391,8 +405,11 @@ private:
         int64_t mtime = -1;
         double checkedAt = -1e9;
         Json prefab;
+        std::shared_ptr<const PrefabTemplate> tmpl;  // linked prefabs: built from `prefab`
+        uint64_t tmplHash = 0;
     };
     std::unordered_map<std::string, CachedPrefab> prefabs_;
+    bool prefabSyncPending_ = false;  // a prefab changed while playing: instances re-expand once editing
     std::unordered_map<std::string, std::shared_ptr<MeshData>> cpuMeshes_;
     struct MeshStream;                      // results handed back from loader threads
     std::shared_ptr<MeshStream> meshStream_;
@@ -473,6 +490,9 @@ private:
     double realSinceFrame_ = 0;  // real seconds accumulated since the last presented frame
     int ticksSinceFrame_ = 0;
     FrameFlowStats flowStats_;
+    // Agent link (after tools_: the host registers py_* tools in it)
+    std::shared_ptr<EventLog> eventLog_ = std::make_shared<EventLog>(4096);
+    std::shared_ptr<ToolHost> toolHost_ = std::make_shared<ToolHost>(tools_);
 };
 
 void registerEngineTools(Engine& engine);

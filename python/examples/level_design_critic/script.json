@@ -1,0 +1,21 @@
+{
+  "agents": {
+    "mira": [
+      {"text": "Placing three platforms.", "tool_calls": [
+        {"name": "entity_create", "input": {"name": "Jump Platform A", "mesh": "cube", "color": "#8d6e52", "position": [42, 2, 0], "scale": [3, 0.5, 1]}},
+        {"name": "entity_create", "input": {"name": "Jump Platform B", "mesh": "cube", "color": "#8d6e52", "position": [48, 3, 0], "scale": [3, 0.5, 1]}},
+        {"name": "entity_create", "input": {"name": "Jump Platform C", "mesh": "cube", "color": "#8d6e52", "position": [55, 4, 0], "scale": [3, 0.5, 1]}}]},
+      {"text": "Built A (x=42), B (x=48), C (x=55), rising 1 m each."},
+      {"text": "Closing the gaps.", "tool_calls": [
+        {"name": "entity_update", "input": {"entity": "Jump Platform B", "position": [46, 3, 0]}},
+        {"name": "entity_update", "input": {"entity": "Jump Platform C", "position": [50, 4, 0]}}]},
+      {"text": "Moved B to x=46 and C to x=50: edge-to-edge gaps are now 1 m, rising 1 m per step."}
+    ],
+    "vera": [
+      {"text": "Recording the standard.", "tool_calls": [
+        {"name": "memory_remember", "input": {"text": "Sky Dash jump gaps must stay at most 4 m edge to edge and rise at most 1.5 m per platform: the runner clears about 4.5 m.", "kind": "fact", "scope": "project", "tags": ["level", "jumps"], "importance": 0.9}}]},
+      {"text": "Gaps of 3 m and 4 m between 3 m wide platforms read fine, but C sits 7 m past B: too far for the runner. Bring C within 4 m edge to edge."},
+      {"text": "APPROVED: three readable steps, gaps within 4 m, rising 1 m each."}
+    ]
+  }
+}

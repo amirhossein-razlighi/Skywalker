@@ -415,7 +415,7 @@ void AnimationSystem::applyLookAt(Instance& inst, EntityId e, const Animator& a)
     // Where to look: another character's head, else the middle of a mesh, else a pivot.
     std::optional<Vec3> targetWorld;
     if (!a.lookAt.empty() && !inst.lookChain.empty()) {
-        EntityId t = scene_.find(a.lookAt);
+        EntityId t = scene_.resolve(a.lookAt, e);
         if (t && t != e && scene_.isActive(t)) {
             auto other = animators_.find(t);
             if (other != animators_.end() && other->second->posed && !other->second->lookChain.empty() &&
@@ -477,7 +477,7 @@ const std::vector<EntityId>* AnimationSystem::ikEffectors(EntityId e) {
             if (!ik || ik->bone.empty()) continue;
             EntityId owner = kNoEntity;
             if (!ik->character.empty()) {
-                owner = scene_.find(ik->character);
+                owner = scene_.resolve(ik->character, id);
             } else if (const EntityRecord* rec = scene_.record(id); rec && rec->parent) {
                 owner = animatorFor(rec->parent);
             }
@@ -535,13 +535,13 @@ void AnimationSystem::finishPose(Instance& inst, EntityId e, const Animator& a) 
 
 void AnimationSystem::poseEditing(Instance& inst, EntityId e, const Animator& a) {
     std::string key = a.preview + "|" + std::to_string(a.time) + "|" + std::to_string(inst.paramsVersion) + "|" +
-                      std::to_string(inst.editClock) + "|" + a.lookAt + "|" + std::to_string(a.lookAtWeight) + "|" +
+                      std::to_string(inst.editClock) + "|" + std::to_string(a.lookAt.id) + a.lookAt.name + "|" + std::to_string(a.lookAtWeight) + "|" +
                       std::to_string(a.lookAtLimit);
     if (inst.preview) key += "|p:" + inst.preview->first + "@" + std::to_string(inst.preview->second);
     if (inst.seqPreview) key += "|s:" + inst.seqPreview->first + "@" + std::to_string(inst.seqPreview->second);
     if (!a.lookAt.empty()) {
         // A moving look target changes the pose without changing the key.
-        if (EntityId t = scene_.find(a.lookAt)) {
+        if (EntityId t = scene_.resolve(a.lookAt, e)) {
             Vec3 p = scene_.worldMatrix(t).translation();
             key += "|" + std::to_string(p.x) + "," + std::to_string(p.y) + "," + std::to_string(p.z);
         }
@@ -577,7 +577,7 @@ void AnimationSystem::poseEditing(Instance& inst, EntityId e, const Animator& a)
         seekSeconds("", a.time);
     }
     // Previews snap (no smoothing) and never keep aiming at an old target.
-    const bool looking = !a.lookAt.empty() && scene_.find(a.lookAt) != kNoEntity;
+    const bool looking = !a.lookAt.empty() && scene_.resolve(a.lookAt, e) != kNoEntity;
     inst.lookBlend = looking ? std::clamp(a.lookAtWeight, 0.f, 1.f) : 0.f;
     if (!looking) inst.lookTarget.reset();
     finishPose(inst, e, a);
@@ -670,7 +670,7 @@ void AnimationSystem::tick(float baseDt) {
                     }
                 }
             }
-            const bool looking = !a->lookAt.empty() && scene_.find(a->lookAt) != kNoEntity;
+            const bool looking = !a->lookAt.empty() && scene_.resolve(a->lookAt, e) != kNoEntity;
             float goal = looking ? std::clamp(a->lookAtWeight, 0.f, 1.f) : 0.f;  // turns fade in and out
             inst->lookBlend += (goal - inst->lookBlend) * std::min(1.f, dt * kLookRate);
             finishPose(*inst, e, *a);
@@ -829,7 +829,7 @@ void AnimationSystem::updateAttachments(FrameOverrides* ov) {
         if (!at || at->bone.empty() || !scene_.isActive(e)) continue;
         EntityId target = kNoEntity;
         if (!at->character.empty()) {
-            target = scene_.find(at->character);
+            target = scene_.resolve(at->character, e);
         } else if (const EntityRecord* rec = scene_.record(e); rec && rec->parent) {
             target = animatorFor(rec->parent);
         }

@@ -439,9 +439,9 @@ void ParticleSystem::gatherGpu(const Scene& scene, const MeshProvider& meshes, c
             }
             item.field = cf.field;
         }
-        item.colliders = collidersFromNames(scene, e, em->colliders);
+        item.colliders = collidersFromLinks(scene, e, em->colliders);
         if (!em->subEmitter.empty()) {
-            EntityId sub = findNear(scene, e, em->subEmitter);
+            EntityId sub = scene.resolve(em->subEmitter, e);
             const ParticleEmitter* se = sub ? scene.get<ParticleEmitter>(sub) : nullptr;
             if (se && se->simulation == "gpu" && sub != e) item.subEmitter = sub;
         }

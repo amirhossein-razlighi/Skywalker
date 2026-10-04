@@ -13,6 +13,8 @@
 //   skywalker studio status|agents|board|feedback|loops|run --project DIR ...   (StudioCommand.cpp)
 //   skywalker build --project DIR --out DIR [--name N --icon F --release --all-assets]   package a macOS app (BuildCommand.cpp)
 //   skywalker movie SCENE [JSON] -o out.mp4 [...]    render a cinematic to video / PNG frames (MovieCommand.cpp)
+//   skywalker legal [terms|privacy|license|licensing] [--accept] [--status] [--json]   terms, privacy notice, license
+//   skywalker serve [--project DIR] [--socket PATH]  headless engine serving the agent socket (ServeCommand.cpp)
 //   skywalker version
 
 #include <sys/socket.h>
@@ -33,6 +35,7 @@
 #include "skywalker/core/Log.h"
 #include "skywalker/core/Strings.h"
 #include "skywalker/engine/Engine.h"
+#include "skywalker/legal/Legal.h"
 #include "skywalker/wander/Compiler.h"
 #include "skywalker/wander/Parser.h"
 #include "skywalker/wander/Runtime.h"
@@ -43,6 +46,7 @@ int runStudio(const std::vector<std::string>& raw);  // StudioCommand.cpp
 int runSetup(const std::vector<std::string>& raw);   // SetupCommand.cpp
 int runBuild(const std::vector<std::string>& raw);   // BuildCommand.cpp
 int runMovie(const std::vector<std::string>& raw);   // MovieCommand.cpp
+int runServe(const std::vector<std::string>& raw);   // ServeCommand.cpp
 
 namespace {
 
@@ -94,6 +98,8 @@ int usage() {
                  "  skywalker mcp [--project DIR] [--scene FILE]   MCP server on stdio\n"
                  "  skywalker mcp --attach [SOCKET]                bridge to a running editor\n"
                  "  skywalker mcp --auto [--project DIR]           bridge to the editor if it runs, else headless\n"
+                 "  skywalker serve [--project DIR] [--scene FILE] [--socket PATH] [--lifeline]\n"
+                 "                                                 headless engine serving the agent socket (like the editor)\n"
                  "  skywalker setup <claude|codex|gemini|cursor|all> [--project DIR] [--global] [--dry-run] [--print] [--no-skills]\n"
                  "                                                 install the MCP server entry, skills, subagents and commands\n"
                  "  skywalker render SCENE -o out.png [--width W] [--height H] [--annotate] [--scene-camera] [--samples N]\n"
@@ -107,6 +113,8 @@ int usage() {
                  "  skywalker build --project DIR --out DIR [--name N] [--icon F.png] [--release] [--all-assets]   package a macOS app\n"
                  "  skywalker movie SCENE [JSON] -o out.mp4 [--sequence S] [--resolution 1080p] [--fps N] [--samples N]\n"
                  "                    [--shutter F] [--simulate] [--clay|--sketch] [--resume] ...   render a cinematic (movie --help)\n"
+                 "  skywalker legal [terms|privacy|license|licensing] [--accept] [--status] [--json]\n"
+                 "                                                 Terms of Use, Privacy Notice, license; --accept records acceptance\n"
                  "  skywalker version\n",
                  SKY_VERSION_STRING);
     return 2;
@@ -383,6 +391,14 @@ int main(int argc, char** argv) {
     if (cmd == "setup") return runSetup(args.raw);
     if (cmd == "build") return runBuild(args.raw);
     if (cmd == "movie") return runMovie(args.raw);
+    if (cmd == "legal") {
+        std::string out, err;
+        int code = legal::runCommand({args.raw.begin() + 1, args.raw.end()}, legal::defaultRecordPath(), out, err);
+        std::fputs(out.c_str(), stdout);
+        std::fputs(err.c_str(), stderr);
+        return code;
+    }
+    if (cmd == "serve") return runServe(args.raw);
     if (cmd == "version" || cmd == "--version") {
         std::printf("skywalker %s\nDeveloped by: AmirHossein (Amir) Razlighi\n", SKY_VERSION_STRING);
         return 0;

@@ -175,8 +175,8 @@ struct ParticleEmitter {
     bool depthCollision = false;      // collide with everything on screen (scene depth + normals)
     bool stick = false;               // stick where they hit instead of bouncing / dying
     float friction = 0.3f;            // tangential slow-down on bounce
-    std::string colliders;            // comma-separated entity names: spheres / planes from their meshes
-    std::string subEmitter;           // entity (with gpu particles) spawned from these particles
+    std::vector<EntityLink> colliders;  // entities: spheres / planes from their meshes
+    EntityLink subEmitter;            // entity (with gpu particles) spawned from these particles
     std::string subEmitOn = "death";  // death | collision | both
     int subEmitCount = 8;             // particles spawned per event
     float subEmitInherit = 0.3f;      // fraction of the parent's velocity inherited

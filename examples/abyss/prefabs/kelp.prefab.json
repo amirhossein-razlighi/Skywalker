@@ -1,8 +1,9 @@
 {
   "format": "skywalker.prefab",
-  "version": 1,
+  "version": 2,
   "name": "Kelp",
   "root": {
+    "pid": 1,
     "name": "Kelp",
     "enabled": true,
     "tags": [],
@@ -36,6 +37,7 @@
     ],
     "children": [
       {
+        "pid": 2,
         "name": "Kelp Blade 1",
         "enabled": true,
         "tags": [],
@@ -87,6 +89,7 @@
         }
       },
       {
+        "pid": 3,
         "name": "Kelp Leaf 1",
         "enabled": true,
         "tags": [],
@@ -138,6 +141,7 @@
         }
       },
       {
+        "pid": 4,
         "name": "Kelp Blade 2",
         "enabled": true,
         "tags": [],
@@ -189,6 +193,7 @@
         }
       },
       {
+        "pid": 5,
         "name": "Kelp Leaf 2",
         "enabled": true,
         "tags": [],
@@ -240,6 +245,7 @@
         }
       },
       {
+        "pid": 6,
         "name": "Kelp Blade 3",
         "enabled": true,
         "tags": [],
@@ -291,6 +297,7 @@
         }
       },
       {
+        "pid": 7,
         "name": "Kelp Leaf 3",
         "enabled": true,
         "tags": [],
@@ -342,6 +349,7 @@
         }
       },
       {
+        "pid": 8,
         "name": "Kelp Blade 4",
         "enabled": true,
         "tags": [],
@@ -393,6 +401,7 @@
         }
       },
       {
+        "pid": 9,
         "name": "Kelp Leaf 4",
         "enabled": true,
         "tags": [],
@@ -444,6 +453,7 @@
         }
       },
       {
+        "pid": 10,
         "name": "Kelp Blade 5",
         "enabled": true,
         "tags": [],
@@ -495,6 +505,7 @@
         }
       },
       {
+        "pid": 11,
         "name": "Kelp Leaf 5",
         "enabled": true,
         "tags": [],

@@ -120,7 +120,7 @@ struct Camera2D {
     int referenceHeight = 0;      // game pixels tall (e.g. 180): integer upscaling; 0 = use camera.orthoSize
     bool pixelSnap = true;        // snap the camera to the texel grid (no shimmering)
     float zoom = 1.f;
-    std::string follow;           // entity name to follow (empty = none)
+    EntityLink follow;            // entity to follow (empty = none)
     float smoothing = 0.15f;      // follow lag in seconds (0 = rigid)
     Vec2 deadZone{0.f, 0.f};      // half-size of the box the target moves in freely (world units)
     Vec2 offset{0.f, 0.f};        // framing offset from the target

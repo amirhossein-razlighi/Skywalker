@@ -413,7 +413,7 @@ void tickCameras(Scene& scene, float baseDt, const ProcessGate* gate) {
         if (!c2 || c2->follow.empty() || !scene.isActive(e)) continue;
         if (gate && !gate->runs(e)) continue;
         const float dt = baseDt * (gate ? gate->scale(e) : 1.f);
-        EntityId target = scene.find(c2->follow);
+        EntityId target = scene.resolve(c2->follow, e);
         if (!target || target == e) continue;
         Transform* t = scene.get<Transform>(e);
         if (!t) continue;

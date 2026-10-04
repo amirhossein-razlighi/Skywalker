@@ -1,0 +1,43 @@
+name: Python agents
+
+# The Python agent layer (python/) only: lint, types and unit tests with the fake engine and scripted
+# models (no engine build, no API keys). Runs only when python/ changes; integration tests need a built
+# engine and run locally (cd python && uv run pytest).
+on:
+  push:
+    branches: [main]
+    paths:
+      - "python/**"
+      - ".github/workflows/python.yml"
+  pull_request:
+    paths:
+      - "python/**"
+      - ".github/workflows/python.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: python-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Python (lint, types, unit tests)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: python
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: python/uv.lock
+      - name: Install (Python 3.10, the minimum)
+        run: uv sync --locked --python 3.10
+      - name: Lint
+        run: uv run ruff check . && uv run ruff format --check .
+      - name: Types
+        run: uv run mypy
+      - name: Unit tests
+        run: uv run pytest -q -m "not integration and not live"

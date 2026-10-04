@@ -83,6 +83,7 @@ struct OutlinerView: View {
                                     })
                             .contentShape(Rectangle())
                             .onTapGesture { select(row.id, in: visible) }
+                            .draggable(EngineStore.entityDragPrefix + String(row.id))  // onto entity-link fields
                             .contextMenu { contextMenu(for: row.entity) }
                     }
                 }
@@ -125,6 +126,11 @@ struct OutlinerView: View {
             let slug = e.name.lowercased().map { $0.isLetter || $0.isNumber ? String($0) : "-" }.joined()
             engine.call("prefab_create", ["entity": id, "path": .string("prefabs/\(slug).prefab.json")])
         }
+        if !e.prefabSource.isEmpty || e.prefabMember {
+            Button("Apply Overrides to Prefab") { engine.call("prefab_apply", ["entity": id]) }
+            Button("Revert to Prefab") { engine.call("prefab_revert", ["entity": id, "all": true]) }
+            Button("Unpack Prefab") { engine.call("prefab_unpack", ["entity": id]) }
+        }
         Divider()
         Button("Delete", role: .destructive) { engine.call("entity_delete", ["entity": id]) }
     }
@@ -152,7 +158,12 @@ struct OutlinerRow: View {
             .buttonStyle(.plain)
             .disabled(!hasChildren)
             Image(systemName: icon).font(.system(size: 10.5)).foregroundStyle(tint).frame(width: 14)
-            Text(entity.name).font(Theme.body).lineLimit(1).foregroundStyle(entity.enabled ? Theme.text : Theme.textFaint)
+            Text(entity.name).font(Theme.body).lineLimit(1)
+                .foregroundStyle(!entity.enabled ? Theme.textFaint : (entity.prefabMember ? Theme.accent.opacity(0.85) : Theme.text))
+            if !entity.prefabSource.isEmpty {
+                Image(systemName: "shippingbox.fill").font(.system(size: 8.5)).foregroundStyle(Theme.accent)
+                    .help("Linked prefab instance of \(entity.prefabSource)")
+            }
             if entity.components.contains("behaviors") {
                 Image(systemName: "sparkles").font(.system(size: 8.5)).foregroundStyle(Theme.ai).help("Has behaviors")
             }

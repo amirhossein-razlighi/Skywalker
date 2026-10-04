@@ -11,6 +11,7 @@
 
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -76,13 +77,28 @@ struct ToolDef {
     /// Reaches outside the project (e.g. the internet). MCP clients and the in-editor crew
     /// ask the human before running these.
     bool openWorld = false;
+    /// Plumbing that should not show up in the activity feed or per-agent tool counts (event
+    /// polling, tool-host traffic): recording it would feed the event stream back into itself.
+    bool quiet = false;
 };
 
 class ToolRegistry {
 public:
     void add(ToolDef def);
+    /// A built-in or dynamic tool by name (nullptr if none).
     const ToolDef* find(std::string_view name) const;
+    /// The built-in tools (registered at startup). Dynamic tools are listed by dynamicTools().
     const std::vector<ToolDef>& all() const { return tools_; }
+
+    /// Dynamic tools come and go while agent connections run (tools hosted by an external process,
+    /// see ToolHost.h). Thread-safe. A tool with the same name replaces the previous one; pointers
+    /// returned by find() stay valid for the registry's lifetime (replaced and removed definitions
+    /// are retired, never freed), so at most kMaxDynamicDefinitions definitions are accepted.
+    static constexpr size_t kMaxDynamicDefinitions = 4096;
+    Status addDynamic(ToolDef def);
+    bool removeDynamic(std::string_view name);
+    /// Snapshot of the live dynamic tools, in registration order.
+    std::vector<ToolDef> dynamicTools() const;
 
     /// Validates arguments against the schema, then invokes the handler. Never throws. A tool
     /// that defers its slow half is completed inline (use invoke() to split the steps).
@@ -96,7 +112,12 @@ public:
     std::string catalogueMarkdown() const;
 
 private:
+    const ToolDef* findDynamic(std::string_view name) const;
+
     std::vector<ToolDef> tools_;
+    mutable std::mutex dynamicMutex_;
+    std::vector<std::shared_ptr<const ToolDef>> dynamic_;  // live, in registration order
+    std::vector<std::shared_ptr<const ToolDef>> retired_;  // kept alive: find() may have handed them out
 };
 
 /// Lightweight JSON-Schema validation covering what tool schemas use: type, required,

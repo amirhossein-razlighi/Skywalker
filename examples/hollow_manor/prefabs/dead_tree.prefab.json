@@ -1,8 +1,9 @@
 {
   "format": "skywalker.prefab",
-  "version": 1,
+  "version": 2,
   "name": "Dead Tree",
   "root": {
+    "pid": 1,
     "name": "Dead Tree",
     "enabled": true,
     "tags": [],
@@ -28,6 +29,7 @@
     },
     "children": [
       {
+        "pid": 2,
         "name": "Dead Tree Trunk",
         "enabled": true,
         "tags": [],
@@ -79,6 +81,7 @@
         }
       },
       {
+        "pid": 3,
         "name": "Dead Tree Branch 1",
         "enabled": true,
         "tags": [],
@@ -130,6 +133,7 @@
         }
       },
       {
+        "pid": 4,
         "name": "Dead Tree Branch 2",
         "enabled": true,
         "tags": [],
@@ -181,6 +185,7 @@
         }
       },
       {
+        "pid": 5,
         "name": "Dead Tree Branch 3",
         "enabled": true,
         "tags": [],
@@ -232,6 +237,7 @@
         }
       },
       {
+        "pid": 6,
         "name": "Dead Tree Branch 4",
         "enabled": true,
         "tags": [],
@@ -283,6 +289,7 @@
         }
       },
       {
+        "pid": 7,
         "name": "Dead Tree Branch 5",
         "enabled": true,
         "tags": [],

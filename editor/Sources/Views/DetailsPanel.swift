@@ -46,6 +46,9 @@ struct EntityDetails: View {
         VStack(alignment: .leading, spacing: 0) {
             if let id = selectedID, !doc.isNull {
                 header(id: id)
+                if !doc["prefab"].isNull {
+                    PrefabSection(entityID: id, prefab: doc["prefab"])
+                }
                 ForEach(Self.componentOrder.filter { !doc["components"][$0].isNull }, id: \.self) { comp in
                     PropertySection(title: title(comp), icon: icon(comp), removable: comp != "transform",
                                     onRemove: { update(id, ["components": .object([(comp, .null)])]) }) {
@@ -160,6 +163,9 @@ struct EntityDetails: View {
                 CommitField(text: doc["name"].string ?? "", font: .system(size: 13, weight: .semibold)) {
                     update(id, ["name": .string($0)])
                 }
+                Toggle("%", isOn: Binding(get: { doc["unique"].bool ?? false }, set: { update(id, ["unique": .bool($0)]) }))
+                    .toggleStyle(.button).controlSize(.mini)
+                    .help("Unique name: Wander find(\"%\(doc["name"].string ?? "Name")\") finds it inside its prefab instance")
                 Text("#\(id)").font(Theme.monoSmall).foregroundStyle(Theme.textFaint)
             }
             HStack(spacing: 6) {
@@ -249,7 +255,11 @@ struct PropertyGrid: View {
                         .frame(width: Self.labelWidth, alignment: .leading)
                         .lineLimit(1)
                         .help(fieldSchema["description"].string ?? field)
-                    if let kind = AssetField.kind(for: field, schema: fieldSchema) {
+                    if fieldSchema["x-sky-entity"].bool == true {
+                        EntityField(value: values[field]) { onChange(field, $0) }
+                    } else if fieldSchema["x-sky-entity-list"].bool == true {
+                        EntityListField(value: values[field]) { onChange(field, $0) }
+                    } else if let kind = AssetField.kind(for: field, schema: fieldSchema) {
                         AssetField(kind: kind, value: values[field].string ?? "") { onChange(field, .string($0)) }
                     } else {
                         FieldEditor(schema: fieldSchema, value: values[field]) { onChange(field, $0) }
@@ -507,5 +517,116 @@ struct AssetField: View {
             options = engine.call("asset_list", ["type": .string(kind), "limit": 200], actor: "editor")
                 .structured["assets"].array.compactMap { $0["path"].string }
         }
+    }
+}
+
+/// An entity-link field (joint target, camera follow, look-at...): type a name, pick from the scene, or drop an
+/// entity from the outliner. Links store the entity id, so they keep working when the target is renamed.
+struct EntityField: View {
+    @Environment(EngineStore.self) private var engine
+    let value: JSON  // {"id", "name"} or null
+    let onChange: (JSON) -> Void
+    @State private var targeted = false
+
+    private var label: String { value["name"].string ?? value["id"].number.map { "#\(Int($0))" } ?? "" }
+    private var dangling: Bool {
+        guard let id = value["id"].number else { return false }
+        return !engine.entities.contains { $0.id == UInt64(id) }
+    }
+
+    var body: some View {
+        HStack(spacing: 4) {
+            CommitField(text: label, placeholder: "None", font: Theme.monoSmall) { text in
+                onChange(text.isEmpty ? .null : .string(text))
+            }
+            .overlay(RoundedRectangle(cornerRadius: 3).stroke(Theme.warning, lineWidth: dangling ? 1 : 0))
+            .help(dangling ? "This link points at an entity that no longer exists (entity_refs lists broken links)" : "")
+            Menu {
+                ForEach(engine.entities.prefix(400)) { e in
+                    Button("\(e.name)  #\(e.id)") { onChange(.number(Double(e.id))) }
+                }
+                if !value.isNull {
+                    Divider()
+                    Button("None") { onChange(.null) }
+                }
+            } label: { Image(systemName: "scope") }
+            .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+            .help("Choose an entity (or drag one from the outliner)")
+        }
+        .overlay(RoundedRectangle(cornerRadius: 4).stroke(Theme.accent, lineWidth: targeted ? 1.5 : 0))
+        .dropDestination(for: String.self) { items, _ in
+            guard let s = items.first, s.hasPrefix(EngineStore.entityDragPrefix),
+                  let id = Double(s.dropFirst(EngineStore.entityDragPrefix.count)) else { return false }
+            onChange(.number(id))
+            return true
+        } isTargeted: { targeted = $0 }
+    }
+}
+
+/// A list of entity links (collider sets): comma-separated names; dropping an entity adds it.
+struct EntityListField: View {
+    let value: JSON  // [{"id", "name"}, ...]
+    let onChange: (JSON) -> Void
+    @State private var targeted = false
+
+    private var text: String {
+        value.array.compactMap { $0["name"].string ?? $0["id"].number.map { "#\(Int($0))" } }.joined(separator: ", ")
+    }
+
+    var body: some View {
+        CommitField(text: text, placeholder: "None", font: Theme.monoSmall) { onChange(.string($0)) }
+            .overlay(RoundedRectangle(cornerRadius: 4).stroke(Theme.accent, lineWidth: targeted ? 1.5 : 0))
+            .dropDestination(for: String.self) { items, _ in
+                guard let s = items.first, s.hasPrefix(EngineStore.entityDragPrefix),
+                      let id = Double(s.dropFirst(EngineStore.entityDragPrefix.count)) else { return false }
+                onChange(.array(value.array + [.number(id)]))
+                return true
+            } isTargeted: { targeted = $0 }
+    }
+}
+
+/// Linked prefab instance: where it comes from, how many overrides it has, and apply / revert / unpack.
+struct PrefabSection: View {
+    @Environment(EngineStore.self) private var engine
+    let entityID: UInt64
+    let prefab: JSON  // {"instance", "pid", "source"?}
+    @State private var info: JSON = .null
+
+    var body: some View {
+        PropertySection(title: "Prefab", icon: "shippingbox") {
+            VStack(alignment: .leading, spacing: 5) {
+                HStack(spacing: 6) {
+                    Text(info["source"].string ?? prefab["source"].string ?? "").font(Theme.monoSmall).lineLimit(1)
+                        .truncationMode(.middle)
+                    Spacer()
+                    Text(overrideText).font(Theme.label).foregroundStyle(Theme.textDim)
+                }
+                ForEach(Array(info["overrides"].array.prefix(8).enumerated()), id: \.offset) { _, o in
+                    Text("\(o["node"].string ?? "") · \(o["property"].string ?? "")").font(Theme.label)
+                        .foregroundStyle(Theme.accent).lineLimit(1)
+                }
+                HStack(spacing: 6) {
+                    Button("Apply") { run("prefab_apply", ["entity": .number(Double(entityID))]) }
+                        .help("Push this instance's overrides into the prefab file (every instance updates)")
+                    Button("Revert") { run("prefab_revert", ["entity": .number(Double(entityID)), "all": true]) }
+                        .help("Make the whole instance match its prefab again")
+                    Button("Unpack") { run("prefab_unpack", ["entity": .number(Double(entityID))]) }
+                        .help("Stop linking to the prefab; keep the entities as they are")
+                }
+                .controlSize(.small)
+            }
+        }
+        .task(id: "\(entityID)-\(engine.revision)") {
+            info = engine.call("prefab_overrides", ["entity": .number(Double(entityID))], actor: "editor").structured
+        }
+    }
+
+    private var overrideText: String {
+        let n = Int(info["override_count"].number ?? 0)
+        return n == 0 ? "matches prefab" : "\(n) override\(n == 1 ? "" : "s")"
+    }
+
+    private func run(_ tool: String, _ args: JSON) {
+        _ = engine.call(tool, args)
     }
 }

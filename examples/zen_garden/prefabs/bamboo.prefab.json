@@ -1,8 +1,9 @@
 {
   "format": "skywalker.prefab",
-  "version": 1,
+  "version": 2,
   "name": "Bamboo",
   "root": {
+    "pid": 1,
     "name": "Bamboo",
     "enabled": true,
     "tags": [],
@@ -36,6 +37,7 @@
     ],
     "children": [
       {
+        "pid": 2,
         "name": "Bamboo Cane 1",
         "enabled": true,
         "tags": [],
@@ -87,6 +89,7 @@
         }
       },
       {
+        "pid": 3,
         "name": "Bamboo Node 1.1",
         "enabled": true,
         "tags": [],
@@ -138,6 +141,7 @@
         }
       },
       {
+        "pid": 4,
         "name": "Bamboo Node 1.2",
         "enabled": true,
         "tags": [],
@@ -189,6 +193,7 @@
         }
       },
       {
+        "pid": 5,
         "name": "Bamboo Node 1.3",
         "enabled": true,
         "tags": [],
@@ -240,6 +245,7 @@
         }
       },
       {
+        "pid": 6,
         "name": "Bamboo Node 1.4",
         "enabled": true,
         "tags": [],
@@ -291,6 +297,7 @@
         }
       },
       {
+        "pid": 7,
         "name": "Bamboo Node 1.5",
         "enabled": true,
         "tags": [],
@@ -342,6 +349,7 @@
         }
       },
       {
+        "pid": 8,
         "name": "Bamboo Node 1.6",
         "enabled": true,
         "tags": [],
@@ -393,6 +401,7 @@
         }
       },
       {
+        "pid": 9,
         "name": "Bamboo Leaf 1.1",
         "enabled": true,
         "tags": [],
@@ -444,6 +453,7 @@
         }
       },
       {
+        "pid": 10,
         "name": "Bamboo Leaf 1.2",
         "enabled": true,
         "tags": [],
@@ -495,6 +505,7 @@
         }
       },
       {
+        "pid": 11,
         "name": "Bamboo Leaf 1.3",
         "enabled": true,
         "tags": [],
@@ -546,6 +557,7 @@
         }
       },
       {
+        "pid": 12,
         "name": "Bamboo Cane 2",
         "enabled": true,
         "tags": [],
@@ -597,6 +609,7 @@
         }
       },
       {
+        "pid": 13,
         "name": "Bamboo Node 2.1",
         "enabled": true,
         "tags": [],
@@ -648,6 +661,7 @@
         }
       },
       {
+        "pid": 14,
         "name": "Bamboo Node 2.2",
         "enabled": true,
         "tags": [],
@@ -699,6 +713,7 @@
         }
       },
       {
+        "pid": 15,
         "name": "Bamboo Node 2.3",
         "enabled": true,
         "tags": [],
@@ -750,6 +765,7 @@
         }
       },
       {
+        "pid": 16,
         "name": "Bamboo Node 2.4",
         "enabled": true,
         "tags": [],
@@ -801,6 +817,7 @@
         }
       },
       {
+        "pid": 17,
         "name": "Bamboo Node 2.5",
         "enabled": true,
         "tags": [],
@@ -852,6 +869,7 @@
         }
       },
       {
+        "pid": 18,
         "name": "Bamboo Node 2.6",
         "enabled": true,
         "tags": [],
@@ -903,6 +921,7 @@
         }
       },
       {
+        "pid": 19,
         "name": "Bamboo Node 2.7",
         "enabled": true,
         "tags": [],
@@ -954,6 +973,7 @@
         }
       },
       {
+        "pid": 20,
         "name": "Bamboo Leaf 2.1",
         "enabled": true,
         "tags": [],
@@ -1005,6 +1025,7 @@
         }
       },
       {
+        "pid": 21,
         "name": "Bamboo Leaf 2.2",
         "enabled": true,
         "tags": [],
@@ -1056,6 +1077,7 @@
         }
       },
       {
+        "pid": 22,
         "name": "Bamboo Leaf 2.3",
         "enabled": true,
         "tags": [],
@@ -1107,6 +1129,7 @@
         }
       },
       {
+        "pid": 23,
         "name": "Bamboo Cane 3",
         "enabled": true,
         "tags": [],
@@ -1158,6 +1181,7 @@
         }
       },
       {
+        "pid": 24,
         "name": "Bamboo Node 3.1",
         "enabled": true,
         "tags": [],
@@ -1209,6 +1233,7 @@
         }
       },
       {
+        "pid": 25,
         "name": "Bamboo Node 3.2",
         "enabled": true,
         "tags": [],
@@ -1260,6 +1285,7 @@
         }
       },
       {
+        "pid": 26,
         "name": "Bamboo Node 3.3",
         "enabled": true,
         "tags": [],
@@ -1311,6 +1337,7 @@
         }
       },
       {
+        "pid": 27,
         "name": "Bamboo Node 3.4",
         "enabled": true,
         "tags": [],
@@ -1362,6 +1389,7 @@
         }
       },
       {
+        "pid": 28,
         "name": "Bamboo Node 3.5",
         "enabled": true,
         "tags": [],
@@ -1413,6 +1441,7 @@
         }
       },
       {
+        "pid": 29,
         "name": "Bamboo Node 3.6",
         "enabled": true,
         "tags": [],
@@ -1464,6 +1493,7 @@
         }
       },
       {
+        "pid": 30,
         "name": "Bamboo Node 3.7",
         "enabled": true,
         "tags": [],
@@ -1515,6 +1545,7 @@
         }
       },
       {
+        "pid": 31,
         "name": "Bamboo Node 3.8",
         "enabled": true,
         "tags": [],
@@ -1566,6 +1597,7 @@
         }
       },
       {
+        "pid": 32,
         "name": "Bamboo Node 3.9",
         "enabled": true,
         "tags": [],
@@ -1617,6 +1649,7 @@
         }
       },
       {
+        "pid": 33,
         "name": "Bamboo Leaf 3.1",
         "enabled": true,
         "tags": [],
@@ -1668,6 +1701,7 @@
         }
       },
       {
+        "pid": 34,
         "name": "Bamboo Leaf 3.2",
         "enabled": true,
         "tags": [],
@@ -1719,6 +1753,7 @@
         }
       },
       {
+        "pid": 35,
         "name": "Bamboo Leaf 3.3",
         "enabled": true,
         "tags": [],
@@ -1770,6 +1805,7 @@
         }
       },
       {
+        "pid": 36,
         "name": "Bamboo Cane 4",
         "enabled": true,
         "tags": [],
@@ -1821,6 +1857,7 @@
         }
       },
       {
+        "pid": 37,
         "name": "Bamboo Node 4.1",
         "enabled": true,
         "tags": [],
@@ -1872,6 +1909,7 @@
         }
       },
       {
+        "pid": 38,
         "name": "Bamboo Node 4.2",
         "enabled": true,
         "tags": [],
@@ -1923,6 +1961,7 @@
         }
       },
       {
+        "pid": 39,
         "name": "Bamboo Node 4.3",
         "enabled": true,
         "tags": [],
@@ -1974,6 +2013,7 @@
         }
       },
       {
+        "pid": 40,
         "name": "Bamboo Node 4.4",
         "enabled": true,
         "tags": [],
@@ -2025,6 +2065,7 @@
         }
       },
       {
+        "pid": 41,
         "name": "Bamboo Node 4.5",
         "enabled": true,
         "tags": [],
@@ -2076,6 +2117,7 @@
         }
       },
       {
+        "pid": 42,
         "name": "Bamboo Node 4.6",
         "enabled": true,
         "tags": [],
@@ -2127,6 +2169,7 @@
         }
       },
       {
+        "pid": 43,
         "name": "Bamboo Leaf 4.1",
         "enabled": true,
         "tags": [],
@@ -2178,6 +2221,7 @@
         }
       },
       {
+        "pid": 44,
         "name": "Bamboo Leaf 4.2",
         "enabled": true,
         "tags": [],
@@ -2229,6 +2273,7 @@
         }
       },
       {
+        "pid": 45,
         "name": "Bamboo Leaf 4.3",
         "enabled": true,
         "tags": [],
@@ -2280,6 +2325,7 @@
         }
       },
       {
+        "pid": 46,
         "name": "Bamboo Cane 5",
         "enabled": true,
         "tags": [],
@@ -2331,6 +2377,7 @@
         }
       },
       {
+        "pid": 47,
         "name": "Bamboo Node 5.1",
         "enabled": true,
         "tags": [],
@@ -2382,6 +2429,7 @@
         }
       },
       {
+        "pid": 48,
         "name": "Bamboo Node 5.2",
         "enabled": true,
         "tags": [],
@@ -2433,6 +2481,7 @@
         }
       },
       {
+        "pid": 49,
         "name": "Bamboo Node 5.3",
         "enabled": true,
         "tags": [],
@@ -2484,6 +2533,7 @@
         }
       },
       {
+        "pid": 50,
         "name": "Bamboo Node 5.4",
         "enabled": true,
         "tags": [],
@@ -2535,6 +2585,7 @@
         }
       },
       {
+        "pid": 51,
         "name": "Bamboo Node 5.5",
         "enabled": true,
         "tags": [],
@@ -2586,6 +2637,7 @@
         }
       },
       {
+        "pid": 52,
         "name": "Bamboo Node 5.6",
         "enabled": true,
         "tags": [],
@@ -2637,6 +2689,7 @@
         }
       },
       {
+        "pid": 53,
         "name": "Bamboo Node 5.7",
         "enabled": true,
         "tags": [],
@@ -2688,6 +2741,7 @@
         }
       },
       {
+        "pid": 54,
         "name": "Bamboo Leaf 5.1",
         "enabled": true,
         "tags": [],
@@ -2739,6 +2793,7 @@
         }
       },
       {
+        "pid": 55,
         "name": "Bamboo Leaf 5.2",
         "enabled": true,
         "tags": [],
@@ -2790,6 +2845,7 @@
         }
       },
       {
+        "pid": 56,
         "name": "Bamboo Leaf 5.3",
         "enabled": true,
         "tags": [],

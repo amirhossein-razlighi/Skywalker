@@ -81,7 +81,7 @@ struct CharacterController {
 /// Connects this entity's body to `target`'s body (or to the world).
 struct Joint {
     std::string kind = "fixed";  // fixed | hinge | ball | slider | distance | spring
-    std::string target;          // entity name or "#id"; empty = the world
+    EntityLink target;           // the other body; empty = the world
     Vec3 anchor{0.f};            // pivot in this entity's local space
     Vec3 connectedAnchor{0.f};   // distance/spring: the other end, in the target's local space (or world point)
     Vec3 axis{0.f, 1.f, 0.f};    // hinge axis / slider direction, local space
