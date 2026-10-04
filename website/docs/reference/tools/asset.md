@@ -523,6 +523,8 @@ Create a reusable material asset (*.mat.json): color, metallic, roughness, emiss
 | `doubleSided` | boolean |  | Render both faces |  |
 | `occlusionStrength` | number |  | Ambient occlusion from the ORM map's red channel | 0 .. 1 |
 | `alphaCutoff` | number |  | Alpha-tested cutout threshold (foliage, sails, fences); 0 = off | 0 .. 1 |
+| `scrollU` | number |  | Texture scroll along U in UV units per second (flowing lava, rivers, conveyor belts); 0 = still | -100 .. 100 |
+| `scrollV` | number |  | Texture scroll along V in UV units per second; 0 = still | -100 .. 100 |
 | `path` | string | yes | Project-relative path ending in .mat.json, e.g. materials/stone.mat.json |  |
 | `preset` | string |  | Start from a built-in material (other fields override it) | `gold` `silver` `copper` `chrome` `brushed_steel` `iron` `plastic` `rubber` `ceramic` `car_paint` `glass` `water` `ice` `skin` `wax` `leaves` `snow` `velvet` `neon` `toon` `toon_metal` `clay` |
 
@@ -587,6 +589,8 @@ Change fields of an existing material; every entity using it updates instantly.
 | `doubleSided` | boolean |  | Render both faces |  |
 | `occlusionStrength` | number |  | Ambient occlusion from the ORM map's red channel | 0 .. 1 |
 | `alphaCutoff` | number |  | Alpha-tested cutout threshold (foliage, sails, fences); 0 = off | 0 .. 1 |
+| `scrollU` | number |  | Texture scroll along U in UV units per second (flowing lava, rivers, conveyor belts); 0 = still | -100 .. 100 |
+| `scrollV` | number |  | Texture scroll along V in UV units per second; 0 = still | -100 .. 100 |
 | `path` | string | yes | Project-relative path ending in .mat.json, e.g. materials/stone.mat.json |  |
 | `preset` | string |  | Start from a built-in material (other fields override it) | `gold` `silver` `copper` `chrome` `brushed_steel` `iron` `plastic` `rubber` `ceramic` `car_paint` `glass` `water` `ice` `skin` `wax` `leaves` `snow` `velvet` `neon` `toon` `toon_metal` `clay` |
 

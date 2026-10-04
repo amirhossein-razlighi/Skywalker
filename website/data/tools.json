@@ -2631,6 +2631,18 @@
       "maximum": 1,
       "description": "Alpha-tested cutout threshold (foliage, sails, fences); 0 = off"
      },
+     "scrollU": {
+      "type": "number",
+      "minimum": -100,
+      "maximum": 100,
+      "description": "Texture scroll along U in UV units per second (flowing lava, rivers, conveyor belts); 0 = still"
+     },
+     "scrollV": {
+      "type": "number",
+      "minimum": -100,
+      "maximum": 100,
+      "description": "Texture scroll along V in UV units per second; 0 = still"
+     },
      "path": {
       "type": "string",
       "description": "Project-relative path ending in .mat.json, e.g. materials/stone.mat.json"
@@ -2798,6 +2810,18 @@
       "minimum": 0,
       "maximum": 1,
       "description": "Alpha-tested cutout threshold (foliage, sails, fences); 0 = off"
+     },
+     "scrollU": {
+      "type": "number",
+      "minimum": -100,
+      "maximum": 100,
+      "description": "Texture scroll along U in UV units per second (flowing lava, rivers, conveyor belts); 0 = still"
+     },
+     "scrollV": {
+      "type": "number",
+      "minimum": -100,
+      "maximum": 100,
+      "description": "Texture scroll along V in UV units per second; 0 = still"
      },
      "path": {
       "type": "string",
