@@ -209,19 +209,46 @@ struct TerrainItem {
     int overlayBlend = 0;         // 0 = mix, 1 = multiply, 2 = glow
 };
 
-/// A chunk of GPU-instanced foliage (one mesh + surface, many transforms).
+/// One drawable part of an instanced model: a mesh, its surface and its transform inside the
+/// model (identity for single meshes; trunk, branches, leaves... of a prefab).
+struct InstancePart {
+    std::string mesh;
+    Surface surface;  // absolute texture paths
+    Mat4 local;
+};
+
+/// A model drawn as an octahedral impostor beyond its transition distance (see
+/// render/Impostor.h). Baked lazily by the backend, cached in the project under `cachePath`.
+struct ImpostorModel {
+    std::string key;        // impostor::cacheKey: stable across runs and machines
+    std::string cachePath;  // absolute .skyimp file ("" = memory only)
+    std::string label;      // what it is (layer name, prefab), for tools and logs
+    std::shared_ptr<const std::vector<InstancePart>> parts;
+    std::string source;     // parts as named in the project (mesh keys, materials, transforms): key input
+    std::string stamp;      // size/mtime of the source files: key input (edits rebake)
+    Aabb bounds;            // model space, all parts
+    int frames = 12;        // views per atlas side
+    int resolution = 1024;  // requested atlas edge (px); see impostor::tileSize
+    bool hemi = true;       // hemi-octahedral (upright vegetation) or full octahedral
+};
+
+/// A chunk of GPU-instanced foliage: every part of one model, sharing the instance transforms.
+/// The backend culls and picks a level of detail per instance on the GPU: mesh LODs near the
+/// camera, a dithered crossfade, then the impostor out to the cull distance.
 struct InstanceBatch {
     EntityId entity = kNoEntity;
     uint64_t id = 0;  // stable while the instance data is unchanged (GPU buffer caching)
-    std::string mesh;
-    Surface surface;
+    std::shared_ptr<const std::vector<InstancePart>> parts;
     std::shared_ptr<const std::vector<world::FoliageInstance>> instances;
     Aabb bounds;
     bool castShadows = true;
     float wind = 1.f;           // bend strength
     float cullDistance = 100.f;
-    float meshHeight = 1.f;     // height of the mesh (m) for wind bending
-    Mat4 part;                  // transform of this part inside a multi-part model (identity otherwise)
+    float meshHeight = 1.f;     // height of the model (m) for wind bending
+    float maxScale = 1.f;       // largest instance scale (LOD selection)
+    Aabb modelBounds{Vec3(-0.5f, 0.f, -0.5f), Vec3(0.5f, 1.f, 0.5f)};  // model space, all parts (instance culling)
+    int impostor = -1;          // index into FrameData::impostors (-1 = meshes only)
+    float impostorDistance = 0.f;  // camera distance where instances become impostors (0 = never)
 };
 
 struct FrameData {
@@ -239,6 +266,7 @@ struct FrameData {
     std::vector<VolumeItem> volumes;
     std::vector<TerrainItem> terrains;
     std::vector<InstanceBatch> instances;
+    std::vector<ImpostorModel> impostors;  // models referenced by InstanceBatch::impostor
     std::vector<SkinItem> skins;  // animation: skinned draws (see SkinItem)
     std::vector<GpuEmitterItem> gpuEmitters;  // GPU-simulated particles (hair & VFX workstream)
     std::vector<GroomItem> grooms;            // strand hair and fur
@@ -251,7 +279,8 @@ struct FrameData {
     /// Discards temporal history (camera cuts). Large camera jumps are detected automatically.
     bool resetHistory = false;
     /// Buffer visualization instead of the final image: 0 off, 1 albedo, 2 normals,
-    /// 3 roughness/metallic, 4 GI, 5 reflections, 6 AO, 7 depth, 8 lighting before GI, 9 sketch.
+    /// 3 roughness/metallic, 4 GI, 5 reflections, 6 AO, 7 depth, 8 lighting before GI, 9 sketch,
+    /// 10 impostors (the final image with foliage meshes tinted green and impostors magenta).
     int debugView = 0;
     /// Viewport quality: 0 full (play, captures), 1 balanced, 2 fast (editing a heavy world).
     /// Lower tiers pick coarser LODs and cheaper shadows; the engine also trims the environment.
@@ -341,6 +370,13 @@ public:
     virtual std::vector<LightItem> effectLights() const { return {}; }
     /// Backend statistics of the last completed frame (GPU time in ms, items drawn, effects...).
     virtual Json stats() const { return Json::object(); }
+    /// Bakes the impostors of these models now (or loads them from their cache files unless
+    /// `force`). Returns one entry per model: key, label, atlas size, frames, tile, bake time,
+    /// whether it came from the cache, and the cache path.
+    virtual Result<Json> bakeImpostors(const std::vector<ImpostorModel>& models, bool force) {
+        (void)models, (void)force;
+        return Error::make("unsupported", "impostor baking needs a GPU renderer backend", "run on macOS (Metal)");
+    }
 };
 
 enum class RendererBackend { Auto, Metal, Null };

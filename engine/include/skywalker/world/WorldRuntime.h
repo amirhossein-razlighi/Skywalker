@@ -28,6 +28,7 @@ public:
             Mat4 local;
         };
         std::function<std::vector<Part>(const std::string&)> prefabParts;  // prefab asset -> mesh parts
+        std::function<size_t(const std::string&)> meshTriangles;  // mesh key -> triangle count (impostor heuristics)
     };
     explicit WorldRuntime(Hooks hooks) : hooks_(std::move(hooks)) {}
 
@@ -53,21 +54,44 @@ public:
     std::optional<Hit> raycast(const Scene& scene, const Ray& ray, float maxDist);
 
     struct Stats {
-        size_t terrains = 0, foliageChunks = 0, foliageInstances = 0;
+        size_t terrains = 0, foliageChunks = 0, foliageInstances = 0, impostorLayers = 0;
     };
     Stats stats() const { return stats_; }
+
+    /// The impostor models of a Foliage entity's layers (those with impostors enabled and heavy
+    /// enough to pay off), for baking ahead of time. `layer` < 0 = every layer.
+    struct LayerImpostor {
+        int layer = 0;
+        std::string name;
+        ImpostorModel model;
+        float transitionDistance = 0;  // at 1080p, 55 degrees, full quality
+        float cullDistance = 0;
+    };
+    std::vector<LayerImpostor> impostorModels(const Scene& scene, EntityId foliage, int layer = -1);
 
 private:
     struct TerrainEntry {
         std::shared_ptr<TerrainData> data;
         std::string key;
     };
+    /// The drawable model of a foliage layer: its parts (shared by every chunk) and impostor.
+    struct LayerModel {
+        std::string signature;  // parts + materials + impostor settings; a change rebuilds the rest
+        std::shared_ptr<const std::vector<InstancePart>> parts;
+        float meshHeight = 1.f;
+        Aabb bounds;            // model space
+        bool impostorWorthy = false;
+        ImpostorModel impostor;
+    };
     struct FoliageEntry {
         FoliageCache cache;
         std::vector<FoliageLayer> layers;
         std::string layersKey;
+        std::vector<LayerModel> models;  // per layer
     };
     EntityId terrainFor(const Scene& scene, EntityId e) const;
+    /// Resolves (and caches) the model of layer `li`; nullptr while its meshes stream in.
+    const LayerModel* layerModel(FoliageEntry& entry, size_t li, const FoliageLayer& layer);
 
     Hooks hooks_;
     std::unordered_map<EntityId, TerrainEntry> terrains_;

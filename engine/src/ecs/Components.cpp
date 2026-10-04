@@ -323,9 +323,15 @@ const TypeInfo& Foliage::type() {
         "its parent) or over scene meshes inside `area`. Wind-animated, deterministic. Use foliage_add with presets.",
         {
             SKY_FIELD_JSON(Foliage, layers,
-                           "Layers: [{preset, mesh, color, density (/m²), scaleMin, scaleMax, slopeMin, slopeMax, heightMin, "
-                           "heightMax, terrainLayer, wind, cullDistance, castShadows, clumping, alignToNormal}]",
-                           R"({"type":"array","items":{"type":"object"}})"),
+                           "Layers: [{preset, mesh | prefab, color, density (/m²), scaleMin, scaleMax, slopeMin, slopeMax, heightMin, "
+                           "heightMax, terrainLayer, wind, cullDistance, castShadows, clumping, alignToNormal, impostors, "
+                           "impostorDistance, impostorResolution, impostorFrames}]. Distant instances of heavy meshes draw as "
+                           "octahedral impostors (see impostor_bake).",
+                           R"json({"type":"array","items":{"type":"object","properties":{
+                               "impostors":{"type":"boolean","description":"Draw far instances as baked octahedral impostors (default true; used when the mesh has 300+ triangles)"},
+                               "impostorDistance":{"type":"number","description":"Camera distance in meters where instances become impostors: 0 = automatic from on-screen size, -1 = never"},
+                               "impostorResolution":{"type":"integer","description":"Impostor atlas edge in pixels: 0 = automatic, 512-2048 by model size"},
+                               "impostorFrames":{"type":"integer","description":"Capture directions per atlas side, 4-32 (default 12)"}}}})json"),
             SKY_FIELD(Foliage, seed, Int, "Random seed of the placement"),
             SKY_FIELD_RANGE(Foliage, density, Float, "Density multiplier for every layer", 0.f, 4.f),
             SKY_FIELD_ENUM(Foliage, surface, "What to grow on", "terrain", "scene"),

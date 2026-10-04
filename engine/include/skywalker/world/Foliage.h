@@ -55,6 +55,12 @@ struct FoliageLayer {
     bool castShadows = true;
     float randomTilt = 4.f;             // degrees
     uint32_t seed = 0;
+    // Distance rendering: beyond `impostorDistance` instances are drawn as octahedral impostors
+    // (baked atlases of the model seen from many directions) instead of meshes.
+    bool impostors = true;              // allow impostors (used when the mesh is heavy enough to pay off)
+    float impostorDistance = 0.f;       // meters; 0 = automatic from on-screen size, < 0 = never
+    int impostorResolution = 0;         // atlas edge in pixels; 0 = automatic (512..2048 by model size)
+    int impostorFrames = 12;            // capture directions per atlas side (4..32)
 };
 
 std::vector<FoliageLayer> foliageLayersFromJson(const Json& layers);

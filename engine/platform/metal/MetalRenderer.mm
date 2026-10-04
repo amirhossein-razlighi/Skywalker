@@ -39,7 +39,9 @@
 
 #include <dispatch/dispatch.h>
 
+#include "MetalFoliage.h"  // [foliage] GPU-driven foliage and impostors
 #include "MetalFx.h"  // [hair+vfx] GPU particles and strand hair
+#include "MetalMesh.h"
 #include "skywalker/core/Log.h"
 #include "skywalker/render/ColorGrading.h"
 #include "skywalker/render/Hdr.h"
@@ -177,11 +179,6 @@ struct TerrainNodeGpu {
     simd_float4 node, morph;
 };
 
-struct FoliageUniformsGpu {
-    simd_float4 wind, params;
-    simd_float4x4 part;
-};
-
 struct LensUniformsGpu {
     simd_float4 lens, motion, texel, view;
 };
@@ -301,29 +298,6 @@ Cascades computeCascades(const FrameData& frame) {
     return c;
 }
 
-struct GpuMesh {
-    id<MTLBuffer> vertices;
-    id<MTLBuffer> indices;  // LOD 0 first, then each coarser level
-    uint32_t indexCount = 0;
-    static constexpr int kMaxLods = 6;
-    int lodCount = 1;
-    uint32_t lodOffset[kMaxLods] = {};  // in indices
-    uint32_t lodCount_[kMaxLods] = {};
-    float lodError[kMaxLods] = {};      // relative to the mesh extent
-    float radius = 1.f;                 // bounding-sphere radius (local units)
-
-    /// The coarsest level whose simplification error stays under ~1 pixel at `pixelsPerUnit`.
-    int lodFor(float pixelsPerUnit) const {
-        int best = 0;
-        for (int i = 1; i < lodCount; ++i) {
-            if (lodError[i] * radius * 2.f * pixelsPerUnit < 0.8f) best = i;
-        }
-        return best;
-    }
-    id<MTLBuffer> skin;  // animation: SkinGpuVertex stream of rigged meshes (nil if static)
-    uint32_t vertexCount = 0;
-};
-
 class MetalRenderer final : public Renderer {
     struct OceanGpu {
         id<MTLTexture> disp[OceanCascades::kCascades];
@@ -350,10 +324,6 @@ class MetalRenderer final : public Renderer {
         int nodesPerSide0 = 0;                             // finest level
         uint64_t lastUse = 0;
     };
-    struct InstanceGpu {
-        id<MTLBuffer> buffer;
-        uint64_t lastUse = 0;
-    };
 
 public:
     bool init() {
@@ -368,6 +338,18 @@ public:
                 return m ? FxMesh{m->vertices, m->indices, m->indexCount} : FxMesh{};
             },
             [this](const std::string& path, bool srgb) { return texture(path, srgb); });
+        foliage_ = std::make_unique<MetalFoliage>(  // [foliage]
+            device_, queue_, [this](const std::string& key) { return mesh(key); },
+            [this](const std::string& path, bool srgb) { return texture(path, srgb); },
+            [this](const Surface& surface, simd_float4 maps) {
+                DrawItem d;
+                d.surface = surface;
+                DrawUniforms du = drawUniforms(d, maps);
+                FxDrawUniforms out;
+                static_assert(sizeof(out) == sizeof(du));
+                std::memcpy(&out, &du, sizeof(du));
+                return out;
+            });
         Status s = buildPipelines(kDefaultShaderSource);
         if (!s) {
             log::error("render", "built-in shaders failed to compile: " + s.error().message);
@@ -446,17 +428,26 @@ public:
         Json j = Json::object({{"gpuMs", std::round(gpuMs_->load() * 100.0) / 100.0},
                              {"culledDraws", static_cast<int64_t>(culled_)},
                              {"terrainNodes", static_cast<int64_t>(terrainNodesDrawn_)},
-                             {"instancesDrawn", static_cast<int64_t>(instancesDrawn_)},
-                             {"trianglesDrawn", static_cast<int64_t>(lastTriangles_)},
+                             {"trianglesDrawn", static_cast<int64_t>(lastTriangles_ + (foliage_ ? foliage_->triangles() : 0))},
                              {"gpuFaults", static_cast<int64_t>(gpuFaults_->load())},
                              {"meshesCached", static_cast<int64_t>(meshes_.size())},
-                             {"texturesCached", static_cast<int64_t>(textures_.size())},
-                             {"instanceBuffers", static_cast<int64_t>(instanceBuffers_.size())}});
+                             {"texturesCached", static_cast<int64_t>(textures_.size())}});
+        if (foliage_) {  // [foliage] instances, impostors, bakes
+            const Json f = foliage_->stats();
+            for (const auto& [k, v] : f.members()) j[k] = v;
+            j["instancesDrawn"] = f.get("meshInstances").asInt() + f.get("impostorInstances").asInt();
+        }
         if (fx_) {  // [hair+vfx] frame/simulation GPU times, emitters, grooms
             const Json fx = fx_->stats();
             for (const auto& [k, v] : fx.members()) j[k] = v;
         }
         return j;
+    }
+
+    Result<Json> bakeImpostors(const std::vector<ImpostorModel>& models, bool force) override {  // [foliage]
+        @autoreleasepool {
+            return foliage_->bake(models, force);
+        }
     }
 
     RendererInfo info() const override { return {"metal", device_ ? std::string(device_.name.UTF8String) : ""}; }
@@ -544,8 +535,15 @@ public:
             encodeEnvironment(cmd, frame, base);
             lodFrame_ = &frame;
             trianglesDrawn_ = 0;
-            chooseFoliageBudgetBias(frame);
             fx_->simulate(frame, depthPrev_, gbufB_, prevViewProj_, historyValid_);  // [hair+vfx]
+            chooseFoliageBudgetBias(frame);
+            {  // [foliage] impostors (bake/load within budget) and the GPU cull pass
+                FoliageView fv;
+                fv.viewProj = vp;
+                for (int c = 0; c < kCascades; ++c) fv.cascadeViewProj[c] = cascades.viewProj[c];
+                fv.shadows = base.params.z > 0.5f;
+                foliage_->prepare(cmd, frame, fv, frameIndex_);
+            }
             encodeShadows(cmd, frame, base, cascades);
             if (r2d_) r2d_->encodeOccluders(cmd, frame);  // 2D shadow casters
             for (int i = 0; i < samples; ++i) {
@@ -585,7 +583,7 @@ public:
             if (spatialUpscale) encodeSpatialUpscale(cmd);
             postSource_ = upscale || spatialUpscale ? upscaled_ : taa_[taaCurrent_];
             encodePost(cmd, frame, accumulate, base);
-            if (frame.debugView > 0) {
+            if (frame.debugView > 0 && frame.debugView != 10) {  // 10 (impostors) tints the final image instead
                 PostUniforms pu{};
                 pu.params = simd_make_float4(static_cast<float>(frame.debugView), 0, 0, 0);
                 pu.texel = simd_make_float4(1.f / std::max(frame.width, 1), 1.f / std::max(frame.height, 1), 0, 0);
@@ -595,6 +593,7 @@ public:
             if (r2d_) r2d_->encodeUI(cmd, frame, resolve_, depthResolved_);  // UI at output resolution
             encodeOverlays(cmd, frame, base);
             fx_->trackFrame(cmd);  // [hair+vfx] GPU frame time
+            foliage_->trackFrame(cmd);  // [foliage] GPU-counted instances and triangles
             {
                 dispatch_semaphore_t sem = inFlight_;
                 auto gpuMs = gpuMs_;
@@ -729,8 +728,7 @@ private:
                                      "fluidCurl", "fluidForces", "fluidDivergence", "fluidJacobi", "fluidProject", "volumetricFragment",
                                      "ssgiFragment", "ssrFragment", "ssTemporalFragment", "lightingResolveFragment",
                                      "temporalFragment", "debugViewFragment", "terrainVertex", "terrainFragment",
-                                     "terrainShadowVertex", "foliageVertex", "foliageShadowVertex", "foliageShadowAlphaVertex",
-                                     "cloudsFragment",
+                                     "terrainShadowVertex", "cloudsFragment",
                                      "cloudTemporalFragment", "cloudShapeKernel", "cloudDetailKernel", "lumaFragment",
                                      "exposureFragment", "motionBlurFragment", "dofCocFragment", "dofBlurFragment",
                                      "dofCombineFragment", "motionVectorFragment"}) {
@@ -820,12 +818,7 @@ private:
         id<MTLRenderPipelineState> debugView = temporal ? make("fullscreenVertex", "debugViewFragment", kColorFormat, 1, Blend::None, false, &e) : nil;
         id<MTLRenderPipelineState> terrain = debugView ? make("terrainVertex", "terrainFragment", kHDRFormat, kSamples, Blend::None, true, &e, true) : nil;
         id<MTLRenderPipelineState> terrainShadow = terrain ? make("terrainShadowVertex", nullptr, MTLPixelFormatInvalid, 1, Blend::None, true, &e) : nil;
-        id<MTLRenderPipelineState> foliage = terrainShadow ? make("foliageVertex", "meshFragment", kHDRFormat, kSamples, Blend::None, true, &e, true) : nil;
-        id<MTLRenderPipelineState> foliageCutout = foliage ? make("foliageVertex", "meshFragment", kHDRFormat, kSamples, Blend::None, true, &e, true, true) : nil;
-        id<MTLRenderPipelineState> foliageShadow = foliageCutout ? make("foliageShadowVertex", nullptr, MTLPixelFormatInvalid, 1, Blend::None, true, &e) : nil;
-        id<MTLRenderPipelineState> foliageShadowAlpha =
-            foliageShadow ? make("foliageShadowAlphaVertex", "shadowAlphaFragment", MTLPixelFormatInvalid, 1, Blend::None, true, &e) : nil;
-        id<MTLRenderPipelineState> clouds = foliageShadowAlpha ? make("fullscreenVertex", "cloudsFragment", kHDRFormat, 1, Blend::None, false, &e) : nil;
+        id<MTLRenderPipelineState> clouds = terrainShadow ? make("fullscreenVertex", "cloudsFragment", kHDRFormat, 1, Blend::None, false, &e) : nil;
         id<MTLRenderPipelineState> cloudTemporal = clouds ? make("fullscreenVertex", "cloudTemporalFragment", kHDRFormat, 1, Blend::None, false, &e) : nil;
         id<MTLComputePipelineState> cloudShapeK = cloudTemporal ? [device_ newComputePipelineStateWithFunction:fn("cloudShapeKernel") error:&e] : nil;
         id<MTLComputePipelineState> cloudDetailK = cloudShapeK ? [device_ newComputePipelineStateWithFunction:fn("cloudDetailKernel") error:&e] : nil;
@@ -852,6 +845,8 @@ private:
         if (!volume) {
             return Error::make("pipeline_error", e ? std::string(e.localizedDescription.UTF8String) : "pipeline creation failed");
         }
+        // [foliage] GPU-driven foliage and impostor pipelines (same shader library).
+        if (Status fs = foliage_->build(lib, FoliageFormats{kHDRFormat, kGbufAFormat, kGbufBFormat, kDepthFormat, kSamples}); !fs) return fs;
         skyPipeline_ = sky;
         meshPipeline_ = mesh;
         meshBlendPipeline_ = meshBlend;
@@ -883,10 +878,6 @@ private:
         debugViewPipeline_ = debugView;
         terrainPipeline_ = terrain;
         terrainShadowPipeline_ = terrainShadow;
-        foliagePipeline_ = foliage;
-        foliageCutoutPipeline_ = foliageCutout;
-        foliageShadowPipeline_ = foliageShadow;
-        foliageShadowAlphaPipeline_ = foliageShadowAlpha;
         cloudsPipeline_ = clouds;
         cloudTemporalPipeline_ = cloudTemporal;
         cloudShapeKernel_ = cloudShapeK;
@@ -1087,19 +1078,6 @@ private:
         bias += lodFrame_->quality >= 2 ? 1 : 0;
         return std::min(m.lodFor(pixelsPerUnit(*lodFrame_, dist) * scale) + bias, m.lodCount - 1);
     }
-    int lodForChunk(const GpuMesh& m, const InstanceBatch& b, int bias = 0) const {
-        if (m.lodCount <= 1 || !lodFrame_) return 0;
-        const Vec3 e = lodFrame_->camera.eye;
-        Vec3 c{std::clamp(e.x, b.bounds.min.x, b.bounds.max.x), std::clamp(e.y, b.bounds.min.y, b.bounds.max.y),
-               std::clamp(e.z, b.bounds.min.z, b.bounds.max.z)};
-        bias += (lodFrame_->quality >= 2 ? 1 : 0) + foliageBudgetBias_;  // fast editing view, triangle budget
-        int lod = std::min(m.lodFor(pixelsPerUnit(*lodFrame_, distance(e, c)) * 1.3f) + bias, m.lodCount - 1);
-        // Leaf/grass cards thin out badly when simplified hard: keep the canopy readable
-        // (distant forests should use impostors) unless the triangle budget forbids it.
-        if (b.surface.alphaCutoff > 0.f && lodFrame_->quality < 2 && foliageBudgetBias_ == 0) lod = std::min(lod, 1 + bias);
-        return lod;
-    }
-
     void drawLod(id<MTLRenderCommandEncoder> enc, const GpuMesh& m, int lod, NSUInteger instances = 1) {
         lod = std::clamp(lod, 0, m.lodCount - 1);
         trianglesDrawn_ += static_cast<uint64_t>(m.lodCount_[lod] / 3) * instances;
@@ -1441,7 +1419,7 @@ private:
                     drawLod(enc, *m, lodForDraw(*m, d, 1));
                 }
                 drawTerrainShadows(enc, frame, fr, lvp);
-                drawFoliageShadows(enc, frame, fr, lvp);
+                foliage_->encodeShadows(enc, frame, c, lvp);  // [foliage]
                 [enc setRenderPipelineState:shadowPipeline_];
                 [enc setCullMode:MTLCullModeNone];
                 fx_->encodeShadowCaster(enc, frame, lvp);  // [hair+vfx] hair and mesh particles
@@ -1707,138 +1685,21 @@ private:
         }
     }
 
-    // --- Instanced foliage ----------------------------------------------------------------------
-    id<MTLBuffer> instanceBuffer(const InstanceBatch& b) {
-        InstanceGpu& g = instanceBuffers_[b.id];
-        g.lastUse = frameIndex_;
-        if (!g.buffer) {
-            g.buffer = [device_ newBufferWithBytes:b.instances->data()
-                                            length:b.instances->size() * sizeof(world::FoliageInstance)
-                                           options:MTLResourceStorageModeShared];
-        }
-        return g.buffer;
-    }
-
-    FoliageUniformsGpu foliageUniforms(const FrameData& frame, const InstanceBatch& b) const {
-        const Environment& env = frame.environment;
-        float a = radians(env.windDirection);
-        FoliageUniformsGpu u{};
-        u.wind = simd_make_float4(std::sin(a), std::cos(a), env.windSpeed, b.wind);
-        u.params = simd_make_float4(b.cullDistance, b.meshHeight, 0, frame.time);
-        u.part = toSimd(b.part);
-        return u;
-    }
-
-    /// Hard safety net for instanced foliage: if the visible instances would exceed the
-    /// triangle budget at the chosen LODs, coarsen them until they fit. Very long GPU frames
-    /// trip the system GPU watchdog and stall the whole desktop.
-    static constexpr uint64_t kFoliageTriangleBudget = 120'000'000;
+    /// After a GPU fault (watchdog timeout, page fault) the renderer stays in safe mode: the
+    /// foliage triangle budget drops to a quarter so frames stay far from the watchdog.
     void chooseFoliageBudgetBias(const FrameData& frame) {
-        foliageBudgetBias_ = 0;
-        // After a GPU fault (watchdog timeout, page fault) the renderer stays in safe mode:
-        // a quarter of the geometry budget so the frame stays far from the watchdog.
+        (void)frame;
         const int faults = gpuFaults_->load();
         if (faults != reportedFaults_) {
             reportedFaults_ = faults;
             log::error("render", "GPU command buffer failed (" + std::to_string(faults) +
                                      " so far): rendering in safe mode with a reduced geometry budget");
         }
-        const uint64_t budget = faults > 0 ? kFoliageTriangleBudget / 4 : kFoliageTriangleBudget;
-        if (frame.instances.empty()) return;
-        const Frustum fr(frame.viewProjection());
-        for (int bias = 0; bias <= 4; ++bias) {
-            foliageBudgetBias_ = bias;
-            uint64_t total = 0;
-            for (const InstanceBatch& b : frame.instances) {
-                if (!b.instances || b.instances->empty() || !fr.intersects(b.bounds)) continue;
-                Vec3 c{std::clamp(frame.camera.eye.x, b.bounds.min.x, b.bounds.max.x),
-                       std::clamp(frame.camera.eye.y, b.bounds.min.y, b.bounds.max.y),
-                       std::clamp(frame.camera.eye.z, b.bounds.min.z, b.bounds.max.z)};
-                if (distance(c, frame.camera.eye) > b.cullDistance) continue;
-                const GpuMesh* m = mesh(b.mesh);
-                if (!m) continue;
-                int lod = std::clamp(lodForChunk(*m, b), 0, m->lodCount - 1);
-                total += static_cast<uint64_t>(m->lodCount_[lod] / 3) * b.instances->size();
-            }
-            if (total <= budget) return;
-        }
-    }
-
-    void drawFoliage(id<MTLRenderCommandEncoder> enc, const FrameData& frame, const Frustum& fr) {
-        if (frame.instances.empty()) return;
-        bool cutBound = false, first = true;
-        for (const InstanceBatch& b : frame.instances) {
-            if (!b.instances || b.instances->empty() || !fr.intersects(b.bounds)) continue;
-            Vec3 c{std::clamp(frame.camera.eye.x, b.bounds.min.x, b.bounds.max.x), std::clamp(frame.camera.eye.y, b.bounds.min.y, b.bounds.max.y),
-                   std::clamp(frame.camera.eye.z, b.bounds.min.z, b.bounds.max.z)};
-            if (distance(c, frame.camera.eye) > b.cullDistance) continue;
-            const GpuMesh* m = mesh(b.mesh);
-            if (!m) continue;
-            bool cut = b.surface.alphaCutoff > 0.f;
-            if (first || cut != cutBound) {
-                [enc setRenderPipelineState:cut ? foliageCutoutPipeline_ : foliagePipeline_];
-                cutBound = cut;
-                first = false;
-            }
-            DrawItem d;
-            d.mesh = b.mesh;
-            d.surface = b.surface;
-            const Surface& s = b.surface;
-            id<MTLTexture> albedo = texture(s.texture, true), normal = texture(s.normalMap, false), orm = texture(s.ormMap, false),
-                           emissive = texture(s.emissiveMap, true);
-            DrawUniforms du = drawUniforms(d, simd_make_float4(albedo ? 1 : 0, normal ? 1 : 0, orm ? 1.f + s.occlusionStrength : 0.f,
-                                                               emissive ? 1 : 0));
-            FoliageUniformsGpu fu = foliageUniforms(frame, b);
-            [enc setCullMode:s.doubleSided ? MTLCullModeNone : MTLCullModeBack];
-            [enc setVertexBuffer:m->vertices offset:0 atIndex:0];
-            [enc setVertexBytes:&du length:sizeof(du) atIndex:1];
-            [enc setVertexBuffer:instanceBuffer(b) offset:0 atIndex:3];
-            [enc setVertexBytes:&fu length:sizeof(fu) atIndex:4];
-            [enc setFragmentBytes:&du length:sizeof(du) atIndex:0];
-            [enc setFragmentTexture:(albedo ?: white_) atIndex:0];
-            [enc setFragmentTexture:(normal ?: white_) atIndex:2];
-            [enc setFragmentTexture:(orm ?: white_) atIndex:3];
-            [enc setFragmentTexture:(emissive ?: white_) atIndex:4];
-            drawLod(enc, *m, lodForChunk(*m, b), b.instances->size());
-            instancesDrawn_ += b.instances->size();
-        }
-    }
-
-    void drawFoliageShadows(id<MTLRenderCommandEncoder> enc, const FrameData& frame, const Frustum& fr, const simd_float4x4& lvp) {
-        bool bound = false;
-        for (const InstanceBatch& b : frame.instances) {
-            if (!b.castShadows || !b.instances || b.instances->empty() || !fr.intersects(b.bounds)) continue;
-            Vec3 c{std::clamp(frame.camera.eye.x, b.bounds.min.x, b.bounds.max.x), std::clamp(frame.camera.eye.y, b.bounds.min.y, b.bounds.max.y),
-                   std::clamp(frame.camera.eye.z, b.bounds.min.z, b.bounds.max.z)};
-            float dist = distance(c, frame.camera.eye);
-            if (dist > b.cullDistance || (frame.quality >= 2 && dist > 60.f)) continue;  // fast view: near shadows only
-            const GpuMesh* m = mesh(b.mesh);
-            if (!m) continue;
-            if (!bound) {
-                [enc setCullMode:MTLCullModeNone];
-                bound = true;
-            }
-            id<MTLTexture> cutTex = b.surface.alphaCutoff > 0.f ? texture(b.surface.texture, true) : nil;
-            [enc setRenderPipelineState:cutTex ? foliageShadowAlphaPipeline_ : foliageShadowPipeline_];
-            if (cutTex) {
-                DrawItem d;
-                d.surface = b.surface;
-                DrawUniforms du = drawUniforms(d);
-                [enc setVertexBytes:&du length:sizeof(du) atIndex:1];
-                [enc setFragmentBytes:&du length:sizeof(du) atIndex:0];
-                [enc setFragmentTexture:cutTex atIndex:0];
-            }
-            FoliageUniformsGpu fu = foliageUniforms(frame, b);
-            [enc setVertexBuffer:m->vertices offset:0 atIndex:0];
-            [enc setVertexBytes:&lvp length:sizeof(lvp) atIndex:2];
-            [enc setVertexBuffer:instanceBuffer(b) offset:0 atIndex:3];
-            [enc setVertexBytes:&fu length:sizeof(fu) atIndex:4];
-            drawLod(enc, *m, lodForChunk(*m, b, 1), b.instances->size());
-        }
+        foliage_->setSafeMode(faults > 0);  // [foliage] per-instance LODs fit MetalFoliage's budget
     }
 
     void evictWorldCaches() {
-        std::erase_if(instanceBuffers_, [&](const auto& kv) { return frameIndex_ - kv.second.lastUse > 180; });
+        foliage_->evict(frameIndex_);  // [foliage]
         std::erase_if(terrainsGpu_, [&](const auto& kv) { return frameIndex_ - kv.second.lastUse > 180; });
     }
 
@@ -1956,9 +1817,9 @@ private:
 
         // Terrain and instanced foliage (opaque)
         terrainNodesDrawn_ = 0;
-        instancesDrawn_ = 0;
         drawTerrains(enc, frame, frustum);
-        drawFoliage(enc, frame, frustum);
+        [enc setFragmentTexture:cloudShape_ atIndex:7];  // terrain layers use slots 7+; lit surfaces expect cloud noise there
+        foliage_->encodeMain(enc, frame);  // [foliage] GPU-culled instances, mesh LOD bands, impostors
         [enc setRenderPipelineState:meshPipeline_];
         [enc setDepthStencilState:depthWrite_];
 
@@ -2798,12 +2659,9 @@ private:
         bloomUpPipeline_, compositePipeline_, envSkyPipeline_, envPrefilterPipeline_, brdfPipeline_, ssaoPipeline_,
         aoBlurPipeline_, meshCutoutPipeline_, shadowAlphaPipeline_, waterPipeline_, particlePipeline_, volumePipeline_, volumetricPipeline_,
         ssgiPipeline_, ssrPipeline_, ssTemporalPipeline_, resolvePipeline_, temporalPipeline_, debugViewPipeline_,
-        terrainPipeline_, terrainShadowPipeline_, foliagePipeline_, foliageCutoutPipeline_, foliageShadowPipeline_,
-        foliageShadowAlphaPipeline_,
-        cloudsPipeline_, cloudTemporalPipeline_, lumaPipeline_, exposurePipeline_, motionBlurPipeline_, dofCocPipeline_,
+        terrainPipeline_, terrainShadowPipeline_, cloudsPipeline_, cloudTemporalPipeline_, lumaPipeline_, exposurePipeline_, motionBlurPipeline_, dofCocPipeline_,
         dofBlurPipeline_, dofCombinePipeline_;
     id<MTLTexture> lum_, exposure_[2], postA_, postB_, dofCoc_, dofBlur_, lut_, upscaled_, motion_, postSource_;
-    int foliageBudgetBias_ = 0;
     std::shared_ptr<std::atomic<int>> gpuFaults_ = std::make_shared<std::atomic<int>>(0);
     int reportedFaults_ = 0;
     id<MTLFXTemporalScaler> scaler_;
@@ -2835,7 +2693,6 @@ private:
     std::unordered_map<EntityId, TerrainGpu> terrainsGpu_;
     id<MTLBuffer> patchVertices_, patchIndices_;
     uint32_t patchIndexCount_ = 0;
-    std::unordered_map<uint64_t, InstanceGpu> instanceBuffers_;
     Alloc lightsBuf_{}, clusterCellsBuf_{}, clusterIndexBuf_{};
     // G-buffer, lighting and temporal targets
     id<MTLTexture> lit_, gbufA_, gbufB_, msaaGbufA_, msaaGbufB_, depthPrev_;
@@ -2867,7 +2724,7 @@ private:
     std::unordered_map<std::string, uint64_t> skinnedKeys_;  // animation: per-instance skinned meshes -> last frame drawn
     std::string source_;
     size_t culled_ = 0;
-    size_t terrainNodesDrawn_ = 0, instancesDrawn_ = 0;
+    size_t terrainNodesDrawn_ = 0;
     uint64_t trianglesDrawn_ = 0, lastTriangles_ = 0;
     const FrameData* lodFrame_ = nullptr;  // frame being encoded (LOD selection)
     std::shared_ptr<std::atomic<double>> gpuMs_ = std::make_shared<std::atomic<double>>(0.0);
@@ -2876,6 +2733,7 @@ private:
     bool volumetricActive_ = false;
     std::unique_ptr<MetalRenderer2D> r2d_;  // 2D world quads + UI
     std::unique_ptr<MetalFx> fx_;  // [hair+vfx]
+    std::unique_ptr<MetalFoliage> foliage_;  // [foliage]
 };
 
 }  // namespace

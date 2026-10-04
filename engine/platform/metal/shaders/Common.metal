@@ -108,6 +108,7 @@ struct MeshOut {
     float3 normal;
     float2 uv;
     float4 color;
+    float fade [[flat]];  // dithered-out fraction (foliage mesh -> impostor crossfade); 0 = solid
 };
 
 // Main pass outputs: lit HDR color + G-buffer.
@@ -186,6 +187,12 @@ static float fbm(float2 p) {
 }
 
 static float interleavedGradientNoise(float2 px) { return fract(52.9829189 * fract(dot(px, float2(0.06711056, 0.00583715)))); }
+
+// Per-pixel dither threshold that changes every frame and sub-sample (temporal AA and
+// accumulation turn dithered crossfades into smooth blends).
+static float ditherNoise(float2 px, float4 temporal) {
+    return interleavedGradientNoise(px + 5.588238 * (temporal.z + temporal.w * 7.0));
+}
 
 // ---------------------------------------------------------------------------
 // BRDF helpers

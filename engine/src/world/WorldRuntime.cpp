@@ -7,6 +7,7 @@
 
 #include "skywalker/core/Log.h"
 #include "skywalker/ecs/Reflection.h"
+#include "skywalker/render/Impostor.h"
 
 namespace sky::world {
 
@@ -24,6 +25,32 @@ int64_t mtimeOf(const std::string& path) {
 uint64_t fnv(const std::string& s, uint64_t h = 1469598103934665603ull) {
     for (unsigned char c : s) h = (h ^ c) * 1099511628211ull;
     return h;
+}
+
+/// Size and modification time of a file ("" when missing): impostor cache keys change when a
+/// source mesh or texture is edited.
+std::string fileStamp(const std::string& path) {
+    std::error_code ec;
+    auto size = fs::file_size(path, ec);
+    if (ec) return {};
+    return "|" + std::to_string(size) + "@" + std::to_string(mtimeOf(path));
+}
+
+/// Everything about a part that changes how it looks (project-relative paths).
+std::string describePart(const InstancePart& p) {
+    const Surface& s = p.surface;
+    char buf[512];
+    std::snprintf(buf, sizeof(buf), "|c%.4f,%.4f,%.4f,%.4f|e%.4f,%.4f,%.4f|m%.3f,%.3f,%.3f,%.3f,%.3f|t%.4f,%.4f,%d,%d|a%.3f,%.3f,%d,%d",
+                  s.color.x, s.color.y, s.color.z, s.color.w, s.emissive.x, s.emissive.y, s.emissive.z, s.metallic, s.roughness,
+                  s.normalStrength, s.subsurface, s.occlusionStrength, s.tiling.x, s.tiling.y, s.triplanar ? 1 : 0,
+                  static_cast<int>(s.shading), s.alphaCutoff, s.clearcoat, s.textureAlphaOnly ? 1 : 0, s.doubleSided ? 1 : 0);
+    std::string out = "{" + p.mesh + "|" + s.texture + "|" + s.normalMap + "|" + s.ormMap + "|" + s.emissiveMap + buf + "|L";
+    for (float v : p.local.m) {
+        char f[24];
+        std::snprintf(f, sizeof(f), "%.4f,", v);
+        out += f;
+    }
+    return out + "}";
 }
 
 bool isGrassLike(const std::string& mesh) {
@@ -257,79 +284,188 @@ void WorldRuntime::gather(const Scene& scene, const ViewCamera& view, FrameData&
             entry.cache.clear();
             entry.cache.signature = sig;
         }
+        entry.models.resize(entry.layers.size());
         for (size_t li = 0; li < entry.layers.size(); ++li) {
             FoliageLayer layer = entry.layers[li];
             layer.density *= fo->density;
-            // The drawable parts: one mesh, or every part of a prefab sharing the instances.
-            struct DrawPart {
-                std::string mesh, material;
-                Mat4 local;
-            };
-            std::vector<DrawPart> parts;
-            if (!layer.prefab.empty() && hooks_.prefabParts) {
-                for (auto& p : hooks_.prefabParts(layer.prefab)) parts.push_back({p.mesh, p.material, p.local});
-            }
-            if (parts.empty()) parts.push_back({layer.mesh, layer.material, Mat4{}});
-            if (hooks_.meshReady &&
-                std::any_of(parts.begin(), parts.end(), [&](const DrawPart& p) { return !hooks_.meshReady(p.mesh); })) {
-                continue;  // streaming in: chunk bounds need the real mesh size
-            }
-            float meshHeight = hooks_.meshBounds ? 0.02f : 1.f;
-            for (const auto& p : parts) {
-                if (!hooks_.meshBounds) break;
-                if (auto bb = hooks_.meshBounds(p.mesh)) {
-                    Aabb wb = bb->transformed(p.local);
-                    meshHeight = std::max(meshHeight, wb.max.y - std::min(wb.min.y, 0.f));
-                }
-            }
+            const LayerModel* model = layerModel(entry, li, layer);
+            if (!model) continue;  // streaming in: chunk bounds need the real mesh size
             auto chunks = entry.cache.visibleChunks(layer, static_cast<int>(li), static_cast<uint32_t>(fo->seed), view.eye, areaMin,
-                                                    areaMax, surface, meshHeight, budget);
-            for (size_t pi = 0; pi < parts.size(); ++pi) {
-                const DrawPart& part = parts[pi];
-                Surface surf;
-                std::string material = !part.material.empty() ? part.material : layer.material;
-                if (!material.empty() && hooks_.material) {
-                    if (const Surface* sm = hooks_.material(material)) surf = *sm;
-                } else {
-                    surf.color = layer.color;
-                    surf.roughness = layer.roughness;
-                    surf.subsurface = layer.subsurface;
-                    surf.texture = layer.texture;
-                    surf.normalMap = layer.normalMap;
-                    surf.ormMap = layer.ormMap;
-                    surf.triplanar = layer.triplanar;
-                    surf.tiling = {layer.tiling, layer.tiling};
+                                                    areaMax, surface, model->meshHeight, budget);
+            if (chunks.empty()) continue;
+            // Far instances switch to the impostor where its texels match the screen's pixels.
+            int impostor = -1;
+            float impostorDistance = 0.f;
+            if (model->impostorWorthy) {
+                impostor::TransitionParams tp;
+                tp.modelRadius = length(model->bounds.extents()) * (layer.scaleMin + layer.scaleMax) * 0.5f;
+                tp.atlasResolution = model->impostor.resolution;
+                tp.frames = model->impostor.frames;
+                tp.screenHeight = frame.height > 0 ? frame.height : 1080;
+                tp.fovDeg = view.orthographic ? 55.f : view.fovDeg;
+                tp.quality = frame.quality;
+                tp.overrideDistance = layer.impostorDistance;
+                tp.cullDistance = layer.cullDistance;
+                impostorDistance = impostor::transitionDistance(tp);
+                if (impostorDistance > 0.f) {
+                    impostor = static_cast<int>(frame.impostors.size());
+                    frame.impostors.push_back(model->impostor);
+                    ++stats_.impostorLayers;
                 }
-                // Leaves and blades let light through.
-                if (layer.subsurface > 0.f && surf.subsurface <= 0.f && surf.alphaCutoff > 0.f) surf.subsurface = layer.subsurface;
-                surf.doubleSided = surf.doubleSided || isGrassLike(part.mesh);
-                if (hooks_.resolvePath) {
-                    for (std::string* p : {&surf.texture, &surf.normalMap, &surf.ormMap, &surf.emissiveMap}) {
-                        if (!p->empty()) *p = hooks_.resolvePath(*p);
-                    }
-                }
-                for (const auto& c : chunks) {
-                    InstanceBatch b;
-                    b.entity = e;
-                    b.id = c.id ^ (static_cast<uint64_t>(e) << 40);  // parts share the chunk's instance buffer
-                    b.mesh = part.mesh;
-                    b.surface = surf;
-                    b.instances = c.instances;
-                    b.bounds = c.bounds;
-                    b.castShadows = layer.castShadows;
-                    b.wind = layer.wind;
-                    b.cullDistance = layer.cullDistance;
-                    b.meshHeight = meshHeight;
-                    b.part = part.local;
-                    if (pi == 0) stats_.foliageInstances += c.instances->size();
-                    frame.instances.push_back(std::move(b));
-                }
+            }
+            for (const auto& c : chunks) {
+                InstanceBatch b;
+                b.entity = e;
+                b.id = c.id ^ (static_cast<uint64_t>(e) << 40);
+                b.parts = model->parts;
+                b.instances = c.instances;
+                b.bounds = c.bounds;
+                b.castShadows = layer.castShadows;
+                b.wind = layer.wind;
+                b.cullDistance = layer.cullDistance;
+                b.meshHeight = model->meshHeight;
+                b.maxScale = layer.scaleMax;
+                b.modelBounds = model->bounds;
+                b.impostor = impostor;
+                b.impostorDistance = impostorDistance;
+                stats_.foliageInstances += c.instances->size();
+                frame.instances.push_back(std::move(b));
             }
         }
         stats_.foliageChunks += entry.cache.chunkCount();
     }
     std::erase_if(terrains_, [&](const auto& kv) { return std::find(liveTerrains.begin(), liveTerrains.end(), kv.first) == liveTerrains.end(); });
     std::erase_if(foliage_, [&](const auto& kv) { return std::find(liveFoliage.begin(), liveFoliage.end(), kv.first) == liveFoliage.end(); });
+}
+
+const WorldRuntime::LayerModel* WorldRuntime::layerModel(FoliageEntry& entry, size_t li, const FoliageLayer& layer) {
+    // The drawable parts: one mesh, or every part of a prefab sharing the instances.
+    std::vector<Hooks::Part> parts;
+    if (!layer.prefab.empty() && hooks_.prefabParts) parts = hooks_.prefabParts(layer.prefab);
+    if (parts.empty()) parts.push_back({layer.mesh, layer.material, Mat4{}});
+    if (hooks_.meshReady &&
+        std::any_of(parts.begin(), parts.end(), [&](const Hooks::Part& p) { return !hooks_.meshReady(p.mesh); })) {
+        return nullptr;
+    }
+    // Surfaces as the project names them (relative paths): they key the impostor cache.
+    std::vector<InstancePart> out;
+    std::string source;
+    for (const auto& part : parts) {
+        InstancePart ip;
+        ip.mesh = part.mesh;
+        ip.local = part.local;
+        Surface& surf = ip.surface;
+        std::string material = !part.material.empty() ? part.material : layer.material;
+        if (!material.empty() && hooks_.material) {
+            if (const Surface* sm = hooks_.material(material)) surf = *sm;
+        } else {
+            surf.color = layer.color;
+            surf.roughness = layer.roughness;
+            surf.subsurface = layer.subsurface;
+            surf.texture = layer.texture;
+            surf.normalMap = layer.normalMap;
+            surf.ormMap = layer.ormMap;
+            surf.triplanar = layer.triplanar;
+            surf.tiling = {layer.tiling, layer.tiling};
+        }
+        // Leaves and blades let light through.
+        if (layer.subsurface > 0.f && surf.subsurface <= 0.f && surf.alphaCutoff > 0.f) surf.subsurface = layer.subsurface;
+        surf.doubleSided = surf.doubleSided || isGrassLike(part.mesh);
+        source += describePart(ip);
+        out.push_back(std::move(ip));
+    }
+    char settings[160];
+    std::snprintf(settings, sizeof(settings), "|imp:%d,%d,%d,%d|scale:%.3f,%.3f", layer.impostors ? 1 : 0,
+                  layer.impostorDistance < 0.f ? 1 : 0, layer.impostorResolution, layer.impostorFrames, layer.scaleMin,
+                  layer.scaleMax);
+    LayerModel& m = entry.models[li];
+    if (m.parts && m.signature == source + settings) return &m;
+    m = LayerModel{};
+    m.signature = source + settings;
+    // Bounds of the whole model (all parts) and its height above the base (wind bending).
+    m.meshHeight = hooks_.meshBounds ? 0.02f : 1.f;
+    m.bounds = Aabb{Vec3(1e30f), Vec3(-1e30f)};
+    size_t triangles = 0;
+    std::string stamp;
+    for (const auto& p : out) {
+        if (hooks_.meshBounds) {
+            if (auto bb = hooks_.meshBounds(p.mesh)) {
+                Aabb wb = bb->transformed(p.local);
+                m.meshHeight = std::max(m.meshHeight, wb.max.y - std::min(wb.min.y, 0.f));
+                m.bounds.min = vmin(m.bounds.min, wb.min);
+                m.bounds.max = vmax(m.bounds.max, wb.max);
+            }
+        }
+        triangles += hooks_.meshTriangles ? hooks_.meshTriangles(p.mesh) : 0;
+        if (p.mesh.rfind("asset:", 0) == 0 && hooks_.resolvePath) {
+            std::string file = p.mesh.substr(6);
+            file = file.substr(0, file.find('#'));
+            stamp += fileStamp(hooks_.resolvePath(file));
+        }
+    }
+    if (m.bounds.min.x > m.bounds.max.x) m.bounds = Aabb{Vec3(-0.5f, 0.f, -0.5f), Vec3(0.5f, 1.f, 0.5f)};
+    // Absolute texture paths for the renderer (and content stamps for the cache key).
+    for (auto& p : out) {
+        if (!hooks_.resolvePath) break;
+        for (std::string* path : {&p.surface.texture, &p.surface.normalMap, &p.surface.ormMap, &p.surface.emissiveMap}) {
+            if (path->empty()) continue;
+            *path = hooks_.resolvePath(*path);
+            stamp += fileStamp(*path);
+        }
+    }
+    m.parts = std::make_shared<const std::vector<InstancePart>>(std::move(out));
+    // Impostors pay off for real meshes (photoscans, imported trees); a few dozen triangles of a
+    // procedural blade are cheaper than any impostor.
+    m.impostorWorthy = layer.impostors && layer.impostorDistance >= 0.f && (!hooks_.meshTriangles || triangles >= 300);
+    if (m.impostorWorthy) {
+        ImpostorModel& im = m.impostor;
+        im.label = layer.name + " (" + (!layer.prefab.empty() ? layer.prefab : layer.mesh) + ")";
+        im.parts = m.parts;
+        im.source = source;
+        im.stamp = stamp;
+        im.bounds = m.bounds;
+        im.frames = std::clamp(layer.impostorFrames, impostor::kMinFrames, impostor::kMaxFrames);
+        im.resolution = layer.impostorResolution > 0
+                            ? layer.impostorResolution
+                            : impostor::autoResolution(length(m.bounds.extents()) * 2.f * layer.scaleMax);
+        im.hemi = true;
+        im.key = impostor::cacheKey(im);
+        if (hooks_.resolvePath) im.cachePath = hooks_.resolvePath(".skywalker/cache/impostors/" + im.key + ".skyimp");
+    }
+    return &m;
+}
+
+std::vector<WorldRuntime::LayerImpostor> WorldRuntime::impostorModels(const Scene& scene, EntityId e, int layer) {
+    std::vector<LayerImpostor> out;
+    const Foliage* fo = scene.get<Foliage>(e);
+    if (!fo) return out;
+    FoliageEntry& entry = foliage_[e];
+    std::string layersKey = fo->layers.dump();
+    if (entry.layersKey != layersKey) {
+        entry.layers = foliageLayersFromJson(fo->layers);
+        entry.layersKey = layersKey;
+    }
+    entry.models.resize(entry.layers.size());
+    for (size_t li = 0; li < entry.layers.size(); ++li) {
+        if (layer >= 0 && static_cast<int>(li) != layer) continue;
+        const FoliageLayer& l = entry.layers[li];
+        const LayerModel* m = layerModel(entry, li, l);
+        if (!m || !m->impostorWorthy) continue;
+        LayerImpostor info;
+        info.layer = static_cast<int>(li);
+        info.name = l.name;
+        info.model = m->impostor;
+        info.cullDistance = l.cullDistance;
+        impostor::TransitionParams tp;
+        tp.modelRadius = length(m->bounds.extents()) * (l.scaleMin + l.scaleMax) * 0.5f;
+        tp.atlasResolution = m->impostor.resolution;
+        tp.frames = m->impostor.frames;
+        tp.overrideDistance = l.impostorDistance;
+        tp.cullDistance = l.cullDistance;
+        info.transitionDistance = impostor::transitionDistance(tp);
+        out.push_back(std::move(info));
+    }
+    return out;
 }
 
 Json defaultTerrainLayers(const std::string& preset) {
