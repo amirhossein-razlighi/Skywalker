@@ -447,6 +447,7 @@ public:
                              {"terrainNodes", static_cast<int64_t>(terrainNodesDrawn_)},
                              {"instancesDrawn", static_cast<int64_t>(instancesDrawn_)},
                              {"trianglesDrawn", static_cast<int64_t>(lastTriangles_)},
+                             {"gpuFaults", static_cast<int64_t>(gpuFaults_->load())},
                              {"meshesCached", static_cast<int64_t>(meshes_.size())},
                              {"texturesCached", static_cast<int64_t>(textures_.size())},
                              {"instanceBuffers", static_cast<int64_t>(instanceBuffers_.size())}});
@@ -594,9 +595,13 @@ public:
             {
                 dispatch_semaphore_t sem = inFlight_;
                 auto gpuMs = gpuMs_;
+                auto faults = gpuFaults_;
                 [cmd addCompletedHandler:^(id<MTLCommandBuffer> done) {
                     double ms = (done.GPUEndTime - firstCmd.GPUStartTime) * 1000.0;  // whole frame, all sub-samples
                     if (ms > 0.0) gpuMs->store(ms);
+                    if (done.status == MTLCommandBufferStatusError || firstCmd.status == MTLCommandBufferStatusError) {
+                        faults->fetch_add(1);  // timeouts, page faults: the next frames run in safe mode
+                    }
                     dispatch_semaphore_signal(sem);
                 }];
             }
@@ -636,6 +641,12 @@ public:
             [cmd waitUntilCompleted];
             if (cmd.status == MTLCommandBufferStatusError) {
                 return Error::make("gpu_error", cmd.error ? cmd.error.localizedDescription.UTF8String : "readback failed");
+            }
+            if (lastCommand_ && lastCommand_.status == MTLCommandBufferStatusError) {
+                return Error::make("gpu_error",
+                                   std::string("the frame failed on the GPU: ") +
+                                       (lastCommand_.error ? lastCommand_.error.localizedDescription.UTF8String : "unknown error"),
+                                   "the scene is too heavy or a shader faulted; lower samples/resolution or check perf_stats");
             }
             Image img(static_cast<int>(w), static_cast<int>(h));
             const auto* src = static_cast<const uint8_t*>(buffer.contents);
@@ -1716,6 +1727,15 @@ private:
     static constexpr uint64_t kFoliageTriangleBudget = 120'000'000;
     void chooseFoliageBudgetBias(const FrameData& frame) {
         foliageBudgetBias_ = 0;
+        // After a GPU fault (watchdog timeout, page fault) the renderer stays in safe mode:
+        // a quarter of the geometry budget so the frame stays far from the watchdog.
+        const int faults = gpuFaults_->load();
+        if (faults != reportedFaults_) {
+            reportedFaults_ = faults;
+            log::error("render", "GPU command buffer failed (" + std::to_string(faults) +
+                                     " so far): rendering in safe mode with a reduced geometry budget");
+        }
+        const uint64_t budget = faults > 0 ? kFoliageTriangleBudget / 4 : kFoliageTriangleBudget;
         if (frame.instances.empty()) return;
         const Frustum fr(frame.viewProjection());
         for (int bias = 0; bias <= 4; ++bias) {
@@ -1732,7 +1752,7 @@ private:
                 int lod = std::clamp(lodForChunk(*m, b), 0, m->lodCount - 1);
                 total += static_cast<uint64_t>(m->lodCount_[lod] / 3) * b.instances->size();
             }
-            if (total <= kFoliageTriangleBudget) return;
+            if (total <= budget) return;
         }
     }
 
@@ -2772,6 +2792,8 @@ private:
         dofBlurPipeline_, dofCombinePipeline_;
     id<MTLTexture> lum_, exposure_[2], postA_, postB_, dofCoc_, dofBlur_, lut_, upscaled_, motion_, postSource_;
     int foliageBudgetBias_ = 0;
+    std::shared_ptr<std::atomic<int>> gpuFaults_ = std::make_shared<std::atomic<int>>(0);
+    int reportedFaults_ = 0;
     id<MTLFXTemporalScaler> scaler_;
     id<MTLFXSpatialScaler> spatialScaler_;
     struct RetiredScaler {
