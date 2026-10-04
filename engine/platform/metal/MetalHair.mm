@@ -207,51 +207,15 @@ id<MTLBuffer> MetalHair::skinVertices(GroomGpu& g, const GroomItem& item, uint32
 }
 
 std::vector<uint32_t> MetalHair::strandBudget(const FrameData& frame) {
-    // Real time only: stills (accumulated sub-samples) and movie frames draw every strand.
-    std::vector<uint32_t> drawn(frame.grooms.size(), 0);
+    // Density-preserving level of detail (fx::groomStrandBudget): hairExpand widens what is drawn.
     const ViewCamera& cam = frame.camera;
     const float H = static_cast<float>(std::max(frame.height, 1));
-    const bool ortho = cam.orthographic;
-    const float pixelAt1m = ortho ? cam.orthoSize * 2.f / H : 2.f * std::tan(radians(cam.fovDeg) * 0.5f) / H;
-    const bool realtime = frame.samples <= 1 && !frame.offline.enabled;
-    double total = 0;
-    for (size_t i = 0; i < frame.grooms.size(); ++i) {
-        const GroomItem& item = frame.grooms[i];
-        if (!item.data) continue;
-        const GroomData& d = *item.data;
-        const uint32_t N = static_cast<uint32_t>(d.strandCount());
-        const Groom& p = item.params;
-        const float scale = modelScale(item.model);
-        Vec3 center = item.model.transformPoint(d.bounds.center());
-        float radius = length(d.bounds.extents()) * scale + p.length * 0.25f * scale + 0.02f;
-        if (item.skinned && item.rootBounds.max.x >= item.rootBounds.min.x) {
-            center = item.rootBounds.center();
-            radius = length(item.rootBounds.extents());
-        }
-        float dist = std::max(distance(cam.eye, center), 0.01f);
-        float screenPx = 2.f * radius / (pixelAt1m * (ortho ? 1.f : dist));
-        float fraction = 1.f;
-        if (realtime && N > 20000) {
-            // Thin strands far away merge into the coverage of fewer, more opaque ones, and the count
-            // follows the groom's size on screen (geometry is the cost on tile-based GPUs).
-            float widthM = p.widthRoot * 0.001f * scale;
-            float ratio = widthM / (pixelAt1m * (ortho ? 1.f : dist));
-            fraction = std::clamp(12.f * ratio * p.lodBias, 0.3f, 1.f);
-            float budget = std::clamp(screenPx * 36.f * p.lodBias, 6000.f, static_cast<float>(N));
-            fraction = std::min(fraction, budget / static_cast<float>(N));
-        }
-        drawn[i] = std::max<uint32_t>(1, static_cast<uint32_t>(static_cast<float>(N) * fraction));
-        total += drawn[i];
-    }
-    // One budget for all grooms on screen (a herd of furred creatures): scale everyone down evenly.
-    if (realtime && total > static_cast<double>(kRealtimeStrandBudget)) {
-        const double k = static_cast<double>(kRealtimeStrandBudget) / total;
-        for (auto& n : drawn) n = std::max<uint32_t>(std::min<uint32_t>(n, 2000), static_cast<uint32_t>(n * k));
-        budgetLimited_ = true;
-    } else {
-        budgetLimited_ = false;
-    }
-    return drawn;
+    fx::StrandLodView view;
+    view.eye = cam.eye;
+    view.orthographic = cam.orthographic;
+    view.pixelAt1m = cam.orthographic ? cam.orthoSize * 2.f / H : 2.f * std::tan(radians(cam.fovDeg) * 0.5f) / H;
+    view.realtime = frame.samples <= 1 && !frame.offline.enabled;
+    return fx::groomStrandBudget(frame.grooms, view, &budgetLimited_);
 }
 
 void MetalHair::simulate(id<MTLCommandBuffer> cmd, const FrameData& frame) {
@@ -434,18 +398,40 @@ void MetalHair::renderDom(id<MTLCommandBuffer> cmd, GroomGpu& g, const GroomItem
     }
     Vec3 L = env.sunDirection();  // direction light travels
     const float r = g.radius;
+    // Map size follows the groom's size on screen (a crowd of distant heads costs a fraction of one
+    // close-up): the map renders into the top-left `fit` x `fit` corner of the 512^2 targets, and the
+    // shading projection is scaled to match. Real-time grooms under 40 px skip their map (no visible self-shadow).
+    const ViewCamera& cam = frame.camera;
+    const float H = static_cast<float>(std::max(frame.height, 1));
+    const float pixelAt1m = cam.orthographic ? cam.orthoSize * 2.f / H : 2.f * std::tan(radians(cam.fovDeg) * 0.5f) / H;
+    const float camDist = std::max(distance(cam.eye, g.center), 0.01f);
+    const float screenPx = 2.f * r / (pixelAt1m * (cam.orthographic ? 1.f : camDist));
+    if (frame.samples <= 1 && !frame.offline.enabled && screenPx < 40.f) {
+        u.dom = simd_make_float4(0, 0, 0, 0);
+        return;
+    }
+    const bool still = frame.samples > 1 || frame.offline.enabled;
+    const NSUInteger fit = still ? kDomSize
+                                 : std::clamp<NSUInteger>(static_cast<NSUInteger>(std::ceil(screenPx * 1.5f / 64.f)) * 64,
+                                                          kDomSize / 4, kDomSize);
+    const float fitScale = static_cast<float>(fit) / static_cast<float>(kDomSize);
     Vec3 eye = g.center - L * (r * 2.5f);
     Mat4 view = Mat4::lookAt(eye, g.center, std::fabs(L.y) > 0.95f ? Vec3{0, 0, 1} : Vec3{0, 1, 0});
     const float nearP = r * 0.5f, farP = r * 4.5f;
     Mat4 vp = Mat4::orthographic(r, 1.f, nearP, farP) * view;
-    u.domViewProj = simdMat(vp);
-    const float texel = 2.f * r / static_cast<float>(kDomSize);
+    // Shading looks the map up in the corner the passes render to (viewport `fit`): uv * fitScale.
+    Mat4 corner = Mat4::translate({fitScale - 1.f, 1.f - fitScale, 0.f}) * Mat4::scale({fitScale, fitScale, 1.f});
+    u.domViewProj = simdMat(corner * vp);
+    const float texel = 2.f * r / static_cast<float>(fit);
     u.dom = simd_make_float4(std::clamp(r * 0.012f, 0.0015f, 0.03f), farP - nearP, texel, 1.f);
     simd_float4 lightInfo = simd_make_float4(L.x, L.y, L.z, texel);
-    const MTLViewport vpt{0, 0, static_cast<double>(kDomSize), static_cast<double>(kDomSize), 0, 1};
-    // A uniform subset of ~16k strands (with proportionally more coverage) is plenty for the map.
+    const MTLViewport vpt{0, 0, static_cast<double>(fit), static_cast<double>(fit), 0, 1};
+    // A uniform subset of up to ~8k strands (with proportionally more coverage) is plenty for the
+    // map; smaller maps take fewer (by area).
     HairParamsUniforms du = u;
-    const uint32_t domStride = std::max<uint32_t>(1, g.drawn / 8000);
+    du.domViewProj = simdMat(vp);  // the passes render with the plain projection into the corner viewport
+    const uint32_t domStrands = std::max<uint32_t>(600, static_cast<uint32_t>(8000.f * fitScale * fitScale));
+    const uint32_t domStride = std::max<uint32_t>(1, g.drawn / domStrands);
     du.cards.z = static_cast<float>(domStride);
     const uint32_t domCount = std::max<uint32_t>(1, g.drawn / domStride);
 
