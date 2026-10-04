@@ -1,8 +1,9 @@
 {
   "format": "skywalker.prefab",
-  "version": 1,
+  "version": 2,
   "name": "Prefab flowers_tulip",
   "root": {
+    "pid": 1,
     "name": "Prefab flowers_tulip",
     "enabled": true,
     "tags": [],
@@ -28,6 +29,7 @@
     },
     "children": [
       {
+        "pid": 2,
         "name": "Prefab flowers_tulip stem",
         "enabled": true,
         "tags": [],
@@ -80,6 +82,7 @@
         }
       },
       {
+        "pid": 3,
         "name": "Prefab flowers_tulip petals",
         "enabled": true,
         "tags": [],

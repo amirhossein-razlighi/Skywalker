@@ -1,8 +1,9 @@
 {
   "format": "skywalker.prefab",
-  "version": 1,
+  "version": 2,
   "name": "Boom",
   "root": {
+    "pid": 1,
     "name": "Boom",
     "enabled": true,
     "tags": [
@@ -40,6 +41,7 @@
     ],
     "children": [
       {
+        "pid": 2,
         "name": "Boom Core",
         "enabled": true,
         "tags": [],
@@ -96,6 +98,7 @@
         }
       },
       {
+        "pid": 3,
         "name": "Boom Ring",
         "enabled": true,
         "tags": [],

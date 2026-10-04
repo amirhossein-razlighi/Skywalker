@@ -1,8 +1,9 @@
 {
   "format": "skywalker.prefab",
-  "version": 1,
+  "version": 2,
   "name": "Firework Gold",
   "root": {
+    "pid": 1,
     "name": "Firework Gold",
     "enabled": true,
     "tags": [],
@@ -38,6 +39,7 @@
     ],
     "children": [
       {
+        "pid": 2,
         "name": "Firework Gold Spark 1",
         "enabled": true,
         "tags": [],
@@ -94,6 +96,7 @@
         }
       },
       {
+        "pid": 3,
         "name": "Firework Gold Spark 2",
         "enabled": true,
         "tags": [],
@@ -150,6 +153,7 @@
         }
       },
       {
+        "pid": 4,
         "name": "Firework Gold Spark 3",
         "enabled": true,
         "tags": [],
@@ -206,6 +210,7 @@
         }
       },
       {
+        "pid": 5,
         "name": "Firework Gold Spark 4",
         "enabled": true,
         "tags": [],
@@ -262,6 +267,7 @@
         }
       },
       {
+        "pid": 6,
         "name": "Firework Gold Spark 5",
         "enabled": true,
         "tags": [],
@@ -318,6 +324,7 @@
         }
       },
       {
+        "pid": 7,
         "name": "Firework Gold Spark 6",
         "enabled": true,
         "tags": [],
@@ -374,6 +381,7 @@
         }
       },
       {
+        "pid": 8,
         "name": "Firework Gold Spark 7",
         "enabled": true,
         "tags": [],
@@ -430,6 +438,7 @@
         }
       },
       {
+        "pid": 9,
         "name": "Firework Gold Spark 8",
         "enabled": true,
         "tags": [],
@@ -486,6 +495,7 @@
         }
       },
       {
+        "pid": 10,
         "name": "Firework Gold Spark 9",
         "enabled": true,
         "tags": [],
@@ -542,6 +552,7 @@
         }
       },
       {
+        "pid": 11,
         "name": "Firework Gold Spark 10",
         "enabled": true,
         "tags": [],
@@ -598,6 +609,7 @@
         }
       },
       {
+        "pid": 12,
         "name": "Firework Gold Spark 11",
         "enabled": true,
         "tags": [],
@@ -654,6 +666,7 @@
         }
       },
       {
+        "pid": 13,
         "name": "Firework Gold Spark 12",
         "enabled": true,
         "tags": [],
@@ -710,6 +723,7 @@
         }
       },
       {
+        "pid": 14,
         "name": "Firework Gold Spark 13",
         "enabled": true,
         "tags": [],
@@ -766,6 +780,7 @@
         }
       },
       {
+        "pid": 15,
         "name": "Firework Gold Spark 14",
         "enabled": true,
         "tags": [],

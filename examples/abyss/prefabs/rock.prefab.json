@@ -1,8 +1,9 @@
 {
   "format": "skywalker.prefab",
-  "version": 1,
+  "version": 2,
   "name": "Rock",
   "root": {
+    "pid": 1,
     "name": "Rock",
     "enabled": true,
     "tags": [],
@@ -28,6 +29,7 @@
     },
     "children": [
       {
+        "pid": 2,
         "name": "Rock Lump 1",
         "enabled": true,
         "tags": [],
@@ -79,6 +81,7 @@
         }
       },
       {
+        "pid": 3,
         "name": "Rock Lump 2",
         "enabled": true,
         "tags": [],
@@ -130,6 +133,7 @@
         }
       },
       {
+        "pid": 4,
         "name": "Rock Lump 3",
         "enabled": true,
         "tags": [],

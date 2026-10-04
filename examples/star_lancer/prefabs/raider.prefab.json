@@ -1,8 +1,9 @@
 {
   "format": "skywalker.prefab",
-  "version": 1,
+  "version": 2,
   "name": "Raider",
   "root": {
+    "pid": 1,
     "name": "Raider",
     "enabled": true,
     "tags": [
@@ -40,6 +41,7 @@
     ],
     "children": [
       {
+        "pid": 2,
         "name": "Raider Hull",
         "enabled": true,
         "tags": [],
@@ -91,6 +93,7 @@
         }
       },
       {
+        "pid": 3,
         "name": "Raider Fins",
         "enabled": true,
         "tags": [],
@@ -142,6 +145,7 @@
         }
       },
       {
+        "pid": 4,
         "name": "Raider Eye",
         "enabled": true,
         "tags": [],
@@ -198,6 +202,7 @@
         }
       },
       {
+        "pid": 5,
         "name": "Raider Engine",
         "enabled": true,
         "tags": [],

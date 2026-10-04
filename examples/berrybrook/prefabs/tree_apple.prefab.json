@@ -1,8 +1,9 @@
 {
   "format": "skywalker.prefab",
-  "version": 1,
+  "version": 2,
   "name": "Prefab tree_apple",
   "root": {
+    "pid": 1,
     "name": "Prefab tree_apple",
     "enabled": true,
     "tags": [],
@@ -28,6 +29,7 @@
     },
     "children": [
       {
+        "pid": 2,
         "name": "Prefab tree_apple bark",
         "enabled": true,
         "tags": [],
@@ -80,6 +82,7 @@
         }
       },
       {
+        "pid": 3,
         "name": "Prefab tree_apple canopy",
         "enabled": true,
         "tags": [],
@@ -132,6 +135,7 @@
         }
       },
       {
+        "pid": 4,
         "name": "Prefab tree_apple fruit",
         "enabled": true,
         "tags": [],

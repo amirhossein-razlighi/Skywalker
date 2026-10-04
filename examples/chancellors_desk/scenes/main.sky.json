@@ -2875,9 +2875,6 @@
       "id": 53,
       "name": "Desk",
       "parent": 0,
-      "enabled": true,
-      "tags": [],
-      "vars": {},
       "components": {
         "transform": {
           "position": [
@@ -2896,167 +2893,14 @@
             1
           ]
         }
-      }
-    },
-    {
-      "id": 54,
-      "name": "walnut",
-      "parent": 53,
-      "enabled": true,
-      "tags": [],
-      "vars": {},
-      "components": {
-        "transform": {
-          "position": [
-            0,
-            0,
-            0
-          ],
-          "rotation": [
-            0,
-            0,
-            0
-          ],
-          "scale": [
-            1,
-            1,
-            1
-          ]
-        },
-        "mesh": {
-          "mesh": "asset:generated/office/desk.glb#0",
-          "color": "#ccccd1",
-          "metallic": 0,
-          "roughness": 0.55,
-          "emissive": "#000000",
-          "texture": "",
-          "visible": true,
-          "billboard": false,
-          "material": "generated/office/desk_walnut.mat.json",
-          "unlit": false,
-          "shading": "pbr",
-          "normalMap": "",
-          "ormMap": "",
-          "emissiveMap": "",
-          "normalStrength": 1,
-          "tiling": 1,
-          "triplanar": false,
-          "clearcoat": 0,
-          "subsurface": 0,
-          "rim": 0,
-          "outline": 0,
-          "outlineColor": "#0a0a0f",
-          "doubleSided": false,
-          "castShadows": true,
-          "alphaCutoff": 0
-        }
-      }
-    },
-    {
-      "id": 55,
-      "name": "leather",
-      "parent": 53,
-      "enabled": true,
-      "tags": [],
-      "vars": {},
-      "components": {
-        "transform": {
-          "position": [
-            0,
-            0,
-            0
-          ],
-          "rotation": [
-            0,
-            0,
-            0
-          ],
-          "scale": [
-            1,
-            1,
-            1
-          ]
-        },
-        "mesh": {
-          "mesh": "asset:generated/office/desk.glb#1",
-          "color": "#ccccd1",
-          "metallic": 0,
-          "roughness": 0.55,
-          "emissive": "#000000",
-          "texture": "",
-          "visible": true,
-          "billboard": false,
-          "material": "generated/office/desk_leather.mat.json",
-          "unlit": false,
-          "shading": "pbr",
-          "normalMap": "",
-          "ormMap": "",
-          "emissiveMap": "",
-          "normalStrength": 1,
-          "tiling": 1,
-          "triplanar": false,
-          "clearcoat": 0,
-          "subsurface": 0,
-          "rim": 0,
-          "outline": 0,
-          "outlineColor": "#0a0a0f",
-          "doubleSided": false,
-          "castShadows": true,
-          "alphaCutoff": 0
-        }
-      }
-    },
-    {
-      "id": 56,
-      "name": "brass",
-      "parent": 53,
-      "enabled": true,
-      "tags": [],
-      "vars": {},
-      "components": {
-        "transform": {
-          "position": [
-            0,
-            0,
-            0
-          ],
-          "rotation": [
-            0,
-            0,
-            0
-          ],
-          "scale": [
-            1,
-            1,
-            1
-          ]
-        },
-        "mesh": {
-          "mesh": "asset:generated/office/desk.glb#2",
-          "color": "#ccccd1",
-          "metallic": 0,
-          "roughness": 0.55,
-          "emissive": "#000000",
-          "texture": "",
-          "visible": true,
-          "billboard": false,
-          "material": "generated/office/desk_brass.mat.json",
-          "unlit": false,
-          "shading": "pbr",
-          "normalMap": "",
-          "ormMap": "",
-          "emissiveMap": "",
-          "normalStrength": 1,
-          "tiling": 1,
-          "triplanar": false,
-          "clearcoat": 0,
-          "subsurface": 0,
-          "rim": 0,
-          "outline": 0,
-          "outlineColor": "#0a0a0f",
-          "doubleSided": false,
-          "castShadows": true,
-          "alphaCutoff": 0
+      },
+      "prefab": {
+        "source": "generated/office/desk.prefab.json",
+        "guid": "8a397bf83dddbe416f63f2d7ae4b4130",
+        "ids": {
+          "2": 54,
+          "3": 55,
+          "4": 56
         }
       }
     },
@@ -3064,9 +2908,6 @@
       "id": 57,
       "name": "Banker Lamp",
       "parent": 0,
-      "enabled": true,
-      "tags": [],
-      "vars": {},
       "components": {
         "transform": {
           "position": [
@@ -3085,167 +2926,14 @@
             1
           ]
         }
-      }
-    },
-    {
-      "id": 58,
-      "name": "brass",
-      "parent": 57,
-      "enabled": true,
-      "tags": [],
-      "vars": {},
-      "components": {
-        "transform": {
-          "position": [
-            0,
-            0,
-            0
-          ],
-          "rotation": [
-            0,
-            0,
-            0
-          ],
-          "scale": [
-            1,
-            1,
-            1
-          ]
-        },
-        "mesh": {
-          "mesh": "asset:generated/office/banker_lamp.glb#0",
-          "color": "#ccccd1",
-          "metallic": 0,
-          "roughness": 0.55,
-          "emissive": "#000000",
-          "texture": "",
-          "visible": true,
-          "billboard": false,
-          "material": "generated/office/banker_lamp_brass.mat.json",
-          "unlit": false,
-          "shading": "pbr",
-          "normalMap": "",
-          "ormMap": "",
-          "emissiveMap": "",
-          "normalStrength": 1,
-          "tiling": 1,
-          "triplanar": false,
-          "clearcoat": 0,
-          "subsurface": 0,
-          "rim": 0,
-          "outline": 0,
-          "outlineColor": "#0a0a0f",
-          "doubleSided": false,
-          "castShadows": true,
-          "alphaCutoff": 0
-        }
-      }
-    },
-    {
-      "id": 59,
-      "name": "glass_green",
-      "parent": 57,
-      "enabled": true,
-      "tags": [],
-      "vars": {},
-      "components": {
-        "transform": {
-          "position": [
-            0,
-            0,
-            0
-          ],
-          "rotation": [
-            0,
-            0,
-            0
-          ],
-          "scale": [
-            1,
-            1,
-            1
-          ]
-        },
-        "mesh": {
-          "mesh": "asset:generated/office/banker_lamp.glb#1",
-          "color": "#ccccd1",
-          "metallic": 0,
-          "roughness": 0.55,
-          "emissive": "#000000",
-          "texture": "",
-          "visible": true,
-          "billboard": false,
-          "material": "generated/office/banker_lamp_glass_green.mat.json",
-          "unlit": false,
-          "shading": "pbr",
-          "normalMap": "",
-          "ormMap": "",
-          "emissiveMap": "",
-          "normalStrength": 1,
-          "tiling": 1,
-          "triplanar": false,
-          "clearcoat": 0,
-          "subsurface": 0,
-          "rim": 0,
-          "outline": 0,
-          "outlineColor": "#0a0a0f",
-          "doubleSided": false,
-          "castShadows": true,
-          "alphaCutoff": 0
-        }
-      }
-    },
-    {
-      "id": 60,
-      "name": "shade_inner",
-      "parent": 57,
-      "enabled": true,
-      "tags": [],
-      "vars": {},
-      "components": {
-        "transform": {
-          "position": [
-            0,
-            0,
-            0
-          ],
-          "rotation": [
-            0,
-            0,
-            0
-          ],
-          "scale": [
-            1,
-            1,
-            1
-          ]
-        },
-        "mesh": {
-          "mesh": "asset:generated/office/banker_lamp.glb#2",
-          "color": "#ccccd1",
-          "metallic": 0,
-          "roughness": 0.55,
-          "emissive": "#000000",
-          "texture": "",
-          "visible": true,
-          "billboard": false,
-          "material": "generated/office/banker_lamp_shade_inner.mat.json",
-          "unlit": false,
-          "shading": "pbr",
-          "normalMap": "",
-          "ormMap": "",
-          "emissiveMap": "",
-          "normalStrength": 1,
-          "tiling": 1,
-          "triplanar": false,
-          "clearcoat": 0,
-          "subsurface": 0,
-          "rim": 0,
-          "outline": 0,
-          "outlineColor": "#0a0a0f",
-          "doubleSided": false,
-          "castShadows": true,
-          "alphaCutoff": 0
+      },
+      "prefab": {
+        "source": "generated/office/banker_lamp.prefab.json",
+        "guid": "896043d85058a3a4485f8778b8c80bb1",
+        "ids": {
+          "2": 58,
+          "3": 59,
+          "4": 60
         }
       }
     },
@@ -3253,9 +2941,6 @@
       "id": 61,
       "name": "Inkwell",
       "parent": 0,
-      "enabled": true,
-      "tags": [],
-      "vars": {},
       "components": {
         "transform": {
           "position": [
@@ -3274,113 +2959,13 @@
             1
           ]
         }
-      }
-    },
-    {
-      "id": 62,
-      "name": "ink_glass",
-      "parent": 61,
-      "enabled": true,
-      "tags": [],
-      "vars": {},
-      "components": {
-        "transform": {
-          "position": [
-            0,
-            0,
-            0
-          ],
-          "rotation": [
-            0,
-            0,
-            0
-          ],
-          "scale": [
-            1,
-            1,
-            1
-          ]
-        },
-        "mesh": {
-          "mesh": "asset:generated/office/inkwell.glb#0",
-          "color": "#ccccd1",
-          "metallic": 0,
-          "roughness": 0.55,
-          "emissive": "#000000",
-          "texture": "",
-          "visible": true,
-          "billboard": false,
-          "material": "generated/office/inkwell_ink_glass.mat.json",
-          "unlit": false,
-          "shading": "pbr",
-          "normalMap": "",
-          "ormMap": "",
-          "emissiveMap": "",
-          "normalStrength": 1,
-          "tiling": 1,
-          "triplanar": false,
-          "clearcoat": 0,
-          "subsurface": 0,
-          "rim": 0,
-          "outline": 0,
-          "outlineColor": "#0a0a0f",
-          "doubleSided": false,
-          "castShadows": true,
-          "alphaCutoff": 0
-        }
-      }
-    },
-    {
-      "id": 63,
-      "name": "brass",
-      "parent": 61,
-      "enabled": true,
-      "tags": [],
-      "vars": {},
-      "components": {
-        "transform": {
-          "position": [
-            0,
-            0,
-            0
-          ],
-          "rotation": [
-            0,
-            0,
-            0
-          ],
-          "scale": [
-            1,
-            1,
-            1
-          ]
-        },
-        "mesh": {
-          "mesh": "asset:generated/office/inkwell.glb#1",
-          "color": "#ccccd1",
-          "metallic": 0,
-          "roughness": 0.55,
-          "emissive": "#000000",
-          "texture": "",
-          "visible": true,
-          "billboard": false,
-          "material": "generated/office/inkwell_brass.mat.json",
-          "unlit": false,
-          "shading": "pbr",
-          "normalMap": "",
-          "ormMap": "",
-          "emissiveMap": "",
-          "normalStrength": 1,
-          "tiling": 1,
-          "triplanar": false,
-          "clearcoat": 0,
-          "subsurface": 0,
-          "rim": 0,
-          "outline": 0,
-          "outlineColor": "#0a0a0f",
-          "doubleSided": false,
-          "castShadows": true,
-          "alphaCutoff": 0
+      },
+      "prefab": {
+        "source": "generated/office/inkwell.prefab.json",
+        "guid": "efe5d10c7d6145dcb0eed755d800afc1",
+        "ids": {
+          "2": 62,
+          "3": 63
         }
       }
     },
@@ -3388,9 +2973,6 @@
       "id": 64,
       "name": "Fountain Pen",
       "parent": 0,
-      "enabled": true,
-      "tags": [],
-      "vars": {},
       "components": {
         "transform": {
           "position": [
@@ -3409,113 +2991,13 @@
             1
           ]
         }
-      }
-    },
-    {
-      "id": 65,
-      "name": "lacquer",
-      "parent": 64,
-      "enabled": true,
-      "tags": [],
-      "vars": {},
-      "components": {
-        "transform": {
-          "position": [
-            0,
-            0,
-            0
-          ],
-          "rotation": [
-            0,
-            0,
-            0
-          ],
-          "scale": [
-            1,
-            1,
-            1
-          ]
-        },
-        "mesh": {
-          "mesh": "asset:generated/office/pen.glb#0",
-          "color": "#ccccd1",
-          "metallic": 0,
-          "roughness": 0.55,
-          "emissive": "#000000",
-          "texture": "",
-          "visible": true,
-          "billboard": false,
-          "material": "generated/office/pen_lacquer.mat.json",
-          "unlit": false,
-          "shading": "pbr",
-          "normalMap": "",
-          "ormMap": "",
-          "emissiveMap": "",
-          "normalStrength": 1,
-          "tiling": 1,
-          "triplanar": false,
-          "clearcoat": 0,
-          "subsurface": 0,
-          "rim": 0,
-          "outline": 0,
-          "outlineColor": "#0a0a0f",
-          "doubleSided": false,
-          "castShadows": true,
-          "alphaCutoff": 0
-        }
-      }
-    },
-    {
-      "id": 66,
-      "name": "brass",
-      "parent": 64,
-      "enabled": true,
-      "tags": [],
-      "vars": {},
-      "components": {
-        "transform": {
-          "position": [
-            0,
-            0,
-            0
-          ],
-          "rotation": [
-            0,
-            0,
-            0
-          ],
-          "scale": [
-            1,
-            1,
-            1
-          ]
-        },
-        "mesh": {
-          "mesh": "asset:generated/office/pen.glb#1",
-          "color": "#ccccd1",
-          "metallic": 0,
-          "roughness": 0.55,
-          "emissive": "#000000",
-          "texture": "",
-          "visible": true,
-          "billboard": false,
-          "material": "generated/office/pen_brass.mat.json",
-          "unlit": false,
-          "shading": "pbr",
-          "normalMap": "",
-          "ormMap": "",
-          "emissiveMap": "",
-          "normalStrength": 1,
-          "tiling": 1,
-          "triplanar": false,
-          "clearcoat": 0,
-          "subsurface": 0,
-          "rim": 0,
-          "outline": 0,
-          "outlineColor": "#0a0a0f",
-          "doubleSided": false,
-          "castShadows": true,
-          "alphaCutoff": 0
+      },
+      "prefab": {
+        "source": "generated/office/pen.prefab.json",
+        "guid": "3e6f78d6046ce1ef8d13c27c0e6d811a",
+        "ids": {
+          "2": 65,
+          "3": 66
         }
       }
     },
@@ -3552,9 +3034,6 @@
       "id": 68,
       "name": "Flag Republic Pole",
       "parent": 67,
-      "enabled": true,
-      "tags": [],
-      "vars": {},
       "components": {
         "transform": {
           "position": [
@@ -3573,113 +3052,13 @@
             1
           ]
         }
-      }
-    },
-    {
-      "id": 69,
-      "name": "brass",
-      "parent": 68,
-      "enabled": true,
-      "tags": [],
-      "vars": {},
-      "components": {
-        "transform": {
-          "position": [
-            0,
-            0,
-            0
-          ],
-          "rotation": [
-            0,
-            0,
-            0
-          ],
-          "scale": [
-            1,
-            1,
-            1
-          ]
-        },
-        "mesh": {
-          "mesh": "asset:generated/office/flag_pole_in.glb#0",
-          "color": "#ccccd1",
-          "metallic": 0,
-          "roughness": 0.55,
-          "emissive": "#000000",
-          "texture": "",
-          "visible": true,
-          "billboard": false,
-          "material": "generated/office/flag_pole_in_brass.mat.json",
-          "unlit": false,
-          "shading": "pbr",
-          "normalMap": "",
-          "ormMap": "",
-          "emissiveMap": "",
-          "normalStrength": 1,
-          "tiling": 1,
-          "triplanar": false,
-          "clearcoat": 0,
-          "subsurface": 0,
-          "rim": 0,
-          "outline": 0,
-          "outlineColor": "#0a0a0f",
-          "doubleSided": false,
-          "castShadows": true,
-          "alphaCutoff": 0
-        }
-      }
-    },
-    {
-      "id": 70,
-      "name": "pole_dark",
-      "parent": 68,
-      "enabled": true,
-      "tags": [],
-      "vars": {},
-      "components": {
-        "transform": {
-          "position": [
-            0,
-            0,
-            0
-          ],
-          "rotation": [
-            0,
-            0,
-            0
-          ],
-          "scale": [
-            1,
-            1,
-            1
-          ]
-        },
-        "mesh": {
-          "mesh": "asset:generated/office/flag_pole_in.glb#1",
-          "color": "#ccccd1",
-          "metallic": 0,
-          "roughness": 0.55,
-          "emissive": "#000000",
-          "texture": "",
-          "visible": true,
-          "billboard": false,
-          "material": "generated/office/flag_pole_in_pole_dark.mat.json",
-          "unlit": false,
-          "shading": "pbr",
-          "normalMap": "",
-          "ormMap": "",
-          "emissiveMap": "",
-          "normalStrength": 1,
-          "tiling": 1,
-          "triplanar": false,
-          "clearcoat": 0,
-          "subsurface": 0,
-          "rim": 0,
-          "outline": 0,
-          "outlineColor": "#0a0a0f",
-          "doubleSided": false,
-          "castShadows": true,
-          "alphaCutoff": 0
+      },
+      "prefab": {
+        "source": "generated/office/flag_pole_in.prefab.json",
+        "guid": "87d84061838ffd5de73561a9b5e7f464",
+        "ids": {
+          "2": 69,
+          "3": 70
         }
       }
     },
@@ -3770,9 +3149,6 @@
       "id": 73,
       "name": "Flag Standard Pole",
       "parent": 72,
-      "enabled": true,
-      "tags": [],
-      "vars": {},
       "components": {
         "transform": {
           "position": [
@@ -3791,113 +3167,13 @@
             1
           ]
         }
-      }
-    },
-    {
-      "id": 74,
-      "name": "brass",
-      "parent": 73,
-      "enabled": true,
-      "tags": [],
-      "vars": {},
-      "components": {
-        "transform": {
-          "position": [
-            0,
-            0,
-            0
-          ],
-          "rotation": [
-            0,
-            0,
-            0
-          ],
-          "scale": [
-            1,
-            1,
-            1
-          ]
-        },
-        "mesh": {
-          "mesh": "asset:generated/office/flag_pole_in.glb#0",
-          "color": "#ccccd1",
-          "metallic": 0,
-          "roughness": 0.55,
-          "emissive": "#000000",
-          "texture": "",
-          "visible": true,
-          "billboard": false,
-          "material": "generated/office/flag_pole_in_brass.mat.json",
-          "unlit": false,
-          "shading": "pbr",
-          "normalMap": "",
-          "ormMap": "",
-          "emissiveMap": "",
-          "normalStrength": 1,
-          "tiling": 1,
-          "triplanar": false,
-          "clearcoat": 0,
-          "subsurface": 0,
-          "rim": 0,
-          "outline": 0,
-          "outlineColor": "#0a0a0f",
-          "doubleSided": false,
-          "castShadows": true,
-          "alphaCutoff": 0
-        }
-      }
-    },
-    {
-      "id": 75,
-      "name": "pole_dark",
-      "parent": 73,
-      "enabled": true,
-      "tags": [],
-      "vars": {},
-      "components": {
-        "transform": {
-          "position": [
-            0,
-            0,
-            0
-          ],
-          "rotation": [
-            0,
-            0,
-            0
-          ],
-          "scale": [
-            1,
-            1,
-            1
-          ]
-        },
-        "mesh": {
-          "mesh": "asset:generated/office/flag_pole_in.glb#1",
-          "color": "#ccccd1",
-          "metallic": 0,
-          "roughness": 0.55,
-          "emissive": "#000000",
-          "texture": "",
-          "visible": true,
-          "billboard": false,
-          "material": "generated/office/flag_pole_in_pole_dark.mat.json",
-          "unlit": false,
-          "shading": "pbr",
-          "normalMap": "",
-          "ormMap": "",
-          "emissiveMap": "",
-          "normalStrength": 1,
-          "tiling": 1,
-          "triplanar": false,
-          "clearcoat": 0,
-          "subsurface": 0,
-          "rim": 0,
-          "outline": 0,
-          "outlineColor": "#0a0a0f",
-          "doubleSided": false,
-          "castShadows": true,
-          "alphaCutoff": 0
+      },
+      "prefab": {
+        "source": "generated/office/flag_pole_in.prefab.json",
+        "guid": "87d84061838ffd5de73561a9b5e7f464",
+        "ids": {
+          "2": 74,
+          "3": 75
         }
       }
     },
@@ -4175,9 +3451,6 @@
       "id": 81,
       "name": "Sconce 0",
       "parent": 0,
-      "enabled": true,
-      "tags": [],
-      "vars": {},
       "components": {
         "transform": {
           "position": [
@@ -4196,113 +3469,13 @@
             1
           ]
         }
-      }
-    },
-    {
-      "id": 82,
-      "name": "brass",
-      "parent": 81,
-      "enabled": true,
-      "tags": [],
-      "vars": {},
-      "components": {
-        "transform": {
-          "position": [
-            0,
-            0,
-            0
-          ],
-          "rotation": [
-            0,
-            0,
-            0
-          ],
-          "scale": [
-            1,
-            1,
-            1
-          ]
-        },
-        "mesh": {
-          "mesh": "asset:generated/office/sconce.glb#0",
-          "color": "#ccccd1",
-          "metallic": 0,
-          "roughness": 0.55,
-          "emissive": "#000000",
-          "texture": "",
-          "visible": true,
-          "billboard": false,
-          "material": "generated/office/sconce_brass.mat.json",
-          "unlit": false,
-          "shading": "pbr",
-          "normalMap": "",
-          "ormMap": "",
-          "emissiveMap": "",
-          "normalStrength": 1,
-          "tiling": 1,
-          "triplanar": false,
-          "clearcoat": 0,
-          "subsurface": 0,
-          "rim": 0,
-          "outline": 0,
-          "outlineColor": "#0a0a0f",
-          "doubleSided": false,
-          "castShadows": true,
-          "alphaCutoff": 0
-        }
-      }
-    },
-    {
-      "id": 83,
-      "name": "glass",
-      "parent": 81,
-      "enabled": true,
-      "tags": [],
-      "vars": {},
-      "components": {
-        "transform": {
-          "position": [
-            0,
-            0,
-            0
-          ],
-          "rotation": [
-            0,
-            0,
-            0
-          ],
-          "scale": [
-            1,
-            1,
-            1
-          ]
-        },
-        "mesh": {
-          "mesh": "asset:generated/office/sconce.glb#1",
-          "color": "#ccccd1",
-          "metallic": 0,
-          "roughness": 0.55,
-          "emissive": "#000000",
-          "texture": "",
-          "visible": true,
-          "billboard": false,
-          "material": "generated/office/sconce_glass.mat.json",
-          "unlit": false,
-          "shading": "pbr",
-          "normalMap": "",
-          "ormMap": "",
-          "emissiveMap": "",
-          "normalStrength": 1,
-          "tiling": 1,
-          "triplanar": false,
-          "clearcoat": 0,
-          "subsurface": 0,
-          "rim": 0,
-          "outline": 0,
-          "outlineColor": "#0a0a0f",
-          "doubleSided": false,
-          "castShadows": true,
-          "alphaCutoff": 0
+      },
+      "prefab": {
+        "source": "generated/office/sconce.prefab.json",
+        "guid": "cec77f96922b31e7231d6f49219f57de",
+        "ids": {
+          "2": 82,
+          "3": 83
         }
       }
     },
@@ -4310,9 +3483,6 @@
       "id": 84,
       "name": "Sconce 1",
       "parent": 0,
-      "enabled": true,
-      "tags": [],
-      "vars": {},
       "components": {
         "transform": {
           "position": [
@@ -4331,113 +3501,13 @@
             1
           ]
         }
-      }
-    },
-    {
-      "id": 85,
-      "name": "brass",
-      "parent": 84,
-      "enabled": true,
-      "tags": [],
-      "vars": {},
-      "components": {
-        "transform": {
-          "position": [
-            0,
-            0,
-            0
-          ],
-          "rotation": [
-            0,
-            0,
-            0
-          ],
-          "scale": [
-            1,
-            1,
-            1
-          ]
-        },
-        "mesh": {
-          "mesh": "asset:generated/office/sconce.glb#0",
-          "color": "#ccccd1",
-          "metallic": 0,
-          "roughness": 0.55,
-          "emissive": "#000000",
-          "texture": "",
-          "visible": true,
-          "billboard": false,
-          "material": "generated/office/sconce_brass.mat.json",
-          "unlit": false,
-          "shading": "pbr",
-          "normalMap": "",
-          "ormMap": "",
-          "emissiveMap": "",
-          "normalStrength": 1,
-          "tiling": 1,
-          "triplanar": false,
-          "clearcoat": 0,
-          "subsurface": 0,
-          "rim": 0,
-          "outline": 0,
-          "outlineColor": "#0a0a0f",
-          "doubleSided": false,
-          "castShadows": true,
-          "alphaCutoff": 0
-        }
-      }
-    },
-    {
-      "id": 86,
-      "name": "glass",
-      "parent": 84,
-      "enabled": true,
-      "tags": [],
-      "vars": {},
-      "components": {
-        "transform": {
-          "position": [
-            0,
-            0,
-            0
-          ],
-          "rotation": [
-            0,
-            0,
-            0
-          ],
-          "scale": [
-            1,
-            1,
-            1
-          ]
-        },
-        "mesh": {
-          "mesh": "asset:generated/office/sconce.glb#1",
-          "color": "#ccccd1",
-          "metallic": 0,
-          "roughness": 0.55,
-          "emissive": "#000000",
-          "texture": "",
-          "visible": true,
-          "billboard": false,
-          "material": "generated/office/sconce_glass.mat.json",
-          "unlit": false,
-          "shading": "pbr",
-          "normalMap": "",
-          "ormMap": "",
-          "emissiveMap": "",
-          "normalStrength": 1,
-          "tiling": 1,
-          "triplanar": false,
-          "clearcoat": 0,
-          "subsurface": 0,
-          "rim": 0,
-          "outline": 0,
-          "outlineColor": "#0a0a0f",
-          "doubleSided": false,
-          "castShadows": true,
-          "alphaCutoff": 0
+      },
+      "prefab": {
+        "source": "generated/office/sconce.prefab.json",
+        "guid": "cec77f96922b31e7231d6f49219f57de",
+        "ids": {
+          "2": 85,
+          "3": 86
         }
       }
     },
@@ -4445,9 +3515,6 @@
       "id": 87,
       "name": "Sconce 2",
       "parent": 0,
-      "enabled": true,
-      "tags": [],
-      "vars": {},
       "components": {
         "transform": {
           "position": [
@@ -4466,113 +3533,13 @@
             1
           ]
         }
-      }
-    },
-    {
-      "id": 88,
-      "name": "brass",
-      "parent": 87,
-      "enabled": true,
-      "tags": [],
-      "vars": {},
-      "components": {
-        "transform": {
-          "position": [
-            0,
-            0,
-            0
-          ],
-          "rotation": [
-            0,
-            0,
-            0
-          ],
-          "scale": [
-            1,
-            1,
-            1
-          ]
-        },
-        "mesh": {
-          "mesh": "asset:generated/office/sconce.glb#0",
-          "color": "#ccccd1",
-          "metallic": 0,
-          "roughness": 0.55,
-          "emissive": "#000000",
-          "texture": "",
-          "visible": true,
-          "billboard": false,
-          "material": "generated/office/sconce_brass.mat.json",
-          "unlit": false,
-          "shading": "pbr",
-          "normalMap": "",
-          "ormMap": "",
-          "emissiveMap": "",
-          "normalStrength": 1,
-          "tiling": 1,
-          "triplanar": false,
-          "clearcoat": 0,
-          "subsurface": 0,
-          "rim": 0,
-          "outline": 0,
-          "outlineColor": "#0a0a0f",
-          "doubleSided": false,
-          "castShadows": true,
-          "alphaCutoff": 0
-        }
-      }
-    },
-    {
-      "id": 89,
-      "name": "glass",
-      "parent": 87,
-      "enabled": true,
-      "tags": [],
-      "vars": {},
-      "components": {
-        "transform": {
-          "position": [
-            0,
-            0,
-            0
-          ],
-          "rotation": [
-            0,
-            0,
-            0
-          ],
-          "scale": [
-            1,
-            1,
-            1
-          ]
-        },
-        "mesh": {
-          "mesh": "asset:generated/office/sconce.glb#1",
-          "color": "#ccccd1",
-          "metallic": 0,
-          "roughness": 0.55,
-          "emissive": "#000000",
-          "texture": "",
-          "visible": true,
-          "billboard": false,
-          "material": "generated/office/sconce_glass.mat.json",
-          "unlit": false,
-          "shading": "pbr",
-          "normalMap": "",
-          "ormMap": "",
-          "emissiveMap": "",
-          "normalStrength": 1,
-          "tiling": 1,
-          "triplanar": false,
-          "clearcoat": 0,
-          "subsurface": 0,
-          "rim": 0,
-          "outline": 0,
-          "outlineColor": "#0a0a0f",
-          "doubleSided": false,
-          "castShadows": true,
-          "alphaCutoff": 0
+      },
+      "prefab": {
+        "source": "generated/office/sconce.prefab.json",
+        "guid": "cec77f96922b31e7231d6f49219f57de",
+        "ids": {
+          "2": 88,
+          "3": 89
         }
       }
     },
@@ -4580,9 +3547,6 @@
       "id": 90,
       "name": "Sconce 3",
       "parent": 0,
-      "enabled": true,
-      "tags": [],
-      "vars": {},
       "components": {
         "transform": {
           "position": [
@@ -4601,113 +3565,13 @@
             1
           ]
         }
-      }
-    },
-    {
-      "id": 91,
-      "name": "brass",
-      "parent": 90,
-      "enabled": true,
-      "tags": [],
-      "vars": {},
-      "components": {
-        "transform": {
-          "position": [
-            0,
-            0,
-            0
-          ],
-          "rotation": [
-            0,
-            0,
-            0
-          ],
-          "scale": [
-            1,
-            1,
-            1
-          ]
-        },
-        "mesh": {
-          "mesh": "asset:generated/office/sconce.glb#0",
-          "color": "#ccccd1",
-          "metallic": 0,
-          "roughness": 0.55,
-          "emissive": "#000000",
-          "texture": "",
-          "visible": true,
-          "billboard": false,
-          "material": "generated/office/sconce_brass.mat.json",
-          "unlit": false,
-          "shading": "pbr",
-          "normalMap": "",
-          "ormMap": "",
-          "emissiveMap": "",
-          "normalStrength": 1,
-          "tiling": 1,
-          "triplanar": false,
-          "clearcoat": 0,
-          "subsurface": 0,
-          "rim": 0,
-          "outline": 0,
-          "outlineColor": "#0a0a0f",
-          "doubleSided": false,
-          "castShadows": true,
-          "alphaCutoff": 0
-        }
-      }
-    },
-    {
-      "id": 92,
-      "name": "glass",
-      "parent": 90,
-      "enabled": true,
-      "tags": [],
-      "vars": {},
-      "components": {
-        "transform": {
-          "position": [
-            0,
-            0,
-            0
-          ],
-          "rotation": [
-            0,
-            0,
-            0
-          ],
-          "scale": [
-            1,
-            1,
-            1
-          ]
-        },
-        "mesh": {
-          "mesh": "asset:generated/office/sconce.glb#1",
-          "color": "#ccccd1",
-          "metallic": 0,
-          "roughness": 0.55,
-          "emissive": "#000000",
-          "texture": "",
-          "visible": true,
-          "billboard": false,
-          "material": "generated/office/sconce_glass.mat.json",
-          "unlit": false,
-          "shading": "pbr",
-          "normalMap": "",
-          "ormMap": "",
-          "emissiveMap": "",
-          "normalStrength": 1,
-          "tiling": 1,
-          "triplanar": false,
-          "clearcoat": 0,
-          "subsurface": 0,
-          "rim": 0,
-          "outline": 0,
-          "outlineColor": "#0a0a0f",
-          "doubleSided": false,
-          "castShadows": true,
-          "alphaCutoff": 0
+      },
+      "prefab": {
+        "source": "generated/office/sconce.prefab.json",
+        "guid": "cec77f96922b31e7231d6f49219f57de",
+        "ids": {
+          "2": 91,
+          "3": 92
         }
       }
     },
@@ -6099,8 +4963,8 @@
           "depthCollision": false,
           "stick": false,
           "friction": 0.3,
-          "colliders": "",
-          "subEmitter": "",
+          "colliders": [],
+          "subEmitter": null,
           "subEmitOn": "death",
           "subEmitCount": 8,
           "subEmitInherit": 0.3,
@@ -6145,7 +5009,8 @@
           "primary": true,
           "aperture": 2.8,
           "focusDistance": 5.4,
-          "motionBlur": 0
+          "motionBlur": 0,
+          "tiltShift": 0
         }
       }
     },
@@ -10621,7 +9486,8 @@
           "primary": false,
           "aperture": 2.8,
           "focusDistance": 5.6,
-          "motionBlur": 0
+          "motionBlur": 0,
+          "tiltShift": 0
         }
       }
     },
@@ -10694,7 +9560,8 @@
           "primary": false,
           "aperture": 2,
           "focusDistance": 0.85,
-          "motionBlur": 0
+          "motionBlur": 0,
+          "tiltShift": 0
         }
       }
     },
@@ -10767,7 +9634,8 @@
           "primary": false,
           "aperture": 2.2,
           "focusDistance": 2.3,
-          "motionBlur": 0
+          "motionBlur": 0,
+          "tiltShift": 0
         }
       }
     },
@@ -10840,7 +9708,8 @@
           "primary": false,
           "aperture": 1.8,
           "focusDistance": 0.72,
-          "motionBlur": 0
+          "motionBlur": 0,
+          "tiltShift": 0
         }
       }
     },
@@ -10913,7 +9782,8 @@
           "primary": false,
           "aperture": 2.8,
           "focusDistance": 4.2,
-          "motionBlur": 0
+          "motionBlur": 0,
+          "tiltShift": 0
         }
       }
     },
@@ -10986,7 +9856,8 @@
           "primary": false,
           "aperture": 2.8,
           "focusDistance": 4.5,
-          "motionBlur": 0
+          "motionBlur": 0,
+          "tiltShift": 0
         }
       }
     },
@@ -11059,7 +9930,8 @@
           "primary": false,
           "aperture": 2.4,
           "focusDistance": 4,
-          "motionBlur": 0
+          "motionBlur": 0,
+          "tiltShift": 0
         }
       }
     },
@@ -11132,7 +10004,8 @@
           "primary": false,
           "aperture": 2.8,
           "focusDistance": 4.4,
-          "motionBlur": 0
+          "motionBlur": 0,
+          "tiltShift": 0
         }
       }
     }
