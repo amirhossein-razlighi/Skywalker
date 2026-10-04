@@ -133,6 +133,11 @@ EntityId Scene::create(std::string entityName, EntityId parent, EntityId forcedI
     return id;
 }
 
+void Scene::setNextEntityId(EntityId next) {
+    for (const auto& [id, rec] : records_) next = std::max(next, id + 1);
+    nextId_ = std::max<EntityId>(next, 1);
+}
+
 size_t Scene::destroy(EntityId id) {
     if (!exists(id)) return 0;
     size_t count = 0;

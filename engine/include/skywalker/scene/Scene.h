@@ -113,6 +113,10 @@ public:
 
     /// Entities in stable, deterministic order (creation / hierarchy order).
     const std::vector<EntityId>& entities() const { return order_; }
+    /// The id the next create() hands out. Save games restore it so spawns after a load get the same ids.
+    EntityId nextEntityId() const { return nextId_; }
+    /// Sets the next id (never at or below an existing entity's id).
+    void setNextEntityId(EntityId next);
     std::vector<EntityId> children(EntityId id) const;
     /// Reorders entities to follow `order` (ids that don't exist are skipped; existing ids
     /// missing from `order` keep their relative order at the end). Used by undo/redo.
