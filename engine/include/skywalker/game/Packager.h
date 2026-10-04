@@ -35,6 +35,9 @@ struct CollectOptions {
 
 struct CollectedFiles {
     std::set<std::string> files;                  // project-relative, '/' separators (includes .meta sidecars)
+    /// Files that live in a game.json mount ("kit/..."): project path -> absolute source. Packages get a
+    /// physical copy under the mount name, so the shipped game needs no mount.
+    std::map<std::string, std::string> mounted;
     std::map<std::string, std::string> missing;   // reference -> first file that mentions it: looks like an asset, does not exist
     std::vector<std::string> excludedReferenced;  // referenced files that game.json "exclude" keeps out (they will be missing at run time)
     std::string startScene;

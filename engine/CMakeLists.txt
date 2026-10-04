@@ -27,6 +27,7 @@ set(SKY_ENGINE_SOURCES
     src/render/Png.cpp
     src/render/MeshData.cpp
     src/render/FrameBuilder.cpp
+    src/render/SceneAudit.cpp
     src/render/NullRenderer.cpp
     src/render/Annotate.cpp
     src/render/Gltf.cpp
@@ -56,6 +57,7 @@ set(SKY_ENGINE_SOURCES
     src/agent/WorldTools.cpp
     src/agent/NetworkTools.cpp
     src/agent/FxTools.cpp
+    src/agent/AuditTools.cpp
     src/agent/ShadowTools.cpp
     src/agent/WanderTools.cpp
     src/agent/NativeTools.cpp

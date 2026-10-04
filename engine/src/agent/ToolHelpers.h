@@ -65,5 +65,6 @@ void addProcessTools(Engine& engine, ToolRegistry& reg);  // ProcessTools.cpp: p
 /// Reads a property path ("transform.position", "vars.score", "name", "enabled") for traces (WorldTools.cpp).
 Json readPropertyPath(const Scene& s, EntityId id, const std::string& path);
 void addShadowTools(Engine& engine, ToolRegistry& reg);  // ShadowTools.cpp: shadow_atlas_info, light_shadows
+void addAuditTools(Engine& engine, ToolRegistry& reg);   // AuditTools.cpp: scene_audit (look-dev quality gate)
 
 }  // namespace sky::tools

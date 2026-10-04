@@ -608,7 +608,7 @@ Status AnimatorRuntime::init(std::shared_ptr<const Library> library, std::shared
                 }
             }
         }
-        layer.current.state = std::max(0, L.stateIndex(L.defaultState));
+        layer.current.state = L.states.empty() ? -1 : std::max(0, L.stateIndex(L.defaultState));  // a library without clips plays nothing
         layers_.push_back(std::move(layer));
     }
     setRootMotion(rootMotion_, up_);

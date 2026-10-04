@@ -1,4 +1,5 @@
 #include "skywalker/engine/Engine.h"
+#include "skywalker/game/GameSettings.h"
 
 #include <algorithm>
 #include <atomic>
@@ -80,6 +81,7 @@ Engine::Engine(EngineConfig config)
       renderer_(createRenderer(config_.renderer)),
       assets_(std::make_unique<AssetDatabase>(config_.projectDir)),
       animation_(std::make_unique<anim::AnimationSystem>(*scene_)) {
+    reloadMounts();  // game.json "mounts" (shared kits outside the project), scanned with the project
     assets_->refresh();
     // Animation: assets come from the project, events go to Wander.
     animation_->hooks.resolvePath = [this](const std::string& p) { return resolvePath(p); };
@@ -1031,7 +1033,16 @@ std::string Engine::resolvePath(const std::string& path) const {
         const char* home = std::getenv("HOME");
         return (fs::path(home ? home : "") / path.substr(path.size() > 1 ? 2 : 1)).string();
     }
-    return (fs::path(config_.projectDir) / p).lexically_normal().string();
+    return assets_->absolute(path);  // project-relative, or inside a mounted folder ("kit/...")
+}
+
+std::vector<std::string> Engine::reloadMounts() {
+    std::vector<std::string> warnings;
+    std::vector<AssetMount> mounts;
+    for (auto& [name, folder] : game::GameSettings::readMounts(config_.projectDir, &warnings)) mounts.push_back({name, folder});
+    for (const auto& w : warnings) log::warn("assets", w);
+    assets_->setMounts(std::move(mounts));
+    return warnings;
 }
 
 Status Engine::newScene(const std::string& name, bool withDefaults) {

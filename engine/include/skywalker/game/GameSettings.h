@@ -6,6 +6,7 @@
 // the app's identity (bundle id, version, icon) and quality. See docs/SHIPPING.md.
 
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "skywalker/core/Json.h"
@@ -45,6 +46,9 @@ struct GameSettings {
     // Packaging
     std::vector<std::string> include;  // extra project files/folders to ship (globs: "audio/**", "data/*.json")
     std::vector<std::string> exclude;  // files to leave out even when referenced (globs)
+    // Shared folders outside the project: "mounts": {"kit": "../_kit"} makes "kit/..." paths resolve into
+    // ../_kit (relative to the project, absolute, or ~). Packaged games get a copy of what they use.
+    std::vector<std::pair<std::string, std::string>> mounts;
     // Rendering: "render": {"layers": {"1": "world", "2": "player"}} names the 20 render layers
     render::LayerNames renderLayers;
 
@@ -65,6 +69,12 @@ struct GameSettings {
     void applyQuality(Environment& env) const;
 
     static const std::vector<std::string>& qualityPresets();
+
+    /// The mounts of `<projectDir>/game.json` as (name, absolute folder), read leniently (only the
+    /// "mounts" key, so a project with other game.json problems still finds its kit). Problems
+    /// (bad names, missing folders) go to `warnings`.
+    static std::vector<std::pair<std::string, std::string>> readMounts(const std::string& projectDir,
+                                                                        std::vector<std::string>* warnings = nullptr);
 };
 
 /// Lower-case letters, digits and '-' only ("Sky Dash!" -> "sky-dash").

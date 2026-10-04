@@ -1155,6 +1155,7 @@ void registerEngineTools(Engine& engine) {
     tools::addRenderLayerTools(engine, reg);  // engine/src/agent/RenderLayerTools.cpp (render layers, cull masks)
     tools::addProcessTools(engine, reg);  // ProcessTools.cpp: process_info, sim_teleport, sim_display
     tools::addShadowTools(engine, reg);  // engine/src/agent/ShadowTools.cpp (point / spot light shadows)
+    tools::addAuditTools(engine, reg);   // engine/src/agent/AuditTools.cpp (scene_audit quality gate)
 }
 
 }  // namespace sky

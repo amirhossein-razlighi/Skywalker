@@ -48,14 +48,29 @@ struct AssetRecord {
     Json toJson() const;
 };
 
+/// A folder outside the project mounted under a top-level name: with {"kit", "/games/_kit"},
+/// the project path "kit/characters/guard.prefab.json" is "/games/_kit/characters/guard.prefab.json".
+/// Configured by `"mounts": {"kit": "../_kit"}` in game.json (shared asset kits, libraries).
+struct AssetMount {
+    std::string name;  // first path component, e.g. "kit"
+    std::string root;  // absolute folder
+};
+
 class AssetDatabase {
 public:
     explicit AssetDatabase(std::string root);
 
     const std::string& root() const { return root_; }
     std::string absolute(std::string_view projectPath) const;
-    /// Project-relative path for an absolute or relative path ("" if outside the project).
+    /// Project-relative path for an absolute or relative path ("" if outside the project and its mounts).
+    /// Files inside a mounted folder get the mount's name as their first component.
     std::string relative(std::string_view path) const;
+
+    /// Mounted folders (scanned with the project; their assets have "<name>/..." paths).
+    void setMounts(std::vector<AssetMount> mounts);
+    const std::vector<AssetMount>& mounts() const { return mounts_; }
+    /// The mount a project path lives in (nullptr for ordinary project files).
+    const AssetMount* mountOf(std::string_view projectPath) const;
 
     /// Rescans the project. Creates .meta files for new assets, forgets deleted ones.
     /// Returns the project paths of assets that were added or modified since the last scan.
@@ -86,7 +101,11 @@ private:
     Status writeMeta(const AssetRecord& r);  // also marks the record persisted
     AssetRecord* findMutable(std::string_view ref);
 
+    void scanFolder(const std::string& folder, std::unordered_map<std::string, bool>& present, std::vector<std::string>& changed,
+                    bool skipMountNames);
+
     std::string root_;
+    std::vector<AssetMount> mounts_;
     std::unordered_map<std::string, AssetRecord> records_;  // by path
     std::unordered_map<std::string, std::string> byGuid_;   // guid -> path
 };

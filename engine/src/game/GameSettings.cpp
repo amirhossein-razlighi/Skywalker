@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <sstream>
@@ -137,12 +138,19 @@ std::string slugify(const std::string& name) {
     return out;
 }
 
+namespace {
+bool validMountName(const std::string& n) {
+    if (n.empty() || n.size() > 64) return false;
+    return std::all_of(n.begin(), n.end(), [](unsigned char c) { return std::isalnum(c) || c == '_' || c == '-'; });
+}
+}  // namespace
+
 Result<GameSettings> GameSettings::fromJson(const Json& j) {
     if (!j.isObject()) return Error::make("invalid_game_json", "game.json must be a JSON object");
     GameSettings g;
     static const std::vector<std::string> keys{"id", "title", "genre", "mood", "pitch", "assets", "startScene", "window", "quality",
                                                "renderScale", "quitOnEscape", "pauseOnFocusLoss", "icon", "bundleId",
-                                               "version", "copyright", "include", "exclude", "render"};
+                                               "version", "copyright", "include", "exclude", "render", "mounts"};
     if (Status s = checkKeys(j, "game.json", keys); !s) return s.error();
     for (auto [key, out] : std::initializer_list<std::pair<const char*, std::string*>>{
              {"id", &g.id}, {"title", &g.title}, {"genre", &g.genre}, {"mood", &g.mood}, {"pitch", &g.pitch}, {"assets", &g.assets},
@@ -191,6 +199,17 @@ Result<GameSettings> GameSettings::fromJson(const Json& j) {
     }
     if (Status s = readStrings(j, "include", g.include); !s) return s.error();
     if (Status s = readStrings(j, "exclude", g.exclude); !s) return s.error();
+    if (const Json* m = j.find("mounts"); m && !m->isNull()) {
+        if (!m->isObject()) return typeError("mounts", "an object like {\"kit\": \"../_kit\"}", *m);
+        for (const auto& [name, folder] : m->members()) {
+            if (!validMountName(name)) {
+                return Error::make("invalid_game_json", "mount name '" + name + "' must be letters, digits, '_' or '-'",
+                                   "e.g. \"mounts\": {\"kit\": \"../_kit\"} then use kit/characters/guard.prefab.json");
+            }
+            if (!folder.isString() || folder.asString().empty()) return typeError("mounts." + name, "a folder path", folder);
+            g.mounts.emplace_back(name, folder.asString());
+        }
+    }
 
     if (!validVersion(g.version)) {
         return Error::make("invalid_game_json", "version '" + g.version + "' must be digits separated by dots", "e.g. \"1.0.0\"");
@@ -250,6 +269,11 @@ Json GameSettings::toJson() const {
     };
     list("include", include);
     list("exclude", exclude);
+    if (!mounts.empty()) {
+        Json m = Json::object();
+        for (const auto& [name, folder] : mounts) m[name] = folder;
+        j["mounts"] = std::move(m);
+    }
     if (Json layers = renderLayers.toJson(); !layers.members().empty()) j["render"] = Json::object({{"layers", layers}});
     return j;
 }
@@ -319,6 +343,47 @@ Result<std::string> resolveStartScene(const std::string& projectDir, const GameS
         return Error::make("no_scene", "the project has no scene (*.sky.json)", "create one with scene_save, then set \"startScene\" in game.json");
     }
     return scenes.front();
+}
+
+}  // namespace sky::game
+
+namespace sky::game {
+
+std::vector<std::pair<std::string, std::string>> GameSettings::readMounts(const std::string& projectDir,
+                                                                          std::vector<std::string>* warnings) {
+    std::vector<std::pair<std::string, std::string>> out;
+    auto warn = [&](std::string w) {
+        if (warnings) warnings->push_back(std::move(w));
+    };
+    fs::path path = fs::path(projectDir) / "game.json";
+    std::error_code ec;
+    if (!fs::is_regular_file(path, ec)) return out;
+    std::ifstream f(path);
+    std::stringstream ss;
+    ss << f.rdbuf();
+    auto doc = Json::parse(ss.str());
+    if (!doc || !doc->isObject()) return out;
+    const Json& m = doc->get("mounts");
+    for (const auto& [name, folder] : m.members()) {
+        if (!validMountName(name) || !folder.isString() || folder.asString().empty()) {
+            warn("game.json mounts: ignoring '" + name + "' (names are letters, digits, '_' or '-'; values are folder paths)");
+            continue;
+        }
+        std::string p = folder.asString();
+        fs::path abs;
+        if (p[0] == '~') {
+            const char* home = std::getenv("HOME");
+            abs = fs::path(home ? home : "") / p.substr(p.size() > 1 ? 2 : 1);
+        } else if (fs::path(p).is_absolute()) {
+            abs = p;
+        } else {
+            abs = fs::path(projectDir) / p;
+        }
+        abs = abs.lexically_normal();
+        if (!fs::is_directory(abs, ec)) warn("game.json mounts: folder for '" + name + "' not found: " + abs.string());
+        out.emplace_back(name, abs.string());
+    }
+    return out;
 }
 
 }  // namespace sky::game
