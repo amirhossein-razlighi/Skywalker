@@ -280,6 +280,8 @@ struct ViewportPanel: View {
                         .fixedSize()
                         .padding(.horizontal, 6)
                         .help("Viewport quality while editing (play mode always renders full quality)")
+                        Divider().frame(height: 14)
+                        DebugViewMenu()
                     }
                     .padding(3)
                     .background(Theme.panel.opacity(0.88), in: RoundedRectangle(cornerRadius: 6))
@@ -313,19 +315,155 @@ struct ViewportPanel: View {
 
 struct StatsOverlay: View {
     @Environment(EngineStore.self) private var engine
+    @AppStorage("viewport.stats.passes") private var showPasses = false
+
     var body: some View {
         let s = engine.stats
         VStack(alignment: .trailing, spacing: 1) {
-            Text("\(Int(s.fps.rounded())) fps · \(s.cpuMs, specifier: "%.1f") ms")
+            Button {
+                showPasses.toggle()
+            } label: {
+                HStack(spacing: 4) {
+                    Text("\(Int(s.fps.rounded())) fps · cpu \(s.cpuMs, specifier: "%.1f") · gpu \(s.gpuMs, specifier: "%.1f") ms")
+                    Image(systemName: showPasses ? "chevron.up" : "chevron.down").font(.system(size: 8, weight: .bold))
+                        .foregroundStyle(Theme.textDim)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help(showPasses ? "Hide the GPU pass timings" : "Show where the frame time goes (GPU passes, CPU scopes)")
             Text("\(s.draws) draws · \(s.entities) entities")
+            if s.debugView != "final" {
+                Text("view: \(s.debugView)").foregroundStyle(Theme.warning)
+            }
             Text(s.renderer).foregroundStyle(Theme.textFaint)
+            if showPasses { PassTimingList(stats: s) }
         }
         .font(Theme.monoSmall)
         .foregroundStyle(Theme.text)
         .padding(.horizontal, 7).padding(.vertical, 4)
-        .background(Theme.panel.opacity(0.82), in: RoundedRectangle(cornerRadius: 6))
+        .background(Theme.panel.opacity(0.88), in: RoundedRectangle(cornerRadius: 6))
         .overlay(RoundedRectangle(cornerRadius: 6).stroke(Theme.border))
-        .allowsHitTesting(false)
+    }
+}
+
+/// Dense per-pass GPU timeline (rolling 60-frame averages) plus the CPU scopes: what
+/// perf_stats {passes: true} reports to agents, in a DCC-style profiler list.
+struct PassTimingList: View {
+    let stats: FrameStats
+    private let nameWidth: CGFloat = 112, barWidth: CGFloat = 64, msWidth: CGFloat = 40
+
+    var body: some View {
+        let passes = Array(stats.passes.prefix(28))
+        let scale = max(passes.map(\.ms).max() ?? 0, 0.05)
+        let total = stats.passes.reduce(0) { $0 + $1.ms }
+        VStack(alignment: .leading, spacing: 1) {
+            Rectangle().fill(Theme.border).frame(height: 1).padding(.vertical, 2)
+            HStack(spacing: 6) {
+                Text("GPU PASS").frame(width: nameWidth, alignment: .leading)
+                Text("avg").frame(width: barWidth, alignment: .leading)
+                Text("ms").frame(width: msWidth, alignment: .trailing)
+            }
+            .font(Theme.caps)
+            .foregroundStyle(Theme.textFaint)
+            if !stats.profilerSupported {
+                Text("per-pass timing unavailable on this GPU").foregroundStyle(Theme.textFaint)
+            } else if passes.isEmpty {
+                Text("waiting for frames…").foregroundStyle(Theme.textFaint)
+            }
+            ForEach(passes) { p in
+                row(p, scale: scale, color: Self.color(p.group))
+            }
+            if !passes.isEmpty {
+                HStack(spacing: 6) {
+                    Text("sum").frame(width: nameWidth + barWidth + 6, alignment: .leading).foregroundStyle(Theme.textDim)
+                    Text(String(format: "%.2f", total)).frame(width: msWidth, alignment: .trailing)
+                }
+            }
+            if !stats.cpuScopes.isEmpty {
+                Rectangle().fill(Theme.border).frame(height: 1).padding(.vertical, 2)
+                Text("CPU SCOPE").font(Theme.caps).foregroundStyle(Theme.textFaint)
+                let cpuScale = max(stats.cpuScopes.map(\.ms).max() ?? 0, 0.05)
+                ForEach(stats.cpuScopes) { c in
+                    row(c, scale: cpuScale, color: Theme.textDim)
+                }
+            }
+        }
+        .frame(width: nameWidth + barWidth + msWidth + 12, alignment: .leading)
+    }
+
+    private func row(_ p: PassTiming, scale: Double, color: Color) -> some View {
+        HStack(spacing: 6) {
+            Text(p.name).lineLimit(1).truncationMode(.tail).frame(width: nameWidth, alignment: .leading)
+            ZStack(alignment: .leading) {
+                Rectangle().fill(Theme.field)
+                Rectangle().fill(color).frame(width: barWidth * min(p.ms / scale, 1))
+            }
+            .frame(width: barWidth, height: 6)
+            Text(String(format: "%.2f", p.ms)).frame(width: msWidth, alignment: .trailing)
+        }
+        .help("\(p.name) (\(p.group)): avg \(String(format: "%.3f", p.ms)) ms, max \(String(format: "%.3f", p.maxMs)) ms")
+    }
+
+    static func color(_ group: String) -> Color {
+        switch group {
+        case "shadows": Theme.ai
+        case "main": Theme.accent
+        case "ao", "ssgi", "ssr", "resolve": Theme.success
+        case "temporal", "upscale": Theme.textDim
+        case "effects", "particles", "hair", "volumetrics": Theme.error
+        case "foliage": Theme.axisY
+        case "clouds", "environment": Color(hex: "#5fc7e8")
+        case "ui", "2d", "overlays", "debug": Theme.textFaint
+        default: Theme.warning  // post
+        }
+    }
+}
+
+/// Viewport debug views (the engine's viewport_debug_view tool; agents see the same views).
+struct DebugViewMenu: View {
+    @Environment(EngineStore.self) private var engine
+
+    private static let groups: [(String, [(String, String)])] = [
+        ("Shading", [("unshaded", "Unshaded"), ("lighting_only", "Lighting Only"), ("emission", "Emission"),
+                     ("specular", "Specular")]),
+        ("Geometry", [("wireframe", "Wireframe"), ("overdraw", "Overdraw"), ("lod", "LOD"), ("uv_checker", "UV Checker"),
+                      ("texel_density", "Texel Density")]),
+        ("Lights", [("shadow_cascades", "Shadow Cascades"), ("light_complexity", "Light Complexity")]),
+        ("Buffers", [("albedo", "Albedo"), ("normals", "Normals"), ("material", "Roughness / Metallic"), ("gi", "GI"),
+                     ("reflections", "Reflections"), ("ao", "Ambient Occlusion"), ("depth", "Depth"), ("lighting", "Direct Lighting")]),
+        ("Looks", [("sketch", "Sketch"), ("impostors", "Impostors")]),
+    ]
+
+    var body: some View {
+        let current = engine.stats.debugView
+        let selection = Binding<String>(get: { engine.stats.debugView }, set: { engine.setDebugView($0) })
+        Menu {
+            Picker("Debug View", selection: selection) {
+                Text("Lit").tag("final")
+                ForEach(Self.groups, id: \.0) { group in
+                    Section(group.0) {
+                        ForEach(group.1, id: \.0) { item in Text(item.1).tag(item.0) }
+                    }
+                }
+            }
+            .pickerStyle(.inline)
+        } label: {
+            Label(Self.title(current), systemImage: current == "final" ? "eye" : "eye.trianglebadge.exclamationmark")
+                .font(Theme.label)
+        }
+        .menuStyle(.borderlessButton)
+        .fixedSize()
+        .padding(.horizontal, 6)
+        .help("Viewport debug view: wireframe, overdraw, LOD, light complexity, buffers…")
+    }
+
+    static func title(_ view: String) -> String {
+        if view == "final" { return "Lit" }
+        for (_, items) in groups {
+            if let item = items.first(where: { $0.0 == view }) { return item.1 }
+        }
+        return view
     }
 }
 

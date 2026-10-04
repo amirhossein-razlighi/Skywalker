@@ -17,7 +17,7 @@
 namespace sky::shadercache {
 
 /// 64-bit FNV-1a hash (stable across platforms and runs).
-uint64_t fnv1a64(std::string_view data, uint64_t seed = 1469598103934665603ULL);
+uint64_t fnv1a64(std::string_view data, uint64_t seed = 14695981039346656037ULL);
 /// 16 lowercase hex digits.
 std::string hex64(uint64_t v);
 /// Cache key for a shader library + pipeline set: changes whenever any input changes.

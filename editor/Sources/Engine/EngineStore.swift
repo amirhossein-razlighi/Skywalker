@@ -47,6 +47,21 @@ struct FrameStats: Sendable {
     var entities = 0
     var renderer = ""
     var fps = 0.0
+    // Profiler (perf_stats {passes: true} in the engine): rolling 60-frame averages.
+    var gpuMs = 0.0
+    var profilerSupported = false
+    var passes: [PassTiming] = []
+    var cpuScopes: [PassTiming] = []
+    var debugView = "final"
+}
+
+/// One row of the profiler list: a GPU pass (group = shadows, main, post, ...) or a CPU scope.
+struct PassTiming: Sendable, Identifiable {
+    var id: String { name }
+    var name: String
+    var group: String
+    var ms: Double
+    var maxMs: Double
 }
 
 /// An entry of the activity feed: who did what.
@@ -124,6 +139,11 @@ final class EngineStore {
     var viewSceneCamera = false { didSet { sky_set_view_scene_camera(handle, viewSceneCamera ? 1 : 0) } }
     /// Editing-time viewport quality (fast / balanced / full); play mode always renders full.
     var viewportQuality = "fast" { didSet { call("viewport_quality", ["quality": .string(viewportQuality)]) } }
+    /// Live viewport debug view (wireframe, overdraw, lod, ...; "final" = off). Agents can change it too.
+    func setDebugView(_ view: String) {
+        call("viewport_debug_view", ["view": .string(view)])
+        stats.debugView = view
+    }
     @ObservationIgnored private var frameCount = 0
     @ObservationIgnored private var fpsWindowStart = Date()
     var selection: Set<UInt64> = [] {
@@ -259,8 +279,19 @@ final class EngineStore {
         guard elapsed >= 0.5, let raw = sky_frame_stats(handle) else { return }  // update UI twice a second
         defer { sky_string_free(raw) }
         let j = JSON.parse(String(cString: raw)) ?? .null
+        let profile = j["profile"]
         stats = FrameStats(cpuMs: j["cpuMs"].number ?? 0, draws: j["draws"].int ?? 0, entities: j["entities"].int ?? 0,
-                           renderer: j["renderer"].string ?? "", fps: Double(frameCount) / elapsed)
+                           renderer: j["renderer"].string ?? "", fps: Double(frameCount) / elapsed,
+                           gpuMs: j["gpuMs"].number ?? 0, profilerSupported: profile["supported"].bool ?? false,
+                           passes: profile["passes"].array.map {
+                               PassTiming(name: $0["pass"].string ?? "?", group: $0["group"].string ?? "",
+                                          ms: $0["avgMs"].number ?? 0, maxMs: $0["maxMs"].number ?? 0)
+                           },
+                           cpuScopes: profile["cpu"].array.map {
+                               PassTiming(name: $0["scope"].string ?? "?", group: "cpu", ms: $0["avgMs"].number ?? 0,
+                                          maxMs: $0["maxMs"].number ?? 0)
+                           },
+                           debugView: j["debugView"].string ?? "final")
         frameCount = 0
         fpsWindowStart = now
     }

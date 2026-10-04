@@ -6,6 +6,8 @@
 #include <memory>
 
 #include "skywalker/core/Log.h"
+#include "skywalker/core/Profiler.h"
+#include "skywalker/render/DebugViews.h"
 #include "skywalker/engine/Engine.h"
 
 using namespace sky;
@@ -225,11 +227,16 @@ char* sky_frame_stats(SkyEngine* h) {
     if (!e) return dup("{}");
     const auto& s = e->stats();
     RendererInfo ri = e->renderer().info();
+    Json profile = e->renderer().passProfile();  // [profiler] the editor's pass list
+    profile["cpu"] = prof::CpuProfiler::instance().toJson();
     return dup(Json::object({{"cpuMs", s.cpuMs},
                              {"draws", s.draws},
                              {"lights", s.lights},
                              {"entities", s.entities},
-                             {"renderer", ri.backend + " · " + ri.device}})
+                             {"renderer", ri.backend + " · " + ri.device},
+                             {"gpuMs", e->renderer().stats().get("gpuMs").asNumber(0.0)},
+                             {"debugView", debugViewName(e->viewportDebugView())},
+                             {"profile", profile}})
                    .dump());
 }
 
