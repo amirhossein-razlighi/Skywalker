@@ -443,3 +443,99 @@ TEST_CASE("hair & vfx: Metal smoke render (skipped without a GPU)") {
     for (const auto& em : stats.get("emitters").elements()) anyAlive = anyAlive || em.get("alive").asInt() > 0;
     CHECK(anyAlive);
 }
+
+TEST_CASE("hair: grooms stack on one mesh (scalp, beard, brows), each on its own entity") {
+    auto e = makeEngine();
+    call(*e, "entity_create", R"({"name":"Head","mesh":"sphere","position":[0,1.6,0],"scale":[0.18,0.22,0.2]})");
+    Json a = call(*e, "groom_create", R"({"entity":"Head","preset":"hair_short","overrides":{"strands":1500}})");
+    Json b = call(*e, "groom_create", R"({"entity":"Head","preset":"hair_wavy","overrides":{"strands":1200}})");
+    Json c = call(*e, "groom_create", R"({"entity":"Head","preset":"hair_wavy","overrides":{"strands":800}})");
+    Scene& s = e->scene();
+    const EntityId head = s.find("Head");
+    // The first groom is on the mesh entity, the next ones on children growing on the same mesh.
+    CHECK(a.get("entity").asInt() == static_cast<int64_t>(head));
+    const EntityId wavy = static_cast<EntityId>(b.get("entity").asInt());
+    const EntityId wavy2 = static_cast<EntityId>(c.get("entity").asInt());
+    CHECK(wavy != head);
+    CHECK(wavy2 != wavy);
+    REQUIRE(s.record(wavy));
+    REQUIRE(s.record(wavy2));
+    CHECK(s.record(wavy)->parent == head);
+    CHECK(s.record(wavy)->name == "Hair Wavy");
+    CHECK(s.record(wavy2)->name == "Hair Wavy 2");
+    CHECK(fx::groomMeshEntity(s, wavy) == head);
+    CHECK(b.get("strands").asInt() == 1200);
+    // All three render; groom_info on one groom entity reports that groom.
+    CaptureOptions o;
+    o.width = 64;
+    o.height = 36;
+    auto cap = e->capture(o);
+    REQUIRE(cap);
+    CHECK(cap->frame.grooms.size() == 3);
+    Json info = call(*e, "groom_info", R"({"entity":"Head"})");
+    CHECK(info.get("strands").asInt() == 1500);  // the head's own groom
+    Json second = call(*e, "groom_info", R"({"entity":"Hair Wavy 2"})");
+    CHECK(second.get("strands").asInt() == 800);
+    // replace swaps the head's own groom instead of adding one; a custom name names the new entity.
+    Json r = call(*e, "groom_create", R"({"entity":"Head","preset":"hair_curly","replace":true,"overrides":{"strands":900}})");
+    CHECK(r.get("entity").asInt() == static_cast<int64_t>(head));
+    CHECK(r.get("strands").asInt() == 900);
+    Json n = call(*e, "groom_create", R"({"entity":"Head","preset":"hair_short","name":"Stubble","overrides":{"strands":700}})");
+    REQUIRE(s.record(static_cast<EntityId>(n.get("entity").asInt())));
+    CHECK(s.record(static_cast<EntityId>(n.get("entity").asInt()))->name == "Stubble");
+    // A parent without a groom (a character root) lists every groom below it.
+    call(*e, "entity_create", R"({"name":"Rig"})");
+    REQUIRE(s.setParent(head, s.find("Rig")));
+    Json all = call(*e, "groom_info", R"({"entity":"Rig"})");
+    CHECK(all.get("grooms").size() == 4);
+}
+
+TEST_CASE("hair: density-preserving LOD shares one budget fairly between many grooms") {
+    auto groomAt = [](Vec3 p, uint32_t strands) {
+        auto d = std::make_shared<GroomData>();
+        d->children.resize(strands);
+        d->points = 10;
+        d->bounds = {{-0.12f, -0.12f, -0.12f}, {0.12f, 0.12f, 0.12f}};
+        GroomItem it;
+        it.data = d;
+        it.params.widthRoot = 0.07f;
+        it.params.length = 0.1f;
+        it.model = Mat4::translate(p);
+        return it;
+    };
+    fx::StrandLodView view;
+    view.pixelAt1m = 2.f * std::tan(radians(30.f) * 0.5f) / 720.f;  // 30 degrees, 720 p
+    // One head: everything up close, fewer (never below the floor) far away; stills draw all.
+    for (float dist : {0.5f, 2.5f, 10.f, 40.f}) {
+        std::vector<GroomItem> one{groomAt({0, 0, -dist}, 90000)};
+        const uint32_t n = fx::groomStrandBudget(one, view)[0];
+        CHECK(n >= fx::kMinStrandsPerGroom);
+        CHECK(n <= 90000u);
+        if (dist >= 10.f) CHECK(n < 30000u);
+    }
+    std::vector<GroomItem> nearHead{groomAt({0, 0, -0.5f}, 90000)}, farHead{groomAt({0, 0, -10.f}, 90000)};
+    CHECK(fx::groomStrandBudget(nearHead, view)[0] > fx::groomStrandBudget(farHead, view)[0]);
+    fx::StrandLodView still = view;
+    still.realtime = false;
+    CHECK(fx::groomStrandBudget(farHead, still)[0] == 90000u);
+    // A crowd of 40 heads between 0.6 and 20 m: within the shared budget, every groom keeps its
+    // floor, nearer heads get at least as many strands as farther ones.
+    std::vector<GroomItem> crowd;
+    for (int i = 0; i < 40; ++i) crowd.push_back(groomAt({0, 0, -(0.6f + 0.5f * static_cast<float>(i))}, 90000));
+    bool limited = false;
+    std::vector<uint32_t> n = fx::groomStrandBudget(crowd, view, &limited);
+    uint64_t sum = 0;
+    for (size_t i = 0; i < n.size(); ++i) {
+        sum += n[i];
+        CHECK(n[i] >= fx::kMinStrandsPerGroom);
+        if (i) CHECK(n[i] <= n[i - 1]);
+    }
+    CHECK(sum <= fx::kRealtimeStrandBudget + n.size());
+    // Stills: every strand up to the still budget (40 x 90k is over it: scaled, an equal share).
+    std::vector<uint32_t> st = fx::groomStrandBudget(crowd, still, &limited);
+    CHECK(limited);
+    uint64_t ssum = 0;
+    for (uint32_t x : st) ssum += x;
+    CHECK(ssum <= fx::kStillStrandBudget + st.size());
+    CHECK(st[0] == st[39]);
+}

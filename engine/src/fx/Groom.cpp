@@ -1329,7 +1329,7 @@ Json groomPreset(const std::string& name) {
             "maskDirection":[0,0.2,-1],"maskAngle":75,"maskSoftness":20,"melanin":0.72,"redness":0.2,"roughness":0.5,
             "stiffness":1,"rootStiffness":1,"follow":1,"simulate":false,"attach":"skinned","density":1.1})"},
         {"hair_scalp", R"({"strands":90000,"segments":12,"length":0.09,"lengthVariation":0.25,"widthRoot":0.07,"widthTip":0.03,
-            "direction":[0,-0.6,1],"directionBlend":0.85,"gravity":0.7,"clumps":900,"clumpStrength":0.4,"clumpShape":1.6,
+            "direction":[0,-1,-0.35],"directionBlend":0.85,"gravity":0.7,"clumps":900,"clumpStrength":0.4,"clumpShape":1.6,
             "wave":0.006,"waveFrequency":10,"frizz":0.0015,"frizzScale":40,"maskBone":"Head","maskSpace":"bounds",
             "maskCenter":[0,0.5,0.15],"maskRadius":[1.15,0.75,1.15],"maskDirection":[0,1,0.3],"maskAngle":100,"maskSoftness":14,
             "melanin":0.75,"redness":0.25,"roughness":0.32,"radialRoughness":0.7,"stiffness":0.55,"rootStiffness":0.95,"follow":0.6,
@@ -1355,6 +1355,60 @@ Json groomPreset(const std::string& name) {
 // ---------------------------------------------------------------------------------------
 // Scene helpers and the groom cache
 // ---------------------------------------------------------------------------------------
+
+std::vector<uint32_t> groomStrandBudget(const std::vector<GroomItem>& grooms, const StrandLodView& view, bool* limited) {
+    auto modelScale = [](const Mat4& m) {
+        return (length(m.transformDir({1, 0, 0})) + length(m.transformDir({0, 1, 0})) + length(m.transformDir({0, 0, 1}))) / 3.f;
+    };
+    std::vector<uint32_t> drawn(grooms.size(), 0);
+    double total = 0;
+    for (size_t i = 0; i < grooms.size(); ++i) {
+        const GroomItem& item = grooms[i];
+        if (!item.data) continue;
+        const GroomData& d = *item.data;
+        const uint32_t N = static_cast<uint32_t>(d.strandCount());
+        const Groom& p = item.params;
+        const float scale = modelScale(item.model);
+        Vec3 center = item.model.transformPoint(d.bounds.center());
+        float radius = length(d.bounds.extents()) * scale + p.length * 0.25f * scale + 0.02f;
+        if (item.skinned && item.rootBounds.max.x >= item.rootBounds.min.x) {
+            center = item.rootBounds.center();
+            radius = length(item.rootBounds.extents());
+        }
+        const float px = view.orthographic ? view.pixelAt1m : view.pixelAt1m * std::max(distance(view.eye, center), 0.01f);
+        const float screenPx = 2.f * radius / std::max(px, 1e-9f);
+        float fraction = 1.f;
+        if (view.realtime && N > 20000) {
+            // Thin strands far away merge into the coverage of fewer, wider ones, and the count follows
+            // the groom's size on screen (geometry is the cost on tile-based GPUs).
+            const float ratio = p.widthRoot * 0.001f * scale / std::max(px, 1e-9f);
+            fraction = std::clamp(12.f * ratio * p.lodBias, 0.3f, 1.f);
+            const float want = std::clamp(screenPx * 36.f * p.lodBias, static_cast<float>(kMinStrandsPerGroom), static_cast<float>(N));
+            fraction = std::min(fraction, want / static_cast<float>(N));
+        }
+        drawn[i] = std::max<uint32_t>(1, static_cast<uint32_t>(static_cast<float>(N) * fraction));
+        total += drawn[i];
+    }
+    // One budget for every groom in view (a herd, a crowd): each keeps a floor and the rest is shared
+    // in proportion to what each asked for (its size on screen).
+    const double budget = view.realtime ? kRealtimeStrandBudget : kStillStrandBudget;
+    if (limited) *limited = false;
+    if (total > budget) {
+        double floors = 0, above = 0;
+        for (uint32_t n : drawn) {
+            const uint32_t f = std::min<uint32_t>(n, kMinStrandsPerGroom);
+            floors += f;
+            above += n - f;
+        }
+        const double k = above > 0 ? std::clamp((budget - floors) / above, 0.0, 1.0) : 0.0;
+        for (auto& n : drawn) {
+            const uint32_t f = std::min<uint32_t>(n, kMinStrandsPerGroom);
+            n = f + static_cast<uint32_t>(static_cast<double>(n - f) * k);
+        }
+        if (limited) *limited = true;
+    }
+    return drawn;
+}
 
 EntityId groomMeshEntity(const Scene& scene, EntityId e) {
     const Groom* g = scene.get<Groom>(e);

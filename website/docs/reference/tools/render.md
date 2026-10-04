@@ -412,13 +412,15 @@ Emit particles from an emitter right now (explosions, muzzle flashes, impacts). 
 
 **Create hair or fur** <span class="sky-badge sky-badge--mut" title="Changes the project; undoable and attributed">mutating</span>
 
-Grow strand hair or fur on an entity's mesh (a head, a bust, an animal body) from a preset, ready to tweak. Presets: hair_straight, hair_wavy, hair_curly, hair_ponytail, hair_short (heads: they grow on the upper back of the mesh; set maskDirection/maskAngle or a vertex-color mask for your model), fur_short, fur_long (cover the whole mesh); for rigged characters: hair_scalp (dense scalp hair on the Head bone's vertices), beard, eyebrows (regions in the head's bounds, mirrored brows), fur_dense (a creature's coat). On a rigged mesh the roots ride the animated skin (attach auto: rooted on triangles, follow, maxSpeed, capsules fitted to the skeleton as colliders); maskBone / maskCenter / maskRadius / maskSpace limit growth to a region. `overrides` patches groom fields, e.g. {"melanin": 0.2, "length": 0.5, "strands": 100000}. Color is physically based: melanin 0 white .. 0.3 blond .. 0.8 brown .. 1 black, redness for auburn/ginger, dye for unnatural tints. Hair is simulated (gravity, wind, collisions with the mesh) and rendered as real strands with Marschner shading and self-shadowing. Example: {"entity": "Head", "preset": "hair_wavy", "overrides": {"melanin": 0.25}}.
+Grow strand hair or fur on an entity's mesh (a head, a bust, an animal body) from a preset, ready to tweak. Presets: hair_straight, hair_wavy, hair_curly, hair_ponytail, hair_short (heads: they grow on the upper back of the mesh; set maskDirection/maskAngle or a vertex-color mask for your model), fur_short, fur_long (cover the whole mesh); for rigged characters: hair_scalp (dense scalp hair on the Head bone's vertices), beard, eyebrows (regions in the head's bounds, mirrored brows), fur_dense (a creature's coat). On a rigged mesh the roots ride the animated skin (attach auto: rooted on triangles, follow, maxSpeed, capsules fitted to the skeleton as colliders); maskBone / maskCenter / maskRadius / maskSpace limit growth to a region. `overrides` patches groom fields, e.g. {"melanin": 0.2, "length": 0.5, "strands": 100000}. Color is physically based: melanin 0 white .. 0.3 blond .. 0.8 brown .. 1 black, redness for auburn/ginger, dye for unnatural tints. Hair is simulated (gravity, wind, collisions with the mesh) and rendered as real strands with Marschner shading and self-shadowing. Example: {"entity": "Head", "preset": "hair_wavy", "overrides": {"melanin": 0.25}}. Grooms stack: the first groom goes on the mesh entity itself, every further one (a beard and eyebrows on a scalp) on a new child entity named after the preset (or `name`) that grows on the same mesh and skin; `replace: true` replaces the existing groom instead. On a character root without a mesh, hair grows on its largest skinned part (the body). The result's `entity` is the groom's entity (edit it with groom_update, remove it with entity_delete). Example: {"entity": "Hero", "preset": "beard", "overrides": {"melanin": 0.6}}.
 
 | Argument | Type | Required | Description | Values |
 |---|---|---|---|---|
-| `entity` | integer \| string | yes | Entity with the mesh to grow on (gets the groom component) |  |
+| `entity` | integer \| string | yes | Entity with the mesh to grow on, or a character root (its body mesh) |  |
 | `preset` | string |  | Starting style | `hair_straight` `hair_wavy` `hair_curly` `hair_ponytail` `hair_short` `fur_short` `fur_long` `beard` `eyebrows` `hair_scalp` `fur_dense` |
 | `overrides` | object |  | Groom fields to change |  |
+| `name` | string |  | Name of the groom's own entity when it is added beside other grooms (default: the preset, e.g. "Beard") |  |
+| `replace` | boolean |  | Replace the groom already on `entity` instead of adding another one |  |
 
 === "Tool call"
 
@@ -501,7 +503,7 @@ Change a groom's fields (or switch to another preset and then apply `fields`). G
 
 **Hair or fur info** <span class="sky-badge sky-badge--ro" title="Never changes the scene">read-only</span>
 
-Strand, guide and point counts, memory (CPU and GPU), generation time and the measured GPU cost (simulation and drawing) of a groom, or of every groom in the scene when `entity` is omitted. Use it to budget hair (e.g. keep a hero head under ~2 ms at 1080p).
+Strand, guide and point counts, memory (CPU and GPU), generation time and the measured GPU cost (simulation and drawing) of a groom, or of every groom in the scene when `entity` is omitted. Use it to budget hair (e.g. keep a hero head under ~2 ms at 1080p). On a character (or a mesh with several grooms) it lists every groom growing on it (`grooms`).
 
 | Argument | Type | Required | Description | Values |
 |---|---|---|---|---|
@@ -510,13 +512,13 @@ Strand, guide and point counts, memory (CPU and GPU), generation time and the me
 === "Tool call"
 
     ```tool
-    groom_info {"entity": "Hero Body"}
+    groom_info {"entity": "Hero"}
     ```
 
 === "CLI"
 
     ```bash
-    skywalker call groom_info '{"entity": "Hero Body"}' --project my_game
+    skywalker call groom_info '{"entity": "Hero"}' --project my_game
     ```
 
 === "MCP request"
@@ -529,7 +531,7 @@ Strand, guide and point counts, memory (CPU and GPU), generation time and the me
       "params": {
         "name": "groom_info",
         "arguments": {
-          "entity": "Hero Body"
+          "entity": "Hero"
         }
       }
     }

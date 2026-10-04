@@ -129,16 +129,33 @@ through them.
 | `lodBias` | Real time: more (> 1) or fewer (< 1) strands at a distance |
 
 Presets for rigged characters: `hair_scalp` (dense scalp hair on the Head bone), `beard`,
-`eyebrows` (regions in the head's bounds), `fur_dense` (a creature's coat). Real-time strand
-counts share one budget (600k strands drawn per frame across all grooms; far grooms thin out
-first, per `lodBias`); stills draw every strand.
+`eyebrows` (regions in the head's bounds), `fur_dense` (a creature's coat).
+
+**Grooms stack.** A character usually wears several: scalp hair, a beard, brows. Each groom lives
+on its own entity: the first `groom_create` on a mesh puts it on that mesh entity, every further
+one creates a child named after the preset ("Beard", "Eyebrows"; or `name`) that grows on the
+same mesh and follows the same skin. On a character root without a mesh the grooms grow on its
+largest skinned part (the body). The result's `entity` is the groom's entity: change it with
+`groom_update`, hide it with `entity_update {groom: {visible: false}}`, remove it with
+`entity_delete`; `replace: true` swaps the mesh entity's own groom instead of adding one.
+`groom_info` on the character (or any entity without a groom of its own) lists every groom on
+it; `character_inspect` lists them under `grooms`.
 
 ```jsonc
-groom_create {"entity": "Hero Body", "preset": "hair_scalp", "overrides": {"melanin": 0.85, "length": 0.12}}
-groom_create {"entity": "Hero Body", "preset": "beard", "overrides": {"melanin": 0.8}}
-groom_create {"entity": "Hero Body", "preset": "eyebrows"}
-groom_info   {"entity": "Hero Body"}   // attach: {mode: skinned, boundRoots, bindErrorM, maskBone}
+groom_create {"entity": "Hero", "preset": "hair_scalp", "overrides": {"melanin": 0.85, "length": 0.12}}  // -> "Hair Scalp"
+groom_create {"entity": "Hero", "preset": "beard", "overrides": {"melanin": 0.8}}                        // -> "Beard"
+groom_create {"entity": "Hero", "preset": "eyebrows"}                                                    // -> "Eyebrows"
+groom_info   {"entity": "Hero"}   // grooms: [{name, strands, attach: {mode: skinned, boundRoots, maskBone}, gpu}]
 ```
+
+**Level of detail keeps the density.** In real time the strand count of each groom follows its
+size on screen (`lodBias` scales it), and all grooms in view share one budget of 600k drawn
+strands: every groom keeps a floor of 1500 and the rest is shared in proportion to screen size,
+so a crowd of twenty heads costs a bounded amount and the nearest keep their detail. The strands
+the LOD drops hand their area to the ones drawn (wider strands, or more coverage below a pixel),
+so short hair still reads as a solid volume at 10 m with a few thousand strands. Stills and
+movie frames draw every strand (up to 3M over all grooms). `perf_stats {characters: true}` and
+`groom_info` report `drawn` and `strands` per groom.
 
 Fur on a beast: `fur_dense` on the body mesh (`strands` 200k–400k, `length` 0.03–0.06, `width`
 0.08–0.12 mm), a second groom for the mane (`maskBone` the neck, longer, less `follow`) and the
@@ -203,7 +220,7 @@ grooms hidden).
 
 **Hair and beard on a running character**
 
-1. `groom_create` with `hair_scalp`, `beard`, `eyebrows` on the body mesh.
+1. `groom_create` with `hair_scalp`, `beard`, `eyebrows` on the character (three groom entities).
 2. `viewport_capture {"debug_view": "groom_roots"}` while running: every root green and on the
    skin; `groom_info` → `attach.boundRoots`.
 3. `perf_stats {"frames": 30, "characters": true}` → keep `groomSimGpuMs` + `groomRenderGpuMs`

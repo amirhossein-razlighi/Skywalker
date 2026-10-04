@@ -519,16 +519,33 @@ static float3 hairShade(constant HairParams& H, constant FrameUniforms& f, const
     return color;
 }
 
+// pcg3d: independent white noise per (pixel, strand, frame / sub-sample).
+static uint3 hairPcg3(uint3 v) {
+    v = v * 1664525u + 1013904223u;
+    v.x += v.y * v.z;
+    v.y += v.z * v.x;
+    v.z += v.x * v.y;
+    v ^= v >> 16u;
+    v.x += v.y * v.z;
+    v.y += v.z * v.x;
+    v.z += v.x * v.y;
+    return v;
+}
+
 // Stochastic transparency: turns fractional coverage into an MSAA sample mask that changes
-// every frame (TAA) and every sub-sample (stills), so thin strands resolve smoothly.
+// every frame (TAA) and every sub-sample (stills), so thin strands resolve smoothly. The noise is
+// independent per strand, pixel and sub-sample: a screen-space dither pattern shared by all strands
+// would pick the same samples for overlapping strands (their coverage would not add up) and leave a
+// fixed pattern through the accumulation (hair reading as a see-through net at a distance).
 static uint hairSampleMask(float coverage, float2 pixel, float strandRand, float frame) {
     float c = saturate(coverage);
     if (c >= 0.999) return 0xFu;
-    float noise = fract(interleavedGradientNoise(pixel + float2(frame * 5.588238, frame * 3.1)) + strandRand * 0.618);
+    uint3 h = hairPcg3(uint3(uint2(max(pixel, 0.0)), uint(strandRand * 16777215.0) ^ (uint(frame) * 0x9E3779B9u)));
+    float noise = float(h.x >> 8) * (1.0 / 16777216.0);
     uint n = uint(floor(c * 4.0 + noise));
     if (n == 0) return 0u;
     uint bits = (1u << n) - 1u;
-    uint rot = uint(fract(noise * 7.31 + strandRand * 3.7) * 4.0) & 3u;
+    uint rot = h.y >> 30;
     return ((bits << rot) | (bits >> (4u - rot))) & 0xFu;
 }
 
@@ -572,8 +589,12 @@ static float3 hairExpand(constant HairParams& H, device const float4* pos, devic
     float widthMul = floor(p4.w) * (1.0 / 256.0);
     float wPhys = mix(H.width.x, H.width.y, t) * widthMul * H.dims.w;
     float pix = ortho ? pixelAt1m : pixelAt1m * max(dot(p - eye, fwd), 1e-3);
-    float wDraw = max(wPhys, pix * 0.9);
-    coverage = wPhys / wDraw * H.width.z * H.width.w * (1.0 - smoothstep(0.9, 1.0, t) * 0.5);
+    // Density-preserving LOD: the strands the level of detail dropped (width.w = all / drawn) hand
+    // their area to the drawn ones, which widen (beyond a pixel) or gain coverage (below one), so
+    // the hair keeps its coverage and silhouette at any strand count.
+    float wEff = wPhys * max(H.width.w, 1.0);
+    float wDraw = max(wEff, pix * 0.9);
+    coverage = wEff / wDraw * H.width.z * (1.0 - smoothstep(0.9, 1.0, t) * 0.5);
     tangent = T;
     rand = fract(p4.w) / 0.999;
     return p + B * side * wDraw * 0.5;

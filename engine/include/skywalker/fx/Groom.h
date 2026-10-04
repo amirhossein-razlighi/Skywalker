@@ -131,6 +131,24 @@ private:
     double lastGenerateMs_ = 0;
 };
 
+/// Level of detail for strand hair (renderer independent; the Metal backend uses it every frame).
+/// Real time: each groom draws a count that follows its size on screen, within one budget shared by
+/// every groom in view (a floor each, the rest in proportion to what each asked for). Stills and
+/// movie frames draw every strand up to a much larger budget. The renderer widens the drawn strands
+/// by all / drawn (or raises their coverage below a pixel), so the hair keeps its density.
+constexpr uint32_t kRealtimeStrandBudget = 600000;  // strands drawn per real-time frame over all grooms
+constexpr uint32_t kStillStrandBudget = 3000000;    // stills and movie frames
+constexpr uint32_t kMinStrandsPerGroom = 1500;      // real time: no groom drops below this (or all it has)
+struct StrandLodView {
+    Vec3 eye{0, 0, 0};
+    float pixelAt1m = 0.001f;  // world size of a pixel 1 m away (perspective) or at any depth (ortho)
+    bool orthographic = false;
+    bool realtime = true;      // false: a still or a movie frame
+};
+/// Strands to draw for each groom (same order as `grooms`); `limited` reports whether the shared
+/// budget scaled the counts down.
+std::vector<uint32_t> groomStrandBudget(const std::vector<GroomItem>& grooms, const StrandLodView& view, bool* limited = nullptr);
+
 /// Entity whose mesh a groom grows on (the groom's `target`, else the entity itself).
 EntityId groomMeshEntity(const Scene& scene, EntityId e);
 /// World-space colliders from entity links (spheres from sphere meshes, planes from plane/quad meshes, capsules

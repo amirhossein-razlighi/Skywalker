@@ -96,8 +96,9 @@ groomed shape (it still follows the entity's transform).
 
 - **Strands**: every strand is an instanced triangle strip expanded to a camera-facing ribbon.
   Strands thinner than a pixel are drawn ~1 px wide with proportionally lower coverage; the
-  coverage becomes a stochastic MSAA sample mask that changes every frame and sub-sample, so
-  thin hair resolves smoothly under TAA and in accumulated stills (no sorting needed).
+  coverage becomes a stochastic MSAA sample mask drawn from noise that is independent per strand,
+  pixel and sub-sample (overlapping strands add up, no fixed dither pattern), so thin hair
+  resolves into a solid volume under TAA and in accumulated stills (no sorting needed).
 - **Marschner BSDF** (Karis 2016 real-time fit): R (white primary highlight, shifted by
   `cuticleTilt`), TT (light through the strand: backlit glow) and TRT (colored secondary
   highlight) lobes with longitudinal Gaussians (`roughness`) and azimuthal terms
@@ -108,7 +109,8 @@ groomed shape (it still follows the entity's transform).
   absorption, so dyed hair keeps a white highlight. Melanin guide: 0.1 platinum, 0.2 blond,
   0.35 dark blond, 0.5 light brown, 0.7 brown, 0.85 dark brown, 0.95+ black.
 - **Self-shadowing**: a deep opacity map per groom from the sun (front hair depth + 4
-  cumulative density layers, 512²), plus the depth of the opaque meshes around the groom (the
+  cumulative density layers, 512² for stills, sized to the groom on screen in real time, skipped
+  below 40 px), plus the depth of the opaque meshes around the groom (the
   head shadows the hair). Light through light hair is tinted (dual-scattering approximation).
   External occluders come from the regular cascades, looked up at the groom's sun-facing
   surface so hair is not shadowed twice.

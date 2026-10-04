@@ -204,7 +204,6 @@ private:
     std::vector<EntityId> order_;
     bool budgetLimited_ = false;  // the shared real-time strand budget scaled grooms down this frame
     static constexpr NSUInteger kDomSize = 512;
-    static constexpr uint32_t kRealtimeStrandBudget = 600000;  // strands drawn per frame over all grooms (real time)
 };
 
 }  // namespace sky
