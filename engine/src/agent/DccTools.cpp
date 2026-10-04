@@ -464,18 +464,20 @@ std::shared_ptr<dcc::Manager> addDccTools(Engine& engine, ToolRegistry& reg, std
                    {"script"}),
             true, false,
             [&engine, mgr](const Json& a, ToolContext& ctx) -> ToolResult {
-                std::string appName = a.get("app").asString();
-                auto app = mgr->pick(appName, "script");
-                if (!app) return ToolResult::error(app.error());
+                // Arguments first, then the application: argument mistakes are reported even on
+                // machines without the DCC app installed.
                 if (a.get("script").asString().size() > (size_t{256} << 10)) {
                     return ToolResult::error(Error::make("invalid_arguments", "script is larger than 256 KB",
                                                          "put helpers in files under the project and import them"));
                 }
-                auto st = std::make_shared<RunState>();
-                st->app = *app;
                 std::string name = sanitize(a.get("name").asString("script"), "script");
                 auto out = inProject(engine, a.get("out_dir").asString("dcc/" + name), "out_dir");
                 if (!out) return ToolResult::error(out.error());
+                std::string appName = a.get("app").asString();
+                auto app = mgr->pick(appName, "script");
+                if (!app) return ToolResult::error(app.error());
+                auto st = std::make_shared<RunState>();
+                st->app = *app;
                 st->spec.label = "run_script";
                 st->spec.task = "script";
                 st->spec.script = a.get("script").asString();

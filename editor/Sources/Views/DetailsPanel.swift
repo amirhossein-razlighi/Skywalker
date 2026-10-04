@@ -172,10 +172,18 @@ struct EntityDetails: View {
         .overlay(alignment: .bottom) { Rectangle().fill(Theme.border).frame(height: 1) }
     }
 
+    private var missingComponents: [String] { Self.addable.filter { doc["components"][$0].isNull } }
+
+    /// `entity_update` arguments that add `component` with its defaults.
+    private static func addPatch(_ component: String) -> JSON {
+        let defaults: JSON = [:]
+        return ["components": JSON.object([(component, defaults)])]
+    }
+
     private func addComponent(id: UInt64) -> some View {
         Menu {
-            ForEach(Self.addable.filter { doc["components"][$0].isNull }, id: \.self) { comp in
-                Button { update(id, ["components": .object([(comp, [:])])]) } label: { Label(title(comp), systemImage: icon(comp)) }
+            ForEach(missingComponents, id: \.self) { comp in
+                Button { update(id, Self.addPatch(comp)) } label: { Label(title(comp), systemImage: icon(comp)) }
             }
         } label: {
             Label("Add Component", systemImage: "plus").font(Theme.label)

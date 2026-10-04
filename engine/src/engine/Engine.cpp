@@ -9,8 +9,11 @@
 #include <fcntl.h>
 #include <sys/file.h>
 #include <unistd.h>
+#if defined(__APPLE__)
 #include <dispatch/dispatch.h>
+#endif
 #include <mutex>
+#include <thread>
 #include <fstream>
 #include <set>
 #include <sstream>
@@ -490,9 +493,7 @@ void Engine::requestMeshAsync(const std::string& key) {
         std::string key, path;
         mesh::LoadOptions lo;
     };
-    auto* job = new Job{meshStream_, key, resolvePath(file), lo};
-    dispatch_async_f(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), job, [](void* ctx) {
-        std::unique_ptr<Job> j(static_cast<Job*>(ctx));
+    auto run = [](std::unique_ptr<Job> j) {
         MeshStream::Done d{j->key, nullptr, {}};
         auto data = mesh::loadMeshFile(j->path, j->lo);
         if (data) {
@@ -503,7 +504,20 @@ void Engine::requestMeshAsync(const std::string& key) {
         }
         std::lock_guard lock(j->stream->mutex);
         j->stream->done.push_back(std::move(d));
+    };
+    auto job = std::make_unique<Job>(Job{meshStream_, key, resolvePath(file), lo});
+#if defined(__APPLE__)
+    struct Ctx {
+        std::unique_ptr<Job> job;
+        decltype(run) fn;
+    };
+    dispatch_async_f(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), new Ctx{std::move(job), run}, [](void* p) {
+        std::unique_ptr<Ctx> c(static_cast<Ctx*>(p));
+        c->fn(std::move(c->job));
     });
+#else
+    std::thread([run, j = std::move(job)]() mutable { run(std::move(j)); }).detach();
+#endif
 }
 
 void Engine::drainStreamedMeshes() {
