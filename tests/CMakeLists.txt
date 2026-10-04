@@ -59,6 +59,7 @@ set(SKY_TEST_SOURCES
     test_website.cpp
     test_custom_tools.cpp
     test_audit.cpp
+    test_wander_debugger.cpp
 )
 
 add_executable(skywalker_tests ${SKY_TEST_SOURCES})
