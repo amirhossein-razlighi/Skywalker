@@ -6,36 +6,36 @@
 
 <div class="sky-grid" markdown>
 
-<a class="sky-card" href="#tidebreak_isle"><img src="../assets/examples/tidebreak_isle.webp" alt="Tidebreak Isle" loading="lazy"><div class="sky-card__body"><p class="sky-card__title">Tidebreak Isle</p><p class="sky-card__meta">Open-world Island Adventure</p><p class="sky-card__text">The storm left you one ship, one map and a cove nobody charts. Make landfall before dark.</p><div class="sky-tags"><span class="sky-tag">Eroded terrain</span><span class="sky-tag">FFT surf</span><span class="sky-tag">Sequences</span><span class="sky-tag">Terrain</span><span class="sky-tag">Foliage</span><span class="sky-tag">FFT water</span></div></div></a>
-<a class="sky-card" href="#neon_requiem"><img src="../assets/examples/neon_requiem.webp" alt="Neon Requiem" loading="lazy"><div class="sky-card__body"><p class="sky-card__title">Neon Requiem</p><p class="sky-card__meta">Open-world Neo-noir RPG</p><p class="sky-card__text">Halcyon Avenue never sleeps. It just stops remembering.</p><div class="sky-tags"><span class="sky-tag">Clustered lights</span><span class="sky-tag">Rain and puddles</span><span class="sky-tag">Skinned characters</span><span class="sky-tag">FFT water</span><span class="sky-tag">Fluid fire and smoke</span><span class="sky-tag">Particles</span></div></div></a>
-<a class="sky-card" href="#ashen_peaks"><img src="../assets/examples/ashen_peaks.webp" alt="Ashen Peaks" loading="lazy"><div class="sky-card__body"><p class="sky-card__title">Ashen Peaks</p><p class="sky-card__meta">Mythic Action-Adventure</p><p class="sky-card__text">Nine hundred steps to the Kindled Crane. The lanterns have not gone out in a thousand years.</p><div class="sky-tags"><span class="sky-tag">Eroded terrain</span><span class="sky-tag">Impostor forests</span><span class="sky-tag">Light shafts</span><span class="sky-tag">Terrain</span><span class="sky-tag">Foliage</span><span class="sky-tag">FFT water</span></div></div></a>
-<a class="sky-card" href="#berrybrook"><img src="../assets/examples/berrybrook.webp" alt="Berrybrook" loading="lazy"><div class="sky-card__body"><p class="sky-card__title">Berrybrook</p><p class="sky-card__meta">Cozy Farming Life Sim</p><p class="sky-card__text">Grandma's berry farm is yours now. Plant a row, mind the hens, and sell the sweetest strawberries on the hill.</p><div class="sky-tags"><span class="sky-tag">Farming gameplay</span><span class="sky-tag">UI hotbar</span><span class="sky-tag">Tilt-shift lens</span><span class="sky-tag">Terrain</span><span class="sky-tag">Foliage</span><span class="sky-tag">FFT water</span></div></div></a>
-<a class="sky-card" href="#meridian_accord"><img src="../assets/examples/meridian_accord.webp" alt="Meridian Accord" loading="lazy"><div class="sky-card__body"><p class="sky-card__title">Meridian Accord</p><p class="sky-card__meta">Grand Strategy · Map Wargame</p><p class="sky-card__text">Ten nations, one inland sea, and an accord that will not survive the spring of '37.</p><div class="sky-tags"><span class="sky-tag">Map overlay</span><span class="sky-tag">Clouds below the camera</span><span class="sky-tag">UI</span><span class="sky-tag">Terrain</span><span class="sky-tag">Foliage</span><span class="sky-tag">FFT water</span></div></div></a>
-<a class="sky-card" href="#gloamwater"><img src="../assets/examples/gloamwater.webp" alt="Gloamwater" loading="lazy"><div class="sky-card__body"><p class="sky-card__title">Gloamwater</p><p class="sky-card__meta">Metroidvania · 2D Action-Adventure</p><p class="sky-card__text">Carry the last lantern down into a drowned kingdom where the light went to sleep.</p><div class="sky-tags"><span class="sky-tag">Painted parallax</span><span class="sky-tag">2D camera</span><span class="sky-tag">Particles</span><span class="sky-tag">Sprites</span><span class="sky-tag">Tilemaps</span><span class="sky-tag">2D lights</span></div></div></a>
-<a class="sky-card" href="#chancellors_desk"><img src="../assets/examples/chancellors_desk.webp" alt="The Chancellor's Desk" loading="lazy"><div class="sky-card__body"><p class="sky-card__title">The Chancellor's Desk</p><p class="sky-card__meta">Narrative Political Drama</p><p class="sky-card__text">One desk. One rainy night. The republic is three weeks old and the pen is in your hand.</p><div class="sky-tags"><span class="sky-tag">Document UI</span><span class="sky-tag">Branching dialogue</span><span class="sky-tag">Particles</span><span class="sky-tag">UI</span><span class="sky-tag">Dialogue</span><span class="sky-tag">Sequences</span></div></div></a>
+<a class="sky-card" href="#tidebreak_isle"><img src="../assets/images/shots/tidebreak_isle/brig.webp" alt="Tidebreak Isle" loading="lazy"><div class="sky-card__body"><p class="sky-card__title">Tidebreak Isle</p><p class="sky-card__meta">Open-world Island Adventure</p><p class="sky-card__text">The storm left you one ship, one map and a cove nobody charts. Make landfall before dark.</p><div class="sky-tags"><span class="sky-tag">Eroded terrain</span><span class="sky-tag">FFT surf</span><span class="sky-tag">Sequences</span><span class="sky-tag">Terrain</span><span class="sky-tag">Foliage</span><span class="sky-tag">FFT water</span></div></div></a>
+<a class="sky-card" href="#neon_requiem"><img src="../assets/images/shots/neon_requiem/avenue_dolly.webp" alt="Neon Requiem" loading="lazy"><div class="sky-card__body"><p class="sky-card__title">Neon Requiem</p><p class="sky-card__meta">Open-world Neo-noir RPG</p><p class="sky-card__text">Halcyon Avenue never sleeps. It just stops remembering.</p><div class="sky-tags"><span class="sky-tag">Clustered lights</span><span class="sky-tag">Rain and puddles</span><span class="sky-tag">Skinned characters</span><span class="sky-tag">FFT water</span><span class="sky-tag">Fluid fire and smoke</span><span class="sky-tag">Particles</span></div></div></a>
+<a class="sky-card" href="#ashen_peaks"><img src="../assets/images/shots/ashen_peaks/crane_gate.webp" alt="Ashen Peaks" loading="lazy"><div class="sky-card__body"><p class="sky-card__title">Ashen Peaks</p><p class="sky-card__meta">Mythic Action-Adventure</p><p class="sky-card__text">Nine hundred steps to the Kindled Crane. The lanterns have not gone out in a thousand years.</p><div class="sky-tags"><span class="sky-tag">Eroded terrain</span><span class="sky-tag">Impostor forests</span><span class="sky-tag">Light shafts</span><span class="sky-tag">Terrain</span><span class="sky-tag">Foliage</span><span class="sky-tag">FFT water</span></div></div></a>
+<a class="sky-card" href="#berrybrook"><img src="../assets/images/shots/berrybrook/berry_rows.webp" alt="Berrybrook" loading="lazy"><div class="sky-card__body"><p class="sky-card__title">Berrybrook</p><p class="sky-card__meta">Cozy Farming Life Sim</p><p class="sky-card__text">Grandma's berry farm is yours now. Plant a row, mind the hens, and sell the sweetest strawberries on the hill.</p><div class="sky-tags"><span class="sky-tag">Farming gameplay</span><span class="sky-tag">UI hotbar</span><span class="sky-tag">Tilt-shift lens</span><span class="sky-tag">Terrain</span><span class="sky-tag">Foliage</span><span class="sky-tag">FFT water</span></div></div></a>
+<a class="sky-card" href="#meridian_accord"><img src="../assets/images/shots/meridian_accord/front_line.webp" alt="Meridian Accord" loading="lazy"><div class="sky-card__body"><p class="sky-card__title">Meridian Accord</p><p class="sky-card__meta">Grand Strategy · Map Wargame</p><p class="sky-card__text">Ten nations, one inland sea, and an accord that will not survive the spring of '37.</p><div class="sky-tags"><span class="sky-tag">Map overlay</span><span class="sky-tag">Clouds below the camera</span><span class="sky-tag">UI</span><span class="sky-tag">Terrain</span><span class="sky-tag">Foliage</span><span class="sky-tag">FFT water</span></div></div></a>
+<a class="sky-card" href="#gloamwater"><img src="../assets/images/shots/gloamwater/grove.webp" alt="Gloamwater" loading="lazy"><div class="sky-card__body"><p class="sky-card__title">Gloamwater</p><p class="sky-card__meta">Metroidvania · 2D Action-Adventure</p><p class="sky-card__text">Carry the last lantern down into a drowned kingdom where the light went to sleep.</p><div class="sky-tags"><span class="sky-tag">Painted parallax</span><span class="sky-tag">2D camera</span><span class="sky-tag">Particles</span><span class="sky-tag">Sprites</span><span class="sky-tag">Tilemaps</span><span class="sky-tag">2D lights</span></div></div></a>
+<a class="sky-card" href="#chancellors_desk"><img src="../assets/images/shots/chancellors_desk/the_decree.webp" alt="The Chancellor's Desk" loading="lazy"><div class="sky-card__body"><p class="sky-card__title">The Chancellor's Desk</p><p class="sky-card__meta">Narrative Political Drama</p><p class="sky-card__text">One desk. One rainy night. The republic is three weeks old and the pen is in your hand.</p><div class="sky-tags"><span class="sky-tag">Document UI</span><span class="sky-tag">Branching dialogue</span><span class="sky-tag">Particles</span><span class="sky-tag">UI</span><span class="sky-tag">Dialogue</span><span class="sky-tag">Sequences</span></div></div></a>
 <a class="sky-card" href="#smugglers_cove"><div class="sky-placeholder"><strong>Render on first build</strong>This project downloads its CC0 assets on first build</div><div class="sky-card__body"><p class="sky-card__title">Smuggler's Cove</p><p class="sky-card__meta">Pirate Adventure</p><p class="sky-card__text">The galleon is in. The tide won't wait. Neither will the Navy.</p><div class="sky-tags"><span class="sky-tag">Photoscanned assets</span><span class="sky-tag">FFT ocean</span><span class="sky-tag">Volumetric fire</span><span class="sky-tag">FFT water</span><span class="sky-tag">Fluid fire and smoke</span><span class="sky-tag">Particles</span></div></div></a>
 <a class="sky-card" href="#hidden_alley"><div class="sky-placeholder"><strong>Render on first build</strong>This project downloads its CC0 assets on first build</div><div class="sky-card__body"><p class="sky-card__title">Hidden Alley</p><p class="sky-card__meta">Neo-noir Stealth</p><p class="sky-card__text">Somebody left the lights on. Somebody always does.</p><div class="sky-tags"><span class="sky-tag">Photoscanned assets</span><span class="sky-tag">Puddles</span><span class="sky-tag">FFT water</span><span class="sky-tag">Fluid fire and smoke</span><span class="sky-tag">Particles</span><span class="sky-tag">Wander</span></div></div></a>
 <a class="sky-card" href="#namaqua_canyon"><div class="sky-placeholder"><strong>Render on first build</strong>This project downloads its CC0 assets on first build</div><div class="sky-card__body"><p class="sky-card__title">Namaqua Canyon</p><p class="sky-card__meta">Open-world Survival</p><p class="sky-card__text">Water's low, the jeep's covered, and the sun is going down fast.</p><div class="sky-tags"><span class="sky-tag">Photoscanned assets</span><span class="sky-tag">Volumetric fire</span><span class="sky-tag">Fluid fire and smoke</span><span class="sky-tag">Particles</span><span class="sky-tag">Wander</span><span class="sky-tag">HDRI sky</span></div></div></a>
-<a class="sky-card" href="#abyss"><img src="../assets/examples/abyss.webp" alt="Abyss" loading="lazy"><div class="sky-card__body"><p class="sky-card__title">Abyss</p><p class="sky-card__meta">Underwater Horror</p><p class="sky-card__text">Three hundred meters down, something else has a light.</p><div class="sky-tags"><span class="sky-tag">Wander</span></div></div></a>
-<a class="sky-card" href="#cyber_alley"><img src="../assets/examples/cyber_alley.webp" alt="Cyber Alley" loading="lazy"><div class="sky-card__body"><p class="sky-card__title">Cyber Alley</p><p class="sky-card__meta">Neo-Noir Adventure</p><p class="sky-card__text">It always rains in the lower city. Someone's waiting under the sign.</p><div class="sky-tags"><span class="sky-tag">Neon</span><span class="sky-tag">Wander</span></div></div></a>
-<a class="sky-card" href="#frostlight"><img src="../assets/examples/frostlight.webp" alt="Frostlight" loading="lazy"><div class="sky-card__body"><p class="sky-card__title">Frostlight</p><p class="sky-card__meta">Cozy Exploration</p><p class="sky-card__text">Under the aurora, the penguins are going home.</p><div class="sky-tags"><span class="sky-tag">Wander</span></div></div></a>
-<a class="sky-card" href="#harvest_fair"><img src="../assets/examples/harvest_fair.webp" alt="Harvest Fair" loading="lazy"><div class="sky-card__body"><p class="sky-card__title">Harvest Fair</p><p class="sky-card__meta">Family · Park Builder</p><p class="sky-card__text">Golden hour, cotton candy, one more ride.</p><div class="sky-tags"><span class="sky-tag">Wander</span><span class="sky-tag">Atmosphere</span></div></div></a>
-<a class="sky-card" href="#hearthside"><img src="../assets/examples/hearthside.webp" alt="Hearthside" loading="lazy"><div class="sky-card__body"><p class="sky-card__title">Hearthside</p><p class="sky-card__meta">Cozy Life Sim</p><p class="sky-card__text">Snow outside. Fire inside. Everyone's home.</p><div class="sky-tags"><span class="sky-tag">Wander</span></div></div></a>
-<a class="sky-card" href="#hollow_manor"><img src="../assets/examples/hollow_manor.webp" alt="Hollow Manor" loading="lazy"><div class="sky-card__body"><p class="sky-card__title">Hollow Manor</p><p class="sky-card__meta">Horror · Exploration</p><p class="sky-card__text">A lantern in the fog, and a manor that should be empty.</p><div class="sky-tags"><span class="sky-tag">Fog</span><span class="sky-tag">Wander</span></div></div></a>
-<a class="sky-card" href="#zen_garden"><img src="../assets/examples/zen_garden.webp" alt="Zen Garden" loading="lazy"><div class="sky-card__body"><p class="sky-card__title">Zen Garden</p><p class="sky-card__meta">Meditative · Art Game</p><p class="sky-card__text">Rake the sand. Feed the koi. Let the petals fall.</p><div class="sky-tags"><span class="sky-tag">Wander</span><span class="sky-tag">Atmosphere</span></div></div></a>
-<a class="sky-card" href="#toy_kart_rally"><img src="../assets/examples/toy_kart_rally.webp" alt="Toy Kart Rally" loading="lazy"><div class="sky-card__body"><p class="sky-card__title">Toy Kart Rally</p><p class="sky-card__meta">Kart Racing</p><p class="sky-card__text">Four karts, one oval, and a crowd that wants fireworks.</p><div class="sky-tags"><span class="sky-tag">Wander</span><span class="sky-tag">Atmosphere</span></div></div></a>
-<a class="sky-card" href="#star_lancer"><img src="../assets/examples/star_lancer.webp" alt="Star Lancer" loading="lazy"><div class="sky-card__body"><p class="sky-card__title">Star Lancer</p><p class="sky-card__meta">Space Shoot 'em Up</p><p class="sky-card__text">Hold the line above the ringed giant.</p><div class="sky-tags"><span class="sky-tag">Wander</span></div></div></a>
-<a class="sky-card" href="#neon_drift"><img src="../assets/examples/neon_drift.webp" alt="Neon Drift" loading="lazy"><div class="sky-card__body"><p class="sky-card__title">Neon Drift</p><p class="sky-card__meta">Arena Shooter</p><p class="sky-card__text">One ship. Endless drones. Don't stop moving.</p><div class="sky-tags"><span class="sky-tag">Neon</span><span class="sky-tag">Wander</span></div></div></a>
-<a class="sky-card" href="#cloudhopper"><img src="../assets/examples/cloudhopper.webp" alt="Cloudhopper" loading="lazy"><div class="sky-card__body"><p class="sky-card__title">Cloudhopper</p><p class="sky-card__meta">3D Platformer</p><p class="sky-card__text">Six islands, one bouncy hero, every coin in the sky.</p><div class="sky-tags"><span class="sky-tag">Wander</span></div></div></a>
-<a class="sky-card" href="#sky_dash"><img src="../assets/examples/sky_dash.webp" alt="Sky Dash" loading="lazy"><div class="sky-card__body"><p class="sky-card__title">Sky Dash</p><p class="sky-card__meta">2D Platformer</p><p class="sky-card__text">Run, hop, grab every coin. Same engine, two dimensions.</p><div class="sky-tags"><span class="sky-tag">Shipping</span><span class="sky-tag">Wander</span></div></div></a>
-<a class="sky-card" href="#sky_village"><img src="../assets/examples/sky_village.webp" alt="Sky Village" loading="lazy"><div class="sky-card__body"><p class="sky-card__title">Sky Village</p><p class="sky-card__meta">Diorama</p><p class="sky-card__text">A floating village above the clouds.</p><div class="sky-tags"><span class="sky-tag">Wander</span></div></div></a>
-<a class="sky-card" href="#hello_sky"><img src="../assets/examples/hello_sky.webp" alt="Hello Sky" loading="lazy"><div class="sky-card__body"><p class="sky-card__title">Hello Sky</p><p class="sky-card__meta">Starter scene</p><p class="sky-card__text">The smallest scene that shows the loop.</p><div class="sky-tags"><span class="sky-tag">Wander</span></div></div></a>
+<a class="sky-card" href="#abyss"><img src="../assets/images/examples/abyss.webp" alt="Abyss" loading="lazy"><div class="sky-card__body"><p class="sky-card__title">Abyss</p><p class="sky-card__meta">Underwater Horror</p><p class="sky-card__text">Three hundred meters down, something else has a light.</p><div class="sky-tags"><span class="sky-tag">Wander</span></div></div></a>
+<a class="sky-card" href="#cyber_alley"><img src="../assets/images/examples/cyber_alley.webp" alt="Cyber Alley" loading="lazy"><div class="sky-card__body"><p class="sky-card__title">Cyber Alley</p><p class="sky-card__meta">Neo-Noir Adventure</p><p class="sky-card__text">It always rains in the lower city. Someone's waiting under the sign.</p><div class="sky-tags"><span class="sky-tag">Neon</span><span class="sky-tag">Wander</span></div></div></a>
+<a class="sky-card" href="#frostlight"><img src="../assets/images/examples/frostlight.webp" alt="Frostlight" loading="lazy"><div class="sky-card__body"><p class="sky-card__title">Frostlight</p><p class="sky-card__meta">Cozy Exploration</p><p class="sky-card__text">Under the aurora, the penguins are going home.</p><div class="sky-tags"><span class="sky-tag">Wander</span></div></div></a>
+<a class="sky-card" href="#harvest_fair"><img src="../assets/images/examples/harvest_fair.webp" alt="Harvest Fair" loading="lazy"><div class="sky-card__body"><p class="sky-card__title">Harvest Fair</p><p class="sky-card__meta">Family · Park Builder</p><p class="sky-card__text">Golden hour, cotton candy, one more ride.</p><div class="sky-tags"><span class="sky-tag">Wander</span><span class="sky-tag">Atmosphere</span></div></div></a>
+<a class="sky-card" href="#hearthside"><img src="../assets/images/examples/hearthside.webp" alt="Hearthside" loading="lazy"><div class="sky-card__body"><p class="sky-card__title">Hearthside</p><p class="sky-card__meta">Cozy Life Sim</p><p class="sky-card__text">Snow outside. Fire inside. Everyone's home.</p><div class="sky-tags"><span class="sky-tag">Wander</span></div></div></a>
+<a class="sky-card" href="#hollow_manor"><img src="../assets/images/examples/hollow_manor.webp" alt="Hollow Manor" loading="lazy"><div class="sky-card__body"><p class="sky-card__title">Hollow Manor</p><p class="sky-card__meta">Horror · Exploration</p><p class="sky-card__text">A lantern in the fog, and a manor that should be empty.</p><div class="sky-tags"><span class="sky-tag">Fog</span><span class="sky-tag">Wander</span></div></div></a>
+<a class="sky-card" href="#zen_garden"><img src="../assets/images/examples/zen_garden.webp" alt="Zen Garden" loading="lazy"><div class="sky-card__body"><p class="sky-card__title">Zen Garden</p><p class="sky-card__meta">Meditative · Art Game</p><p class="sky-card__text">Rake the sand. Feed the koi. Let the petals fall.</p><div class="sky-tags"><span class="sky-tag">Wander</span><span class="sky-tag">Atmosphere</span></div></div></a>
+<a class="sky-card" href="#toy_kart_rally"><img src="../assets/images/examples/toy_kart_rally.webp" alt="Toy Kart Rally" loading="lazy"><div class="sky-card__body"><p class="sky-card__title">Toy Kart Rally</p><p class="sky-card__meta">Kart Racing</p><p class="sky-card__text">Four karts, one oval, and a crowd that wants fireworks.</p><div class="sky-tags"><span class="sky-tag">Wander</span><span class="sky-tag">Atmosphere</span></div></div></a>
+<a class="sky-card" href="#star_lancer"><img src="../assets/images/examples/star_lancer.webp" alt="Star Lancer" loading="lazy"><div class="sky-card__body"><p class="sky-card__title">Star Lancer</p><p class="sky-card__meta">Space Shoot 'em Up</p><p class="sky-card__text">Hold the line above the ringed giant.</p><div class="sky-tags"><span class="sky-tag">Wander</span></div></div></a>
+<a class="sky-card" href="#neon_drift"><img src="../assets/images/examples/neon_drift.webp" alt="Neon Drift" loading="lazy"><div class="sky-card__body"><p class="sky-card__title">Neon Drift</p><p class="sky-card__meta">Arena Shooter</p><p class="sky-card__text">One ship. Endless drones. Don't stop moving.</p><div class="sky-tags"><span class="sky-tag">Neon</span><span class="sky-tag">Wander</span></div></div></a>
+<a class="sky-card" href="#cloudhopper"><img src="../assets/images/examples/cloudhopper.webp" alt="Cloudhopper" loading="lazy"><div class="sky-card__body"><p class="sky-card__title">Cloudhopper</p><p class="sky-card__meta">3D Platformer</p><p class="sky-card__text">Six islands, one bouncy hero, every coin in the sky.</p><div class="sky-tags"><span class="sky-tag">Wander</span></div></div></a>
+<a class="sky-card" href="#sky_dash"><img src="../assets/images/examples/sky_dash.webp" alt="Sky Dash" loading="lazy"><div class="sky-card__body"><p class="sky-card__title">Sky Dash</p><p class="sky-card__meta">2D Platformer</p><p class="sky-card__text">Run, hop, grab every coin. Same engine, two dimensions.</p><div class="sky-tags"><span class="sky-tag">Shipping</span><span class="sky-tag">Wander</span></div></div></a>
+<a class="sky-card" href="#sky_village"><img src="../assets/images/examples/sky_village.webp" alt="Sky Village" loading="lazy"><div class="sky-card__body"><p class="sky-card__title">Sky Village</p><p class="sky-card__meta">Diorama</p><p class="sky-card__text">A floating village above the clouds.</p><div class="sky-tags"><span class="sky-tag">Wander</span></div></div></a>
+<a class="sky-card" href="#hello_sky"><img src="../assets/images/examples/hello_sky.webp" alt="Hello Sky" loading="lazy"><div class="sky-card__body"><p class="sky-card__title">Hello Sky</p><p class="sky-card__meta">Starter scene</p><p class="sky-card__text">The smallest scene that shows the loop.</p><div class="sky-tags"><span class="sky-tag">Wander</span></div></div></a>
 
 </div>
 
 ## Tidebreak Isle { #tidebreak_isle }
 
-<video controls muted loop playsinline preload="none" poster="../assets/examples/tidebreak_isle.webp"><source src="../assets/examples/tidebreak_isle.mp4" type="video/mp4"></video>
+<video controls muted loop playsinline preload="none" poster="../assets/images/shots/tidebreak_isle/brig.webp"><source src="../assets/video/tidebreak_isle/establishing.mp4" type="video/mp4"></video>
 
 *Open-world Island Adventure* · The storm left you one ship, one map and a cove nobody charts. Make landfall before dark.
 
@@ -75,7 +75,7 @@ An island cove at golden hour, built by an agent crew with the engine's own tool
 
 ## Neon Requiem { #neon_requiem }
 
-<video controls muted loop playsinline preload="none" poster="../assets/examples/neon_requiem.webp"><source src="../assets/examples/neon_requiem.mp4" type="video/mp4"></video>
+<video controls muted loop playsinline preload="none" poster="../assets/images/shots/neon_requiem/avenue_dolly.webp"><source src="../assets/video/neon_requiem/avenue_dolly.mp4" type="video/mp4"></video>
 
 *Open-world Neo-noir RPG* · Halcyon Avenue never sleeps. It just stops remembering.
 
@@ -115,7 +115,7 @@ A rain-soaked neon avenue at midnight with nearly six hundred lights evaluated b
 
 ## Ashen Peaks { #ashen_peaks }
 
-<video controls muted loop playsinline preload="none" poster="../assets/examples/ashen_peaks.webp"><source src="../assets/examples/ashen_peaks.mp4" type="video/mp4"></video>
+<video controls muted loop playsinline preload="none" poster="../assets/images/shots/ashen_peaks/crane_gate.webp"><source src="../assets/video/ashen_peaks/establishing.mp4" type="video/mp4"></video>
 
 *Mythic Action-Adventure* · Nine hundred steps to the Kindled Crane. The lanterns have not gone out in a thousand years.
 
@@ -155,7 +155,7 @@ A monastery valley at a misty sunrise: eroded alpine terrain, forests that turn 
 
 ## Berrybrook { #berrybrook }
 
-<video controls muted loop playsinline preload="none" poster="../assets/examples/berrybrook.webp"><source src="../assets/examples/berrybrook.mp4" type="video/mp4"></video>
+<video controls muted loop playsinline preload="none" poster="../assets/images/shots/berrybrook/berry_rows.webp"><source src="../assets/video/berrybrook/berry_rows.mp4" type="video/mp4"></video>
 
 *Cozy Farming Life Sim* · Grandma's berry farm is yours now. Plant a row, mind the hens, and sell the sweetest strawberries on the hill.
 
@@ -195,7 +195,7 @@ A cozy berry farm: plant a row, harvest ripe berries, sell them at the stand and
 
 ## Meridian Accord { #meridian_accord }
 
-<video controls muted loop playsinline preload="none" poster="../assets/examples/meridian_accord.webp"><source src="../assets/examples/meridian_accord.mp4" type="video/mp4"></video>
+<video controls muted loop playsinline preload="none" poster="../assets/images/shots/meridian_accord/front_line.webp"><source src="../assets/video/meridian_accord/above_the_clouds.mp4" type="video/mp4"></video>
 
 *Grand Strategy · Map Wargame* · Ten nations, one inland sea, and an accord that will not survive the spring of '37.
 
@@ -235,7 +235,7 @@ A grand strategy map of a fictional continent: a terrain with a draped map overl
 
 ## Gloamwater { #gloamwater }
 
-![Gloamwater](../assets/examples/gloamwater.webp){ loading=lazy }
+![Gloamwater](../assets/images/shots/gloamwater/grove.webp){ loading=lazy }
 
 *Metroidvania · 2D Action-Adventure* · Carry the last lantern down into a drowned kingdom where the light went to sleep.
 
@@ -274,7 +274,7 @@ A 2D metroidvania in a drowned kingdom: painted parallax layers, sprites with fl
 
 ## The Chancellor's Desk { #chancellors_desk }
 
-<video controls muted loop playsinline preload="none" poster="../assets/examples/chancellors_desk.webp"><source src="../assets/examples/chancellors_desk.mp4" type="video/mp4"></video>
+<video controls muted loop playsinline preload="none" poster="../assets/images/shots/chancellors_desk/the_decree.webp"><source src="../assets/video/chancellors_desk/the_decree.mp4" type="video/mp4"></video>
 
 *Narrative Political Drama* · One desk. One rainy night. The republic is three weeks old and the pen is in your hand.
 
@@ -431,7 +431,7 @@ A desert canyon at sunset with a covered jeep and a campfire: CC0 photoscanned r
 
 ## Abyss { #abyss }
 
-![Abyss](../assets/examples/abyss.webp){ loading=lazy }
+![Abyss](../assets/images/examples/abyss.webp){ loading=lazy }
 
 *Underwater Horror* · Three hundred meters down, something else has a light.
 
@@ -470,7 +470,7 @@ Underwater horror three hundred meters down: a lit submarine, drifting biolumine
 
 ## Cyber Alley { #cyber_alley }
 
-![Cyber Alley](../assets/examples/cyber_alley.webp){ loading=lazy }
+![Cyber Alley](../assets/images/examples/cyber_alley.webp){ loading=lazy }
 
 *Neo-Noir Adventure* · It always rains in the lower city. Someone's waiting under the sign.
 
@@ -509,7 +509,7 @@ A neon alley in the rain: glowing signs, wet reflective pavement and about two h
 
 ## Frostlight { #frostlight }
 
-![Frostlight](../assets/examples/frostlight.webp){ loading=lazy }
+![Frostlight](../assets/images/examples/frostlight.webp){ loading=lazy }
 
 *Cozy Exploration* · Under the aurora, the penguins are going home.
 
@@ -548,7 +548,7 @@ Cozy exploration under an aurora: snowy pines, an igloo and penguins heading hom
 
 ## Harvest Fair { #harvest_fair }
 
-![Harvest Fair](../assets/examples/harvest_fair.webp){ loading=lazy }
+![Harvest Fair](../assets/images/examples/harvest_fair.webp){ loading=lazy }
 
 *Family · Park Builder* · Golden hour, cotton candy, one more ride.
 
@@ -587,7 +587,7 @@ A family park at golden hour with a Ferris wheel, string lights, stalls and pump
 
 ## Hearthside { #hearthside }
 
-![Hearthside](../assets/examples/hearthside.webp){ loading=lazy }
+![Hearthside](../assets/images/examples/hearthside.webp){ loading=lazy }
 
 *Cozy Life Sim* · Snow outside. Fire inside. Everyone's home.
 
@@ -626,7 +626,7 @@ A log cabin on a snowy night: firelight, a decorated tree and snow outside the w
 
 ## Hollow Manor { #hollow_manor }
 
-![Hollow Manor](../assets/examples/hollow_manor.webp){ loading=lazy }
+![Hollow Manor](../assets/images/examples/hollow_manor.webp){ loading=lazy }
 
 *Horror · Exploration* · A lantern in the fog, and a manor that should be empty.
 
@@ -665,7 +665,7 @@ Horror exploration: a lantern in the fog, a graveyard and a manor that should be
 
 ## Zen Garden { #zen_garden }
 
-![Zen Garden](../assets/examples/zen_garden.webp){ loading=lazy }
+![Zen Garden](../assets/images/examples/zen_garden.webp){ loading=lazy }
 
 *Meditative · Art Game* · Rake the sand. Feed the koi. Let the petals fall.
 
@@ -704,7 +704,7 @@ A meditative art game: raked sand, a koi pond, bamboo and falling petals in soft
 
 ## Toy Kart Rally { #toy_kart_rally }
 
-![Toy Kart Rally](../assets/examples/toy_kart_rally.webp){ loading=lazy }
+![Toy Kart Rally](../assets/images/examples/toy_kart_rally.webp){ loading=lazy }
 
 *Kart Racing* · Four karts, one oval, and a crowd that wants fireworks.
 
@@ -743,7 +743,7 @@ Kart racing at dusk: four karts on an oval under floodlights, with a crowd waiti
 
 ## Star Lancer { #star_lancer }
 
-![Star Lancer](../assets/examples/star_lancer.webp){ loading=lazy }
+![Star Lancer](../assets/images/examples/star_lancer.webp){ loading=lazy }
 
 *Space Shoot 'em Up* · Hold the line above the ringed giant.
 
@@ -782,7 +782,7 @@ A space shoot 'em up above a ringed giant, driven by more than three hundred beh
 
 ## Neon Drift { #neon_drift }
 
-![Neon Drift](../assets/examples/neon_drift.webp){ loading=lazy }
+![Neon Drift](../assets/images/examples/neon_drift.webp){ loading=lazy }
 
 *Arena Shooter* · One ship. Endless drones. Don't stop moving.
 
@@ -821,7 +821,7 @@ A synthwave arena shooter: one ship, endless drones, a grid floor and a setting 
 
 ## Cloudhopper { #cloudhopper }
 
-![Cloudhopper](../assets/examples/cloudhopper.webp){ loading=lazy }
+![Cloudhopper](../assets/images/examples/cloudhopper.webp){ loading=lazy }
 
 *3D Platformer* · Six islands, one bouncy hero, every coin in the sky.
 
@@ -860,7 +860,7 @@ A 3D platformer across six floating islands with coins, mushrooms and a castle; 
 
 ## Sky Dash { #sky_dash }
 
-![Sky Dash](../assets/examples/sky_dash.webp){ loading=lazy }
+![Sky Dash](../assets/images/examples/sky_dash.webp){ loading=lazy }
 
 *2D Platformer* · Run, hop, grab every coin. Same engine, two dimensions.
 
@@ -899,7 +899,7 @@ A side-scrolling platformer: run, hop and grab every coin. It is the project the
 
 ## Sky Village { #sky_village }
 
-![Sky Village](../assets/examples/sky_village.webp){ loading=lazy }
+![Sky Village](../assets/images/examples/sky_village.webp){ loading=lazy }
 
 *Diorama* · A floating village above the clouds.
 
@@ -938,7 +938,7 @@ A floating village diorama with a windmill, a lighthouse and an airship, small e
 
 ## Hello Sky { #hello_sky }
 
-![Hello Sky](../assets/examples/hello_sky.webp){ loading=lazy }
+![Hello Sky](../assets/images/examples/hello_sky.webp){ loading=lazy }
 
 *Starter scene* · The smallest scene that shows the loop.
 

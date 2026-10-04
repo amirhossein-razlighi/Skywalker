@@ -619,7 +619,7 @@ def gen_examples(curated: dict) -> dict[str, str]:
             auto.append("Volumetric clouds")
         features = list(dict.fromkeys(info.get("features", []) + auto))
         image = info.get("image")
-        media = (f'<img src="../assets/examples/{image}" alt="{title}" loading="lazy">' if image else
+        media = (f'<img src="../assets/{image}" alt="{title}" loading="lazy">' if image else
                  '<div class="sky-placeholder"><strong>Render on first build</strong>'
                  'This project downloads its CC0 assets on first build</div>')
         tags = "".join(f'<span class="sky-tag">{f}</span>' for f in features[:6])
@@ -628,11 +628,11 @@ def gen_examples(curated: dict) -> dict[str, str]:
                      f'<p class="sky-card__text">{pitch}</p><div class="sky-tags">{tags}</div></div></a>')
         sec = [f"## {title} {{ #{p.name} }}", ""]
         if info.get("video"):
-            poster = f' poster="../assets/examples/{image}"' if image else ""
+            poster = f' poster="../assets/{image}"' if image else ""
             sec += [f'<video controls muted loop playsinline preload="none"{poster}>'
-                    f'<source src="../assets/examples/{info["video"]}" type="video/mp4"></video>', ""]
+                    f'<source src="../assets/{info["video"]}" type="video/mp4"></video>', ""]
         elif image:
-            sec += [f"![{title}](../assets/examples/{image}){{ loading=lazy }}", ""]
+            sec += [f"![{title}](../assets/{image}){{ loading=lazy }}", ""]
         sec += [f"*{genre}* · {pitch}" if genre else pitch, "", info["description"].strip(), ""]
         sec += ["| | |", "|---|---|",
                 f"| Folder | [`examples/{p.name}`]({REPO}examples/{p.name}) |",
