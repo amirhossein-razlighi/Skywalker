@@ -728,11 +728,15 @@ void addWorldTools(Engine& engine, ToolRegistry& reg) {
                                                                  {"foliageInstances", static_cast<int64_t>(engine.world().stats().foliageInstances)}})}});
                  if (frames > 0) j["benchmark"] = bench;
                  {  // [characters] skinning, groom simulation and groom rendering cost
-                     double groomRenderMs = -1.0;
-                     if (frames > 0 && a.get("characters").asBool(false) && bench.contains("gpuMsAvg")) {
-                         groomRenderMs = bench.get("gpuMsAvg").asFloat() - benchmarkWithoutGrooms(engine, a, frames);
+                     // Read the live stats first: the comparison benchmark below renders frames without grooms.
+                     Json chars = characterPerfStats(engine);
+                     if (frames > 0 && a.get("characters").asBool(false) && bench.contains("gpuMsAvg") &&
+                         chars.get("grooms").asInt(0) > 0) {
+                         const double ms = bench.get("gpuMsAvg").asFloat() - benchmarkWithoutGrooms(engine, a, frames);
+                         chars["groomRenderGpuMs"] = std::round(std::max(ms, 0.0) * 100.0) / 100.0;  // strands + their shadows
+                         chars.erase("note");
                      }
-                     j["characters"] = characterPerfStats(engine, groomRenderMs);
+                     j["characters"] = chars;
                  }
                  j["frameFlow"] = Json::object({{"interpolation", engine.interpolation()},
                                                 {"alpha", std::round(engine.interpolationAlpha() * 1000.f) / 1000.f},

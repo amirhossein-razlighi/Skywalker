@@ -128,8 +128,9 @@ Json characterPerfStats(Engine& engine, double groomRenderMs) {
                            {"skinnedVertices", vertices},
                            {"grooms", grooms}});
     if (groups.contains("skinning")) j["skinningGpuMs"] = groups.get("skinning");
-    j["groomSimGpuMs"] = gpu.get("hairGpuMs").asFloat(0.f);           // guide simulation + strand rebuild
-    j["groomShadowGpuMs"] = gpu.get("hairShadowGpuMs").asFloat(0.f);  // deep opacity maps
+    auto ms2 = [](float v) { return std::round(v * 100.f) / 100.f; };
+    j["groomSimGpuMs"] = ms2(gpu.get("hairGpuMs").asFloat(0.f));           // guide simulation + strand rebuild
+    j["groomShadowGpuMs"] = ms2(gpu.get("hairShadowGpuMs").asFloat(0.f));  // deep opacity maps
     size_t drawn = 0, total = 0;
     for (const auto& g : gpu.get("grooms").elements()) {
         drawn += static_cast<size_t>(g.get("drawn").asInt(0));

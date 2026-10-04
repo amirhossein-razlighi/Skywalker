@@ -98,7 +98,7 @@ static float3 skinLight(SurfaceData s, CharacterInputs ci, constant DrawUniforms
     float3 diffuse = saturate((ndl + w) / ((1.0 + w) * (1.0 + w))) * (1.0 + w * 0.5);
     // Shadow edges glow slightly warm: light diffuses a few millimeters into the penumbra (which is
     // centimeters wide in the shadow map, so only a gentle tint).
-    float3 shadowC = pow(max(shadow, 0.0), 1.0 / (1.0 + 0.45 * blur));
+    float3 shadowC = pow(max(shadow, 0.0), 1.0 / (1.0 + 0.25 * blur));
     float NdotV = max(dot(s.N, V), 1e-4);
     float nl = saturate(dot(s.N, L));
     float3 H = normalize(V + L);

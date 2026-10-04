@@ -87,8 +87,10 @@ float legLength(const HumanoidMap& m, const std::vector<Mat4>& rest) {
     int legs = 0;
     for (auto [u, l, f] : {std::tuple{HumanBone::LeftUpperLeg, HumanBone::LeftLowerLeg, HumanBone::LeftFoot},
                            std::tuple{HumanBone::RightUpperLeg, HumanBone::RightLowerLeg, HumanBone::RightFoot}}) {
-        if (m[u] < 0 || m[l] < 0 || m[f] < 0) continue;
-        sum += distance(posOf(rest, m[u]), posOf(rest, m[l])) + distance(posOf(rest, m[l]), posOf(rest, m[f]));
+        // A foot that is an IK control outside the leg still marks where the leg ends.
+        const int foot = m[f] >= 0 ? m[f] : m.footControls[f == HumanBone::LeftFoot ? 0 : 1];
+        if (m[u] < 0 || m[l] < 0 || foot < 0) continue;
+        sum += distance(posOf(rest, m[u]), posOf(rest, m[l])) + distance(posOf(rest, m[l]), posOf(rest, foot));
         ++legs;
     }
     return legs ? sum / static_cast<float>(legs) : 0.f;
@@ -230,6 +232,19 @@ void retargetPose(const RetargetSetup& s, const Skeleton& src, const Pose& srcPo
         }
         gt[b] = p >= 0 ? parentG * local.matrix() : local.matrix();
     }
+    // Feet that are IK controls outside the leg keep their rest placement relative to the retargeted
+    // lower leg (their parent, often the root, does not move with the leg).
+    for (int side = 0; side < 2; ++side) {
+        const int c = s.target.footControls[static_cast<size_t>(side)];
+        const int lower = s.target[side == 0 ? HumanBone::LeftLowerLeg : HumanBone::RightLowerLeg];
+        if (c < 0 || lower < 0 || dst.isDescendant(lower, c)) continue;
+        const Mat4 rel = s.targetRest[static_cast<size_t>(lower)].inverse() * s.targetRest[static_cast<size_t>(c)];
+        const Mat4 world = gt[static_cast<size_t>(lower)] * rel;
+        const int p = dst.bones[static_cast<size_t>(c)].parent;
+        const Mat4 local = p >= 0 ? gt[static_cast<size_t>(p)].inverse() * world : world;
+        out[static_cast<size_t>(c)].t = local.translation();
+        out[static_cast<size_t>(c)].r = rotationOf(local).normalized();
+    }
 }
 
 Clip retargetClipPose(const RetargetSetup& s, const Skeleton& src, const Clip& clip, const Skeleton& dst, const RetargetOptions& o) {
@@ -244,11 +259,17 @@ Clip retargetClipPose(const RetargetSetup& s, const Skeleton& src, const Clip& c
         if (s.target.bones[i] >= 0 && s.source.bones[i] >= 0) rotBones.push_back(s.target.bones[i]);
     }
     if (s.targetRoot >= 0 && s.sourceRoot >= 0) rotBones.push_back(s.targetRoot);
+    for (int c : s.target.footControls) {
+        if (c >= 0) rotBones.push_back(c);
+    }
     std::sort(rotBones.begin(), rotBones.end());
     rotBones.erase(std::unique(rotBones.begin(), rotBones.end()), rotBones.end());
     if (o.translation) {
         moveBones.push_back(s.target[HumanBone::Hips]);
         if (s.targetRoot >= 0 && s.sourceRoot >= 0) moveBones.push_back(s.targetRoot);
+    }
+    for (int c : s.target.footControls) {
+        if (c >= 0) moveBones.push_back(c);  // IK-control feet follow the legs (above)
     }
     std::vector<Channel> rot(rotBones.size()), mov(moveBones.size());
     for (size_t i = 0; i < rotBones.size(); ++i) {

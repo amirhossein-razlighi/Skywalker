@@ -350,6 +350,7 @@ HumanoidMap detectHumanoid(const Skeleton& sk) {
         if (m[end] >= 0 && m[upper] >= 0 && m[lower] >= 0 && sk.isDescendant(m[lower], m[upper]) && !sk.isDescendant(m[end], m[upper])) {
             m.warnings.push_back(sk.bones[static_cast<size_t>(m[end])].name + " is not below " + sk.bones[static_cast<size_t>(m[upper])].name +
                                  " (an IK control?): ignored for " + humanBoneName(end));
+            if (end == H::LeftFoot || end == H::RightFoot) m.footControls[end == H::LeftFoot ? 0 : 1] = m[end];
             m.at(end) = -1;
             for (size_t i = 0; i < n; ++i) {
                 if (sk.bones[i].parent == m[lower] && !parsed[i].skip) {

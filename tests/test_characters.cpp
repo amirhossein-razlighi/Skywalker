@@ -187,7 +187,23 @@ TEST_CASE("humanoid map: mixamo, UE and generic names, inferred links, sides by 
     CHECK(knight.bones[static_cast<size_t>(k[HumanBone::LeftHand])].name == "Palm.L");
     CHECK_FALSE(k.complete());
     CHECK(k.retargetable());
-    REQUIRE(prepareRetarget(mx, -1, knight, 0));
+    auto kSetup = prepareRetarget(mx, -1, knight, 0);
+    REQUIRE(kSetup);
+    // Its IK-control feet follow the retargeted legs: a bent knee carries Foot.L along with the shin.
+    REQUIRE(k.footControls[0] == knight.find("Foot.L"));
+    Pose bent = restPose(mx);
+    const int knee = mx.find("mixamorig:LeftLeg");
+    bent[static_cast<size_t>(knee)].r = Quat::axisAngle({1, 0, 0}, radians(70.f)) * bent[static_cast<size_t>(knee)].r;
+    Pose kp;
+    retargetPose(*kSetup, mx, bent, knight, kp);
+    std::vector<Mat4> kRest, kNow;
+    computeGlobals(knight, restPose(knight), kRest);
+    computeGlobals(knight, kp, kNow);
+    const int kLower = k[HumanBone::LeftLowerLeg], kFoot = k.footControls[0];
+    const float restGap = distance(kRest[static_cast<size_t>(kLower)].translation(), kRest[static_cast<size_t>(kFoot)].translation());
+    CHECK(distance(kNow[static_cast<size_t>(kLower)].translation(), kNow[static_cast<size_t>(kFoot)].translation()) ==
+          doctest::Approx(restGap).epsilon(1e-3));
+    CHECK(distance(kNow[static_cast<size_t>(kFoot)].translation(), kRest[static_cast<size_t>(kFoot)].translation()) > 0.1f);
 
     // Overrides: a bad slot or bone fails with a hint.
     HumanoidMap o = detectHumanoid(mx);

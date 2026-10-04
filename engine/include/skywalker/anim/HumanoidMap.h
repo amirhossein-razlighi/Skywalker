@@ -68,6 +68,9 @@ struct HumanoidMap {
     std::string convention = "generic";  // mixamo | ue | generic | custom
     float confidence = 0.f;              // 0..1: required slots found, names agreeing with topology
     std::vector<std::string> warnings;
+    /// Foot bones that are IK controls outside the leg (left, right; -1 = none): retargeting keeps
+    /// them at the end of the retargeted lower leg so the feet the mesh is skinned to follow the legs.
+    std::array<int, 2> footControls{-1, -1};
 
     HumanoidMap() { bones.fill(-1); }
     int operator[](HumanBone b) const { return bones[static_cast<size_t>(b)]; }
