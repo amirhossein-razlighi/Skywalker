@@ -25,6 +25,7 @@
 #include "skywalker/core/Log.h"
 #include "skywalker/core/Strings.h"
 #include "skywalker/engine/Engine.h"
+#include "skywalker/physics2d/Physics2DSystem.h"
 #include "skywalker/game/GameSettings.h"
 #include "skywalker/game/SaveGame.h"
 #include "skywalker/game/SceneFlow.h"
@@ -627,6 +628,8 @@ Result<SaveSystem::Outcome> SaveSystem::load(const std::string& slot, const std:
     if (Status rs = engine.runtime().loadState(d.get("runtime"), out.warnings); !rs) return rs.error();
     engine.physics().endPlay();  // rebuilt from the restored scene (positions, velocities) on the next tick
     engine.physics().beginPlay();
+    engine.physics2d().endPlay();  // 2D bodies too (body2d.velocity is saved with the component)
+    engine.physics2d().beginPlay();
     engine.navigation().endPlay();
     engine.navigation().beginPlay();
     impl_->globals = d.get("globals").isObject() ? d.get("globals") : Json::object();

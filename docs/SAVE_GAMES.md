@@ -264,7 +264,9 @@ entities that could not be restored.
 
 - Only persisted entities are restored. Particles, animation poses, sounds playing and non-persisted entities keep
   their current state.
-- Physics bodies restart from their saved transform and `body.velocity`; contact and sleep state is rebuilt.
+- Physics bodies restart from their saved transform and `body.velocity` (2D bodies from `body2d.velocity` and
+  `angularVelocity`); contact and sleep state is rebuilt, so bodies in contact, and the rotation of 2D bodies, can
+  differ from an uninterrupted run by rounding. Exact replay covers behaviors and free motion.
 - A behavior whose script changed since the save starts fresh (its `on start` runs again; vars keep their saved
   values because var initializers never overwrite existing values).
 - Events queued for non-persisted entities at save time are not saved.

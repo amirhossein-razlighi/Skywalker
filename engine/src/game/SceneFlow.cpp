@@ -21,6 +21,7 @@
 #include "skywalker/core/FileTime.h"
 #include "skywalker/core/Strings.h"
 #include "skywalker/engine/Engine.h"
+#include "skywalker/physics2d/Physics2DSystem.h"
 #include "skywalker/game/SaveGame.h"
 #include "skywalker/ecs/Reflection.h"
 
@@ -454,6 +455,8 @@ struct SceneFlow::Impl {
         s.markDirty();
         engine.physics().endPlay();  // rebuilt from the new scene on the next tick
         engine.physics().beginPlay();
+        engine.physics2d().endPlay();  // 2D physics too
+        engine.physics2d().beginPlay();
         engine.navigation().endPlay();
         engine.navigation().beginPlay();
         currentPath = path;

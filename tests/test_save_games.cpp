@@ -680,3 +680,41 @@ TEST_CASE("saves: a save from another scene loads through the scene flow; carrie
     r = call(*shifted, "load_game", R"({"slot": "lvl"})");
     CHECK_FALSE(r.contains("sceneChanged"));
 }
+
+TEST_CASE("saves: 2D bodies restart from the save (position, velocity) and replay a free flight exactly") {
+    Project p("physics2d");
+    {
+        auto e = makeEngine(p);
+        REQUIRE(e->newScene("Arena", false));
+        make(*e, R"({"name": "Ball", "components": {"transform": {"position": [0, 20, 0]}, "persist": {"id": "ball"},
+                     "body2d": {"velocity": [3, 9], "angularVelocity": 90, "angularDamping": 0}, "collider2d": {"shape": "circle", "radius": 0.5}}})");
+        REQUIRE(e->saveScene("scenes/arena.sky.json"));
+    }
+    auto run = [&](bool viaSave) {
+        auto e = makeEngine(p);
+        REQUIRE(e->loadScene("scenes/arena.sky.json"));
+        e->play();
+        e->step(20);
+        if (viaSave) {
+            call(*e, "save_game", R"({"slot": "ball"})");
+            e->step(17);  // the timeline moves on...
+            Json r = call(*e, "load_game", R"({"slot": "ball"})");
+            CHECK(r.get("warnings").size() == 0);
+        }
+        e->step(30);
+        const EntityId ball = e->scene().find("Ball");
+        const Transform& t = *e->scene().get<Transform>(ball);
+        const Body2D& b = *e->scene().get<Body2D>(ball);
+        return std::vector<float>{t.position.x, t.position.y, t.rotation.z, b.velocity.x, b.velocity.y, b.angularVelocity};
+    };
+    const auto direct = run(false);
+    const auto loaded = run(true);
+    CHECK(direct[0] > 1.f);  // it flew
+    // Position and velocities replay exactly; Box2D integrates rotations incrementally, so a body rebuilt
+    // from its saved angle lands within rounding of the continued one (docs/SAVE_GAMES.md "Limits").
+    for (size_t i : {0u, 1u, 3u, 4u, 5u}) {
+        INFO("component ", i);
+        CHECK(loaded[i] == direct[i]);
+    }
+    CHECK(loaded[2] == doctest::Approx(direct[2]).epsilon(0.002));
+}
