@@ -1,5 +1,10 @@
 #include <doctest/doctest.h>
 
+#include <cstdlib>
+#include <filesystem>
+#include <fstream>
+#include <iterator>
+
 #include "skywalker/engine/Engine.h"
 
 using namespace sky;
@@ -230,4 +235,30 @@ TEST_CASE("gizmo: translate drag along X follows the cursor ray; hit testing pic
     CHECK(snapped.worldPosition.x == doctest::Approx(1.5f).epsilon(1e-3));
     // Empty space hits nothing.
     CHECK(g.hitTest(f, Ray{cam.eye, normalize(Vec3{5, 5, 0} - cam.eye)}) == -1);
+}
+
+TEST_CASE("tools: scene_overview reports the open scene file and scene_save writes back to it") {
+    namespace fs = std::filesystem;
+    EngineConfig cfg;
+    cfg.renderer = RendererBackend::Null;
+    cfg.projectDir = (fs::temp_directory_path() / ("skywalker-save-" + std::to_string(std::rand()))).string();
+    fs::create_directories(cfg.projectDir);
+    Engine e(cfg);
+    (void)e.newScene("Fresh", true);
+    CHECK(call(e, "scene_overview", R"({"max_entities":0})").get("path").asString().empty());
+    call(e, "scene_save", "{}", false);  // never saved: the editor asks for a name instead
+    call(e, "scene_save", R"({"path":"scenes/cave.sky.json"})");
+    call(e, "scene_new", R"({"name":"Other"})");
+    call(e, "scene_save", R"({"path":"scenes/other.sky.json"})");
+    call(e, "scene_load", R"({"path":"scenes/cave.sky.json"})");
+    CHECK(call(e, "scene_overview", R"({"max_entities":0})").get("path").asString() == "scenes/cave.sky.json");
+    call(e, "entity_create", R"({"name":"Stalagmite"})");
+    call(e, "scene_save", "{}");  // File > Save: back into the scene that is open, not another file
+    CHECK(e.callTool("scene_overview", Json::object(), "agent:test").content.front().text.find("scenes/cave.sky.json") !=
+          std::string::npos);
+    std::ifstream cave(fs::path(cfg.projectDir) / "scenes/cave.sky.json"), other(fs::path(cfg.projectDir) / "scenes/other.sky.json");
+    std::string caveText((std::istreambuf_iterator<char>(cave)), {}), otherText((std::istreambuf_iterator<char>(other)), {});
+    CHECK(caveText.find("Stalagmite") != std::string::npos);
+    CHECK(otherText.find("Stalagmite") == std::string::npos);
+    fs::remove_all(cfg.projectDir);
 }

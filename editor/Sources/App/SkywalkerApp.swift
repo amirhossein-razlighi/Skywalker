@@ -61,8 +61,11 @@ struct SkywalkerApp: App {
                 Button("Open Project…") { Self.chooseProject() }.keyboardShortcut("o").disabled(legal.needsAcceptance)
             }
             CommandGroup(replacing: .saveItem) {
-                Button("Save Scene") { engine.call("scene_save", ["path": "scenes/main.sky.json"]) }.keyboardShortcut("s")
-                    .disabled(legal.needsAcceptance)
+                Group {
+                    Button("Save Scene") { Self.saveScene(engine) }.keyboardShortcut("s")
+                    Button("Save Scene As…") { Self.saveSceneAs(engine) }.keyboardShortcut("s", modifiers: [.command, .shift])
+                }
+                .disabled(legal.needsAcceptance)
             }
             CommandMenu("Game") {
                 Group {
@@ -127,6 +130,63 @@ struct SkywalkerApp: App {
     private static func remember(_ url: URL) -> URL {
         UserDefaults.standard.set(url.path, forKey: lastProjectKey)
         return url
+    }
+
+    /// File ▸ Save Scene: writes the open scene back to its own file. The engine tracks that file across
+    /// scene_load / scene_save from any client (asset browser, agents), so the save goes where the scene came
+    /// from. A scene that was never saved asks for a file name first.
+    static func saveScene(_ engine: EngineStore) {
+        if engine.currentScenePath().isEmpty {
+            saveSceneAs(engine)
+        } else {
+            reportSave(engine.saveScene())
+        }
+    }
+
+    /// File ▸ Save Scene As…: saves the scene under a new name inside the project and keeps editing that file.
+    static func saveSceneAs(_ engine: EngineStore) {
+        let root = engine.projectDirectory.standardizedFileURL.path
+        let current = engine.currentScenePath()
+        let panel = NSSavePanel()
+        panel.title = "Save Scene"
+        panel.message = "Scenes are saved inside the project folder"
+        panel.canCreateDirectories = true
+        if current.isEmpty {
+            // The editor opens scenes/main.sky.json at launch, so a project's first scene goes there.
+            let scenes = engine.projectDirectory.appending(path: "scenes")
+            let slug = engine.sceneName.lowercased().map { $0.isLetter || $0.isNumber ? $0 : "_" }
+            let hasMain = FileManager.default.fileExists(atPath: scenes.appending(path: "main.sky.json").path)
+            panel.directoryURL = scenes
+            panel.nameFieldStringValue = hasMain ? (slug.isEmpty ? "scene" : String(slug)) + ".sky.json" : "main.sky.json"
+        } else {
+            let url = engine.projectDirectory.appending(path: current)
+            panel.directoryURL = url.deletingLastPathComponent()
+            panel.nameFieldStringValue = url.lastPathComponent
+        }
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        let path = url.standardizedFileURL.path
+        guard path.hasPrefix(root + "/") else {
+            let alert = NSAlert()
+            alert.messageText = "Save the scene inside the project"
+            alert.informativeText = "Scenes reference the project's assets by relative path, so they must live in \(root)."
+            alert.runModal()
+            return
+        }
+        var relative = String(path.dropFirst(root.count + 1))
+        if !relative.hasSuffix(".sky.json") {
+            if relative.hasSuffix(".json") { relative.removeLast(".json".count) }
+            relative += ".sky.json"
+        }
+        reportSave(engine.saveScene(to: relative))
+    }
+
+    private static func reportSave(_ result: ToolCallResult) {
+        guard result.isError else { return }
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = "The scene was not saved"
+        alert.informativeText = result.text
+        alert.runModal()
     }
 
     /// Picks a project folder and relaunches the editor on it (each window owns one project).

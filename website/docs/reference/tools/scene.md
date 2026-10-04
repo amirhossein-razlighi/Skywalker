@@ -12,7 +12,7 @@ Orient yourself, query and save scenes, and batch many edits into one undo step.
 | Tool | Summary |
 |---|---|
 | [`engine_info`](#engine_info) | Version, renderer, play state, component types and tool categories. |
-| [`scene_overview`](#scene_overview) | Compact outline of the whole scene: every entity as one line (id, name, mesh/color, position, tags) in hierarchy order, plus environment and selection. |
+| [`scene_overview`](#scene_overview) | Compact outline of the whole scene: every entity as one line (id, name, mesh/color, position, tags) in hierarchy order, plus environment, selection and the scene file (`path`; empty until saved). |
 | [`scene_query`](#scene_query) | Find entities by name glob (e.g. |
 | [`batch`](#batch) | Run many tool calls atomically as ONE undo step. |
 | [`scene_save`](#scene_save) | Save the scene as JSON (.sky.json). |
@@ -57,7 +57,7 @@ Takes no arguments.
 
 **Scene overview** <span class="sky-badge sky-badge--ro" title="Never changes the scene">read-only</span>
 
-Compact outline of the whole scene: every entity as one line (id, name, mesh/color, position, tags) in hierarchy order, plus environment and selection. Start here before editing.
+Compact outline of the whole scene: every entity as one line (id, name, mesh/color, position, tags) in hierarchy order, plus environment, selection and the scene file (`path`; empty until saved). Start here before editing.
 
 | Argument | Type | Required | Description | Values |
 |---|---|---|---|---|

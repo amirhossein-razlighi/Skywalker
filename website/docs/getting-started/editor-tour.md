@@ -109,7 +109,8 @@ the viewport to wireframe, overdraw, LOD, light complexity, G-buffer channels an
 | Menu | Command | Shortcut |
 |---|---|---|
 | File | Open Project… | ++cmd+o++ |
-| File | Save Scene | ++cmd+s++ |
+| File | Save Scene (back to the open scene's file) | ++cmd+s++ |
+| File | Save Scene As… | ++shift+cmd+s++ |
 | Game | Play / Pause / Stop | ++cmd+p++ / ++shift+cmd+p++ / ++cmd+period++ |
 | Game | Render Movie… | ++option+cmd+m++ |
 | Game | Frame All | ++cmd+0++ |

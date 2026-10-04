@@ -185,14 +185,17 @@ void addSceneTools(Engine& engine, ToolRegistry& reg) {
 
     reg.add({"scene_overview", "Scene overview",
              "Compact outline of the whole scene: every entity as one line (id, name, mesh/color, position, tags) in "
-             "hierarchy order, plus environment and selection. Start here before editing.",
+             "hierarchy order, plus environment, selection and the scene file (`path`; empty until saved). Start here "
+             "before editing.",
              "scene", object({{"max_entities", integer("Limit lines (default 300)")}}), false, false,
              [&engine](const Json& a, ToolContext&) {
                  Scene& s = engine.scene();
                  const Environment& env = s.environment();
                  size_t limit = static_cast<size_t>(a.get("max_entities").asInt(300));
                  std::ostringstream os;
-                 os << "Scene \"" << s.name << "\": " << s.size() << " entities, state " << toString(engine.playState());
+                 os << "Scene \"" << s.name << "\" ("
+                    << (engine.scenePath().empty() ? std::string("not saved yet") : engine.scenePath()) << "): " << s.size()
+                    << " entities, state " << toString(engine.playState());
                  if (!engine.selection().empty()) {
                      os << ", selected:";
                      for (EntityId id : engine.selection()) os << " #" << id;
@@ -215,7 +218,8 @@ void addSceneTools(Engine& engine, ToolRegistry& reg) {
                  Json sel = Json::array();
                  for (EntityId id : engine.selection()) sel.push(id);
                  ToolResult r = ToolResult::text(os.str());
-                 r.structured = Json::object({{"name", s.name}, {"count", s.size()}, {"selection", sel}, {"entities", list}});
+                 r.structured = Json::object({{"name", s.name}, {"path", engine.scenePath()}, {"count", s.size()},
+                                              {"selection", sel}, {"entities", list}});
                  return r;
              }});
 

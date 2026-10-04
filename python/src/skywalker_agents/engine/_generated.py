@@ -2294,7 +2294,7 @@ class AsyncTools:
         return await self._c.call('scene_new', _args(SceneNewArgs, {'name': name, 'empty': empty}), check=check, timeout=timeout)
 
     async def scene_overview(self, *, max_entities: int | None = None, check: bool = False, timeout: float | None = None) -> ToolResult:
-        """Compact outline of the whole scene: every entity as one line (id, name, mesh/color, position, tags) in hierarchy order, plus environment and selection. Start here before editing."""
+        """Compact outline of the whole scene: every entity as one line (id, name, mesh/color, position, tags) in hierarchy order, plus environment, selection and the scene file (`path`; empty until saved). Start here before editing."""
         return await self._c.call('scene_overview', _args(SceneOverviewArgs, {'max_entities': max_entities}), check=check, timeout=timeout)
 
     async def scene_query(self, *, name: str | None = None, tag: str | None = None, component: str | None = None, near: list[float] | None = None, radius: float | None = None, limit: int | None = None, check: bool = False, timeout: float | None = None) -> ToolResult:
@@ -3045,7 +3045,7 @@ class Tools:
         return self._c.call('scene_new', _args(SceneNewArgs, {'name': name, 'empty': empty}), check=check, timeout=timeout)
 
     def scene_overview(self, *, max_entities: int | None = None, check: bool = False, timeout: float | None = None) -> ToolResult:
-        """Compact outline of the whole scene: every entity as one line (id, name, mesh/color, position, tags) in hierarchy order, plus environment and selection. Start here before editing."""
+        """Compact outline of the whole scene: every entity as one line (id, name, mesh/color, position, tags) in hierarchy order, plus environment, selection and the scene file (`path`; empty until saved). Start here before editing."""
         return self._c.call('scene_overview', _args(SceneOverviewArgs, {'max_entities': max_entities}), check=check, timeout=timeout)
 
     def scene_query(self, *, name: str | None = None, tag: str | None = None, component: str | None = None, near: list[float] | None = None, radius: float | None = None, limit: int | None = None, check: bool = False, timeout: float | None = None) -> ToolResult:

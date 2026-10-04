@@ -131,7 +131,8 @@ it. ++cmd+period++ stops and restores the scene exactly as it was before play.
 ## Start your own
 
 Create a folder and open it; the editor starts an empty project with a default scene (a ground plane, a cube and a
-camera). Save with ++cmd+s++, which writes `scenes/main.sky.json`.
+camera). Save with ++cmd+s++: the first save asks for a name and suggests `scenes/main.sky.json`, the scene the
+editor opens at launch.
 
 ```bash
 mkdir -p ~/Games/my_game

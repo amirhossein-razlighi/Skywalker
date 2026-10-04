@@ -344,6 +344,19 @@ final class EngineStore {
         syncSelectionFromEngine()
     }
 
+    /// The project-relative scene file the engine has open ("" until the scene is first saved). The engine
+    /// tracks it across scene_load / scene_save from every client, so it is read fresh, not cached.
+    func currentScenePath() -> String {
+        call_noRefresh("scene_overview", ["max_entities": 0]).structured["path"].string ?? ""
+    }
+
+    /// Saves the open scene to `path` (project-relative), or back to its own file when `path` is nil.
+    @discardableResult
+    func saveScene(to path: String? = nil) -> ToolCallResult {
+        let args: JSON = path.map { JSON.object([("path", .string($0))]) } ?? [:]
+        return call("scene_save", args)
+    }
+
     private func call_noRefresh(_ tool: String, _ args: JSON) -> ToolCallResult {
         guard let handle else { return ToolCallResult(text: "", imagesBase64: [], structured: .null, isError: true, raw: .null) }
         let raw = sky_call_tool(handle, tool, args.serialized(), "editor")

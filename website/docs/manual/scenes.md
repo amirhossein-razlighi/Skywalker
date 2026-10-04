@@ -239,8 +239,9 @@ scene_new {"name": "Arena", "empty": true}
 - `scene_save` without a path writes the current file. Paths are relative to the project.
 - `scene_load` replaces the open scene and clears the history. Save first.
 - `scene_new` starts a scene with a ground plane, a cube and a camera; `"empty": true` starts with nothing.
-- In the editor, **File › Save Scene** (++cmd+s++) writes `scenes/main.sky.json`; use `scene_save` with a path to
-  save under another name. ++cmd+z++ and ++cmd+shift+z++ undo and redo.
+- In the editor, **File › Save Scene** (++cmd+s++) writes the open scene back to its own file (a new scene asks for
+  a name first), and **Save Scene As…** (++shift+cmd+s++) saves it under another name; agents use `scene_save`,
+  with a path or without one for the open file. `scene_overview` reports the open file as `path`. ++cmd+z++ and ++cmd+shift+z++ undo and redo.
 
 The CLI works on scene files directly:
 

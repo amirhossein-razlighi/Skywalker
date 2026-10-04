@@ -23,7 +23,7 @@
   {
    "name": "scene_overview",
    "title": "Scene overview",
-   "description": "Compact outline of the whole scene: every entity as one line (id, name, mesh/color, position, tags) in hierarchy order, plus environment and selection. Start here before editing.",
+   "description": "Compact outline of the whole scene: every entity as one line (id, name, mesh/color, position, tags) in hierarchy order, plus environment, selection and the scene file (`path`; empty until saved). Start here before editing.",
    "inputSchema": {
     "type": "object",
     "properties": {

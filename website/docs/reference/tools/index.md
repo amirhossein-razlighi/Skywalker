@@ -39,7 +39,7 @@ Arguments are validated before a tool runs: unknown keys, wrong types and bad en
 | [`engine_info`](scene.md#engine_info) | Scene | Version, renderer, play state, component types and tool categories. |
 | [`scene_load`](scene.md#scene_load) | Scene | Load a scene file (replaces the current scene and clears history). |
 | [`scene_new`](scene.md#scene_new) | Scene | Start a new scene. |
-| [`scene_overview`](scene.md#scene_overview) | Scene | Compact outline of the whole scene: every entity as one line (id, name, mesh/color, position, tags) in hierarchy order, plus environment and selection. |
+| [`scene_overview`](scene.md#scene_overview) | Scene | Compact outline of the whole scene: every entity as one line (id, name, mesh/color, position, tags) in hierarchy order, plus environment, selection and the scene file (`path`; empty until saved). |
 | [`scene_query`](scene.md#scene_query) | Scene | Find entities by name glob (e.g. |
 | [`scene_save`](scene.md#scene_save) | Scene | Save the scene as JSON (.sky.json). |
 | [`component_schema`](entity.md#component_schema) | Entity | JSON schema of components (transform, mesh, light, camera) and the environment, with field docs, ranges and enums. |
