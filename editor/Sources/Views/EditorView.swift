@@ -282,6 +282,7 @@ struct ViewportPanel: View {
                         .help("Viewport quality while editing (play mode always renders full quality)")
                         Divider().frame(height: 14)
                         DebugViewMenu()
+                        LanguageMenu()
                     }
                     .padding(3)
                     .background(Theme.panel.opacity(0.88), in: RoundedRectangle(cornerRadius: 6))
@@ -466,6 +467,48 @@ struct DebugViewMenu: View {
             if let item = items.first(where: { $0.0 == view }) { return item.1 }
         }
         return view
+    }
+}
+
+/// Language preview (docs/LOCALIZATION.md): shows the game in another of its locales through locale_set.
+/// Hidden while the game has a single language.
+struct LanguageMenu: View {
+    @Environment(EngineStore.self) private var engine
+    @State private var locales: [String] = []
+    @State private var current = ""
+
+    var body: some View {
+        HStack(spacing: 2) {
+            if locales.count > 1 {
+                Divider().frame(height: 14)
+                Menu {
+                    Picker("Language", selection: Binding(get: { current }, set: { select($0) })) {
+                        ForEach(locales, id: \.self) { Text($0).tag($0) }
+                    }
+                    .pickerStyle(.inline)
+                    Divider()
+                    Button("Default Language") { select("") }
+                } label: {
+                    Label(current.isEmpty ? "Language" : current, systemImage: "globe").font(Theme.label)
+                }
+                .menuStyle(.borderlessButton)
+                .fixedSize()
+                .padding(.horizontal, 6)
+                .help("Preview the game in another language (texts written as @key, tr(), dialogue lines)")
+            }
+        }
+        .task(id: engine.playState) { reload() }
+    }
+
+    private func reload() {
+        let list = engine.call("locale_list", [:], actor: "editor").structured
+        locales = list["locales"].array.compactMap { $0["code"].string }
+        current = list["current"].string ?? ""
+    }
+
+    private func select(_ code: String) {
+        let result = engine.call("locale_set", ["locale": .string(code)], actor: "editor").structured
+        current = result["current"].string ?? code
     }
 }
 

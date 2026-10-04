@@ -35,14 +35,15 @@ struct EntityDetails: View {
                                          "water", "terrain", "foliage", "audio", "listener", "body", "collider", "character",
                                          "joint", "vehicle", "chase_camera", "nav_agent", "navmesh", "physics_world", "animator", "characterIk", "attach", "ik", "sequencer",
                                          "sprite", "sprite_anim", "tilemap", "light2d", "parallax", "camera2d", "text", "ui_canvas",
-                                         "ui", "dialogue", "process", "particles2d"]
+                                         "ui", "dialogue", "process", "particles2d", "persist", "carry"]
     /// Components offered by Add Component (transform is always present).
     private static let addable = ["mesh", "light", "reflection_probe", "camera", "particles", "groom", "water", "terrain",
                                   "foliage", "audio", "listener", "body", "collider", "character", "joint", "vehicle", "chase_camera",
                                   "nav_agent", "navmesh",
                                   "physics_world", "animator", "characterIk", "attach", "ik", "sequencer", "sprite", "sprite_anim",
                                   "tilemap",
-                                  "light2d", "parallax", "camera2d", "text", "ui_canvas", "ui", "dialogue", "process", "particles2d"]
+                                  "light2d", "parallax", "camera2d", "text", "ui_canvas", "ui", "dialogue", "process", "particles2d",
+                                  "persist", "carry"]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -127,6 +128,8 @@ struct EntityDetails: View {
         case "sequencer": "film.stack"
         case "process": "pause.circle"
         case "particles2d": "cloud.snow"
+        case "persist": "square.and.arrow.down.on.square"
+        case "carry": "suitcase"
         default: "puzzlepiece"
         }
     }
@@ -149,6 +152,8 @@ struct EntityDetails: View {
         case "process": "Process (Pause / Time)"
         case "reflection_probe": "Reflection Probe"
         case "particles2d": "Particles 2D"
+        case "persist": "Persist (Save Games)"
+        case "carry": "Carry (Scene Changes)"
         default: comp.capitalized
         }
     }
