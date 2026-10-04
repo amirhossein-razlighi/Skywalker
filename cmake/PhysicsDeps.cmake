@@ -55,16 +55,12 @@ endforeach()
 set(RECASTNAVIGATION_DEMO OFF CACHE BOOL "" FORCE)
 set(RECASTNAVIGATION_TESTS OFF CACHE BOOL "" FORCE)
 set(RECASTNAVIGATION_EXAMPLES OFF CACHE BOOL "" FORCE)
-# recastnavigation 1.6.0 declares cmake_minimum_required(3.1); allow it under CMake 4.
-set(_sky_saved_policy_min "${CMAKE_POLICY_VERSION_MINIMUM}")
-set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
 FetchContent_Declare(recastnavigation
     GIT_REPOSITORY https://github.com/recastnavigation/recastnavigation.git
     GIT_TAG v1.6.0
     GIT_SHALLOW TRUE
     SYSTEM)
 FetchContent_MakeAvailable(recastnavigation)
-set(CMAKE_POLICY_VERSION_MINIMUM "${_sky_saved_policy_min}")
 
 # Third-party code is built without Skywalker's sanitizer/warning flags (they are interface
 # options of sky::options and never reach these targets), but must be position independent
@@ -74,3 +70,9 @@ foreach(_sky_dep Jolt Recast Detour DetourCrowd)
         set_target_properties(${_sky_dep} PROPERTIES POSITION_INDEPENDENT_CODE ON)
     endif()
 endforeach()
+
+# Detour zeroes its (non-trivially copyable) tile array with memset; recastnavigation's own code, known safe.
+if(TARGET Detour)
+    target_compile_options(Detour PRIVATE
+        $<$<CXX_COMPILER_ID:AppleClang,Clang>:-Wno-unknown-warning-option -Wno-nontrivial-memcall>)
+endif()

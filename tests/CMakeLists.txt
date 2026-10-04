@@ -6,8 +6,6 @@ FetchContent_Declare(doctest
     GIT_TAG v2.4.11
     GIT_SHALLOW TRUE)
 set(DOCTEST_NO_INSTALL ON CACHE BOOL "" FORCE)
-# doctest 2.4.11 declares an ancient cmake_minimum_required; allow it under CMake 4.
-set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
 FetchContent_MakeAvailable(doctest)
 
 set(SKY_TEST_SOURCES
@@ -56,7 +54,8 @@ set(SKY_TEST_SOURCES
 )
 
 add_executable(skywalker_tests ${SKY_TEST_SOURCES})
-target_link_libraries(skywalker_tests PRIVATE sky::engine sky::capi doctest::doctest)
+# capi before engine: capi already depends on engine, listing engine first makes the linker see it twice.
+target_link_libraries(skywalker_tests PRIVATE sky::capi sky::engine doctest::doctest)
 target_compile_definitions(skywalker_tests PRIVATE
     SKY_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
 if(TARGET skywalker-player)

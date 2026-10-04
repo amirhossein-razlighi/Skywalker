@@ -28,6 +28,8 @@ target_compile_options(SkywalkerEditor PRIVATE
     $<$<AND:$<COMPILE_LANGUAGE:Swift>,$<CONFIG:Debug>>:-Onone>)
 target_link_libraries(SkywalkerEditor PRIVATE sky::capi
     "-framework AppKit" "-framework SwiftUI" "-framework Security" "-framework GameController")
+# CMake adds -lc++ once per linked C++ / Objective-C++ language; the duplicate is harmless but noisy.
+target_link_options(SkywalkerEditor PRIVATE LINKER:-no_warn_duplicate_libraries)
 
 if(EXISTS ${SKY_ICON})
     target_sources(SkywalkerEditor PRIVATE ${SKY_ICON})
