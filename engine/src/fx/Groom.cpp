@@ -463,8 +463,8 @@ void baseCurve(const GroomData& d, const GroomData::Child& c, const Vec3* guides
 void assignGuides(GroomData& d, const std::vector<Vec3>& guideRoots, const RootGrid& grid, float spacing) {
     parallelFor(d.children.size(), [&](size_t ci) {
         GroomData::Child& c = d.children[ci];
-        uint32_t idx[3];
-        float dist[3];
+        uint32_t idx[3] = {0, 0, 0};
+        float dist[3] = {0.f, 0.f, 0.f};
         int n = grid.nearest(c.root, 3, idx, dist);
         float wsum = 0;
         for (int j = 0; j < 3; ++j) {

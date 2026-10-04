@@ -995,14 +995,14 @@ void addAssetAndRenderTools(Engine& engine, ToolRegistry& reg) {
                      }
                  }
                  // Record provenance so agents can later find and regenerate this asset.
-                 if (auto reg = engine.assets().registerFile(engine.resolvePath(req->path))) {
+                 if (auto registered = engine.assets().registerFile(engine.resolvePath(req->path))) {
                      (void)engine.assets().updateMeta(
-                         (*reg)->path, Json::object({{"source", Json::object({{"kind", req->kind},
+                         (*registered)->path, Json::object({{"source", Json::object({{"kind", req->kind},
                                                                               {"prompt", req->prompt},
                                                                               {"style", req->style},
                                                                               {"by", req->requestedBy},
                                                                               {"completedBy", ctx.actor}})},
-                                                     {"description", (*reg)->description.empty() ? Json(req->prompt) : Json()}}));
+                                                     {"description", (*registered)->description.empty() ? Json(req->prompt) : Json()}}));
                  }
                  req->status = "done";
                  engine.emitEvent(Json::object({{"type", "asset_done"}, {"request", req->toJson()}}));

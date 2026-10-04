@@ -1,6 +1,7 @@
 // Sequencer tools: build cinematic sequences (keyed properties, camera shots and cuts,
 // events, animation tracks), scrub them with captures, render frames, and play them.
 
+#include <cstring>
 #include <algorithm>
 #include <cmath>
 #include <cstdio>

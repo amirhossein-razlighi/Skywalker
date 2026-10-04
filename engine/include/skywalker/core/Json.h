@@ -64,6 +64,11 @@ public:
     void push(Json value);
     size_t size() const;
     const Json& operator[](size_t index) const;
+    // Non-const and int overloads: `j[size_t{0}]` / `j[0]` on a mutable Json must not be
+    // ambiguous with the object-key overload (GCC treats a zero integer as a null pointer).
+    const Json& operator[](size_t index) { return static_cast<const Json&>(*this)[index]; }
+    const Json& operator[](int index) const { return (*this)[static_cast<size_t>(index)]; }
+    const Json& operator[](int index) { return static_cast<const Json&>(*this)[static_cast<size_t>(index)]; }
 
     // Objects
     const Object& members() const;  // empty if not an object

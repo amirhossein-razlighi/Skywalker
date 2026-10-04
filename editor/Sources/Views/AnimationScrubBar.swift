@@ -29,7 +29,7 @@ struct AnimationScrubBar: View {
             }
             .buttonStyle(.borderless)
             .help(isAnimator ? "Animate live in the editor" : "Show the sequence at this time in the viewport")
-            Slider(value: Binding(get: { min(time, length) }, set: scrub), in: 0...max(length, 0.01),
+            Slider(value: Binding(get: { min(time, length) }, set: { scrub($0) }), in: 0...max(length, 0.01),
                    onEditingChanged: { editing in if !editing { commit() } })
                 .controlSize(.mini)
             Text(String(format: "%.2f s", time))

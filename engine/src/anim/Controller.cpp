@@ -1,5 +1,6 @@
 #include "skywalker/anim/Controller.h"
 
+#include <cstring>
 #include <algorithm>
 #include <cmath>
 #include <fstream>

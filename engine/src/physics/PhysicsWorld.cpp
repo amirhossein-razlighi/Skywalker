@@ -483,7 +483,7 @@ struct PhysicsWorld::Impl final : public JPH::ContactListener {
                 d.role = kRoleTrigger;
                 d.motion = JPH::EMotionType::Kinematic;
                 d.sensor = true;
-                d.layer = objectLayer(rb ? layerIndex(rb->layer, kTrigger) : kTrigger, false, true);
+                d.layer = objectLayer(rb ? layerIndex(rb->layer, kTrigger) : JPH::ObjectLayer{kTrigger}, false, true);
                 ShapePart p;
                 p.entity = e;
                 p.collider = col;
@@ -512,7 +512,7 @@ struct PhysicsWorld::Impl final : public JPH::ContactListener {
             if (d.motion == JPH::EMotionType::Dynamic && rb && allowedDofs(rb->lockPosition, rb->lockRotation) == JPH::EAllowedDOFs::None) {
                 d.motion = JPH::EMotionType::Kinematic;  // fully locked: Jolt needs at least one free axis
             }
-            JPH::ObjectLayer user = rb ? layerIndex(rb->layer, kDefault) : kStatic;
+            JPH::ObjectLayer user = rb ? layerIndex(rb->layer, kDefault) : JPH::ObjectLayer{kStatic};
             if (!rb && d.motion == JPH::EMotionType::Static) user = kStatic;
             if (rb && rb->layer == "default" && d.motion == JPH::EMotionType::Static) user = kStatic;
             d.layer = objectLayer(user, d.motion == JPH::EMotionType::Static);

@@ -1,6 +1,8 @@
 // `skywalker build`: assembles, icons, signs and verifies a macOS app bundle around the standalone player.
 
+#if defined(__APPLE__)
 #include <mach-o/dyld.h>
+#endif
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -195,10 +197,16 @@ std::string findPlayerBinary() {
     std::error_code ec;
     auto usable = [&](const fs::path& p) { return !p.empty() && fs::is_regular_file(p, ec) && ::access(p.c_str(), X_OK) == 0; };
     if (const char* env = std::getenv("SKYWALKER_PLAYER"); env && usable(env)) return env;
+    fs::path self;
+#if defined(__APPLE__)
     char buf[4096];
     uint32_t size = sizeof(buf);
-    if (_NSGetExecutablePath(buf, &size) == 0) {
-        fs::path dir = fs::weakly_canonical(buf, ec).parent_path();
+    if (_NSGetExecutablePath(buf, &size) == 0) self = buf;
+#else
+    self = fs::read_symlink("/proc/self/exe", ec);
+#endif
+    if (!self.empty()) {
+        fs::path dir = fs::weakly_canonical(self, ec).parent_path();
         for (const fs::path& candidate : {dir / "skywalker-player", dir.parent_path() / "bin" / "skywalker-player"}) {
             if (usable(candidate)) return candidate.string();
         }

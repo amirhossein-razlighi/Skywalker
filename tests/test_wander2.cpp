@@ -600,7 +600,11 @@ behavior Player
     log [1][3]
   end
 end)";
-    TestReport rep = runTests(src, TestOptions{.behaviorName = "Player"});
+    TestReport rep = runTests(src, [] {
+        TestOptions o;
+        o.behaviorName = "Player";
+        return o;
+    }());
     REQUIRE(rep.compiled);
     REQUIRE(rep.tests.size() == 4);
     CHECK(rep.tests[0].passed);

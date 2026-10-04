@@ -5,6 +5,8 @@ add_library(sky::options ALIAS sky_options)
 
 target_compile_options(sky_options INTERFACE
     $<$<COMPILE_LANG_AND_ID:CXX,AppleClang,Clang,GNU>:-Wall -Wextra -Wpedantic -Wshadow -Wnon-virtual-dtor -Wno-unused-parameter>
+    # GCC 12/13 report false stringop-overflow errors inside std::move of small vectors (GCC bug 107852).
+    $<$<COMPILE_LANG_AND_ID:CXX,GNU>:-Wno-stringop-overflow>
     $<$<COMPILE_LANG_AND_ID:OBJCXX,AppleClang,Clang>:-Wall -Wextra -fobjc-arc -Wno-unused-parameter>
 )
 

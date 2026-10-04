@@ -108,7 +108,7 @@ public:
 /// Per-collider surface material (friction/restitution overrides), combined in the contact listener.
 class SurfaceMaterial final : public JPH::PhysicsMaterial {
 public:
-    SurfaceMaterial(float friction, float restitution) : friction(friction), restitution(restitution) {}
+    SurfaceMaterial(float frictionValue, float restitutionValue) : friction(frictionValue), restitution(restitutionValue) {}
     const float friction;
     const float restitution;
 };

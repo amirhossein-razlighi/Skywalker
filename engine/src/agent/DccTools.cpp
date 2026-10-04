@@ -471,8 +471,8 @@ std::shared_ptr<dcc::Manager> addDccTools(Engine& engine, ToolRegistry& reg, std
                                                          "put helpers in files under the project and import them"));
                 }
                 std::string name = sanitize(a.get("name").asString("script"), "script");
-                auto out = inProject(engine, a.get("out_dir").asString("dcc/" + name), "out_dir");
-                if (!out) return ToolResult::error(out.error());
+                auto outDir = inProject(engine, a.get("out_dir").asString("dcc/" + name), "out_dir");
+                if (!outDir) return ToolResult::error(outDir.error());
                 std::string appName = a.get("app").asString();
                 auto app = mgr->pick(appName, "script");
                 if (!app) return ToolResult::error(app.error());
@@ -482,7 +482,7 @@ std::shared_ptr<dcc::Manager> addDccTools(Engine& engine, ToolRegistry& reg, std
                 st->spec.task = "script";
                 st->spec.script = a.get("script").asString();
                 st->spec.projectDir = engine.assets().root();
-                st->spec.outDir = *out;
+                st->spec.outDir = *outDir;
                 st->spec.timeout = std::chrono::seconds(timeoutSeconds(a, 300));
                 st->spec.userPrefs = a.get("user_prefs").asBool(false);
                 for (const auto& s : a.get("args").elements()) st->spec.args.push_back(s.asString());
@@ -753,14 +753,14 @@ std::shared_ptr<dcc::Manager> addDccTools(Engine& engine, ToolRegistry& reg, std
                 if (extOf(*blend) != ".blend") {
                     return ToolResult::error(Error::make("invalid_arguments", "blend must be a .blend file", "use dcc_convert for other formats"));
                 }
-                auto out = inProject(engine, a.get("out_dir").asString("dcc/" + sanitize(fs::path(*blend).stem().string(), "export")), "out_dir");
-                if (!out) return ToolResult::error(out.error());
+                auto outDir = inProject(engine, a.get("out_dir").asString("dcc/" + sanitize(fs::path(*blend).stem().string(), "export")), "out_dir");
+                if (!outDir) return ToolResult::error(outDir.error());
                 auto st = std::make_shared<RunState>();
                 st->app = *blender;
                 st->spec.label = "export";
                 st->spec.task = "export";
                 st->spec.projectDir = engine.assets().root();
-                st->spec.outDir = *out;
+                st->spec.outDir = *outDir;
                 st->spec.inputFile = *blend;
                 st->spec.timeout = std::chrono::seconds(timeoutSeconds(a, 300));
                 st->spec.params = Json::object({{"blend", *blend}});
@@ -1015,14 +1015,14 @@ std::shared_ptr<dcc::Manager> addDccTools(Engine& engine, ToolRegistry& reg, std
                                                          "recipes: " + [] { std::string s; for (const auto& r : recipeNames()) s += (s.empty() ? "" : ", ") + r; return s; }()));
                 }
                 std::string name = sanitize(a.get("name").asString(recipe.empty() ? "generated" : recipe), "generated");
-                auto out = inProject(engine, a.get("out_dir").asString("dcc/generated"), "out_dir");
-                if (!out) return ToolResult::error(out.error());
+                auto outDir = inProject(engine, a.get("out_dir").asString("dcc/generated"), "out_dir");
+                if (!outDir) return ToolResult::error(outDir.error());
                 auto st = std::make_shared<RunState>();
                 st->app = *blender;
                 st->spec.label = "generate";
                 st->spec.task = "generate";
                 st->spec.projectDir = engine.assets().root();
-                st->spec.outDir = *out;
+                st->spec.outDir = *outDir;
                 st->spec.script = a.get("script").asString();
                 st->spec.timeout = std::chrono::seconds(timeoutSeconds(a, 300));
                 st->spec.params = Json::object({{"recipe", recipe}, {"name", name}, {"output", name + ".glb"}});
