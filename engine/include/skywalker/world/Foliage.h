@@ -30,6 +30,15 @@ struct FoliageInstance {
 };
 static_assert(sizeof(FoliageInstance) == 16 * sizeof(float));
 
+/// A hand-placed instance of a layer (`points`): a building, a wall segment, a lamp post, a row
+/// of cypresses. Placed exactly, with the layer's instancing, LODs, impostors and wind.
+struct FoliagePoint {
+    Vec3 position;               // world position; with `snapToSurface`, y is an offset above the surface
+    Vec3 rotation{0.f, 0.f, 0.f};  // Euler degrees: pitch (x), yaw (y), roll (z), applied yaw * pitch * roll
+    Vec3 scale{1.f, 1.f, 1.f};
+    float tint = 0.f;            // -1..1 color variation (as scattered instances get)
+};
+
 struct FoliageLayer {
     std::string name;
     std::string mesh = "grass";         // primitive ("grass", "grass_tall", "pebbles", "fern", ...) or "asset:..." (incl. #part)
@@ -62,7 +71,16 @@ struct FoliageLayer {
     float impostorDistance = 0.f;       // meters; 0 = automatic from on-screen size, < 0 = never
     int impostorResolution = 0;         // atlas edge in pixels; 0 = automatic (512..2048 by model size)
     int impostorFrames = 12;            // capture directions per atlas side (4..32)
+    // Hand-placed instances: when set, exactly these are drawn (density, slope, height and
+    // terrain-layer rules do not apply) and the layer's scaleMin/Max cover their scales.
+    std::shared_ptr<const std::vector<FoliagePoint>> points;
+    bool snapToSurface = false;         // points: y is an offset above the surface under (x, z)
+    float boundsRadius = 0.f;           // model radius around its origin (m); set by the runtime, pads chunk bounds
 };
+
+/// Parses a layer's `points`: [x, y, z, yaw?, scale?] arrays or {position, rotation?, yaw?,
+/// scale (number or [x, y, z])?, tint?} objects. Fails with `invalid_points` naming the entry.
+Result<std::vector<FoliagePoint>> foliagePointsFromJson(const Json& points);
 
 /// Parses foliage layers. `terrainLayerNames` (see terrainLayerNames) lets `terrainLayer` name a
 /// terrain material layer instead of giving its index; a name that does not resolve leaves the

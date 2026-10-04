@@ -290,6 +290,12 @@ void WorldRuntime::gather(const Scene& scene, const ViewCamera& view, FrameData&
             layer.density *= fo->density;
             const LayerModel* model = layerModel(entry, li, layer);
             if (!model) continue;  // streaming in: chunk bounds need the real mesh size
+            {
+                const Aabb& mb = model->bounds;  // farthest model corner from the origin pads the chunk bounds
+                Vec3 far{std::max(std::fabs(mb.min.x), std::fabs(mb.max.x)), std::max(std::fabs(mb.min.y), std::fabs(mb.max.y)),
+                         std::max(std::fabs(mb.min.z), std::fabs(mb.max.z))};
+                layer.boundsRadius = length(far);
+            }
             auto chunks = entry.cache.visibleChunks(layer, static_cast<int>(li), static_cast<uint32_t>(fo->seed), view.eye, areaMin,
                                                     areaMax, surface, model->meshHeight, budget);
             if (chunks.empty()) continue;

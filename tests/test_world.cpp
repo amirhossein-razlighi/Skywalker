@@ -83,6 +83,75 @@ TEST_CASE("world: foliage chunks are deterministic and respect rules") {
     CHECK(cache.chunkCount() >= chunks.size());  // empty (all-steep) chunks are cached but not drawn
 }
 
+TEST_CASE("world: foliage points place hand-picked instances exactly once") {
+    auto layers = world::foliageLayersFromJson(Json::parse(R"([{"mesh":"rock","snapToSurface":true,"density":0.001,"slopeMax":1,
+        "points":[[1, 0.5, 2], [20, 0, 3, 90, 2], {"position":[-5, 0, -40], "rotation":[0, 180, 0], "scale":[1, 3, 0.5], "tint":0.4}]}])")
+                                                   .value());
+    REQUIRE(layers.size() == 1);
+    REQUIRE(layers[0].points);
+    REQUIRE(layers[0].points->size() == 3);
+    CHECK(layers[0].scaleMin == doctest::Approx(0.5f));
+    CHECK(layers[0].scaleMax == doctest::Approx(3.f));
+    world::SurfaceFn ground = [](float x, float, world::SurfaceSample& s) {
+        s.y = x > 10 ? 4.f : 1.f;
+        s.normal = normalize(Vec3{1, 1, 0});  // steep everywhere: slope rules do not apply to points
+        return true;
+    };
+    // Every point lands in exactly one chunk, whatever the chunk grid.
+    const float cs = world::FoliageCache::chunkSizeFor(layers[0]);
+    std::vector<world::FoliageInstance> all;
+    for (int cz = -4; cz <= 4; ++cz) {
+        for (int cx = -4; cx <= 4; ++cx) {
+            auto chunk = world::scatterChunk(layers[0], 0, 1, cx, cz, cs, ground, 2.f);
+            all.insert(all.end(), chunk.begin(), chunk.end());
+        }
+    }
+    REQUIRE(all.size() == 3);
+    auto find = [&](float x) {
+        for (const auto& i : all) {
+            if (std::fabs(i.row0[3] - x) < 1e-4f) return i;
+        }
+        FAIL("no instance at x = " << x);
+        return all[0];
+    };
+    auto a = find(1), b = find(20), c = find(-5);
+    CHECK(a.row1[3] == doctest::Approx(1.5f));  // snapped: surface 1 + offset 0.5
+    CHECK(a.row2[3] == doctest::Approx(2.f));
+    CHECK(b.row1[3] == doctest::Approx(4.f));
+    // yaw 90, scale 2: local +X maps to world -Z (yaw * pitch * roll, right-handed).
+    CHECK(b.row0[0] == doctest::Approx(0.f).epsilon(1e-5));
+    CHECK(b.row2[0] == doctest::Approx(-2.f));
+    CHECK(b.row1[1] == doctest::Approx(2.f));
+    CHECK(b.height == doctest::Approx(4.f));  // mesh height x scale.y (wind bending)
+    // Non-uniform scale and the tint come through; yaw 180 flips X and Z.
+    CHECK(c.row0[0] == doctest::Approx(-1.f));
+    CHECK(c.row1[1] == doctest::Approx(3.f));
+    CHECK(c.row2[2] == doctest::Approx(-0.5f));
+    CHECK(c.tint == doctest::Approx(0.4f));
+    // The cache serves them like scattered chunks, padded by the model radius.
+    world::FoliageLayer padded = layers[0];
+    padded.boundsRadius = 6.f;
+    world::FoliageCache cache;
+    int budget = 1000;
+    auto chunks = cache.visibleChunks(padded, 0, 1, {0, 0, 0}, {-100, -100}, {100, 100}, ground, 2.f, budget);
+    size_t n = 0;
+    for (const auto& ch : chunks) {
+        n += ch.instances->size();
+        for (const auto& i : *ch.instances) {
+            CHECK(ch.bounds.min.x <= i.row0[3] - 6.f * padded.scaleMax + 1e-3f);
+            CHECK(ch.bounds.max.z >= i.row2[3] + 6.f * padded.scaleMax - 1e-3f);
+        }
+    }
+    CHECK(n == 3);
+
+    CHECK(!world::foliagePointsFromJson(Json::parse(R"([[1, 2]])").value()));
+    CHECK(!world::foliagePointsFromJson(Json::parse(R"([{"position":[0,0,0],"scale":[1,0,1]}])").value()));
+    auto err = world::foliagePointsFromJson(Json::parse(R"([[0,0,0], "x"])").value());
+    REQUIRE(!err);
+    CHECK(err.error().code == "invalid_points");
+    CHECK(err.error().message.find("points[1]") != std::string::npos);
+}
+
 TEST_CASE("world: terrain and foliage tools, frame items and raycasts") {
     EngineConfig cfg;
     cfg.renderer = RendererBackend::Null;
@@ -100,6 +169,14 @@ TEST_CASE("world: terrain and foliage tools, frame items and raycasts") {
     REQUIRE(!r.isError);
     r = e.callTool("foliage_add", Json::parse(R"({"entity":"Terrain","layers":[{"preset":"grasss"}]})").value(), "agent:test");
     CHECK(r.isError);
+    r = e.callTool("foliage_add", Json::parse(R"({"entity":"Terrain","layers":[{"mesh":"rock","points":[[0,0,0],[1,2]]}]})").value(),
+                   "agent:test");
+    REQUIRE(r.isError);
+    CHECK(r.content.front().text.find("layers[0]: points[1]") != std::string::npos);
+    r = e.callTool("foliage_add",
+                   Json::parse(R"({"entity":"Terrain","name":"Markers","layers":[{"mesh":"rock","snapToSurface":true,"points":[[0,0,0],[10,0,10,45,2]]}]})").value(),
+                   "agent:test");
+    REQUIRE(!r.isError);
 
     r = e.callTool("terrain_query", Json::parse(R"({"points":[[0,0],[5000,0]]})").value(), "agent:test");
     REQUIRE(!r.isError);

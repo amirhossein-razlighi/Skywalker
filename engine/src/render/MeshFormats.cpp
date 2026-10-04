@@ -77,7 +77,9 @@ void turnAround(MeshData& m) {
 
 Aabb turnAround(const Aabb& b) { return {{-b.max.x, b.min.y, -b.max.z}, {-b.min.x, b.max.y, -b.min.z}}; }
 
-std::pair<std::string, int> splitPart(const std::string& ref) {
+std::pair<std::string, int> splitPart(const std::string& refIn) {
+    std::string ref = refIn;
+    if (size_t at = ref.rfind("@skin"); at != std::string::npos) ref.resize(at);  // posed per-instance copy
     size_t hash = ref.rfind('#');
     if (hash == std::string::npos) return {ref, -2};
     try {

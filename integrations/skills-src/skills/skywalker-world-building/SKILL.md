@@ -95,6 +95,13 @@ affordable. Per layer: `impostorDistance` (m; 0 = automatic from on-screen size,
 preview:true}` bakes ahead of time or after editing a mesh/material; `viewport_capture {debug_view:"impostors"}`
 tints meshes green and impostors magenta; `perf_stats` lists the triangles of each model (`foliageModels`).
 
+Hand-placed instances (a whole city of houses, a row of cypresses, lamp posts along a quay): give a layer `points`
+instead of a density and it draws exactly those, with the same instancing, LODs and impostors. Points are
+`[x, y, z, yaw?, scale?]` or `{position, rotation:[pitch,yaw,roll], scale (number or [x,y,z]), tint}`;
+`snapToSurface:true` makes y an offset above the ground. Use one layer per model (a prefab of a generated building
+works) and `wind:0` for architecture: `foliage_add {entity:"Terrain", name:"Far City", layers:[{prefab:"models/house_a.prefab.json",
+wind:0, cullDistance:3000, snapToSurface:true, points:[[40,0,-120,90],[52,0,-118,0,1.2]]}]}`.
+
 ## Water
 
 `fx_create {effect:"ocean"|"calm_sea"|"storm"|"lake"|"pool"|"puddle", position:[x,y,z], overrides}`. The entity's

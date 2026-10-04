@@ -482,7 +482,12 @@ void addWorldBuildTools(Engine& engine, ToolRegistry& reg) {
                  "layers stream in around the camera. Heavy meshes (trees, bushes, rocks) switch to octahedral impostors "
                  "in the distance automatically; tune with impostorDistance (m; 0 auto, -1 off), impostorResolution and "
                  "impostorFrames, or impostors:false. Example: {\"entity\":\"Island\",\"layers\":[{\"preset\":\"dune_grass\","
-                 "\"heightMin\":1.5},{\"preset\":\"shells\",\"heightMax\":1.2}]}.",
+                 "\"heightMin\":1.5},{\"preset\":\"shells\",\"heightMax\":1.2}]}. Hand-placed instances: a layer with "
+                 "`points` draws exactly those (buildings of a distant city, a row of cypresses, lamp posts along a quay) "
+                 "with the same instancing, LODs and impostors: [x, y, z, yaw?, scale?] or {position, rotation [pitch, yaw, "
+                 "roll], scale (number or [x, y, z]), tint}; `snapToSurface: true` makes y an offset above the ground. "
+                 "Example: {\"entity\":\"Terrain\",\"name\":\"Far City\",\"layers\":[{\"prefab\":\"models/house_a.prefab.json\","
+                 "\"wind\":0,\"cullDistance\":3000,\"snapToSurface\":true,\"points\":[[40,0,-120,90],[52,0,-118,0,1.2]]}]}.",
              "world",
              object({{"entity", entity("Terrain entity to grow on (foliage becomes its child), or any entity for scene mode")},
                      {"layers", Json::object({{"type", "array"}, {"description", "Layers: {preset, ...overrides} or full custom layers"}})},
@@ -502,6 +507,20 @@ void addWorldBuildTools(Engine& engine, ToolRegistry& reg) {
                              return ToolResult::error(Error::make("unknown_preset", "no foliage preset '" + p + "'",
                                                                   guess.empty() ? "" : "did you mean '" + guess + "'?"));
                          }
+                     }
+                 }
+                 {
+                     size_t index = 0;
+                     for (const auto& l : a.get("layers").elements()) {
+                         if (l.contains("points")) {
+                             auto pts = world::foliagePointsFromJson(l.get("points"));
+                             if (!pts) {
+                                 Error err = pts.error();
+                                 err.message = "layers[" + std::to_string(index) + "]: " + err.message;
+                                 return ToolResult::error(err);
+                             }
+                         }
+                         ++index;
                      }
                  }
                  // terrainLayer: an index or a layer name of the terrain it grows on (did-you-mean on typos).
