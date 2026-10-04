@@ -658,6 +658,11 @@ void addViewTools(Engine& engine, ToolRegistry& reg) {
                      o.customView = engine.camera().toView();
                      o.customView.eye = eye;
                      if (reflect::jsonToVec3(a.get("target"), target)) o.customView.target = target;
+                     // Clip planes follow the custom view, not the editor orbit: a continent seen from
+                     // 2 km must not be clipped by an editor camera parked 5 m from its target.
+                     const float d = std::max(length(o.customView.target - eye), 0.2f);
+                     o.customView.nearPlane = std::clamp(d * 0.005f, 0.01f, 5.f);
+                     o.customView.farPlane = std::max(4000.f, d * 50.f);
                      if (a.contains("fov")) o.customView.fovDeg = std::clamp(a.get("fov").asFloat(), 5.f, 150.f);
                      o.customView.aperture = std::max(0.f, a.get("aperture").asFloat(0.f));
                      o.customView.focusDistance = std::max(0.f, a.get("focus_distance").asFloat(0.f));
