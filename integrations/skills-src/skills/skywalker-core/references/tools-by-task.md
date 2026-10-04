@@ -62,6 +62,7 @@ full descriptions; `component_schema` and each tool's input schema list every fi
 `wander_reference {topic}`, `wander_check {source*, format, disassemble}`, `behavior_set {entity*, name*, intent, spec, source, enabled, allow_errors}`, `behavior_remove {entity*, name*}`, `behavior_spec {entity*, name*}`,
 `wander_test {entity, name, source, filter, mode:entity\|scene\|isolated, max_seconds}`, `behavior_graph {entity, name, source, palette}` / `behavior_from_graph {graph*, entity, name, allow_errors}`, `wander_inspect {entity*}`,
 `sim_control {action*: play\|pause\|stop\|step\|status, ticks}`, `sim_input {press, hold, release, actions, axes, gamepad, mouse, click, event, data, target}`, `sim_trace {entities*, properties*, ticks, every, press, hold, restore}`, `logs {limit}`, `input_map`.
+Debugger: `wander_break_set {script, line, condition, hit_count, log, entity, on_error}`, `wander_break_clear {id, script, on_error}`, `wander_break_list`, `wander_debug_state {wait_ms}`, `wander_continue {wait_ms}`, `wander_step {mode:over\|into\|out, wait_ms}`, `wander_pause {wait_ms}`, `wander_stack {vars}`, `wander_eval {expression*, frame}`, `wander_set_var {name*, value*, frame}`. See skywalker-wander.
 Native code: `wander_compile_native {entity, force, auto}`, `native_template {name, overwrite}`, `native_build {force, load}`, `native_list`. See skywalker-wander.
 
 ## Physics and navigation

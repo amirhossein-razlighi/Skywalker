@@ -22,6 +22,7 @@ the intent, writes code plus one test per rule, and proves the code meets the in
 - [The graph view](#the-graph-view)
 - [Execution: bytecode VM](#execution-bytecode-vm)
 - [Native code: AOT behaviors and C++ modules](#native-code-aot-behaviors-and-c-modules)
+- [Debugging](#debugging)
 - [Tools](#tools)
 - [Performance](#performance)
 - [Migrating from Wander 1](#migrating-from-wander-1)
@@ -444,6 +445,81 @@ machine. The tools that build and load them are mutating tools in the `code` cat
 MCP clients and the in-editor crew ask before an agent uses them; review agent-written C++
 before building it. Wander itself stays sandboxed (no file, network or clock access).
 
+## Debugging
+
+The VM has a debugger that agents drive through tools (and that the editor can drive through the
+same API). It stops a running game *inside* a handler, before a statement, with the world frozen
+mid-tick:
+
+```text
+wander_break_set   {"script": "Guard", "line": 12, "condition": "hp <= 0"}
+wander_debug_state {"wait_ms": 5000}          # wait for the stop: reason, script:line, entity
+wander_stack       {}                         # frames, args, locals, the entity's vars, globals
+wander_eval        {"expression": "distance(self, target)"}
+wander_set_var     {"name": "hp", "value": 10}
+wander_step        {"mode": "into"}           # over | into | out
+wander_continue    {"wait_ms": 2000}
+wander_break_clear {}
+```
+
+- **Breakpoints** are set by script and line: the behavior's script name as in `behavior_set`
+  (`"Guard"`), or a module path for code from `use` (`"scripts/ai.wander"`); with no script
+  they stop in any script at that line. A breakpoint on a line without code moves to the
+  next line with code (the result warns). Options: `condition` (a Wander expression over the
+  frame's locals, arguments and vars), `hit_count` (`"5"` = the 5th hit, `">=5"`, `">5"`,
+  `"%3"` = every 3rd), `entity` (only that entity) and `log`: a **logpoint** logs a message
+  with `{expression}` parts interpolated (`"hp={hp} at {self.position}"`) and never stops.
+- **Break on error**: `wander_break_set {"on_error": true}` stops at a runtime error before
+  it is reported, at the failing statement, with the frame intact.
+- **Stepping**: `over` runs to the next statement of the same function (calls run through),
+  `into` stops at the next statement anywhere (entering a called `fn`), `out` stops back in
+  the caller. When the handler ends, a step stops at the next statement any behavior runs.
+  `wander_pause` stops at the next statement of any behavior.
+- **Inspection**: `wander_stack` lists frames innermost first with the function
+  (`Guard.on tick`, `Guard.chase`), script, line and column, entity and behavior state, the
+  frame's arguments and locals in scope at that point, the entity's vars, and the globals
+  (`time`, `frame`, `dt`). `wander_eval` evaluates any expression in a frame (watch
+  expressions: evaluate them at each stop); it is read-only, so assignments to the scene
+  fail. `wander_set_var` changes a local, an argument or a var, and the code continues with
+  the new value.
+- **Events**: each stop emits `wander.paused` (the state: reason, where, breakpoint) and each
+  resume `wander.resumed` (`action`: continue, over, into, out) on the engine event log.
+
+**Determinism.** While a tick is held at a stop, nothing advances: no tick, timer, physics
+step or `on frame` handler runs, and play time does not move. Resuming continues the same
+statement of the same tick, so a run that stopped at breakpoints ends in exactly the state
+of a run that did not (tested). `sim_control stop` while paused abandons the tick and
+restores the scene as usual. Mutating tools other than the debugger's and `sim_control`
+answer `paused_in_debugger` while the game is held; read-only tools keep working.
+
+**How it waits.** When the debugger is active, the engine runs each step's ticks on a short
+helper thread with a strict hand-over: the two threads never run at the same time. At a stop
+the helper waits and the engine's frame returns, so the main thread goes on serving tool
+calls (including over `skywalker mcp`, which answers one call at a time), rendering and
+pumping jobs; resuming hands control back until the next stop or the end of the ticks.
+`wait_ms` on the waiting tools only waits on agent connections that have their own thread;
+on the main thread they answer at once with the state reached.
+
+**Cost.** With no breakpoints, no stepping, no pause request and break-on-error off, the VM
+runs its normal loop and native (AOT) code; the only check is one flag per handler call.
+Measured with `wander_bench` (median of 7 alternating runs, ms/tick, Linux x86-64, a 4-core
+cloud machine):
+
+| Scenario | No debugger | Debugger idle | Debugger active |
+|---|---|---|---|
+| `w1_compute` | 0.906 | 0.897 | 1.756 |
+| `w1_gameplay` | 2.631 | 2.529 | 2.613 |
+| `w1_vectors` | 0.786 | 0.714 | 0.925 |
+| `w1_builtins` | 2.443 | 2.241 | 3.078 |
+| `overhead` | 0.603 | 0.602 | 0.646 |
+| `w2_functions` | 1.580 | 1.466 | 1.729 |
+
+Idle is within the noise of the build without a debugger. "Active" (`wander_bench
+--debug-active`: break on error on, no breakpoint hit) runs the separate debug loop, which
+checks each new line against the breakpoint lines; tight arithmetic loops pay the most. AOT
+behaviors run in the VM while the debugger is active, so they can stop like the rest.
+`on frame` (cosmetic) handlers are never stopped.
+
 ## Tools
 
 | Tool | What it does |
@@ -459,6 +535,9 @@ before building it. Wander itself stays sandboxed (no file, network or clock acc
 | `wander_compile_native` | AOT-compile behaviors to native code |
 | `native_build` / `native_list` / `native_template` | Native C++ modules |
 | `sim_input` | Inject input and events (`event` + `data` payload) |
+| `wander_break_set` / `wander_break_clear` / `wander_break_list` | Breakpoints, logpoints, break on error ([Debugging](#debugging)) |
+| `wander_debug_state` / `wander_continue` / `wander_step` / `wander_pause` | Debugger state and control |
+| `wander_stack` / `wander_eval` / `wander_set_var` | Inspect and change a paused frame |
 
 CLI: `skywalker check file.wander [--project DIR] [--format] [--disassemble]`.
 
