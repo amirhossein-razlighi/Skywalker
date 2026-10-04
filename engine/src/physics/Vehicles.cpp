@@ -759,19 +759,31 @@ void VehicleSet::preStep(const Scene& s, float dt) {
         } else {
             en.reversing = false;
             if (v->gear != en.lastGearWritten) en.requestedGear = std::clamp(v->gear, -1, en.forwardGears);
-            en.controller->GetTransmission().Set(en.requestedGear, 1.f);
+        }
+        // Pulling the handbrake declutches, as drivers do: the rear wheels lock instead of fighting
+        // the engine, and letting go drops the clutch (a classic way into a drift).
+        {
+            JPH::VehicleTransmission& tr = en.controller->GetTransmission();
+            const bool declutch = in.handbrake > 0.3f;
+            if (en.manual) {
+                tr.Set(en.requestedGear, declutch ? 0.f : 1.f);
+            } else if (declutch) {
+                tr.mMode = JPH::ETransmissionMode::Manual;
+                tr.Set(tr.GetCurrentGear() == 0 ? 1 : tr.GetCurrentGear(), 0.f);
+            } else {
+                tr.mMode = JPH::ETransmissionMode::Auto;
+            }
         }
 
-        // Steering: less lock at speed, rate-limited like a real steering rack, plus the drift
-        // assist's automatic counter-steer.
+        // Steering: less lock at speed, rate-limited like a real steering rack. Drift assist adds
+        // counter-steer only past a comfortable drift angle, so slides are held, not straightened.
         float lockScale = 1.f - std::clamp(v->speedSensitiveSteering, 0.f, 1.f) * 0.65f * std::clamp(flatSpeed / 35.f, 0.f, 1.f);
         float target = in.steer * lockScale;
         const float drift = std::clamp(v->driftAssist, 0.f, 1.f);
-        en.driftActive = false;
-        if (drift > 0 && forwardSpeed > 4.f && grounded >= 2 && std::fabs(en.bodySlip) > 4.f && !en.reversing) {
-            target += drift * 0.7f * std::clamp(en.bodySlip / std::max(en.maxSteerDeg, 1.f), -1.f, 1.f);
-            en.driftActive = true;
-        }
+        constexpr float kComfortAngle = 30.f;  // degrees of drift the assist leaves to the driver
+        en.driftActive = drift > 0 && forwardSpeed > 4.f && grounded >= 2 && std::fabs(en.bodySlip) > 6.f && !en.reversing;
+        const float excess = en.driftActive ? std::max(std::fabs(en.bodySlip) - kComfortAngle, 0.f) : 0.f;
+        if (excess > 0.f) target += drift * std::clamp(excess / 20.f, 0.f, 1.f) * (en.bodySlip > 0 ? 1.f : -1.f);
         target = std::clamp(target, -1.f, 1.f);
         if (v->steerSpeed > 0) {
             float delta = target - en.steer;
@@ -802,9 +814,11 @@ void VehicleSet::preStep(const Scene& s, float dt) {
         // if Jolt locked the wheel, and keeps its cornering grip. Without ABS a locked tire slides at the
         // lower locked friction and barely steers (see the tire callback).
         en.abs = v->abs;
-        en.braking = brake > 0.f;
+        en.braking = brake > 0.f || in.handbrake > 0.f;
         for (size_t i = 0; i < en.wheels.size(); ++i) {
-            bool on = v->abs && brake > 0.f && std::fabs(groundSpeed[i]) > 1.5f;
+            // The handbrake locks its wheels on purpose (slides, hairpins): ABS leaves those alone.
+            const bool handbraked = in.handbrake > 0.1f && en.wheels[i].handbrake;
+            const bool on = v->abs && brake > 0.f && !handbraked && std::fabs(groundSpeed[i]) > 1.5f;
             en.absHit[i] = on ? 1 : 0;
         }
 
@@ -831,12 +845,13 @@ void VehicleSet::preStep(const Scene& s, float dt) {
             en.tractionScale = 1.f;
         }
 
-        // Drift assist grip shaping: the handbrake and power break the rear loose more easily.
+        // Drift assist grip shaping: the handbrake and power break the rear loose more easily, and a
+        // slide on the throttle keeps the rear light so it can be held.
         for (size_t i = 0; i < en.wheels.size(); ++i) {
             float lat = 1.f;
             if (drift > 0 && en.wheels[i].axle > 0) {
                 lat -= 0.35f * drift * in.handbrake;
-                if (in.throttle > 0.6f && std::fabs(en.bodySlip) > 6.f) lat -= 0.15f * drift;
+                if (en.driftActive && in.throttle > 0.3f) lat -= 0.3f * drift;
             }
             en.lateralScale[i] = std::max(lat, 0.2f);
             en.longitudinalScale[i] = 1.f;
@@ -856,23 +871,26 @@ void VehicleSet::preStep(const Scene& s, float dt) {
             bi.AddForce(en.body, force, JPH::EActivation::DontActivate);
         }
 
-        // Drift assist: a sliding car keeps its momentum along its nose and its rotation in check,
-        // so slides are long, controllable arcs instead of spins.
+        // Drift assist: a slide keeps its speed (the tires scrub less of it) and never turns into a
+        // spin: past the comfortable angle the rotation is damped and the travel direction swings
+        // toward the nose.
         if (en.driftActive) {
-            JPH::Vec3 w = bi.GetAngularVelocity(en.body);
-            float yaw = w.Dot(up);
-            float maxYaw = flatSpeed * std::tan(radians(en.maxSteerDeg)) / std::max(en.wheelBase, 0.5f) * (1.f + 0.6f * drift) + 0.4f;
-            if (std::fabs(yaw) > maxYaw) {
-                float limited = (yaw > 0 ? maxYaw : -maxYaw);
-                w += up * ((limited - yaw) * std::min(1.f, drift * 8.f * dt));
-                bi.SetAngularVelocity(en.body, w);
+            if (in.throttle > 0.3f) {
+                float push = drift * 2.5f * std::clamp(std::fabs(en.bodySlip) / kComfortAngle, 0.f, 1.f);  // m/s^2
+                bi.AddForce(en.body, fwd * (push * en.mass), JPH::EActivation::DontActivate);
             }
-            float slip = radians(en.bodySlip);
-            float turn = std::clamp(std::fabs(slip), 0.f, drift * 0.9f * dt) * (slip > 0 ? 1.f : -1.f);
-            // Rotate the horizontal velocity toward the heading by `turn` (keeps its magnitude).
-            JPH::Quat q = JPH::Quat::sRotation(up, turn);
-            JPH::Vec3 vertical = up * vel.Dot(up);
-            bi.SetLinearVelocity(en.body, q * flat + vertical);
+            if (excess > 0.f) {
+                const float k = drift * std::clamp(excess / 25.f, 0.f, 1.f);
+                JPH::Vec3 w = bi.GetAngularVelocity(en.body);
+                float yaw = w.Dot(up);
+                w -= up * (yaw * std::min(1.f, k * 6.f * dt));
+                bi.SetAngularVelocity(en.body, w);
+                float slip = radians(en.bodySlip);
+                float turn = std::clamp(std::fabs(slip), 0.f, k * 1.5f * dt) * (slip > 0 ? 1.f : -1.f);
+                JPH::Quat q = JPH::Quat::sRotation(up, turn);  // keeps the speed, changes the direction
+                JPH::Vec3 vertical = up * vel.Dot(up);
+                bi.SetLinearVelocity(en.body, q * flat + vertical);
+            }
         }
     }
     lastStepMs_ = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
@@ -1033,12 +1051,16 @@ std::optional<VehicleTelemetry> VehicleSet::telemetry(EntityId e) const {
             wt.load = std::max(0.f, w->GetSuspensionLambda() * inv);
             wt.longitudinalForce = w->GetLongitudinalLambda() * inv;
             wt.lateralForce = w->GetLateralLambda() * inv;
-            wt.slipRatio = w->mLongitudinalSlip;
-            wt.slipAngle = degrees(w->mLateralSlip);
             JPH::Vec3 rel = body.GetPointVelocity(w->GetContactPosition()) - w->GetContactPointVelocity();
+            // Slip ratio as drivers feel it: + wheelspin, - lock-up, relative to at least 3 m/s (Jolt's own
+            // ratio explodes near a standstill). An ABS-held wheel rolls at its peak slip.
+            const float ground = rel.Dot(w->GetContactLongitudinal());
+            const float surface = w->GetAngularVelocity() * ws.radius;
+            wt.slipRatio = en.absHit[i] ? -0.1f : (std::fabs(surface) - std::fabs(ground)) / std::max(std::fabs(ground), 3.f);
+            wt.slipAngle = degrees(w->mLateralSlip);
             float speed = rel.Length();
             if (speed > 2.f) {
-                float longitudinal = std::clamp((std::min(wt.slipRatio, 3.f) - 0.2f) / 0.6f, 0.f, 1.f);
+                float longitudinal = std::clamp((std::fabs(wt.slipRatio) - 0.2f) / 0.6f, 0.f, 1.f);
                 float lateral = std::clamp((wt.slipAngle - 7.f) / 15.f, 0.f, 1.f);
                 wt.skid = std::max(longitudinal, lateral) * std::clamp(speed / 6.f, 0.f, 1.f);
             }

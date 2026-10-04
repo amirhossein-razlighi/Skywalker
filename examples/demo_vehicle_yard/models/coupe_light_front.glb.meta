@@ -1,0 +1,12 @@
+{
+  "guid": "e287df41943340f1a14fb22c6cd945b9",
+  "type": "mesh",
+  "tags": [],
+  "description": "",
+  "source": {},
+  "import": {
+    "normalize": false,
+    "zUp": false,
+    "vertexColors": false
+  }
+}

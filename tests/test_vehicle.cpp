@@ -397,38 +397,29 @@ TEST_CASE("vehicle: perf stats and physics stats count vehicles") {
     e->stop();
 }
 
-TEST_CASE("vehicle-debug: print") {
+TEST_CASE("vehicle: a handbrake flick and power hold a drift; ABS shortens stops") {
     auto e = makeVehicleEngine();
-    EntityId car = createScripted(*e);
-    if (const char* set = std::getenv("SKY_VEHICLE_SET")) call(*e, "vehicle_tune", std::string(R"({"entity":"Car","set":)") + set + "}");
-    e->play();
-    e->step(30);
-    const char* th = std::getenv("SKY_VEHICLE_THROTTLE");
-    float throttle = th ? static_cast<float>(std::atof(th)) : 1.f;
-    for (int i = 0; i < 6; ++i) {
-        drive(*e, car, throttle, 0.f, 0.f, 30);
-        auto t = telemetry(*e, car);
-        MESSAGE(physics::telemetryJson(e->scene(), t, true).dump());
-    }
-    e->stop();
+    createScripted(*e);
+    // Handbrake into a left turn, then throttle with a little counter-steer: a sustained slide.
+    Json r = call(*e, "vehicle_test_drive",
+                  R"({"entity":"Car","maneuver":"custom","duration":7,"inputs":[{"t":0,"throttle":1},
+                      {"t":3.4,"throttle":0.3,"steer":-1,"handbrake":1},{"t":3.9,"throttle":1,"steer":-0.3,"handbrake":0},
+                      {"t":4.3,"throttle":1,"steer":0.3}]})");
+    CHECK(r.get("custom").get("maxDriftAngle").asFloat(0.f) > 15.f);
+    CHECK(r.get("custom").get("maxDriftAngle").asFloat(99.f) < 70.f);  // held, not spun
+    Json withAbs = call(*e, "vehicle_test_drive", R"({"entity":"Car","maneuver":"braking"})");
+    Json without = call(*e, "vehicle_test_drive", R"({"entity":"Car","maneuver":"braking","overrides":{"abs":false}})");
+    CHECK(withAbs.get("braking").get("distanceM").asFloat(99.f) < without.get("braking").get("distanceM").asFloat(0.f));
+    CHECK(without.get("braking").get("wheelsLocked").asBool());
+    CHECK_FALSE(withAbs.get("braking").get("wheelsLocked").asBool());
 }
 
-TEST_CASE("vehicle-debug: overrides") {
+TEST_CASE("vehicle: input_map adds the drive actions as a preset") {
     auto e = makeVehicleEngine();
-    const char* preset = std::getenv("SKY_VEHICLE_PRESET");
-    createScripted(*e, preset ? preset : "sports");
-    const char* env = std::getenv("SKY_VEHICLE_OVERRIDES");
-    std::string list = env ? env : "{}";
-    const char* m = std::getenv("SKY_VEHICLE_MANEUVER");
-    std::string maneuver = m ? m : "accel";
-    size_t start = 0;
-    while (start < list.size()) {
-        size_t end = list.find('|', start);
-        std::string o = list.substr(start, end == std::string::npos ? std::string::npos : end - start);
-        Json r = call(*e, "vehicle_test_drive", R"({"entity":"Car","maneuver":")" + maneuver + R"(","overrides":)" + o + "}");
-        r["summary"] = Json();
-        MESSAGE(o, " -> ", r.dump());
-        if (end == std::string::npos) break;
-        start = end + 1;
-    }
+    Json r = call(*e, "input_map", R"({"operation":"add_preset","preset":"drive"})");
+    CHECK(r.get("changed").get("added").size() == 6);
+    for (const char* a : {"throttle", "brake", "steer", "handbrake", "shift_up", "shift_down"}) CHECK(e->actionMap().find(a));
+    Json again = call(*e, "input_map", R"({"operation":"add_preset","preset":"drive"})");
+    CHECK(again.get("changed").get("added").size() == 0);  // the project's own bindings are kept
+    call(*e, "input_map", R"({"operation":"add_preset","preset":"flying"})", false);
 }

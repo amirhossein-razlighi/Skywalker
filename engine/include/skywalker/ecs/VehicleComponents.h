@@ -107,8 +107,8 @@ struct ChaseCamera {
     float height = 2.f;          // m above the target
     float targetHeight = 0.8f;   // m above the target origin to aim at
     float lookAhead = 0.3f;      // s of velocity to aim ahead (into corners)
-    float stiffness = 5.f;       // position spring (1/s): higher follows tighter
-    float turnStiffness = 3.f;   // how fast the arm swings behind a turning target (1/s)
+    float stiffness = 8.f;       // position spring (1/s): higher follows tighter
+    float turnStiffness = 4.f;   // how fast the arm swings behind a turning target (1/s)
     float fovMin = 60.f;         // degrees at a standstill
     float fovMax = 76.f;         // degrees at fovSpeed
     float fovSpeed = 50.f;       // m/s where the field of view reaches fovMax
