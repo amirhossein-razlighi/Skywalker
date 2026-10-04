@@ -141,6 +141,8 @@ struct WaterUniforms {
     simd_float4 params2;    // x = roughness, y = 1 / N, z = endless, w = unused
     simd_float4 patch;      // xyz = cascade tile sizes (m)
     simd_float4 origin;     // xz = grid origin (endless)
+    simd_float4 shore;      // xyz = terrain center, w = terrain size (m)
+    simd_float4 shore2;     // x = heightmap resolution, y = terrain bound, z = shoaling depth (m)
 };
 
 struct FluidParams {
@@ -317,6 +319,7 @@ class MetalRenderer final : public Renderer {
     };
     struct TerrainGpu {
         id<MTLTexture> height, normal, weights0, weights1;
+        id<MTLTexture> seabed;  // low-passed heights (~16 m) the water uses for shore depth
         uint64_t version = 0;
         const world::TerrainData* source = nullptr;
         int levels = 0;                                    // quadtree levels above the finest node
@@ -1486,6 +1489,26 @@ private:
         return t;
     }
 
+    /// The terrain that forms the seabed of `w` near the camera: the one under the camera,
+    /// else the closest one whose waterLevel matches the water (none for open ocean scenes).
+    const TerrainItem* seabedTerrain(const FrameData& frame, const WaterItem& w) const {
+        const TerrainItem* best = nullptr;
+        float bestDist = 1e30f;
+        for (const TerrainItem& t : frame.terrains) {
+            if (!t.data || t.data->resolution() < 2) continue;
+            const float half = t.data->size() * 0.5f;
+            const float dx = std::max(std::abs(frame.camera.eye.x - t.origin.x) - half, 0.f);
+            const float dz = std::max(std::abs(frame.camera.eye.z - t.origin.z) - half, 0.f);
+            float d = std::sqrt(dx * dx + dz * dz);
+            if (std::abs(t.waterLevel - w.level) < 0.5f) d -= 1.f;  // prefer terrains made for this water
+            if (d < bestDist) {
+                bestDist = d;
+                best = &t;
+            }
+        }
+        return best;
+    }
+
     TerrainGpu& terrainGpu(const TerrainItem& item) {
         TerrainGpu& g = terrainsGpu_[item.entity];
         g.lastUse = frameIndex_;
@@ -1517,6 +1540,41 @@ private:
         }
         g.weights0 = sharedTexture(MTLPixelFormatRGBA8Unorm, n, n, w0.data(), static_cast<NSUInteger>(n) * 4);
         g.weights1 = sharedTexture(MTLPixelFormatRGBA8Unorm, n, n, w1.data(), static_cast<NSUInteger>(n) * 4);
+        {
+            // Smoothed seabed for wave shoaling: block average to ~16 m cells, then a 3x3 blur.
+            // Hollows behind a beach berm average out above the waterline, so swells never
+            // flood them, while open beaches still see waves run up the sand.
+            const int k = std::max(1, static_cast<int>(std::lround(16.f / std::max(t.cell(), 1e-3f))));
+            const int m = std::max(2, (n + k - 1) / k);
+            std::vector<float> avg(static_cast<size_t>(m) * m), blur(avg.size());
+            const auto& hs = t.heights();
+            for (int bz = 0; bz < m; ++bz) {
+                for (int bx = 0; bx < m; ++bx) {
+                    double sum = 0;
+                    int count = 0;
+                    for (int z = bz * k; z < std::min(n, bz * k + k); ++z) {
+                        for (int x = bx * k; x < std::min(n, bx * k + k); ++x, ++count) sum += hs[static_cast<size_t>(z) * n + x];
+                    }
+                    avg[static_cast<size_t>(bz) * m + bx] = count ? static_cast<float>(sum / count) : 0.f;
+                }
+            }
+            for (int z = 0; z < m; ++z) {
+                for (int x = 0; x < m; ++x) {
+                    float sum = 0;
+                    int count = 0;
+                    for (int dz = -1; dz <= 1; ++dz) {
+                        for (int dx = -1; dx <= 1; ++dx) {
+                            int xx = x + dx, zz = z + dz;
+                            if (xx < 0 || zz < 0 || xx >= m || zz >= m) continue;
+                            sum += avg[static_cast<size_t>(zz) * m + xx];
+                            ++count;
+                        }
+                    }
+                    blur[static_cast<size_t>(z) * m + x] = sum / static_cast<float>(count);
+                }
+            }
+            g.seabed = sharedTexture(MTLPixelFormatR32Float, m, m, blur.data(), static_cast<NSUInteger>(m) * 4);
+        }
         // Min/max height pyramid over kPatchCells-sized blocks (node culling).
         const int cells = n - 1;
         const int n0 = std::max(1, (cells + kPatchCells - 1) / kPatchCells);
@@ -2246,6 +2304,15 @@ private:
                 const float snap = 0.6f;  // whole grid cells, so the mesh does not swim
                 wu.origin = simd_make_float4(std::round(frame.camera.eye.x / snap) * snap, 0.f,
                                              std::round(frame.camera.eye.z / snap) * snap, 0.f);
+                // The seabed: the terrain under the camera (or nearest it) damps waves in the shallows.
+                id<MTLTexture> seabed = white_;
+                if (const TerrainItem* t = seabedTerrain(frame, w)) {
+                    TerrainGpu& tg = terrainGpu(*t);
+                    seabed = tg.seabed ? tg.seabed : tg.height;
+                    wu.shore = simd_make_float4(t->origin.x, t->origin.y, t->origin.z, t->data->size());
+                    wu.shore2 = simd_make_float4(static_cast<float>(t->data->resolution()), 1.f, 3.f, 0.f);
+                }
+                [enc setVertexTexture:seabed atIndex:3];
                 const GridMesh& grid = endless ? endlessGrid_ : unitGrid_;
                 [enc setVertexBuffer:grid.vertices offset:0 atIndex:0];
                 [enc setVertexBytes:&wu length:sizeof(wu) atIndex:1];

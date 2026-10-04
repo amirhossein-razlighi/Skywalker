@@ -12,6 +12,8 @@ struct WaterUniforms {
     float4 params2;    // x = roughness, y = 1/N, z = endless
     float4 patch;      // xyz = cascade tile sizes
     float4 origin;     // xz = grid origin
+    float4 shore;      // xyz = terrain center, w = terrain size (m); the seabed under the water
+    float4 shore2;     // x = heightmap resolution, y = 1 if a terrain is bound, z = shoaling depth (m)
 };
 
 struct WaterOut {
@@ -19,7 +21,23 @@ struct WaterOut {
     float3 worldPos;
     float2 baseXZ;
     float height;
+    float calm;  // 0 at the waterline .. 1 in open water (waves shoal and die in the shallows)
 };
+
+// Waves shoal toward the shore: they lose height as the (smoothed) seabed rises, still run up
+// the beach face, and die out just above the waterline. The seabed is low-passed (~16 m), so
+// hollows behind a beach berm read as land: without this the FFT surface rises through gently
+// sloping sand and floods dry hollows with every swell.
+static float shoreDamping(constant WaterUniforms& w, texture2d<float> seabed, float2 xz) {
+    if (w.shore2.y < 0.5) return 1.0;
+    float2 uv = (xz - w.shore.xz) / w.shore.w + 0.5;
+    if (any(uv < 0.0) || any(uv > 1.0)) return 1.0;
+    float h = seabed.sample(linearClamp, uv).r;
+    float depth = w.levelSize.x - (w.shore.y + h);
+    float open = smoothstep(0.0, max(w.shore2.z, 0.1), depth);   // shoaling: 0 at the waterline, 1 offshore
+    float runup = smoothstep(-1.2, 0.0, depth);                  // the beach face above the waterline
+    return runup * mix(0.4, 1.0, open);
+}
 
 vertex WaterOut waterVertex(uint vid [[vertex_id]],
                             const device float2* grid [[buffer(0)]],
@@ -27,7 +45,8 @@ vertex WaterOut waterVertex(uint vid [[vertex_id]],
                             constant FrameUniforms& f [[buffer(2)]],
                             texture2d<float> d0 [[texture(0)]],
                             texture2d<float> d1 [[texture(1)]],
-                            texture2d<float> d2 [[texture(2)]]) {
+                            texture2d<float> d2 [[texture(2)]],
+                            texture2d<float> seabed [[texture(3)]]) {
     float2 g = grid[vid];
     bool endless = w.params2.z > 0.5;
     float2 xz = endless ? g + w.origin.xz : w.levelSize.zw + g * w.levelSize.y;
@@ -44,7 +63,8 @@ vertex WaterOut waterVertex(uint vid [[vertex_id]],
             saturate(1.5 - dist / (w.patch.y * 12.0));
     disp += d2.sample(oceanSampler, xz / w.patch.z + ht, level(clamp(log2(max(dist, 1.0) / (texel2 * 60.0)), 0.0, 6.0))).xyz *
             saturate(1.5 - dist / (w.patch.z * 12.0));
-    disp *= edge;
+    float calm = shoreDamping(w, seabed, xz);
+    disp *= edge * calm;
     float3 world = float3(xz.x + disp.x, w.levelSize.x + disp.y, xz.y + disp.z);
     WaterOut o;
     o.position = f.viewProj * float4(world, 1.0);
@@ -52,6 +72,7 @@ vertex WaterOut waterVertex(uint vid [[vertex_id]],
     o.worldPos = world;
     o.baseXZ = xz;
     o.height = disp.y;
+    o.calm = calm;
     return o;
 }
 
@@ -122,7 +143,7 @@ fragment EffectOut waterFragment(WaterOut in [[stage_in]],
     float4 sl0 = s0.sample(oceanSampler, u0), sl1 = s1.sample(oceanSampler, u1), sl2 = s2.sample(oceanSampler, u2);
     float2 sl = sl0.xy + sl1.xy + sl2.xy;
     float persistentFoam = saturate(sl0.z + sl1.z * 0.8 + sl2.z * 0.5);
-    float3 N = normalize(float3(-sl.x, 1.0, -sl.y));
+    float3 N = normalize(float3(-sl.x, 1.0, -sl.y) * float3(mix(0.3, 1.0, in.calm), 1.0, mix(0.3, 1.0, in.calm)));
     float J = j0.sample(oceanSampler, u0).w + j1.sample(oceanSampler, u1).w + j2.sample(oceanSampler, u2).w - 2.0;
 
     float3 V = normalize(f.cameraPos.xyz - in.worldPos);
