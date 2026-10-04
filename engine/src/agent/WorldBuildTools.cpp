@@ -419,7 +419,9 @@ void addWorldBuildTools(Engine& engine, ToolRegistry& reg) {
                  }() +
                  ". Layer fields: mesh, color, density (/m²), scaleMin/Max, slopeMin/Max, heightMin/Max (world y), "
                  "terrainLayer (index; only where that layer is painted), wind, cullDistance, castShadows, clumping. Dense "
-                 "layers stream in around the camera. Example: {\"entity\":\"Island\",\"layers\":[{\"preset\":\"dune_grass\","
+                 "layers stream in around the camera. Heavy meshes (trees, bushes, rocks) switch to octahedral impostors "
+                 "in the distance automatically; tune with impostorDistance (m; 0 auto, -1 off), impostorResolution and "
+                 "impostorFrames, or impostors:false. Example: {\"entity\":\"Island\",\"layers\":[{\"preset\":\"dune_grass\","
                  "\"heightMin\":1.5},{\"preset\":\"shells\",\"heightMax\":1.2}]}.",
              "world",
              object({{"entity", entity("Terrain entity to grow on (foliage becomes its child), or any entity for scene mode")},

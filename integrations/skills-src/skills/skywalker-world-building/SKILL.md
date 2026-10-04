@@ -72,7 +72,7 @@ Generate seamless sets with `texture_generate {kind:"rock", name:"cliff", create
 `foliage_add {entity:"Terrain", layers:[...], seed}` grows foliage as a child of the terrain. Presets:
 `meadow_grass, tall_grass, dune_grass, flowers, ferns, beach_pebbles, shells, rocks_small, boulders, custom`.
 Layer fields: `preset, mesh, color, density (/m2), scaleMin/Max, slopeMin/Max, heightMin/Max (world y),
-terrainLayer, wind, cullDistance, castShadows, clumping, alignToNormal`.
+terrainLayer, wind, cullDistance, castShadows, clumping, alignToNormal, impostorDistance`.
 
 ```text
 foliage_add {entity:"Terrain", layers:[
@@ -86,6 +86,13 @@ foliage_add {entity:"Terrain", layers:[
 Dense layers stream in around the camera, so only the visible part costs. Still check `perf_stats` after
 large additions, and give heavy meshes (trees) low density plus a `cullDistance`. `density` on the component
 (0..4) scales every layer at once.
+
+Forests to the horizon: heavy meshes (imported trees, bushes, rocks) switch to **octahedral impostors** in the
+distance automatically (baked once, cached in `.skywalker/cache/impostors/`), so a `cullDistance` of 1-2 km is
+affordable. Per layer: `impostorDistance` (m; 0 = automatic from on-screen size, -1 = never), `impostorResolution`
+(atlas px), `impostorFrames` (views per side), `impostors:false`. `impostor_bake {entity:"Forest", rebake:true,
+preview:true}` bakes ahead of time or after editing a mesh/material; `viewport_capture {debug_view:"impostors"}`
+tints meshes green and impostors magenta; `perf_stats` lists the triangles of each model (`foliageModels`).
 
 ## Water
 

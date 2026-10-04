@@ -65,10 +65,13 @@ See the `terrain_*` and `foliage_add` tools.
   between LODs with no cracks or popping.
 - **Foliage:** GPU-instanced and wind-animated, generated in chunks around the camera
   (about 256 instances per chunk) and thinned toward the cull distance. Multi-part models
-  (trunk + alpha-cut leaves) share instances.
+  (trunk + alpha-cut leaves) share instances. A compute pass culls every instance and picks
+  its level of detail; heavy models become octahedral impostors in the distance (see
+  [Foliage impostors](#foliage-impostors)).
 - **Levels of detail:** meshes of 3,000+ triangles (photoscans) get an automatic LOD chain
   from meshoptimizer: attribute-aware, with a sloppy fallback for card geometry. The level
-  is chosen by on-screen error under one pixel. Leaf cards keep a readable canopy.
+  is chosen by on-screen error under one pixel (foliage allows ~3 px, per instance). Leaf
+  cards keep a readable canopy.
 
 ### Camera, grading and looks
 
@@ -87,7 +90,8 @@ See the `terrain_*` and `foliage_add` tools.
 `debug_view` is one of:
 - `albedo`, `normals`, `material` (roughness/metallic), `gi`, `reflections`, `ao`,
   `depth`, `lighting` (before GI);
-- `sketch`: pencil contours and hatching.
+- `sketch`: pencil contours and hatching;
+- `impostors`: the final image with foliage meshes tinted green and impostors magenta.
 
 `clay: true` renders every surface as matte white clay. Sketch, clay and final make
 "sketch to fill" sequences.
@@ -96,7 +100,10 @@ See the `terrain_*` and `foliage_add` tools.
 
 - `perf_stats` reports GPU frame time, triangles drawn, terrain nodes, foliage instances,
   draw calls and effect timings. `perf_stats {frames: 30}` benchmarks the current view in
-  real time.
+  real time; `view: {eye, target, fov}` benchmarks any camera and `quality` an editor tier.
+  Foliage stats: `meshInstances`, `impostorInstances`, `foliageTriangles` (+ shadows),
+  `foliageModels` (mesh triangles per model, its impostor and cull distances),
+  `impostorsBaked` / `impostorsLoaded` / `impostorBakeMs` / `impostorMemoryMB`.
 - `renderScale` 0.5–0.77 renders fewer pixels and lets MetalFX reconstruct full
   resolution (about 25% faster at 0.67 on an M1 Pro).
 - Per-frame data uses a triple-buffered ring with a frames-in-flight semaphore. Static
@@ -213,6 +220,89 @@ embers or shrapnel on top.
 | Light shafts | `godRays: 1`, `haze: 0.01`–`0.03`, a low sun behind trees, pillars or canyon walls; lamps get visible cones in misty air. |
 | Rainy neon street | Night `hdri` or gradient sky, `fx_create rain` 12 m up with `floorHeight` at the street, wet materials (`roughness` 0.1–0.2), emissive signs, `mist` at street level. |
 
+## Foliage impostors
+
+Imported trees, bushes and rocks are often 50k–3M triangles each. Drawn as meshes out to
+a 1–2 km cull distance they cost billions of triangles. Beyond a per-layer **transition
+distance**, instances draw as **octahedral impostors** instead: camera-facing cards that
+read a pre-rendered atlas of the model seen from many directions. This is the same
+technique as Fortnite / Unreal's impostors and Horizon's distant vegetation.
+
+**Bake** (GPU, lazy, cached):
+- Every foliage layer whose model has 300+ triangles gets an impostor (`impostors: false`
+  turns it off). A model is one mesh, or every part of a prefab (trunk, branches, leaves).
+- Upright vegetation is captured on a **hemi-octahedral** grid of `impostorFrames`² views
+  (default 12×12). Each view is an orthographic render of the bounding sphere, using
+  `evaluateMaterial`, the same material code as the meshes (textures, ORM, normal maps,
+  alpha test). The alpha test runs per MSAA sample, so leaf edges resolve to true coverage.
+- Two RGBA8 atlases: albedo + coverage, and model-space normal (octahedral) + depth +
+  subsurface. The model's mean roughness is stored alongside.
+- CPU post-process (`render/Impostor.h`):
+  - un-premultiply, then dilate colors and normals into the empty texels of each frame
+    (no dark halos);
+  - build a mip chain whose alpha is rescaled per frame so the alpha-tested area stays
+    constant. Distant forests keep their density instead of thinning out.
+- Cached in `.skywalker/cache/impostors/<key>.skyimp` (zlib).
+  - The key hashes the parts: mesh keys, materials, part transforms, the source files'
+    size and mtime, the atlas layout and the bake version.
+  - Editing a mesh, texture or material rebakes it. Identical models share one atlas.
+  - Caches are gitignored. They rebuild on demand.
+- Bakes run in short command buffers: batches of views capped by triangle count, and
+  watchdog-safe. In the live viewport, about 100 ms of baking or loading runs per frame.
+  Until its impostor is ready, a layer draws only its mesh range.
+  - `impostor_bake {entity, layer, rebake, preview}` bakes ahead of time and returns the
+    atlas.
+
+**Transition distance.** It is set automatically from on-screen size: where one atlas texel
+covers about 1.5 screen pixels, about 0.08–0.1 of the screen height for a tree. It scales with
+the resolution and lens.
+- Override it per layer with `impostorDistance` (m), or `-1` to disable.
+- `impostorResolution` (atlas px; auto 512–2048 by size) and `impostorFrames` trade memory
+  against sharpness.
+- The balanced and fast editor tiers move it to 0.75× and 0.5×.
+
+**Rendering:**
+- **GPU-driven culling.** One compute threadgroup per chunk tests every instance against
+  the camera and the 4 sun cascades. It sorts instances into 4 distance bands (per-instance
+  mesh LOD) and the impostor bin, and writes compact instance lists plus indirect draw
+  arguments. The CPU issues indirect draws only for bands a chunk can touch.
+  - Arguments are bounds-checked on the GPU and validated on the CPU when each frame
+    completes.
+  - `SKY_GPU_CULL=0` (or a failed validation) switches to an identical CPU path.
+  - A triangle budget coarsens all foliage LODs if a frame would exceed 120M camera
+    triangles (30M in safe mode after a GPU fault).
+- **Impostor cards:**
+  - Each card blends the 3 nearest views with barycentric weights over the view grid, so
+    there is no popping between views.
+  - Two depth-parallax steps per view put each pixel on the baked surface.
+  - Cards write the G-buffer (normals, roughness, subsurface) and real depth (pixel depth
+    offset), so sun and clustered lights, shadows, GI, SSAO, reflections and fog treat
+    impostors as geometry.
+  - A coarse-mip coverage test skips empty card pixels early.
+- **Transition:** meshes and impostors crossfade over a band before the transition distance
+  with a complementary per-pixel dither that changes every frame. TAA (or still
+  accumulation) blends it, so nothing pops.
+- **Shadows:**
+  - Mesh LODs (one level coarser) near the camera.
+  - Sun-facing impostor cards beyond the transition. They write depth reconstructed from
+    the baked depth, so canopies self-shadow.
+  - The far cascades (from the 3rd; from the 2nd in lower tiers) draw impostors only.
+- **Leaf cards:** with impostors in place, alpha-tested parts may use LOD 2 at mid distance
+  (LOD 1 without impostors).
+
+**Measured on ashen_peaks** (M1 Pro, 1920×1080, full quality, 30-frame `perf_stats`):
+
+| View | Before | After |
+|---|---|---|
+| Aerial | 852 ms, 1.35 G triangles | ~20 ms |
+| Mid-valley | 2022 ms, 3.9 G triangles | ~52 ms |
+| Ground | 2002 ms, 3.2 G triangles | ~80 ms |
+
+The same scene without any foliage costs about 13 ms (aerial) and 17 ms (ground). What
+remains at ground level is mostly the jacaranda's 3.5M-triangle mesh near the camera and
+dense alpha-tested grass. Assets with game-ready triangle counts (20–100k) fall well
+within budget.
+
 ## Limits and next steps
 
 - Point and spot lights don't cast shadows yet. The sun casts four cascades; clouds and
@@ -222,5 +312,7 @@ embers or shrapnel on top.
 - Transparent meshes don't refract (water does). Particles and fluid volumes render after
   transparent meshes.
 - Fluid volumes don't cast shadows on the scene yet.
-- Distant forests use mesh LODs. Impostors (billboard captures) are planned.
+- Impostors are static: they don't sway in the wind, and their lighting uses the model's
+  mean roughness. Up close they can look slightly brighter than the meshes, which show
+  more inner-canopy shadowing.
 - Metal backend only; a Vulkan port is on the [roadmap](ROADMAP.md).
