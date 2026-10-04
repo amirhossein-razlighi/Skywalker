@@ -77,6 +77,7 @@ struct Camera {
     float aperture = 0.f;       // f-stop for depth of field (1.4 shallow .. 16 deep), 0 = everything sharp
     float focusDistance = 0.f;  // meters, 0 = autofocus on the center of the frame
     float motionBlur = 0.f;     // shutter fraction 0..1 (0.5 = 180-degree shutter), 0 = off
+    float tiltShift = 0.f;      // miniature look: 0..1 blur above and below a sharp horizontal band (tilt-shift lens)
 
     static const TypeInfo& type();
 };

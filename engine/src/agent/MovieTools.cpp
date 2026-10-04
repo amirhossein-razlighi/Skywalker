@@ -208,7 +208,7 @@ void addMovieTools(Engine& engine, ToolRegistry& reg) {
              object({{"action", enumeration({"render", "status", "cancel"}, "render (default), status of the current/last render, or cancel it")},
                      {"sequence", any("Sequence to render: entity with a sequencer, or a .sequence.json path")},
                      {"camera", any("Inline camera move: {keys: [{t, eye, target, fov?, roll?, ease?}]} or {shots: [{shot, duration, "
-                                    "target, t?, ...}]}, plus aperture, focus_distance")},
+                                    "target, t?, ...}]}, plus aperture, focus_distance, tilt_shift")},
                      {"camera_entity", schema::entity("Look through this camera instead of the scene's primary one")},
                      {"simulate", boolean("Run the full game simulation (scripts, physics) while rendering (default false)")},
                      {"start", number("Start time in seconds (default 0; the simulation pre-rolls to it)")},

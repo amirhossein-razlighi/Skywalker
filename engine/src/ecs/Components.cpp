@@ -101,6 +101,9 @@ const TypeInfo& Camera::type() {
             SKY_FIELD_RANGE(Camera, aperture, Float, "Depth of field f-stop: 1.4 very shallow .. 16 deep (0 = off)", 0.f, 64.f),
             SKY_FIELD_RANGE(Camera, focusDistance, Float, "Focus distance in meters (0 = autofocus on the frame center)", 0.f, 100000.f),
             SKY_FIELD_RANGE(Camera, motionBlur, Float, "Motion blur shutter (0.5 = film-like 180 degrees, 0 = off)", 0.f, 1.f),
+            SKY_FIELD_RANGE(Camera, tiltShift, Float,
+                            "Tilt-shift miniature look: blur above and below a sharp band across the middle of the frame (0 = off, 1 = strong)",
+                            0.f, 1.f),
         }};
     return info;
 }

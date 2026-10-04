@@ -87,10 +87,13 @@ See the `terrain_*` and `foliage_add` tools.
 
 ### Camera, grading and looks
 
-- **Lens** (camera component, or `viewport_capture` `aperture` / `focus_distance`):
+- **Lens** (camera component, or `viewport_capture` `aperture` / `focus_distance` / `tilt_shift`):
   `aperture` (f-stop; 0 = everything sharp), `focusDistance` (0 = autofocus on the center)
   and `motionBlur` (shutter fraction; a post-process blur in real time, a real accumulated shutter in
-  movie renders, see [MOVIE_RENDER](MOVIE_RENDER.md)).
+  movie renders, see [MOVIE_RENDER](MOVIE_RENDER.md)). `tiltShift` (0..1) fakes a tilt-shift lens: a
+  sharp band across the middle of the frame with blur growing above and below it, the "toy town"
+  miniature look for aerial shots (a real aperture cannot blur a scene 50 m away that much). It
+  shares the bokeh gather with `aperture` and combines with it.
 - **Exposure:** `autoExposure`, `exposureCompensation` (EV), `adaptationSpeed`. Manual
   `exposure` still multiplies.
 - **Looks:** `look` is one of `warm`, `cool`, `teal_orange`, `golden_hour`, `bleach`,

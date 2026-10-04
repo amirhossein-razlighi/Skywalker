@@ -39,6 +39,7 @@ struct ViewCamera {
     float aperture = 0.f;       // f-stop (0 = no depth of field)
     float focusDistance = 0.f;  // 0 = autofocus
     float motionBlur = 0.f;     // shutter fraction
+    float tiltShift = 0.f;      // 0..1 miniature blur outside a sharp horizontal band
 
     Mat4 view() const { return Mat4::lookAt(eye, target, up); }
     /// Points the camera from `eye` at `target` with clip planes suited to any view distance

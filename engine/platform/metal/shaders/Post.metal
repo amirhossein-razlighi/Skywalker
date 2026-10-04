@@ -222,7 +222,7 @@ fragment float4 temporalFragment(FullscreenOut in [[stage_in]], constant FrameUn
 
 struct LensUniforms {
     float4 lens;    // x = f-stop (0 = off), y = focus distance (m, 0 = auto), z = focal length (mm), w = max CoC (half-res px)
-    float4 motion;  // x = shutter (0 = off), yzw = unused
+    float4 motion;  // x = shutter (0 = off), y = tilt-shift strength (0 = off), zw = unused
     float4 texel;   // xy = full-res texel, zw = half-res texel
     float4 view;    // x = image height (px), yzw = unused
 };
@@ -275,9 +275,18 @@ static float circleOfConfusion(constant FrameUniforms& f, constant LensUniforms&
     float z = max(dot(p - f.cameraPos.xyz, f.cameraForward.xyz), 0.01) * 1000.0;  // mm
     float zf = focus * 1000.0;
     float fl = l.lens.z;
-    float A = fl / max(l.lens.x, 0.5);
-    float cocMM = A * fl * (z - zf) / (z * max(zf - fl, 1.0));
-    float px = cocMM / 24.0 * l.view.x * 0.5;  // 24 mm sensor height, half resolution
+    float px = 0.0;
+    if (l.lens.x > 0.0) {
+        float A = fl / max(l.lens.x, 0.5);
+        float cocMM = A * fl * (z - zf) / (z * max(zf - fl, 1.0));
+        px = cocMM / 24.0 * l.view.x * 0.5;  // 24 mm sensor height, half resolution
+    }
+    if (l.motion.y > 0.0) {
+        // Tilt-shift (miniature) lens: a sharp horizontal band across the middle of the frame, blur
+        // growing above and below it. Signed by depth so a blurred foreground still covers the background.
+        float ts = l.motion.y * l.lens.w * smoothstep(0.07, 0.48, abs(uv.y - 0.5));
+        px = (z < zf ? -1.0 : 1.0) * max(abs(px), ts);
+    }
     return clamp(px, -l.lens.w, l.lens.w);
 }
 
