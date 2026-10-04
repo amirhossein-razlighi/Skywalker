@@ -231,6 +231,8 @@ gradual typing: no annotation noise, and agents still get type errors before pla
   is real for entities on `process.clock: real`); `time` is game time (it stops while paused);
   `unscaled_dt()` / `unscaled_time()` are real time. `process.priority` reorders behaviors
   (lower first). See docs/ARCHITECTURE.md "Game pause, process modes and time scale".
+- **Scene changes.** `change_scene` / `load_additive` apply at the end of a tick; behaviors of
+  `persistent` entities keep running across them ([SCENE_FLOW](SCENE_FLOW.md)).
 - Replacing a behavior while playing restarts its instance. `use`d modules reload when
   play starts or when their files change.
 

@@ -83,6 +83,7 @@ typo never silently ships the wrong thing.
 | `exclude` | none | Files to leave out even when referenced. The build warns about each referenced file you excluded. |
 | `render` | none | `{"layers": {"1": "world", "2": "hero"}}` names the 20 render layers ([RENDERING](RENDERING.md#render-layers)); tools and Wander `layer_mask()` accept the names. |
 | `mounts` | none | `{"kit": "../_kit"}`: shared folders outside the project, addressed as `kit/...` ([ASSETS](ASSETS.md#shared-kits-mounts-in-gamejson)). Names are letters, digits, `_` and `-`. |
+| `scenes`, `sceneFlow` | none | `"scenes": {"menu": "scenes/menu.sky.json"}` names scenes for `change_scene`; `"sceneFlow": {"persistent": [...], "loadingScene": "...", "transition": {"kind": "fade", "duration": 0.4}}` ([SCENE_FLOW](SCENE_FLOW.md)). |
 
 Command-line flags of the player and `skywalker build` override the file.
 

@@ -47,6 +47,7 @@ game_build {out:"~/Builds", name:"Sky Dash", release:true, version:"1.0.0", bund
 | `bundleId` | `dev.skywalker.games.<id>` | Reverse-DNS; use your own for distribution |
 | `version`, `copyright` | `1.0.0` | Digits and dots; shown in the About panel |
 | `include`, `exclude` | none | Extra files/folders to ship (globs `*` `?`; a folder includes everything below), files to leave out even when referenced (the build warns for each referenced file you excluded) |
+| `scenes`, `sceneFlow` | none | Scene aliases for `change_scene` and the runtime flow: `{persistent, loadingScene, transition, preloadPerTick}` (skywalker://docs/SCENE_FLOW) |
 
 `game_build` arguments override the file for one build (`name`, `icon`, `version`, `bundle_id`, `scene`); `release:true` strips the player's symbols; `all_assets:true` ships every runtime file; `sign:false` skips the ad-hoc signature; `build_native:false` skips the native module.
 
