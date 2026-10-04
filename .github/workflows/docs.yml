@@ -1,0 +1,67 @@
+name: Docs
+
+# Builds the documentation site (website/) and deploys it to GitHub Pages.
+# The build never needs the C++ engine: the reference pages and the JSON they come from are committed, and the
+# engine's own test suite (ci.yml) fails when they are stale.
+# While the repository is private the deploy job is skipped (not failed); it runs by itself once the repository is
+# public and Pages uses "GitHub Actions" as its source (see website/README.md, "Going live").
+on:
+  push:
+    branches: [main]
+    paths:
+      - "website/**"
+      - "docs/**"
+      - ".github/workflows/docs.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: website/requirements.txt
+
+      - name: Install MkDocs
+        run: pip install -r website/requirements.txt
+
+      - name: Check samples, links to the registry and hygiene
+        run: python3 website/scripts/check_snippets.py
+
+      - name: Check the generated reference matches its data
+        run: python3 website/scripts/gen_reference.py --check
+
+      - name: Build (strict)
+        run: mkdocs build --strict -f website/mkdocs.yml -d "${{ runner.temp }}/site"
+
+      - name: Upload the site
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ${{ runner.temp }}/site
+
+  deploy:
+    needs: build
+    # Skipped (not failed) while the repository is private.
+    if: ${{ !github.event.repository.private }}
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

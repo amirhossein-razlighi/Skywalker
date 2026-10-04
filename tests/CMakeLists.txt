@@ -52,6 +52,7 @@ set(SKY_TEST_SOURCES
     test_profiler.cpp
     test_render_layers.cpp
     test_process.cpp
+    test_website.cpp
 )
 
 add_executable(skywalker_tests ${SKY_TEST_SOURCES})
@@ -62,6 +63,12 @@ target_compile_definitions(skywalker_tests PRIVATE
 if(TARGET skywalker-player)
     add_dependencies(skywalker_tests skywalker-player)
     target_compile_definitions(skywalker_tests PRIVATE SKY_PLAYER_PATH="$<TARGET_FILE:skywalker-player>")
+endif()
+
+# The documentation site's reference is checked against the CLI (test_website.cpp).
+if(TARGET skywalker)
+    add_dependencies(skywalker_tests skywalker)
+    target_compile_definitions(skywalker_tests PRIVATE SKY_CLI_PATH="$<TARGET_FILE:skywalker>")
 endif()
 
 add_test(NAME skywalker_tests COMMAND skywalker_tests)

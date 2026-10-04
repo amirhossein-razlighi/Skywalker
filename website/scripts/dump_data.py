@@ -7,13 +7,14 @@
 The site's reference pages are generated from these files by gen_reference.py, so the Pages workflow never has to
 build the C++ engine. Sources:
 
-  tools.json       `skywalker tools --json` (every tool: name, description, schema, annotations, category)
-  components.json  `skywalker call component_schema` (every reflected component and the environment)
-  wander.json      `skywalker call wander_reference` (the guide) plus one structured call per builtin category
+  tools.json       MCP tools/list (every tool: name, description, schema, annotations, category; = `skywalker tools --json`)
+  components.json  the component_schema tool (every reflected component and the environment)
+  wander.json      the wander_reference tool (the guide) plus one structured call per builtin category
   cli.json         the CLI's usage text and the help of its subcommands
   capi.json        the declarations and comments of engine/capi/include/sky_api.h
 
-Output is deterministic and scrubbed of machine-specific paths. Standard library only.
+Tools are called through one headless `skywalker mcp` session on an empty temporary project. Output is deterministic
+and scrubbed of machine-specific paths. Standard library only.
 """
 from __future__ import annotations
 
@@ -49,29 +50,59 @@ def run(cli: str, *args: str) -> str:
     return out if out.strip() else proc.stderr
 
 
-def call_json(cli: str, tool: str, args: dict | None = None):
-    text = run(cli, "call", tool, json.dumps(args or {}))
-    start = text.find("{")
-    if start < 0:
-        raise SystemExit(f"{tool}: no JSON in output:\n{text[:400]}")
-    return json.loads(text[start:])
+class Session:
+    """One headless `skywalker mcp` process for all tool calls (fast, and only one engine start)."""
+
+    def __init__(self, cli: str):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.proc = subprocess.Popen([cli, "mcp", "--project", self.tmp.name], stdin=subprocess.PIPE,
+                                     stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, cwd=self.tmp.name)
+        self.ids = 0
+        self.server = self.request("initialize", {"protocolVersion": "2025-06-18", "capabilities": {},
+                                                  "clientInfo": {"name": "site-dump", "version": "1"}})["serverInfo"]
+        self.proc.stdin.write(json.dumps({"jsonrpc": "2.0", "method": "notifications/initialized"}) + "\n")
+        self.proc.stdin.flush()
+
+    def request(self, method: str, params: dict):
+        self.ids += 1
+        self.proc.stdin.write(json.dumps({"jsonrpc": "2.0", "id": self.ids, "method": method, "params": params}) + "\n")
+        self.proc.stdin.flush()
+        while True:
+            line = self.proc.stdout.readline()
+            if not line:
+                raise SystemExit(f"skywalker mcp exited during {method}")
+            msg = json.loads(line)
+            if msg.get("id") == self.ids:
+                if "error" in msg:
+                    raise SystemExit(f"{method}: {msg['error']}")
+                return msg["result"]
+
+    def call(self, tool: str, args: dict | None = None):
+        result = self.request("tools/call", {"name": tool, "arguments": args or {}})
+        if result.get("isError"):
+            raise SystemExit(f"{tool}: {result}")
+        return result
+
+    def close(self) -> None:
+        self.proc.stdin.close()
+        self.proc.wait(timeout=60)
+        self.tmp.cleanup()
 
 
-def dump_tools(cli: str) -> dict:
-    data = json.loads(run(cli, "tools", "--json"))
-    return {"version": run(cli, "version").strip().split()[-1], "tools": data["tools"]}
+def dump_tools(mcp: Session) -> dict:
+    return {"version": mcp.server["version"], "tools": mcp.request("tools/list", {})["tools"]}
 
 
-def dump_components(cli: str) -> dict:
-    return call_json(cli, "component_schema")
+def dump_components(mcp: Session) -> dict:
+    return mcp.call("component_schema")["structuredContent"]
 
 
-def dump_wander(cli: str) -> dict:
-    guide = run(cli, "call", "wander_reference")
+def dump_wander(mcp: Session) -> dict:
+    guide = "".join(c.get("text", "") for c in mcp.call("wander_reference")["content"] if c.get("type") == "text")
     categories = re.findall(r"^\s{2}\[([a-z0-9_]+)\]\s*$", guide, re.M)
     entries = {}
     for cat in categories:
-        entries[cat] = call_json(cli, "wander_reference", {"topic": cat})["entries"]
+        entries[cat] = mcp.call("wander_reference", {"topic": cat})["structuredContent"]["entries"]
     return {"guide": guide, "categories": entries}
 
 
@@ -141,13 +172,17 @@ def main() -> int:
     cli = str(Path(opts.cli).resolve())
     out = Path(opts.out)
     out.mkdir(parents=True, exist_ok=True)
-    dumps = {
-        "tools.json": dump_tools(cli),
-        "components.json": dump_components(cli),
-        "wander.json": dump_wander(cli),
-        "cli.json": dump_cli(cli),
-        "capi.json": dump_capi(),
-    }
+    mcp = Session(cli)
+    try:
+        dumps = {
+            "tools.json": dump_tools(mcp),
+            "components.json": dump_components(mcp),
+            "wander.json": dump_wander(mcp),
+            "cli.json": dump_cli(cli),
+            "capi.json": dump_capi(),
+        }
+    finally:
+        mcp.close()
     for name, data in dumps.items():
         text = scrub(json.dumps(data, indent=1, ensure_ascii=False, sort_keys=False)) + "\n"
         (out / name).write_text(text)
