@@ -89,8 +89,10 @@ int runServe(const std::vector<std::string>& raw) {
     std::string scene = option(raw, "--scene");
     if (scene.empty()) {
         std::error_code ec;
-        std::string main = (std::filesystem::path(cfg.projectDir) / "scenes" / "main.sky.json").string();
-        if (std::filesystem::exists(main, ec)) scene = main;
+        // Scene paths resolve against the project (like `skywalker call --scene`).
+        if (std::filesystem::exists(std::filesystem::path(cfg.projectDir) / "scenes" / "main.sky.json", ec)) {
+            scene = "scenes/main.sky.json";
+        }
     }
     if (!scene.empty()) {
         if (Status s = engine.loadScene(scene); !s) {
