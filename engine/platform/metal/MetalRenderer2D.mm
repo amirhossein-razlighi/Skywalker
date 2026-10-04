@@ -300,13 +300,15 @@ void MetalRenderer2D::encodeWorld(id<MTLRenderCommandEncoder> enc, MTLRenderPass
         GPULight2D g{};
         g.positionRadius = simd_make_float4(l.position.x, l.position.y, l.position.z, l.radius);
         g.colorFalloff = simd_make_float4(l.color.x, l.color.y, l.color.z, l.falloff);
-        g.directionCone = simd_make_float4(l.direction.x, l.direction.y, l.direction.z, l.kind == Light2DItem::Kind::Spot ? 2.f : 1.f);
+        // w = kind (1 point, 2 spot) + 4 * bands (pixel-art stepped falloff), decoded in Sprite2D.metal
+        g.directionCone = simd_make_float4(l.direction.x, l.direction.y, l.direction.z,
+                                           (l.kind == Light2DItem::Kind::Spot ? 2.f : 1.f) + 4.f * static_cast<float>(l.bands));
         g.extra = simd_make_float4(l.cosInner, l.cosOuter, l.height, l.shadows ? l.shadowSoftness : -1.f);
         lights.push_back(g);
     }
     if (lights.empty()) lights.push_back(GPULight2D{});  // a valid buffer even with no lights
     u.params = simd_make_float4(f.lights.empty() ? 0.f : static_cast<float>(std::min(f.lights.size(), Frame2D::kMaxLights)), frame.time,
-                                occludersValid_ ? 1.f : 0.f, 0.f);
+                                occludersValid_ ? 1.f : 0.f, f.texel);
     // The scene pass may run below output resolution (upscaling): use its real size.
     id<MTLTexture> target = pass.colorAttachments[0].texture;
     const float vw = target ? static_cast<float>(target.width) : static_cast<float>(frame.width);

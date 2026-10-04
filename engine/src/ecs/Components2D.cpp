@@ -118,6 +118,8 @@ const TypeInfo& Light2D::type() {
             SKY_FIELD_RANGE(Light2D, shadowSoftness, Float, "Penumbra softness", 0.f, 1.f),
             SKY_FIELD_RANGE(Light2D, halo, Float, "Visible glow in the air around the light", 0.f, 10.f),
             SKY_FIELD_RANGE(Light2D, flicker, Float, "Candle/torch flicker amount", 0.f, 1.f),
+            SKY_FIELD_RANGE(Light2D, bands, Int, "Pixel-art falloff: 0 = smooth gradient; n = n stepped rings joined by an ordered "
+                                                "dither on the art's texel grid (no 8-bit banding; 4-8 suits pixel art)", 0, 32),
         }};
     return info;
 }

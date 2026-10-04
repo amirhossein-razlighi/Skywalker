@@ -30,7 +30,7 @@ Conventions:
 | `sprite_anim` | Flipbook | `clips` `{"run": {"frames": "4-11" \| [..] \| "run_*", "fps": 12, "loop": true, "events": {"3": "footstep"}, "texture"?}}`, `clip`, `playing`, `speed`. Frame events reach the entity's behaviors as `on anim "footstep"`, a non-looping clip's end as `on anim "finished"` |
 | `tilemap` | Layers of tiles | `tileset` (png or `*.tileset.json`), `tileSize`, `cellSize`, `width`, `height`, `layers` (`[{name, data, solid, z, tint, sortingLayer, order, ySort}]`), `solidTiles`, `autotile` (terrains), `sortingLayer`, `filter`, `lit`, `castShadows`, `palette` |
 | `particles2d` | Pixel-art particles | `texture` (sheet/atlas, or empty for solid `pixelSize` rectangles), `columns`/`rows`, `frames`, `animate` (random/life/loop), `rate`, `burst`, `lifetime`, `area`, `wrap` (weather fills any view), `velocity`, `gravity`, `sway`, `flutter`, `color`, `emissive`, `pulse`, `fadeIn`/`fadeOut`, `sortingLayer`, `lit`, `seed` |
-| `light2d` | 2D light | `kind` point/spot/global (ambient), `color`, `intensity` (HDR), `radius`, `falloff`, `innerAngle`/`outerAngle` (spot along local +Y), `height` (normal maps), `shadows`, `shadowSoftness`, `halo` (glow in the air), `flicker` |
+| `light2d` | 2D light | `kind` point/spot/global (ambient), `color`, `intensity` (HDR), `radius`, `falloff`, `innerAngle`/`outerAngle` (spot along local +Y), `height` (normal maps), `shadows`, `shadowSoftness`, `halo` (glow in the air), `flicker`, `bands` (pixel-art stepped, dithered falloff) |
 | `parallax` | Parallax layer (entity + children) | `factor` (0 = fixed to camera, <1 far, >1 near), `origin`, `repeatX/Y`, `spacing` |
 | `camera2d` | On the camera entity | `pixelsPerUnit`, `referenceHeight` (e.g. 180 → integer upscaling), `pixelSnap`, `zoom`, `follow` + `smoothing` + `deadZone` + `offset`, `bounds` |
 | `text` | World text (signs, damage numbers) | `text` (rich), `font`, `size` (world em), `color`, `align`, `valign`, `maxWidth`, `outline`, `shadowColor`, `emissive` (neon), `billboard`, `sortingLayer` |
@@ -321,6 +321,11 @@ for e in find_all("seasonal")
 end
 find("Ground").tilemap.palette = "palettes/winter.palette.json"
 ```
+
+**Pixel-art light pools.** Smooth 2D light falloff bands visibly on 8-bit displays and looks airbrushed
+next to pixel art. `light2d.bands` (4-8) quantizes the falloff (and the halo) into flat steps whose
+outer third is an ordered 4x4 Bayer dither on the art texel grid (the camera2d pixel snap), the way
+pixel artists paint lamp light. The CPU rasterizer lights per sprite and ignores bands.
 
 **Pixel particles.** `particles2d` emitters draw sprites (nearest sampling, texel snapping, sorting
 layers) and simulate on fixed ticks with a seeded generator, so runs replay exactly and reset on stop.

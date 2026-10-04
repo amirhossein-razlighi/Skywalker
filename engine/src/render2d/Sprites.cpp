@@ -1205,13 +1205,14 @@ void gatherLight(Ctx& c, EntityId e, const Light2D& l) {
     li.height = l.height;
     li.shadows = l.shadows;
     li.shadowSoftness = l.shadowSoftness;
+    li.bands = std::clamp(l.bands, 0, 32);
     f.lights.push_back(li);
     if (l.halo > 0.f) {
         float r = l.radius * 0.75f;
         Vec3 o = li.position - c.right * r + c.up * r;
         SpriteInstance s = quad(o, c.right * (2.f * r), c.up * (-2.f * r), 0, 0, 1, 1,
                                 {rgb.x * l.halo * 0.35f, rgb.y * l.halo * 0.35f, rgb.z * l.halo * 0.35f, 1.f});
-        set4(s.params, static_cast<float>(SpriteMode::Halo), 0.f, 0.f, 0.f);
+        set4(s.params, static_cast<float>(SpriteMode::Halo), static_cast<float>(li.bands), 0.f, 0.f);
         Entry& en = c.begin(e, 4, 1 << 29, c.depthOf(li.position), 0, 0);
         en.additive = true;
         c.pool.push_back(s);
@@ -1231,6 +1232,7 @@ void gather2D(const Scene& scene, Assets2D& assets, FrameData& frame, const Gath
     c.up = normalize(inv.transformDir({0, 1, 0}));
     Frame2D& f = frame.render2d;
     f.ambient = {0, 0, 0};
+    f.texel = opts.pixelSnap;
 
     const auto& order = scene.entities();
     for (size_t i = 0; i < order.size(); ++i) {

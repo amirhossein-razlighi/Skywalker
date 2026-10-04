@@ -100,6 +100,7 @@ struct Light2D {
     float shadowSoftness = 0.4f;
     float halo = 0.f;            // visible glow in the air around the light (additive)
     float flicker = 0.f;         // 0..1 candle/torch flicker (deterministic)
+    int bands = 0;               // pixel-art falloff: 0 = smooth, n = n brightness steps blended by ordered (Bayer) dither
 
     static const TypeInfo& type();
 };

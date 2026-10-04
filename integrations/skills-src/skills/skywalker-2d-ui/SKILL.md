@@ -82,6 +82,8 @@ tilemap_inspect {entity:"Level"}      # ASCII per layer, legend with counts, mer
   2-row png strip. Author nature in its own ramps, then one palette per season repaints the land, foliage and roofs; switch from Wander: `e.sprite.palette = "palettes/winter.palette.json"`.
 - **Weather and ambient life.** `particles2d_create` makes pixel particles: rain (with ripples), snow, leaves, petals, fireflies, chimney smoke, sparkles. Weather presets wrap,
   so one emitter fills any camera view. `burst(find("Dust"), 6)` in Wander puffs a `particles2d` emitter; `particles2d_info` reports live counts.
+- **Pixel-art lighting.** Give lamps and windows `light2d.bands` (4-8): flat light pools with dithered rims on the texel grid
+  instead of smooth (banding) gradients. Drive day and night with a `global` light2d whose color and intensity follow the clock.
 - **Pixel UI.** Style 9-slice frames with `backgroundImage`, `slice:[5,5,5,5]`, `sliceScale:4` and `imageFilter:"nearest"` (the `pixel` theme samples images nearest); use a
   pixel `.ttf` from the project as the canvas `font`, at sizes that are whole multiples of its pixel grid.
 

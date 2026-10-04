@@ -316,3 +316,32 @@ TEST_CASE("2d topdown: pixel UI images sample nearest and 9-slices scale their b
     CHECK(framed.sliceScale == doctest::Approx(5.f));
     CHECK(framed.imageFilter == "nearest");
 }
+
+TEST_CASE("2d topdown: banded lights carry their steps to the frame (light and halo) with the texel grid") {
+    Scene s;
+    EntityId e = s.create("Lamp");
+    Light2D& l = s.add<Light2D>(e);
+    l.bands = 6;
+    l.halo = 0.5f;
+    EntityId plain = s.create("Plain");
+    s.add<Light2D>(plain);
+    render2d::Assets2D assets(".");
+    BuildOptions bo;
+    bo.editorOverlays = false;
+    FrameData f = buildFrame(s, topDown(), 64, 64, bo);
+    render2d::Gather2DOptions o;
+    o.pixelSnap = 1.f / 16.f;
+    render2d::gather2D(s, assets, f, o);
+    REQUIRE(f.render2d.lights.size() == 2);
+    CHECK(f.render2d.lights[0].bands == 6);
+    CHECK(f.render2d.lights[1].bands == 0);
+    CHECK(f.render2d.texel == doctest::Approx(1.f / 16.f));
+    bool halo = false;
+    for (const auto& q : f.render2d.sprites) {
+        if (static_cast<int>(q.params[0]) == static_cast<int>(SpriteMode::Halo)) {
+            halo = true;
+            CHECK(q.params[1] == doctest::Approx(6.f));
+        }
+    }
+    CHECK(halo);
+}
