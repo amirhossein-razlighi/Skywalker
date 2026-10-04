@@ -17,6 +17,7 @@ constant int kDbgSpecular = 19;
 constant int kDbgUvChecker = 20;
 constant int kDbgTexelDensity = 21;
 constant int kDbgMotion = 22;
+constant int kDbgSssMask = 29;  // [characters] material models: skin (red, brighter = more scattering), eye, cloth, hair cards
 
 static int debugMode(constant FrameUniforms& f) { return int(f.debug.x + 0.5); }
 
@@ -62,6 +63,8 @@ struct DebugSurface {
     float roughness;
     float lod;         // mesh LOD (0 = finest), -1 = impostor
     float lights;      // point/spot lights evaluated in this pixel's cluster
+    float shading = 0.0;  // [characters] material model id (4 skin, 5 eye, 6 cloth, 7 hair card)
+    float scatter = 0.0;  // [characters] skin: how far light wraps here (curvature x scatter distance)
 };
 
 // Gentle form shading so heat maps still read as geometry.
@@ -75,6 +78,14 @@ static float3 debugSurfaceColor(int mode, DebugSurface s, constant FrameUniforms
     float shade = debugShade(s, f);
     if (mode == kDbgWireframe) return float3(0.045, 0.05, 0.06) * shade;
     if (mode == kDbgUnshaded) return s.albedo + s.emissive;
+    if (mode == kDbgSssMask) {
+        int m = int(s.shading + 0.5);
+        if (m == 4) return mix(float3(0.35, 0.03, 0.02), float3(1.0, 0.35, 0.25), s.scatter) * shade;
+        if (m == 5) return float3(0.15, 0.45, 1.0) * shade;
+        if (m == 6) return float3(0.2, 0.85, 0.3) * shade;
+        if (m == 7) return float3(1.0, 0.85, 0.15) * shade;
+        return float3(dot(s.albedo, float3(0.3, 0.55, 0.15)) * 0.35) * shade;
+    }
     if (mode == kDbgCascades) {
         float d = dot(s.worldPos - f.cameraPos.xyz, f.cameraForward.xyz);
         const float3 tint[4] = {float3(0.95, 0.25, 0.20), float3(0.25, 0.85, 0.30), float3(0.25, 0.45, 0.95), float3(0.95, 0.85, 0.20)};

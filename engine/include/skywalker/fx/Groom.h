@@ -54,7 +54,7 @@ Result<StrandSet> loadStrands(const std::string& path, float scale = 1.f, bool z
 /// region is evaluated exactly per root, around `regionCenter` (default: params.maskCenter).
 /// Deterministic: the same inputs give bit-identical output. Roots are bound to their triangles.
 Result<GroomData> generateGroom(const Groom& params, const MeshData* mesh, const std::vector<float>* vertexMask = nullptr,
-                                const Vec3* regionCenter = nullptr);
+                                const Vec3* regionCenter = nullptr, const Vec3* regionRadius = nullptr);
 /// Builds a groom from explicit strands (every strand rendered; a subset becomes guides).
 Result<GroomData> groomFromStrands(const Groom& params, const StrandSet& strands, const MeshData* mesh);
 
@@ -121,7 +121,7 @@ private:
     /// Per-vertex density from maskBone (skin weights of the bone family); `regionCenter` = maskCenter offset
     /// from the bone's rest position (scaled mesh space).
     std::vector<float> vertexMask(const Groom& g, const MeshData& mesh, const std::string& meshKey, Vec3 scale, Vec3& regionCenter,
-                                  std::string& error) const;
+                                  Vec3& regionRadius, std::string& error) const;
     struct Entry {
         uint64_t hash = 0;
         std::shared_ptr<const GroomData> data;

@@ -1216,6 +1216,7 @@ void registerEngineTools(Engine& engine) {
     tools::addPrefabTools(engine, reg);  // engine/src/agent/PrefabTools.cpp (entity links, linked prefabs)
     tools::addLegalTools(engine, reg);  // engine/src/agent/LegalTools.cpp (terms, privacy, acceptance state)
     tools::addAgentLinkTools(engine, reg);  // engine/src/agent/AgentLinkTools.cpp: events_poll, tool_host_*
+    tools::addCharacterTools(engine, reg);  // engine/src/agent/CharacterTools.cpp: character_inspect, character_ik, animation_retarget
 }
 
 }  // namespace sky

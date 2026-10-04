@@ -9,6 +9,7 @@
 //              lod, light_complexity, ...); shown without tonemapping so colors stay exact
 //   final    - the final image, tinted or with lines on top (impostors, wireframe)
 //   style    - a stylized look (sketch)
+//   overlay  - the final image with engine-drawn lines on top after readback (skeleton, IK, groom roots)
 
 #include <string>
 #include <string_view>
@@ -44,7 +45,13 @@ constexpr int kUvChecker = 20;
 constexpr int kTexelDensity = 21;
 constexpr int kMotion = 22;
 constexpr int kShadowAtlas = 23;
-constexpr int kCount = 24;
+// Character tech (24 and 25 are left to other workstreams): CPU overlays on the final image (skeleton,
+// IK targets, groom roots) and the material-model view (skin scattering, eyes, cloth, hair cards).
+constexpr int kSkeleton = 26;
+constexpr int kIkTargets = 27;
+constexpr int kGroomRoots = 28;
+constexpr int kSssMask = 29;
+constexpr int kCount = 30;  // one past the highest id (ids may have gaps)
 }  // namespace debugview
 
 struct DebugViewInfo {
@@ -64,6 +71,9 @@ Result<int> debugViewFromName(std::string_view name);
 const char* debugViewName(int id);
 /// True for views where surfaces shade with debug colors (the shaders' FrameUniforms.debug.x).
 bool debugViewOverridesSurfaces(int id);
+/// True for views drawn by the engine on top of the final image after readback (skeleton, IK targets,
+/// groom roots): renderers show the final image for them.
+bool debugViewIsOverlay(int id);
 /// One line per view ("name: description"), for tool descriptions and docs.
 std::string debugViewHelp();
 

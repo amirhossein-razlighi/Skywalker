@@ -105,6 +105,9 @@ bool solveTwoBoneChain(const Skeleton& skeleton, Pose& pose, std::vector<Mat4>& 
 /// Average horizontal speed of the root bone over a clip (model units per second, `up` is
 /// the model's up axis). Locomotion clips report how fast they move: blend thresholds.
 float rootSpeed(const Library& library, const Clip& clip, Vec3 up = {0, 1, 0});
+/// How far the root turns about `up` over the whole clip (radians, unwrapped; + = counter-clockwise
+/// seen from above). Turn clips and curved walks report it; straight locomotion is ~0.
+float rootTurn(const Library& library, const Clip& clip, Vec3 up = {0, 1, 0});
 
 /// Re-addresses a clip from another skeleton onto `target` by bone name. Channels whose
 /// bone has no match are dropped. Returns the number of channels kept.

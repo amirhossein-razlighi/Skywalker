@@ -180,6 +180,9 @@ static MaterialSample evaluateMaterial(float3 worldPos, float3 normal, float2 uv
             if (hardAlphaTest) {
                 if (s.alpha < d.material4.x) discard_fragment();
                 s.alpha = 1.0;
+            } else if (int(d.material.w + 0.5) == 7) {
+                // Hair cards keep their soft alpha (dithered or alpha-to-coverage in meshFragment).
+                if (s.alpha < d.material4.x * 0.5) discard_fragment();
             } else {
                 // Alpha test, sharpened to a ~1 px ramp so alpha-to-coverage antialiases the edge.
                 s.alpha = saturate((s.alpha - d.material4.x) / max(fwidth(s.alpha), 1e-4) + 0.5);
@@ -242,6 +245,26 @@ fragment MainOut meshFragment(MeshOut in [[stage_in]],
     SurfaceData s = m.s;
     float3 Ngeo = m.Ngeo;
     float3 emissive = m.emissive;
+    // [characters] skin pores, refracted irises, hair-card transparency (Characters.metal).
+    const int shadingModel = int(d.material.w + 0.5);
+    CharacterInputs ci;
+    ci.model = shadingModel;
+    ci.Ngeo = Ngeo;
+    ci.curvature = 0.0;
+    ci.hairT = float3(0.0, 1.0, 0.0);
+    if (isCharacterModel(shadingModel)) {
+        float2 texUV = in.uv * d.material2.xy;
+        ci.curvature = charCurvature(Ngeo, in.worldPos);
+        if (shadingModel == kShadeSkin) s.N = skinMicroNormal(s.N, in.worldPos, texUV, d);
+        if (shadingModel == kShadeEye) eyeSurface(s, Ngeo, in.worldPos, texUV, V, d, albedoTex, f.extra.w);
+        if (shadingModel == kShadeHairCard) {
+            ci.hairT = hairCardTangent(s.N, in.worldPos, texUV, d);
+            if (d.character[1].x < 0.5) {  // dithered: stochastic coverage that TAA / accumulation resolves
+                if (s.alpha < ditherNoise(in.position.xy, f.temporal)) discard_fragment();
+                s.alpha = 1.0;
+            }
+        }
+    }
     // [debug views] lighting_only: a white diffuse material; other surface views replace the color.
     const int dbg = debugMode(f);
     if (dbg == kDbgLightingOnly) {
@@ -261,10 +284,12 @@ fragment MainOut meshFragment(MeshOut in [[stage_in]],
         ds.roughness = s.roughness;
         ds.lod = max(d.material4.w - 1.0, 0.0);
         ds.lights = float(clusterCells[clusterOf(f, in.position.xy, in.worldPos)].y);
+        ds.shading = float(shadingModel);
+        ds.scatter = shadingModel == kShadeSkin ? saturate(ci.curvature * d.character[0].r * d.character[0].w * 0.002 * 6.0) : 0.0;
         return mainOut(float4(debugSurfaceColor(dbg, ds, f), s.alpha), s.albedo, 1.0, Ngeo, 1.0, kGbufNoLighting);
     }
 
-    int shading = int(d.material.w + 0.5);
+    int shading = shadingModel;
     if (shading == 2) {  // unlit: flat color, still emissive
         MainOut o = mainOut(float4(s.albedo + emissive, s.alpha), s.albedo, 1.0, Ngeo, 1.0, kGbufNoLighting);
         o.velocity = objectMotion(f, in.worldPos, in.prevWorldPos);
@@ -307,8 +332,11 @@ fragment MainOut meshFragment(MeshOut in [[stage_in]],
 
     // Render layers of this draw (DrawUniforms.motion.y; 0 = unset, e.g. mesh particles: layer 1).
     const uint layers = d.motion.y > 0.5 ? uint(d.motion.y) : 1u;
-    float3 color = shadeSurface(s, Ngeo, in.worldPos, in.position.xy, V, toon, d.material3.z, f, lights, clusterCells,
-                                clusterIndices, shadowAtlas, envTex, brdfLut, cloudShape, localShadows, layers) + emissive;
+    float3 color = isCharacterModel(shading)
+                       ? shadeCharacter(s, ci, in.worldPos, in.position.xy, V, d, f, lights, clusterCells, clusterIndices, shadowAtlas,
+                                        envTex, brdfLut, cloudShape, localShadows, layers) + emissive
+                       : shadeSurface(s, Ngeo, in.worldPos, in.position.xy, V, toon, d.material3.z, f, lights, clusterCells,
+                                      clusterIndices, shadowAtlas, envTex, brdfLut, cloudShape, localShadows, layers) + emissive;
     color = applyFog(color, in.worldPos, V, f);
 
 

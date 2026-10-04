@@ -123,6 +123,10 @@ Shading shadingFromString(std::string_view s) {
     if (s == "toon") return Shading::Toon;
     if (s == "unlit") return Shading::Unlit;
     if (s == "water") return Shading::Water;
+    if (s == "skin") return Shading::Skin;
+    if (s == "eye") return Shading::Eye;
+    if (s == "cloth") return Shading::Cloth;
+    if (s == "hair_card") return Shading::HairCard;
     return Shading::Pbr;
 }
 

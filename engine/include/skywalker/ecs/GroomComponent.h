@@ -80,6 +80,7 @@ struct Groom {
     float maxSpeed = 8.f;            // m/s: strand points never move faster than this relative to their roots
     bool bodyColliders = true;       // skinned: collide with capsules fitted to the character's skeleton (head, neck, torso, limbs)
     std::string maskBone;            // grow only on vertices skinned to this bone and its children ("Head")
+    std::string maskSpace = "auto";  // region coordinates: auto | mesh (m) | bone (m from maskBone) | bounds (-1..1 of maskBone's vertices)
     Vec3 maskCenter{0.f};            // region center: offset from maskBone's rest position (or the mesh origin), mesh axes, m
     Vec3 maskRadius{0.f};            // region ellipsoid radii (m); 0 = no region
     bool maskMirror = false;         // also grow in the region mirrored across the mesh's X = 0 plane (eyebrows, sideburns)

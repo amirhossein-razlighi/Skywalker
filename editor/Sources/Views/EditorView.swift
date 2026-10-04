@@ -433,6 +433,8 @@ struct DebugViewMenu: View {
         ("Buffers", [("albedo", "Albedo"), ("normals", "Normals"), ("material", "Roughness / Metallic"), ("gi", "GI"),
                      ("reflections", "Reflections"), ("ao", "Ambient Occlusion"), ("depth", "Depth"), ("lighting", "Direct Lighting")]),
         ("Looks", [("sketch", "Sketch"), ("impostors", "Impostors")]),
+        ("Characters", [("skeleton", "Skeleton"), ("ik_targets", "IK Targets"), ("groom_roots", "Groom Roots"),
+                        ("sss_mask", "Material Models")]),
     ]
 
     var body: some View {

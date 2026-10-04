@@ -141,10 +141,11 @@ TEST_CASE("profiler: CPU scopes record named blocks") {
 
 TEST_CASE("debug views: ids, names and the shading-override set are stable") {
     const auto& views = debugViews();
-    REQUIRE(views.size() == static_cast<size_t>(debugview::kCount));
+    REQUIRE(!views.empty());
+    CHECK(views.back().id + 1 == debugview::kCount);
     for (size_t i = 0; i < views.size(); ++i) {
         INFO(views[i].name);
-        CHECK(views[i].id == static_cast<int>(i));  // ordered by id: the shaders switch on these numbers
+        if (i > 0) CHECK(views[i].id > views[i - 1].id);  // ordered by id (gaps allowed): the shaders switch on these numbers
         CHECK(std::string(views[i].description).size() > 10);
         CHECK(debugViewFromName(views[i].name).value() == views[i].id);
         CHECK(std::string(debugViewName(views[i].id)) == views[i].name);
@@ -164,6 +165,12 @@ TEST_CASE("debug views: ids, names and the shading-override set are stable") {
     CHECK_FALSE(debugViewOverridesSurfaces(debugview::kAlbedo));
     CHECK_FALSE(debugViewOverridesSurfaces(debugview::kFinal));
     CHECK(debugViewHelp().find("light_complexity:") != std::string::npos);
+    // Character views: overlays drawn by the engine, the material-model view shades surfaces.
+    CHECK(debugViewFromName("skeleton").value() == debugview::kSkeleton);
+    CHECK(debugViewIsOverlay(debugview::kGroomRoots));
+    CHECK_FALSE(debugViewIsOverlay(debugview::kSssMask));
+    CHECK(debugViewOverridesSurfaces(debugview::kSssMask));
+    CHECK(std::string(debugViewName(24)) == "final");  // reserved ids without a view
 }
 
 TEST_CASE("debug views: unknown names fail with a did-you-mean hint") {
@@ -182,9 +189,9 @@ TEST_CASE("debug views: tools take every view, reject typos, and drive the live 
     const ToolDef* capture = e->tools().find("viewport_capture");
     REQUIRE(capture);
     const Json& en = capture->inputSchema.get("properties").get("debug_view").get("enum");
-    CHECK(en.size() == static_cast<size_t>(debugview::kCount));
+    CHECK(en.size() == debugViews().size());
     // Captures with new views work on the null renderer (CPU fallback ignores the view).
-    for (const char* v : {"wireframe", "overdraw", "lod", "texel_density"}) {
+    for (const char* v : {"wireframe", "overdraw", "lod", "texel_density", "skeleton", "groom_roots", "sss_mask"}) {
         std::string args = std::string(R"({"width":64,"height":36,"samples":1,"include_image":false,"debug_view":")") + v + "\"}";
         ToolResult r = call(*e, "viewport_capture", args.c_str());
         CHECK_FALSE(r.isError);
@@ -199,7 +206,7 @@ TEST_CASE("debug views: tools take every view, reject typos, and drive the live 
     CHECK(set.structured.get("legend").asString().find("lights") != std::string::npos);
     CHECK(e->viewportDebugView() == debugview::kLightComplexity);
     ToolResult list = call(*e, "viewport_debug_view", R"({"list":true})");
-    CHECK(list.structured.get("views").size() == static_cast<size_t>(debugview::kCount));
+    CHECK(list.structured.get("views").size() == debugViews().size());
     CHECK(call(*e, "viewport_debug_view", R"({"view":"lodd"})").isError);
     call(*e, "viewport_debug_view", R"({"view":"final"})");
     CHECK(e->viewportDebugView() == 0);

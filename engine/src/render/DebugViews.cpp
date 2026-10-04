@@ -48,6 +48,18 @@ const std::vector<DebugViewInfo>& debugViews() {
         {kShadowAtlas, "shadow_atlas", "final",
          "the local (point / spot) shadow atlas: 4 quadrants of shadow maps (near white, far dark), one outline per "
          "light view: green re-rendered this frame, blue cached, orange waiting for the update budget (shadow_atlas_info)"},
+        {kSkeleton, "skeleton", "overlay",
+         "final image with every animated skeleton drawn on top: bones cyan, humanoid hips red, hands green, feet orange, "
+         "head yellow (character_inspect lists the bone map)"},
+        {kIkTargets, "ik_targets", "overlay",
+         "final image with foot and hand IK on top: ground probes yellow, foot targets magenta (green when locked in "
+         "contact), animated ankles gray, hand targets cyan with a red line when out of reach, ik effectors white"},
+        {kGroomRoots, "groom_roots", "overlay",
+         "final image with every groom's guide roots on top: green = following the skinned surface, blue = rigid, short "
+         "lines along the root normals; red where an imported root is far from its bound surface"},
+        {kSssMask, "sss_mask", "surface",
+         "material models: skin red (brighter = more subsurface scattering: curved, thin parts), eye blue, cloth green, "
+         "hair cards yellow, other surfaces dark gray"},
     };
     return kViews;
 }
@@ -71,16 +83,29 @@ Result<int> debugViewFromName(std::string_view name) {
     return Error::make("invalid_debug_view", "unknown debug view \"" + std::string(name) + "\"", hint);
 }
 
+namespace {
+/// The view with this id (ids may have gaps), else null.
+const DebugViewInfo* viewById(int id) {
+    for (const auto& v : debugViews()) {
+        if (v.id == id) return &v;
+    }
+    return nullptr;
+}
+}  // namespace
+
 const char* debugViewName(int id) {
-    const auto& views = debugViews();
-    if (id < 0 || id >= static_cast<int>(views.size())) return "final";
-    return views[static_cast<size_t>(id)].name;
+    const DebugViewInfo* v = viewById(id);
+    return v ? v->name : "final";
 }
 
 bool debugViewOverridesSurfaces(int id) {
-    const auto& views = debugViews();
-    if (id < 0 || id >= static_cast<int>(views.size())) return false;
-    return std::string_view(views[static_cast<size_t>(id)].kind) == "surface" || id == debugview::kWireframe;
+    const DebugViewInfo* v = viewById(id);
+    return v && (std::string_view(v->kind) == "surface" || id == debugview::kWireframe);
+}
+
+bool debugViewIsOverlay(int id) {
+    const DebugViewInfo* v = viewById(id);
+    return v && std::string_view(v->kind) == "overlay";
 }
 
 std::string debugViewHelp() {

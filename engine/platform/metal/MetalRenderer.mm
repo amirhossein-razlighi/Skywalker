@@ -128,8 +128,10 @@ struct DrawUniforms {
     // --- appended (velocity buffer) ---
     simd_float4x4 prevModel;  // previous frame's model matrix (= model when static)
     simd_float4 motion;       // x = moves (prevModel differs or a previous skinned pose is bound)
+    // --- appended (character material models) ---
+    simd_float4 character[3];  // Surface::model (skin, eye, cloth, hair_card parameters)
 };
-static_assert(sizeof(DrawUniforms) == 336, "must match DrawUniforms in Common.metal");
+static_assert(sizeof(DrawUniforms) == 384, "must match DrawUniforms in Common.metal");
 
 struct PostUniforms {
     simd_float4 params;
@@ -754,7 +756,8 @@ public:
             // impostors tints the final image and lighting_only only changes materials: no debug pass.
             if (frame.debugView == debugview::kShadowAtlas) {  // [local shadows]
                 shadows_->encodeDebug(cmd, resolve_);
-            } else if (frame.debugView > 0 && frame.debugView != debugview::kImpostors && frame.debugView != debugview::kLightingOnly) {
+            } else if (frame.debugView > 0 && frame.debugView != debugview::kImpostors && frame.debugView != debugview::kLightingOnly &&
+                       !debugViewIsOverlay(frame.debugView)) {  // [characters] overlays are drawn by the engine on the final image
                 PostUniforms pu{};
                 pu.params = simd_make_float4(static_cast<float>(frame.debugView), 0, 0, 0);
                 pu.texel = simd_make_float4(1.f / std::max(frame.width, 1), 1.f / std::max(frame.height, 1),
@@ -1559,6 +1562,7 @@ private:
         du.material4 = simd_make_float4(s.alphaCutoff, s.textureAlphaOnly ? 1.f : 0.f, 0, 0);
         du.prevModel = du.model;  // static unless drawMesh knows better (velocity buffer)
         du.motion = simd_make_float4(0, static_cast<float>(d.layers & 0xFFFFFu), 0, 0);  // y = render layers (light masks)
+        for (int i = 0; i < 3; ++i) du.character[i] = simd_make_float4(s.model[i].x, s.model[i].y, s.model[i].z, s.model[i].w);
         return du;
     }
 

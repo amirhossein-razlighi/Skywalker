@@ -110,10 +110,15 @@ const TypeInfo& Groom::type() {
             SKY_FIELD(Groom, maskBone, String,
                       "Grow only on vertices skinned to this bone and its children (e.g. Head for scalp hair, beard and brows "
                       "on a full-body mesh); character_inspect lists bones"),
+            SKY_FIELD_ENUM(Groom, maskSpace,
+                           "Coordinates of maskCenter / maskRadius: bounds = -1..1 across the bounding box of maskBone's "
+                           "vertices (rig independent: a beard is about [0, -0.6, -0.8] on a head facing -Z); bone = meters "
+                           "from maskBone's rest position; mesh = meters in the mesh; auto = bone with a maskBone, else mesh",
+                           "auto", "mesh", "bone", "bounds"),
             SKY_FIELD(Groom, maskCenter, Vec3,
-                      "Region center (meters, mesh axes): offset from maskBone's rest position, or from the mesh origin; "
-                      "imported characters face -Z, so a beard is at negative Z of the head"),
-            SKY_FIELD(Groom, maskRadius, Vec3, "Region ellipsoid radii in meters (0 = no region): beards, eyebrows, sideburns"),
+                      "Region center (see maskSpace; mesh axes): imported characters face -Z, so a beard is at negative Z"),
+            SKY_FIELD(Groom, maskRadius, Vec3,
+                      "Region ellipsoid radii (see maskSpace; 0 = no region): beards, eyebrows, sideburns"),
             SKY_FIELD(Groom, maskMirror, Bool, "Also grow in the region mirrored across the mesh's X = 0 plane (both eyebrows)"),
             SKY_FIELD_RANGE(Groom, lodBias, Float, "Real time: > 1 keeps more strands at a distance, < 1 fewer (stills draw all)",
                             0.05f, 8.f),
@@ -273,14 +278,16 @@ bool regionTouches(const Surface& s, Vec3 a, Vec3 b, Vec3 c) {
     return touches(s.center) || (s.mirror && touches(Vec3{-s.center.x, s.center.y, s.center.z}));
 }
 
-Surface buildSurface(const MeshData& m, const Groom& g, const std::vector<float>* vmask, const Vec3* regionCenter) {
+Surface buildSurface(const MeshData& m, const Groom& g, const std::vector<float>* vmask, const Vec3* regionCenter,
+                     const Vec3* regionRadius) {
     Surface s;
     s.mesh = &m;
     s.vmask = vmask;
+    const Vec3 r = regionRadius ? *regionRadius : g.maskRadius;
     if (length(g.maskRadius) > 0.f) {
         s.region = true;
         s.center = regionCenter ? *regionCenter : g.maskCenter;
-        s.radius = {std::max(g.maskRadius.x, 1e-4f), std::max(g.maskRadius.y, 1e-4f), std::max(g.maskRadius.z, 1e-4f)};
+        s.radius = {std::max(r.x, 1e-4f), std::max(r.y, 1e-4f), std::max(r.z, 1e-4f)};
         s.mirror = g.maskMirror;
     }
     const size_t triCount = m.indices.size() / 3;
@@ -577,14 +584,15 @@ int guideCountFor(const Groom& g, int strands) {
 // Generation
 // ---------------------------------------------------------------------------------------
 
-Result<GroomData> generateGroom(const Groom& g, const MeshData* mesh, const std::vector<float>* vertexMask, const Vec3* regionCenter) {
+Result<GroomData> generateGroom(const Groom& g, const MeshData* mesh, const std::vector<float>* vertexMask, const Vec3* regionCenter,
+                                const Vec3* regionRadius) {
     if (!mesh || mesh->indices.size() < 3) {
         return Error::make("no_mesh", "the groom needs a mesh to grow on", "add a mesh component or set `target`");
     }
     const int P = pointsFor(g);
     const int N = std::clamp(g.strands, 1, 1000000);
     const int G = guideCountFor(g, N);
-    Surface surf = buildSurface(*mesh, g, vertexMask, regionCenter);
+    Surface surf = buildSurface(*mesh, g, vertexMask, regionCenter, regionRadius);
     if (surf.cdf.empty()) {
         return Error::make("empty_mask", "the mask leaves no surface to grow hair on",
                            "widen maskAngle, check maskDirection, the vertex-color channel, maskBone or the maskCenter / "
@@ -963,6 +971,7 @@ uint64_t groomHash(const Groom& g, const std::string& meshKey, const MeshData* m
     }
     h = fnvs(h, g.maskChannel);
     h = fnvs(h, g.maskBone);
+    h = fnvs(h, g.maskSpace);
     for (float v : {g.maskCenter.x, g.maskCenter.y, g.maskCenter.z, g.maskRadius.x, g.maskRadius.y, g.maskRadius.z}) h = fnvv(h, v);
     h = fnvv(h, g.maskMirror ? 1 : 0);
     h = fnvs(h, meshKey);
@@ -1274,13 +1283,13 @@ Json groomPreset(const std::string& name) {
         // Faces of skinned characters: a bone mask (the head) and a region in front of / around it.
         {"beard", R"({"strands":45000,"segments":7,"length":0.032,"lengthVariation":0.35,"widthRoot":0.065,"widthTip":0.025,
             "direction":[0,-1,-0.25],"directionBlend":0.7,"gravity":0.45,"clumps":900,"clumpStrength":0.35,"clumpShape":1.3,
-            "curlRadius":0.0018,"curlFrequency":70,"frizz":0.0018,"frizzScale":70,"maskBone":"Head","maskCenter":[0,0.035,-0.085],
-            "maskRadius":[0.075,0.055,0.065],"maskDirection":[0,-0.35,-1],"maskAngle":95,"maskSoftness":20,"melanin":0.85,
+            "curlRadius":0.0018,"curlFrequency":70,"frizz":0.0018,"frizzScale":70,"maskBone":"Head","maskSpace":"bounds",
+            "maskCenter":[0,-0.62,-0.85],"maskRadius":[0.78,0.42,0.55],"maskDirection":[0,-0.35,-1],"maskAngle":95,"maskSoftness":20,"melanin":0.85,
             "redness":0.2,"colorVariation":0.2,"roughness":0.45,"radialRoughness":0.8,"stiffness":0.85,"rootStiffness":1,
             "follow":0.9,"simulate":false,"attach":"skinned","density":1.6})"},
         {"eyebrows", R"({"strands":5000,"segments":4,"length":0.011,"lengthVariation":0.3,"widthRoot":0.06,"widthTip":0.02,
             "direction":[1,0.35,0],"directionBlend":0.9,"gravity":0.05,"clumps":300,"clumpStrength":0.3,"frizz":0.0006,
-            "maskBone":"Head","maskCenter":[0.034,0.088,-0.088],"maskRadius":[0.026,0.009,0.03],"maskMirror":true,
+            "maskBone":"Head","maskSpace":"bounds","maskCenter":[0.36,0.08,-0.92],"maskRadius":[0.26,0.07,0.2],"maskMirror":true,
             "maskDirection":[0,0.2,-1],"maskAngle":75,"maskSoftness":20,"melanin":0.88,"redness":0.15,"roughness":0.5,
             "stiffness":1,"rootStiffness":1,"follow":1,"simulate":false,"attach":"skinned","density":1.8})"},
         {"fur_dense", R"({"strands":400000,"segments":6,"length":0.05,"lengthVariation":0.4,"widthRoot":0.06,"widthTip":0.008,
@@ -1374,10 +1383,14 @@ MeshData scaledMesh(const MeshData& m, Vec3 s) {
 }  // namespace
 
 std::vector<float> GroomSystem::vertexMask(const Groom& g, const MeshData& mesh, const std::string& meshKey, Vec3 scale,
-                                           Vec3& center, std::string& error) const {
+                                           Vec3& center, Vec3& radius, std::string& error) const {
     const size_t n = mesh.vertexCount();
     center = g.maskCenter;
-    if (g.maskBone.empty()) return {};
+    radius = g.maskRadius;
+    if (g.maskBone.empty()) {
+        if (g.maskSpace == "bone" || g.maskSpace == "bounds") error = "maskSpace \"" + g.maskSpace + "\" needs a maskBone";
+        return {};
+    }
     std::vector<float> mask(n, 1.f);
     if (!g.maskBone.empty()) {
         const SkinStream& skin = mesh.skin;
@@ -1412,7 +1425,21 @@ std::vector<float> GroomSystem::vertexMask(const Groom& g, const MeshData& mesh,
             }
             mask[v] = smoothstep(0.3f, 0.7f, w);
         }
-        if (boneSlot >= 0 && static_cast<size_t>(boneSlot) < skin.restGlobal.size()) {
+        if (g.maskSpace == "bounds") {
+            // Normalized to the box of the bone's own vertices: the same numbers fit any head.
+            Aabb b{Vec3(1e30f), Vec3(-1e30f)};
+            for (size_t v = 0; v < n; ++v) {
+                if (mask[v] < 0.5f) continue;
+                Vec3 p = vpos(mesh, static_cast<uint32_t>(v)) * scale;
+                b.min = vmin(b.min, p);
+                b.max = vmax(b.max, p);
+            }
+            if (b.max.x >= b.min.x) {
+                Vec3 half = b.extents();
+                center = b.center() + g.maskCenter * half;
+                radius = g.maskRadius * half;
+            }
+        } else if (boneSlot >= 0 && static_cast<size_t>(boneSlot) < skin.restGlobal.size() && g.maskSpace != "mesh") {
             center += skin.transform.transformPoint(skin.restGlobal[static_cast<size_t>(boneSlot)].translation()) * scale;
         }
     }
@@ -1449,10 +1476,10 @@ std::shared_ptr<const GroomData> GroomSystem::groomFor(const Scene& scene, Entit
     auto start = std::chrono::steady_clock::now();
     MeshData scaled;
     std::vector<float> vmask;
-    Vec3 regionCenter = g->maskCenter;
+    Vec3 regionCenter = g->maskCenter, regionRadius = g->maskRadius;
     std::string maskError;
     if (mesh) {
-        vmask = vertexMask(*g, *mesh, meshKey, scale, regionCenter, maskError);
+        vmask = vertexMask(*g, *mesh, meshKey, scale, regionCenter, regionRadius, maskError);
         scaled = scaledMesh(*mesh, scale);
         mesh = &scaled;
     }
@@ -1467,7 +1494,7 @@ std::shared_ptr<const GroomData> GroomSystem::groomFor(const Scene& scene, Entit
     } else if (!maskError.empty()) {
         r = Error::make("invalid_mask", maskError, "character_inspect lists the skeleton's bones; maskBone takes one of them");
     } else {
-        r = generateGroom(*g, mesh, vmask.empty() ? nullptr : &vmask, &regionCenter);
+        r = generateGroom(*g, mesh, vmask.empty() ? nullptr : &vmask, &regionCenter, &regionRadius);
     }
     lastGenerateMs_ = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
     entry.hash = h;

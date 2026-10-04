@@ -32,8 +32,9 @@ struct FxDrawUniforms {
     simd_float4 material4;  // alpha cutoff
     simd_float4x4 prevModel;  // velocity buffer (appended)
     simd_float4 motion;
+    simd_float4 character[3];  // character material models (appended)
 };
-static_assert(sizeof(FxDrawUniforms) == 336);
+static_assert(sizeof(FxDrawUniforms) == 384);
 
 /// Mirror of GpuStep in GpuParticles.metal.
 struct GpuStepUniforms {

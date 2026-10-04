@@ -28,6 +28,7 @@
 #include "skywalker/engine/Movie.h"
 #include "skywalker/native/NativeModules.h"
 #include "skywalker/assets/Prefab.h"
+#include "skywalker/render/DebugViews.h"
 #include "skywalker/render/Gltf.h"
 #include "skywalker/render/Impostor.h"
 #include "skywalker/render/MeshData.h"
@@ -753,6 +754,7 @@ FrameData Engine::buildFrameData(const CaptureOptions& opts) {
         GizmoFrame gf = Gizmo::frameFor(scene_->worldMatrix(selection_[0]), view, gizmo_.local);
         f.overlays = gizmo_.overlays(gf, gizmoHot_, gizmoDrag_ ? gizmoDrag_->axis : -1);
     }
+    if (debugViewIsOverlay(opts.debugView)) addCharacterDebugOverlays(*this, f);  // skeleton / IK / groom roots
     return f;
 }
 

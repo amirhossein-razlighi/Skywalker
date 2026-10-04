@@ -74,8 +74,10 @@ struct DrawUniforms {
     // --- appended (velocity buffer) ---
     float4x4 prevModel;   // the object's model matrix in the previous frame (= model when static)
     float4 motion;        // x = moves (prevModel differs or a previous skinned pose is bound), y = render layers (bits as a float), zw = unused
+    // --- appended (character material models: skin, eye, cloth, hair_card; Characters.metal) ---
+    float4 character[3];  // packed per model by toSurface() (assets/Material.cpp)
 };
-static_assert(sizeof(DrawUniforms) == 336, "DrawUniforms must match MetalRenderer.mm");
+static_assert(sizeof(DrawUniforms) == 384, "DrawUniforms must match MetalRenderer.mm");
 
 struct PostUniforms {
     float4 params;   // x = exposure, y = bloom intensity, z = bloom threshold, w = saturation
