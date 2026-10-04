@@ -1,3 +1,4 @@
 node_modules/
 out/
-public/footage/
+public/footage/*
+!public/footage/*.marks.json

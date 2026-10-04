@@ -1,19 +1,28 @@
-import { AbsoluteFill, interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
-import { loadFont } from "@remotion/google-fonts/Inter";
+import React from "react";
+import { AbsoluteFill, Audio, getStaticFiles, Sequence, staticFile } from "remotion";
+import { Grain, Vignette } from "./components/Overlays";
+import { S1Open } from "./sections/S1Open";
+import { FILM_FRAMES, section } from "./timeline";
 
-const { fontFamily } = loadFont();
-export const FILM_FRAMES = 60;
+export { FILM_FRAMES };
+
+const SECTIONS: { id: string; C: React.FC }[] = [{ id: "open", C: S1Open }];
 
 export const Film: React.FC = () => {
-  const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
-  const s = spring({ frame, fps, config: { damping: 200 } });
+  const hasScore = getStaticFiles().some((f) => f.name === "audio/score.wav");
   return (
-    <AbsoluteFill style={{ background: "#000", alignItems: "center", justifyContent: "center" }}>
-      <div style={{ fontFamily, fontWeight: 600, fontSize: 120, color: "white", letterSpacing: -4,
-                    opacity: s, transform: `translateY(${interpolate(s, [0, 1], [40, 0])}px)` }}>
-        Skywalker
-      </div>
+    <AbsoluteFill style={{ background: "#000" }}>
+      {SECTIONS.map(({ id, C }) => {
+        const s = section(id);
+        return (
+          <Sequence key={id} from={s.from} durationInFrames={s.duration} name={s.title}>
+            <C />
+          </Sequence>
+        );
+      })}
+      <Vignette strength={0.42} />
+      <Grain opacity={0.06} />
+      {hasScore && <Audio src={staticFile("audio/score.wav")} />}
     </AbsoluteFill>
   );
 };
