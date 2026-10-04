@@ -7,6 +7,7 @@
 
 #include "skywalker/core/Log.h"
 #include "skywalker/core/Strings.h"
+#include "skywalker/render2d/Particles2D.h"
 
 namespace sky {
 
@@ -106,6 +107,7 @@ void World2D::postTick(Scene& scene, wander::Runtime& runtime, float dt) {
     const ProcessGate* gate = &runtime.processGate();
     render2d::tickAnimators(scene, *assets_, dt, [&](EntityId e, const std::string& ev) { runtime.emit("anim:" + ev, e); }, gate);
     render2d::tickCameras(scene, dt, gate);
+    render2d::tickParticles2D(scene, *assets_, dt, gate);
 }
 
 void World2D::preTick(Scene& scene, wander::InputState& input, wander::Runtime& runtime, float baseDt) {

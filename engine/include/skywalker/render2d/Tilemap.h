@@ -38,6 +38,7 @@ struct Layer {
     Vec4 tint{1, 1, 1, 1};
     std::string sortingLayer;     // empty = the map's
     int order = 0;
+    bool ySort = false;           // draw row by row, sorted against ySort sprites (top-down depth)
     Json extra = Json::object();  // unknown keys, preserved
 };
 
