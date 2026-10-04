@@ -74,8 +74,10 @@ const TypeInfo& MaterialAsset::type() {
             // hair cards
             SKY_FIELD_RANGE(MaterialAsset, hairShift, Float, "hair_card: primary highlight shift along the strand", -1.f, 1.f),
             SKY_FIELD_RANGE(MaterialAsset, hairSpecular, Float, "hair_card: highlight strength", 0.f, 4.f),
-            SKY_FIELD_ENUM(MaterialAsset, hairDirection, "hair_card: strand direction in the card's UVs (root to tip)", "v", "-v",
-                           "u", "-u"),
+            SKY_FIELD_ENUM(MaterialAsset, hairDirection,
+                           "hair_card: strand direction in the card's UVs (root to tip); auto = found per pixel from the strand "
+                           "pattern of the texture (atlases whose cards run either way)",
+                           "auto", "v", "-v", "u", "-u"),
             SKY_FIELD_ENUM(MaterialAsset, alphaMode,
                            "hair_card: dither = stochastic transparency that resolves to soft strands under TAA and stills; "
                            "coverage = alpha to coverage (MSAA)",
@@ -126,7 +128,9 @@ Surface toSurface(const MaterialAsset& m) {
         case Shading::HairCard: {
             const bool u = m.hairDirection == "u" || m.hairDirection == "-u";
             const bool neg = !m.hairDirection.empty() && m.hairDirection[0] == '-';
-            s.model[0] = {m.hairShift, m.hairSpecular, u ? 0.f : 1.f, neg ? -1.f : 1.f};
+            const bool autoDir = m.hairDirection.empty() || m.hairDirection == "auto";
+            // z: 0 = along u, 1 = along v, 2 = auto (the shader reads the texture's strand pattern)
+            s.model[0] = {m.hairShift, m.hairSpecular, autoDir ? 2.f : (u ? 0.f : 1.f), neg ? -1.f : 1.f};
             s.model[1] = {m.alphaMode == "coverage" ? 1.f : 0.f, 0.f, 0.f, 0.f};
             break;
         }
@@ -166,7 +170,7 @@ Result<MaterialAsset> materialPreset(const std::string& name) {
         {"cloth", R"({"color":"#6f6a62","metallic":0,"roughness":0.85,"shading":"cloth","sheenColor":"#d8d2c8",
             "sheenRoughness":0.55,"fuzz":0.4})"},
         {"hair_card", R"({"color":"#3a2a1e","metallic":0,"roughness":0.35,"shading":"hair_card","alphaCutoff":0.05,
-            "doubleSided":true,"hairShift":0.08,"hairSpecular":0.8,"hairDirection":"v","alphaMode":"dither"})"},
+            "doubleSided":true,"hairShift":0.08,"hairSpecular":0.8,"hairDirection":"auto","alphaMode":"dither"})"},
         {"wax", R"({"color":"#f1e7cf","metallic":0,"roughness":0.35,"subsurface":0.9})"},
         {"leaves", R"({"color":"#4f8a34","metallic":0,"roughness":0.7,"subsurface":0.6,"doubleSided":true})"},
         {"snow", R"({"color":"#f4f8ff","metallic":0,"roughness":0.75,"subsurface":0.5})"},

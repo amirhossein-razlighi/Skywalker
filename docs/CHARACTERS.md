@@ -154,7 +154,7 @@ Start from the preset with `material_create {"path": ..., "preset": "skin"}` (or
 | `skin` | `scatterColor`, `scatterRadius` (mm), `lobeMix`, `lobeRoughness`, `microNormal`, `microNormalTiling`, `transmission` | Pre-integrated subsurface scattering (curvature from the geometry, per-channel softened normals, colored shadow edges), two specular lobes (oily + broad), procedural pores, light through ears and nostrils from the sun's shadow-map thickness |
 | `eye` | `irisCenter`, `irisCenter2`, `irisRadius`, `irisDepth`, `corneaRoughness`, `eyeShadow`, `limbusDarkening` | Iris refracted under the cornea (parallax), wet cornea highlight, darkened limbus, shadowed corners; `irisCenter2` for atlases with both eyes |
 | `cloth` | `sheenColor`, `sheenRoughness`, `fuzz` | Sheen at grazing angles (velvet, wool, cotton), soft fiber rim |
-| `hair_card` | `hairShift`, `hairSpecular`, `hairDirection`, `alphaMode` | Anisotropic two-highlight strand shading on cards; `dither` (stochastic, resolves under TAA) or `coverage` (alpha to coverage) |
+| `hair_card` | `hairShift`, `hairSpecular`, `hairDirection` (`auto` by default: read per pixel from the strand pattern of the texture; or `v`, `-v`, `u`, `-u`), `alphaMode` | Anisotropic two-highlight strand shading on cards (a Fresnel-weighted white R lobe and a tinted TRT lobe); `dither` (stochastic, resolves under TAA) or `coverage` (alpha to coverage) |
 
 Typical values: skin `scatterRadius` 1.5–2.5 mm (thin skin and children higher), `microNormal`
 0.15–0.35; eyes `irisDepth` 0.03–0.08; cloth `sheenRoughness` 0.3 satin .. 1 felt.
