@@ -50,6 +50,7 @@
     "giDistance": 4,
     "ssr": 1,
     "taa": true,
+    "renderScale": 1,
     "sharpen": 0.35,
     "shadowSoftness": 1.1,
     "tonemap": "agx",
@@ -12558,18 +12559,18 @@
           "layers": [
             {
               "mesh": "grass_tall",
-              "color": "#b4a865",
-              "density": 4.5,
+              "color": "#a3a05c",
+              "density": 3.2,
               "scaleMin": 0.85,
               "scaleMax": 1.35,
               "slopeMax": 30,
-              "clumping": 0.8,
+              "clumping": 0.85,
               "cullDistance": 120,
               "subsurface": 0.4,
               "wind": 1.6,
               "castShadows": true,
               "alignToNormal": 0.2,
-              "colorVariation": 0.5,
+              "colorVariation": 0.8,
               "preset": "dune_grass",
               "heightMin": 2.3,
               "heightMax": 12
@@ -17313,7 +17314,53 @@
           "lightColor": "#ff994d",
           "lightRange": 26,
           "prewarm": true,
-          "seed": 0
+          "seed": 0,
+          "simulation": "cpu",
+          "facing": "camera",
+          "mesh": "",
+          "roughness": 0.6,
+          "metallic": 0,
+          "texture": "",
+          "flipbookColumns": 1,
+          "flipbookRows": 1,
+          "flipbookFps": 0,
+          "colorGradient": "",
+          "sizeCurve": "",
+          "opacityCurve": "",
+          "shapeMesh": "",
+          "field": "none",
+          "fieldStrength": 1,
+          "fieldRadius": 2,
+          "fieldCenter": [
+            0,
+            0,
+            0
+          ],
+          "fieldAxis": [
+            0,
+            1,
+            0
+          ],
+          "fieldPull": 0,
+          "fieldLift": 0,
+          "fieldTexture": "",
+          "fieldSize": [
+            4,
+            4,
+            4
+          ],
+          "depthCollision": false,
+          "stick": false,
+          "friction": 0.3,
+          "colliders": "",
+          "subEmitter": "",
+          "subEmitOn": "death",
+          "subEmitCount": 8,
+          "subEmitInherit": 0.3,
+          "trailLength": 0.25,
+          "trailSegments": 12,
+          "sort": true,
+          "hueVariation": 0
         }
       }
     },
@@ -19797,7 +19844,53 @@
           "lightColor": "#ff994d",
           "lightRange": 14,
           "prewarm": true,
-          "seed": 0
+          "seed": 0,
+          "simulation": "cpu",
+          "facing": "camera",
+          "mesh": "",
+          "roughness": 0.6,
+          "metallic": 0,
+          "texture": "",
+          "flipbookColumns": 1,
+          "flipbookRows": 1,
+          "flipbookFps": 0,
+          "colorGradient": "",
+          "sizeCurve": "",
+          "opacityCurve": "",
+          "shapeMesh": "",
+          "field": "none",
+          "fieldStrength": 1,
+          "fieldRadius": 2,
+          "fieldCenter": [
+            0,
+            0,
+            0
+          ],
+          "fieldAxis": [
+            0,
+            1,
+            0
+          ],
+          "fieldPull": 0,
+          "fieldLift": 0,
+          "fieldTexture": "",
+          "fieldSize": [
+            4,
+            4,
+            4
+          ],
+          "depthCollision": false,
+          "stick": false,
+          "friction": 0.3,
+          "colliders": "",
+          "subEmitter": "",
+          "subEmitOn": "death",
+          "subEmitCount": 8,
+          "subEmitInherit": 0.3,
+          "trailLength": 0.25,
+          "trailSegments": 12,
+          "sort": true,
+          "hueVariation": 0
         }
       }
     },
@@ -19872,7 +19965,53 @@
           "lightColor": "#ff994d",
           "lightRange": 8,
           "prewarm": true,
-          "seed": 0
+          "seed": 0,
+          "simulation": "cpu",
+          "facing": "camera",
+          "mesh": "",
+          "roughness": 0.6,
+          "metallic": 0,
+          "texture": "",
+          "flipbookColumns": 1,
+          "flipbookRows": 1,
+          "flipbookFps": 0,
+          "colorGradient": "",
+          "sizeCurve": "",
+          "opacityCurve": "",
+          "shapeMesh": "",
+          "field": "none",
+          "fieldStrength": 1,
+          "fieldRadius": 2,
+          "fieldCenter": [
+            0,
+            0,
+            0
+          ],
+          "fieldAxis": [
+            0,
+            1,
+            0
+          ],
+          "fieldPull": 0,
+          "fieldLift": 0,
+          "fieldTexture": "",
+          "fieldSize": [
+            4,
+            4,
+            4
+          ],
+          "depthCollision": false,
+          "stick": false,
+          "friction": 0.3,
+          "colliders": "",
+          "subEmitter": "",
+          "subEmitOn": "death",
+          "subEmitCount": 8,
+          "subEmitInherit": 0.3,
+          "trailLength": 0.25,
+          "trailSegments": 12,
+          "sort": true,
+          "hueVariation": 0
         }
       }
     },
@@ -25322,7 +25461,7 @@
           "orthographic": false,
           "orthoSize": 5,
           "primary": false,
-          "aperture": 8,
+          "aperture": 2.8,
           "focusDistance": 0,
           "motionBlur": 0
         }

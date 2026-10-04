@@ -2,19 +2,13 @@
 
 Third-party assets used in this project (maintained by `asset_download`).
 
-- **coast_sand_01_diff_2k** by Rob Tuytel — CC0-1.0 — https://polyhaven.com/a/coast_sand_01 (`downloads/coast_sand_01`, 2026-10-03)
 - **damp_beach_sand_02_diff_2k** by Dimitrios Savva — CC0-1.0 — https://polyhaven.com/a/damp_beach_sand_02 (`downloads/damp_beach_sand_02`, 2026-10-03)
-- **coast_sand_05_diff_2k** by Rob Tuytel, Dario Barresi — CC0-1.0 — https://polyhaven.com/a/coast_sand_05 (`downloads/coast_sand_05`, 2026-10-03)
-- **coast_sand_rocks_02_diff_2k** by Rob Tuytel — CC0-1.0 — https://polyhaven.com/a/coast_sand_rocks_02 (`downloads/coast_sand_rocks_02`, 2026-10-03)
 - **forrest_sand_01_diff_2k** by Rob Tuytel — CC0-1.0 — https://polyhaven.com/a/forrest_sand_01 (`downloads/forrest_sand_01`, 2026-10-03)
-- **aerial_grass_rock_diff_2k** by Rob Tuytel — CC0-1.0 — https://polyhaven.com/a/aerial_grass_rock (`downloads/aerial_grass_rock`, 2026-10-03)
-- **cliff_side_diff_2k** by James Ray Cock, Jenelle van Heerden, Dario Barresi — CC0-1.0 — https://polyhaven.com/a/cliff_side (`downloads/cliff_side`, 2026-10-03)
 - **aerial_beach_01_diff_4k** by Rob Tuytel — CC0-1.0 — https://polyhaven.com/a/aerial_beach_01 (`downloads/aerial_beach_01`, 2026-10-03)
 - **aerial_beach_02_diff_2k** by Rob Tuytel — CC0-1.0 — https://polyhaven.com/a/aerial_beach_02 (`downloads/aerial_beach_02`, 2026-10-03)
 - **low_tide_rocks_diff_2k** by Dimitrios Savva — CC0-1.0 — https://polyhaven.com/a/low_tide_rocks (`downloads/low_tide_rocks`, 2026-10-03)
 - **aerial_grass_rock_diff_4k** by Rob Tuytel — CC0-1.0 — https://polyhaven.com/a/aerial_grass_rock (`downloads/aerial_grass_rock`, 2026-10-03)
 - **aerial_rocks_02_diff_4k** by Rob Tuytel — CC0-1.0 — https://polyhaven.com/a/aerial_rocks_02 (`downloads/aerial_rocks_02`, 2026-10-03)
-- **dark_rock_02_diff_2k** by Amal Kumar — CC0-1.0 — https://polyhaven.com/a/dark_rock_02 (`downloads/dark_rock_02`, 2026-10-03)
 - **island_tree_01_2k** by Rob Tuytel, Rico Cilliers — CC0-1.0 — https://polyhaven.com/a/island_tree_01 (`downloads/island_tree_01`, 2026-10-03)
 - **island_tree_02_2k** by Rob Tuytel, Rico Cilliers — CC0-1.0 — https://polyhaven.com/a/island_tree_02 (`downloads/island_tree_02`, 2026-10-03)
 - **island_tree_03_2k** by Rob Tuytel, Rico Cilliers — CC0-1.0 — https://polyhaven.com/a/island_tree_03 (`downloads/island_tree_03`, 2026-10-03)
@@ -60,3 +54,9 @@ Third-party assets used in this project (maintained by `asset_download`).
 - **treasure_chest_2k** by Rico Cilliers — CC0-1.0 — https://polyhaven.com/a/treasure_chest (`downloads/treasure_chest`, 2026-10-03)
 - **boulder_01_2k** by Rico Cilliers — CC0-1.0 — https://polyhaven.com/a/boulder_01 (`downloads/boulder_01`, 2026-10-03)
 - **aerial_rocks_04_diff_4k** by Rob Tuytel — CC0-1.0 — https://polyhaven.com/a/aerial_rocks_04 (`downloads/aerial_rocks_04`, 2026-10-03)
+
+## Made for this project
+
+- Coconut palms (five variants) and the seagull: modeled procedurally in Blender by the crew through the DCC bridge (`media/demo/games/tidebreak_blender.py`, script `PALMS` / `GULL`).
+- The watchtower, rampart pieces and jetty sections: split out of Poly Haven's CC0 `modular_fort_01` and `modular_wooden_pier` kits in Blender (script `SPLIT`).
+- Terrain: generated (`island_beach`) and sculpted by the crew; every stroke is recorded in the scene so the terrain rebuilds identically.

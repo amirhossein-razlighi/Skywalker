@@ -5,6 +5,12 @@ A sculpted volcanic island: a crescent cove of photoscanned sand that darkens wh
 waves run up, crystal shallows over a sand shelf, dunes of wind-blown grass, island trees
 and shrubs, a headland of sea cliffs crowned by a ruined watchtower, a fishing jetty, a
 merchant brig riding at anchor, a driftwood campfire at dusk and gulls wheeling overhead.
+
+  python3 media/demo/showcase.py build tidebreak_isle      # (re)build examples/tidebreak_isle
+  python3 media/demo/showcase.py stills tidebreak_isle OUT # one still per hero shot
+
+Hero shots live in SHOTS; each becomes `sequences/<name>.sequence.json` (a path camera plus the
+mood's environment keys), so `movie_render {sequence: ...}` renders the move.
 """
 import math
 import os
@@ -238,8 +244,8 @@ def vegetation(cir, A):
                     clumping=0.8, cullDistance=1400, wind=0.25, randomTilt=4, subsurface=0.45, seed=41 + i)
              for i, k in enumerate(("island_tree_01", "island_tree_02", "island_tree_03"))]
     cir.call("foliage_add", entity="Island", name="Island Foliage", seed=7, layers=[
-        {"preset": "dune_grass", "density": 4.5, "heightMin": 2.3, "heightMax": 12, "slopeMax": 30, "scaleMin": 0.85,
-         "scaleMax": 1.35, "color": "#b4a865", "clumping": 0.8},
+        {"preset": "dune_grass", "density": 3.2, "colorVariation": 0.8, "heightMin": 2.3, "heightMax": 12, "slopeMax": 30, "scaleMin": 0.85,
+         "scaleMax": 1.35, "color": "#a3a05c", "clumping": 0.85},
         {"preset": "tall_grass", "density": 1.2, "heightMin": 4.5, "slopeMax": 34, "terrainLayer": 4, "color": "#8a9a48",
          "clumping": 0.75, "seed": 3},
         {"preset": "tall_grass", "name": "jungle grass", "density": 2.5, "heightMin": 6.5, "slopeMax": 44, "terrainLayer": 5,
@@ -484,9 +490,9 @@ SHOTS = [
     dict(name="establishing", mood="golden", seconds=7, fov=42,
          path=[[-95, 52, 480], [-62, 36, 420], [-38, 24, 372]], target=[18, 5, 215]),
     dict(name="swash", mood="golden", seconds=6, fov=38, aperture=5.6,
-         path=[[-27, 0.75, 202.5, "g"], [-19, 0.7, 201.0, "g"], [-11, 0.75, 199.5, "g"]], target=[72, 2.5, 252]),
-    dict(name="campfire", mood="dusk", seconds=7, fov=46, aperture=2.8, orbit=dict(center="camp", radius=4.6, height=1.05,
-                                                                                    start=162, end=212, aim=0.55)),
+         path=[[-28, 1.05, 198.0, "g"], [-20, 1.0, 196.6, "g"], [-12, 1.05, 195.2, "g"]], target=[72, 2.5, 252]),
+    dict(name="campfire", mood="dusk", seconds=7, fov=46, aperture=2.8, orbit=dict(center="camp", radius=4.8, height=1.15,
+                                                                                    start=165, end=205, aim=0.6)),
     dict(name="watchtower", mood="golden", seconds=6, fov=46,
          path=[[90, 1.7, 196, "g"], [93, 3.0, 203, "g"], [95.5, 4.6, 209, "g"]], target=[104, 27, 238]),
     dict(name="brig", mood="golden", seconds=6, fov=36,
@@ -495,8 +501,8 @@ SHOTS = [
          path=[[-46, 1.4, 150, "g"], [-43, 1.5, 154, "g"], [-40, 1.7, 158, "g"]], target=[-28, 9, 196]),
     dict(name="shallows", mood="midday", seconds=7, fov=48,
          path=[[-92, 34, 268], [-62, 30, 282], [-30, 28, 292]], target=[-24, 0, 236]),
-    dict(name="dunes", mood="midday", seconds=6, fov=44, aperture=8,
-         path=[[16, 1.65, 140, "g"], [14, 1.65, 147, "g"], [12, 1.7, 154, "g"]], target=[26, 2.5, 262]),
+    dict(name="dunes", mood="midday", seconds=6, fov=44, aperture=2.8,
+         path=[[16, 0.95, 140, "g"], [14, 1.0, 147, "g"], [12, 1.1, 154, "g"]], target=[26, 2.5, 262]),
     dict(name="cliffs", mood="midday", seconds=6, fov=40,
          path=[[176, 4.5, 330], [182, 5.5, 300], [186, 6.5, 270]], target=[112, 12, 252]),
 ]
