@@ -52,6 +52,45 @@ end
     CHECK(r.program->behaviors[0].handlers.size() == 4);
 }
 
+TEST_CASE("wander: an if on the line after else is nested, `else if` on one line chains") {
+    // Nested: the inner if has its own end, and the statement after the outer end stays in the handler.
+    auto nested = compile(R"(
+behavior T
+  var a = 1
+  on tick
+    if a > 0 then
+      a = 2
+    else
+      if a < -5 then
+        a = 3
+      end
+    end
+    let b = 2
+    a = b
+  end
+end
+)", kComponents);
+    CHECK(nested.ok());
+    CHECK(nested.errorCount() == 0);
+    // Chained: `else if` on one line needs a single end, like elif.
+    auto chained = compile(R"(
+behavior T
+  var a = 1
+  on tick
+    if a > 0 then
+      a = 2
+    else if a < -5 then
+      a = 3
+    end
+    let b = 2
+    a = b
+  end
+end
+)", kComponents);
+    CHECK(chained.ok());
+    CHECK(chained.errorCount() == 0);
+}
+
 TEST_CASE("wander: bare handlers are wrapped in an implicit behavior") {
     auto r = compile("on tick\n  rotate self by (0, 90 * dt, 0)\nend", kComponents);
     REQUIRE(r.ok());

@@ -95,3 +95,5 @@ examples/neon_requiem/lookdev/
 
 # Ashen Peaks: Blender-generated monastery kit (rebuilt by media/demo/games/ashen_peaks.py)
 examples/ashen_peaks/dcc/
+# Gloamwater art is painted by media/demo/games/gloamwater_art.py (regenerated on build)
+examples/gloamwater/art/

@@ -745,7 +745,9 @@ void gatherTilemap(Ctx& c, EntityId e, size_t sceneIndex, const Tilemap& map) {
         y1 = std::min(y1, static_cast<int>(std::ceil(maxV)) + 1);
     }
     const float invW = ts ? 1.f / static_cast<float>(ts->texW) : 1.f, invH = ts ? 1.f / static_cast<float>(ts->texH) : 1.f;
-    const float inset = 0.02f;  // texels: avoids sampling a neighbour tile at the edges
+    // Texels kept away from the tile's edges so filtering never reads the neighbouring tile in the
+    // sheet: nearest only needs a hair, bilinear reads half a texel around the sample point.
+    const float inset = map.filter == "nearest" ? 0.02f : 0.5f;
     for (size_t li = 0; li < grid.layers.size(); ++li) {
         const tiles::Layer& layer = grid.layers[li];
         if (!layer.visible) continue;
