@@ -2845,6 +2845,27 @@
     "minimum": 0,
     "maximum": 180,
     "description": "Maximum head/spine turn (degrees)"
+   },
+   "rootYaw": {
+    "type": "boolean",
+    "description": "With rootMotion: also turn the entity by the clip's root rotation (turn-in-place and curved-walk clips); the body keeps facing the entity's forward"
+   },
+   "inPlace": {
+    "type": "boolean",
+    "description": "Play locomotion in place: the root's horizontal motion (and turn, with rootYaw) is removed and the entity does not move (gameplay code moves it)"
+   },
+   "retargetFrom": {
+    "type": "string",
+    "description": "Clip library (*.anim or a rigged .glb) whose clips play on this character when they are not in its own library, e.g. a shared animation pack for a different rig (retargeted per `retarget`)"
+   },
+   "retarget": {
+    "type": "string",
+    "enum": [
+     "auto",
+     "pose",
+     "name"
+    ],
+    "description": "How clips from another rig map onto this skeleton: auto = pose-space when both rigs are humanoids (different names, rest poses, proportions), else by bone name; pose = always pose-space; name = by bone name"
    }
   },
   "additionalProperties": false
@@ -3290,6 +3311,73 @@
    "seed": {
     "type": "integer",
     "description": "Random seed (a different head of the same style)"
+   },
+   "attach": {
+    "type": "string",
+    "enum": [
+     "auto",
+     "rigid",
+     "skinned"
+    ],
+    "description": "auto = roots follow the animated skin when the mesh is rigged (characters, creatures); rigid = follow the entity only; skinned = always bind to the skin"
+   },
+   "follow": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1,
+    "description": "Skinned: share of the skin's motion strands take rigidly before simulating (0 = all inertia, floppy; 1 = stiff); 0.5-0.8 keeps hair stable on running characters"
+   },
+   "maxSpeed": {
+    "type": "number",
+    "minimum": 0.1,
+    "maximum": 100,
+    "description": "Strand points never move faster than this relative to their roots (m/s)"
+   },
+   "bodyColliders": {
+    "type": "boolean",
+    "description": "Skinned: collide with capsules fitted to the character's skeleton (head, neck, torso, arms, legs)"
+   },
+   "maskBone": {
+    "type": "string",
+    "description": "Grow only on vertices skinned to this bone and its children (e.g. Head for scalp hair, beard and brows on a full-body mesh); character_inspect lists bones"
+   },
+   "maskSpace": {
+    "type": "string",
+    "enum": [
+     "auto",
+     "mesh",
+     "bone",
+     "bounds"
+    ],
+    "description": "Coordinates of maskCenter / maskRadius: bounds = -1..1 across the bounding box of maskBone's vertices (rig independent: a beard is about [0, -0.6, -0.8] on a head facing -Z); bone = meters from maskBone's rest position; mesh = meters in the mesh; auto = bone with a maskBone, else mesh"
+   },
+   "maskCenter": {
+    "type": "array",
+    "items": {
+     "type": "number"
+    },
+    "minItems": 3,
+    "maxItems": 3,
+    "description": "Region center (see maskSpace; mesh axes): imported characters face -Z, so a beard is at negative Z"
+   },
+   "maskRadius": {
+    "type": "array",
+    "items": {
+     "type": "number"
+    },
+    "minItems": 3,
+    "maxItems": 3,
+    "description": "Region ellipsoid radii (see maskSpace; 0 = no region): beards, eyebrows, sideburns"
+   },
+   "maskMirror": {
+    "type": "boolean",
+    "description": "Also grow in the region mirrored across the mesh's X = 0 plane (both eyebrows)"
+   },
+   "lodBias": {
+    "type": "number",
+    "minimum": 0.05,
+    "maximum": 8,
+    "description": "Real time: > 1 keeps more strands at a distance, < 1 fewer (stills draw all)"
    }
   },
   "additionalProperties": false
@@ -4166,6 +4254,120 @@
    "seed": {
     "type": "integer",
     "description": "Random seed (same seed, same particles)"
+   }
+  },
+  "additionalProperties": false
+ },
+ "characterIk": {
+  "type": "object",
+  "description": "Automatic foot planting (stairs, slopes, rocks), pelvis adjustment, feet aligned to the slope and locked while in contact, hand targets (two-handed grips, ledges, rails) and turn in place for a humanoid character. Put it on the entity with the animator; bones come from the skeleton's humanoid map (character_inspect shows it).",
+  "properties": {
+   "feet": {
+    "type": "boolean",
+    "description": "Plant the feet on the ground under them every tick"
+   },
+   "feetWeight": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1,
+    "description": "0 = animation only .. 1 = fully planted"
+   },
+   "stepHeight": {
+    "type": "number",
+    "minimum": 0.01,
+    "maximum": 2,
+    "description": "Meters a foot may reach up or down to find ground (stairs: 0.3-0.5)"
+   },
+   "footHeight": {
+    "type": "number",
+    "minimum": -1,
+    "maximum": 0.5,
+    "description": "Ankle height above the sole in meters; -1 = measured from the rest pose"
+   },
+   "pelvis": {
+    "type": "boolean",
+    "description": "Lower the hips so the lower foot reaches its ground (uneven ground, stairs)"
+   },
+   "alignFeet": {
+    "type": "boolean",
+    "description": "Pitch and roll the feet onto the ground's slope"
+   },
+   "maxSlope": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 80,
+    "description": "Steeper ground aligns the feet only this far (degrees)"
+   },
+   "contact": {
+    "type": "string",
+    "enum": [
+     "auto",
+     "velocity",
+     "events",
+     "always",
+     "never"
+    ],
+    "description": "When a foot is in contact and locks to its spot (no sliding): auto = low and slow, velocity = slow, events = animation events foot_l_down / foot_l_up / foot_r_down / foot_r_up, always, never"
+   },
+   "lockSpeed": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 5,
+    "description": "A foot slower than this (m/s) counts as planted"
+   },
+   "lockDistance": {
+    "type": "number",
+    "minimum": 0.02,
+    "maximum": 2,
+    "description": "A locked foot re-plants with a quick step once the animation pulls it this far (m)"
+   },
+   "smoothing": {
+    "type": "number",
+    "minimum": 0.5,
+    "maximum": 60,
+    "description": "How fast the pelvis and feet follow the ground (1/s; higher = snappier)"
+   },
+   "leftHand": {
+    "type": [
+     "object",
+     "string",
+     "integer",
+     "null"
+    ],
+    "description": "The left hand reaches this entity: a grip point on a staff held in the right hand, a ledge, a rail — entity link: name (\"Door\"), \"#id\", {\"id\": 12} or null; read back as {\"id\", \"name\"} (follows renames; entity_refs lists links)",
+    "x-sky-entity": true
+   },
+   "leftHandWeight": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1,
+    "description": "Blend of the left-hand target (animate it for grabs)"
+   },
+   "rightHand": {
+    "type": [
+     "object",
+     "string",
+     "integer",
+     "null"
+    ],
+    "description": "The right hand reaches this entity — entity link: name (\"Door\"), \"#id\", {\"id\": 12} or null; read back as {\"id\", \"name\"} (follows renames; entity_refs lists links)",
+    "x-sky-entity": true
+   },
+   "rightHandWeight": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1,
+    "description": "Blend of the right-hand target"
+   },
+   "handRotation": {
+    "type": "boolean",
+    "description": "Also orient the hands like their target entities"
+   },
+   "turnSpeed": {
+    "type": "number",
+    "minimum": 1,
+    "maximum": 2000,
+    "description": "Turn-in-place rate in degrees per second (turn_in_place)"
    }
   },
   "additionalProperties": false

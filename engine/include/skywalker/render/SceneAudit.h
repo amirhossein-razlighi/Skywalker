@@ -5,7 +5,8 @@
 // director asks before filming:
 //   * which builtin primitive meshes (cube, sphere, capsule...) are on screen and how much of
 //     the image they cover, occlusion included (a coarse CPU depth raster of every draw,
-//     terrain and water), so a ground plane hidden under terrain does not count;
+//     terrain, water and instanced foliage), so a ground plane hidden under terrain or a prop
+//     inside a hedge does not count;
 //   * which "characters" are made of primitives (an animator / character controller / nav
 //     agent on primitive meshes, or a sphere-on-capsule arrangement of primitive parts);
 //   * default or untextured materials, missing texture files, big meshes without LODs,
@@ -64,6 +65,7 @@ struct CoverageBuffer {
     static constexpr int kSky = -1;
     static constexpr int kTerrain = -2;
     static constexpr int kWater = -3;
+    static constexpr int kFoliageBase = -16;  // foliage batch i owns pixels as kFoliageBase - i
     int width = 0;
     int height = 0;
     std::vector<float> depth;   // clip z / w (0 near .. 1 far)
@@ -72,6 +74,9 @@ struct CoverageBuffer {
     /// Pixels per owner (draw index -> count); sky, terrain and water in the extras.
     std::vector<uint32_t> drawPixels;
     uint32_t skyPixels = 0, terrainPixels = 0, waterPixels = 0;
+    /// Pixels per instanced foliage batch (FrameData::instances index).
+    std::vector<uint32_t> foliagePixels;
+    size_t foliageInstances = 0;  // instances rasterized (nearest first, within a triangle budget)
     /// Draws whose geometry could not be loaded (missing or broken mesh files).
     std::vector<size_t> missing;
     float pixelFraction() const { return width && height ? 1.f / static_cast<float>(width * height) : 0.f; }

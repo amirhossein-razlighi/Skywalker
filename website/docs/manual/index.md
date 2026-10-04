@@ -73,6 +73,7 @@ Strand hair and fur, particles and fluids, skeletal animation and cinematics.
 
 | Page | What you learn |
 |---|---|
+| [Characters](characters.md) | Humanoid maps, retargeting, foot and hand IK, turn in place, skinned grooms, skin / eye / cloth / hair-card materials |
 | [Hair and fur](hair.md) | Strand grooms from presets or files, shading, simulation and budgets |
 | [Visual effects](vfx.md) | CPU and GPU particles, volumetric fluids and the effect presets |
 | [Animation](animation.md) | Skeletal animation, animator controllers, IK, bone attachments and sequences |

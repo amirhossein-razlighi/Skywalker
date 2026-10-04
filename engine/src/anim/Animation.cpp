@@ -208,7 +208,14 @@ bool solveTwoBoneIk(const Skeleton& sk, Pose& pose, std::vector<Mat4>& globals, 
     if (end < 0 || static_cast<size_t>(end) >= sk.bones.size() || weight <= 0.f) return false;
     const int mid = sk.bones[static_cast<size_t>(end)].parent;
     const int root = mid >= 0 ? sk.bones[static_cast<size_t>(mid)].parent : -1;
-    if (root < 0 || globals.size() != sk.bones.size() || pose.size() != sk.bones.size()) return false;
+    return solveTwoBoneChain(sk, pose, globals, root, mid, end, t, pole, weight);
+}
+
+bool solveTwoBoneChain(const Skeleton& sk, Pose& pose, std::vector<Mat4>& globals, int root, int mid, int end, Vec3 t, Vec3 pole,
+                       float weight) {
+    const int n = static_cast<int>(sk.bones.size());
+    if (weight <= 0.f || root < 0 || mid < 0 || end < 0 || root >= n || mid >= n || end >= n) return false;
+    if (globals.size() != sk.bones.size() || pose.size() != sk.bones.size()) return false;
     const Vec3 a = globals[static_cast<size_t>(root)].translation();
     const Vec3 b = globals[static_cast<size_t>(mid)].translation();
     const Vec3 c = globals[static_cast<size_t>(end)].translation();
@@ -261,6 +268,48 @@ float rootSpeed(const Library& lib, const Clip& clip, Vec3 up) {
         return p - up * dot(p, up);
     };
     return length(flat(clip.duration) - flat(0.f)) / clip.duration;
+}
+
+float rootTurn(const Library& lib, const Clip& clip, Vec3 up) {
+    if (lib.rootBone < 0 || clip.duration <= 1e-4f) return 0.f;
+    const Bone& root = lib.skeleton.bones[static_cast<size_t>(lib.rootBone)];
+    Quat parent;
+    if (root.parent >= 0) {
+        std::vector<Mat4> rest;
+        computeGlobals(lib.skeleton, restPose(lib.skeleton), rest);
+        parent = rotationOf(rest[static_cast<size_t>(root.parent)]);
+    }
+    up = length(up) > 1e-6f ? normalize(up) : Vec3{0, 1, 0};
+    Vec3 fwd = Vec3{0, 0, 1} - up * up.z;
+    if (length(fwd) < 1e-3f) fwd = Vec3{1, 0, 0} - up * up.x;
+    fwd = normalize(fwd);
+    const Quat restQ = parent * root.rest.r;
+    auto heading = [&](float t) {
+        Quat local = root.rest.r;
+        for (const auto& ch : clip.channels) {
+            if (ch.bone == lib.rootBone && ch.path == Path::Rotation) {
+                Trs base;
+                base.r = root.rest.r;
+                local = sampleChannel(ch, t, base).r;
+            }
+        }
+        Vec3 f = ((parent * local) * restQ.conjugate()).rotate(fwd);
+        f = f - up * dot(f, up);
+        if (length(f) < 1e-5f) return 0.f;
+        f = normalize(f);
+        return std::atan2(dot(cross(fwd, f), up), dot(fwd, f));
+    };
+    constexpr int kSteps = 48;
+    float total = 0.f, prev = heading(0.f);
+    for (int i = 1; i <= kSteps; ++i) {
+        float h = heading(clip.duration * static_cast<float>(i) / kSteps);
+        float d = h - prev;
+        while (d > kPi) d -= 2.f * kPi;
+        while (d < -kPi) d += 2.f * kPi;
+        total += d;
+        prev = h;
+    }
+    return total;
 }
 
 size_t retarget(const Clip& clip, const Skeleton& source, const Skeleton& target, Clip& out) {

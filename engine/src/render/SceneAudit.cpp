@@ -399,6 +399,63 @@ CoverageBuffer rasterize(const FrameData& frame, const Sources& src, int width) 
             }
         }
     }
+    // Instanced foliage (trees, hedges, grass, scattered rocks): every part's coarsest LOD per instance,
+    // nearest instances first within a triangle budget, so props hidden in vegetation do not count.
+    buf.foliagePixels.assign(frame.instances.size(), 0);
+    {
+        constexpr size_t kFoliageTriangleBudget = 600000;
+        struct Pick {
+            float dist;
+            size_t batch, instance;
+        };
+        std::vector<Pick> picks;
+        for (size_t bi = 0; bi < frame.instances.size(); ++bi) {
+            const InstanceBatch& b = frame.instances[bi];
+            if (!b.instances || !b.parts) continue;
+            for (size_t ii = 0; ii < b.instances->size(); ++ii) {
+                const world::FoliageInstance& in = (*b.instances)[ii];
+                Vec3 p{in.row0[3], in.row1[3], in.row2[3]};
+                float d = distance(p, frame.camera.eye);
+                if (d > b.cullDistance) continue;
+                picks.push_back({d, bi, ii});
+            }
+        }
+        std::sort(picks.begin(), picks.end(), [](const Pick& a, const Pick& b) {
+            return a.dist < b.dist || (a.dist == b.dist && (a.batch < b.batch || (a.batch == b.batch && a.instance < b.instance)));
+        });
+        size_t spent = 0;
+        for (const Pick& pk : picks) {
+            const InstanceBatch& b = frame.instances[pk.batch];
+            const world::FoliageInstance& in = (*b.instances)[pk.instance];
+            Mat4 w;
+            for (int c = 0; c < 4; ++c) {
+                w.at(c, 0) = in.row0[c];
+                w.at(c, 1) = in.row1[c];
+                w.at(c, 2) = in.row2[c];
+                w.at(c, 3) = c == 3 ? 1.f : 0.f;
+            }
+            size_t tris = 0;
+            for (const InstancePart& part : *b.parts) {
+                const MeshData* m = src.mesh ? src.mesh(part.mesh) : nullptr;
+                if (!m) continue;
+                const auto& idx = m->lods.empty() ? m->indices : m->lods.back();
+                const Mat4 model = w * part.local;
+                const auto& v = m->vertices;
+                for (size_t t = 0; t + 2 < idx.size(); t += 3) {
+                    if (static_cast<size_t>(std::max({idx[t], idx[t + 1], idx[t + 2]})) * MeshData::kFloatsPerVertex >= v.size()) continue;
+                    auto P = [&](uint32_t i) {
+                        const float* p = &v[static_cast<size_t>(i) * MeshData::kFloatsPerVertex];
+                        return model.transformPoint(Vec3{p[0], p[1], p[2]});
+                    };
+                    r.triangle(P(idx[t]), P(idx[t + 1]), P(idx[t + 2]), CoverageBuffer::kFoliageBase - static_cast<int32_t>(pk.batch));
+                }
+                tris += idx.size() / 3;
+            }
+            ++buf.foliageInstances;
+            spent += tris;
+            if (spent > kFoliageTriangleBudget) break;
+        }
+    }
     // Water bodies: a flat sheet at the water level (opaque enough to hide what is far below).
     for (const WaterItem& w : frame.water) {
         const float half = w.size > 0.f ? w.size * 0.5f : 4000.f;
@@ -424,6 +481,9 @@ CoverageBuffer rasterize(const FrameData& frame, const Sources& src, int width) 
             ++buf.terrainPixels;
         } else if (o == CoverageBuffer::kWater) {
             ++buf.waterPixels;
+        } else if (o <= CoverageBuffer::kFoliageBase) {
+            size_t bi = static_cast<size_t>(CoverageBuffer::kFoliageBase - o);
+            if (bi < buf.foliagePixels.size()) ++buf.foliagePixels[bi];
         }
     }
     return buf;
@@ -701,6 +761,42 @@ Json auditFrame(const Scene& scene, const FrameData& frame, const Sources& src, 
         }
     }
 
+    // --- Foliage materials: textured, existing files ------------------------------------------
+    Json foliage = Json::array();
+    float foliageCoverage = 0.f;
+    for (size_t bi = 0; bi < frame.instances.size(); ++bi) {
+        const InstanceBatch& b = frame.instances[bi];
+        const float cov = bi < buf.foliagePixels.size() ? static_cast<float>(buf.foliagePixels[bi]) * px : 0.f;
+        foliageCoverage += cov;
+        if (cov < opts.minCoverage || !b.parts) continue;
+        Json parts = Json::array();
+        bool untextured = false;
+        for (const InstancePart& part : *b.parts) {
+            const Surface& s = part.surface;
+            Json pj = Json::object({{"mesh", part.mesh}});
+            if (!s.texture.empty()) pj["texture"] = s.texture;
+            for (const std::string* tex : {&s.texture, &s.normalMap, &s.ormMap}) {
+                if (!tex->empty() && !exists(*tex) && missingFiles.insert(*tex).second) {
+                    add("error", "missing_texture", "foliage texture not found: " + *tex + " (" + ref(scene, b.entity) + ")",
+                        "fetch the project's downloads or fix the foliage layer's material", b.entity);
+                }
+            }
+            if (s.texture.empty() && s.shading != Shading::Unlit && !isProceduralMesh(part.mesh)) {
+                untextured = true;
+                pj["issue"] = "untextured";
+            }
+            if (isProceduralMesh(part.mesh)) pj["issue"] = "procedural";
+            parts.push(std::move(pj));
+        }
+        foliage.push(Json::object({{"id", b.entity}, {"name", entityName(scene, b.entity)}, {"coverage", round4(cov * 100.f)},
+                                   {"parts", parts}}));
+        if (untextured && cov > 0.002f) {
+            add(opts.stylized ? "info" : "warning", "untextured_foliage",
+                "foliage on " + ref(scene, b.entity) + " has flat-colored parts (" + pct(cov) + " of the image)",
+                "use scanned plants with texture sets (Poly Haven) in the foliage layers", b.entity);
+        }
+    }
+
     // --- Geometry: LODs and texel density ---------------------------------------------------
     Json lods = Json::array(), texel = Json::array();
     std::set<std::string> lodChecked;
@@ -854,13 +950,16 @@ Json auditFrame(const Scene& scene, const FrameData& frame, const Sources& src, 
     if (lods.size()) out["lods"] = lods;
     if (texel.size()) out["texelDensity"] = texel;
     if (lightIssues.size()) out["lightsWithoutShadows"] = lightIssues;
+    if (foliage.size()) capped("foliage", foliage, 20);
     out["environment"] = env;
     out["stats"] = Json::object({{"draws", frame.draws.size()},
                                  {"visibleDraws", visibleDraws},
                                  {"rasterTriangles", buf.triangles},
                                  {"raster", Json::array({buf.width, buf.height})},
                                  {"terrainCoverage", round4(static_cast<float>(buf.terrainPixels) * px * 100.f)},
-                                 {"waterCoverage", round4(static_cast<float>(buf.waterPixels) * px * 100.f)}});
+                                 {"waterCoverage", round4(static_cast<float>(buf.waterPixels) * px * 100.f)},
+                                 {"foliageCoverage", round4(foliageCoverage * 100.f)},
+                                 {"foliageInstancesRasterized", buf.foliageInstances}});
     out["warnings"] = warnings;
     return out;
 }

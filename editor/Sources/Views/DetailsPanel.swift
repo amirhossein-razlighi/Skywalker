@@ -33,14 +33,15 @@ struct EntityDetails: View {
     private var selectedID: UInt64? { engine.selection.count == 1 ? engine.selection.first : nil }
     private static let componentOrder = ["transform", "mesh", "light", "reflection_probe", "camera", "particles", "groom",
                                          "water", "terrain", "foliage", "audio", "listener", "body", "collider", "character",
-                                         "joint", "vehicle", "chase_camera", "nav_agent", "navmesh", "physics_world", "animator", "attach", "ik", "sequencer",
+                                         "joint", "vehicle", "chase_camera", "nav_agent", "navmesh", "physics_world", "animator", "characterIk", "attach", "ik", "sequencer",
                                          "sprite", "sprite_anim", "tilemap", "light2d", "parallax", "camera2d", "text", "ui_canvas",
                                          "ui", "dialogue", "process", "particles2d"]
     /// Components offered by Add Component (transform is always present).
     private static let addable = ["mesh", "light", "reflection_probe", "camera", "particles", "groom", "water", "terrain",
                                   "foliage", "audio", "listener", "body", "collider", "character", "joint", "vehicle", "chase_camera",
                                   "nav_agent", "navmesh",
-                                  "physics_world", "animator", "attach", "ik", "sequencer", "sprite", "sprite_anim", "tilemap",
+                                  "physics_world", "animator", "characterIk", "attach", "ik", "sequencer", "sprite", "sprite_anim",
+                                  "tilemap",
                                   "light2d", "parallax", "camera2d", "text", "ui_canvas", "ui", "dialogue", "process", "particles2d"]
 
     var body: some View {
@@ -121,6 +122,7 @@ struct EntityDetails: View {
         case "dialogue": "bubble.left.and.bubble.right"
         case "animator": "figure.run"
         case "attach": "paperclip"
+        case "characterIk": "figure.stairs"
         case "ik": "hand.point.up.left"
         case "sequencer": "film.stack"
         case "process": "pause.circle"
@@ -142,6 +144,7 @@ struct EntityDetails: View {
         case "ui_canvas": "UI Canvas"
         case "ui": "UI Element"
         case "attach": "Bone Attachment"
+        case "characterIk": "Character IK"
         case "ik": "IK Target"
         case "process": "Process (Pause / Time)"
         case "reflection_probe": "Reflection Probe"

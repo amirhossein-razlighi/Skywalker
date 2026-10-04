@@ -213,15 +213,20 @@ void addAnimationTools(Engine& engine, ToolRegistry& reg) {
              "(default) finds idle/walk/run/jump clips by name and builds: parameter `speed` (m/s) driving a 1D blend "
              "Idle -> Walk -> Run whose thresholds are the clips' real root speeds (feet don't slide when you set speed to "
              "the actual velocity), and if there is a jump clip a `jump` trigger with Jump -> back to locomotion. "
-             "preset=clips: one state per clip, no transitions (drive with play_animation). Override clip choices with "
+             "preset=clips: one state per clip, no transitions (drive with play_animation). preset=directional: a polar 2D "
+             "blend space for strafing characters: parameters `moveX` (right) and `moveY` (forward) in m/s drive idle, "
+             "forward, back, left, right and diagonal clips placed at their measured root velocities (direction and speed "
+             "blend separately: no slowdown or foot sliding between directions). Override clip choices with "
              "`clips` ({\"idle\": \"Breathe\", \"run\": \"Sprint\"}), or pass a full `controller` document (parameters, "
              "layers with states/blend/blend2d, transitions with \"when\" conditions like \"speed > 0.1 and grounded\", "
              "exit times, events, masks) — it is validated with did-you-mean errors. Then drive it from Wander: "
              "set_param(self, \"speed\", v), trigger(self, \"jump\"), play_animation(self, \"Wave\").",
              "animation",
              object({{"entity", entity("The character")},
-                     {"preset", enumeration({"locomotion", "clips"}, "Generated controller (default locomotion)")},
-                     {"clips", Json::object({{"type", "object"}, {"description", "Clip choice overrides: idle, walk, run, jump"}})},
+                     {"preset", enumeration({"locomotion", "clips", "directional"}, "Generated controller (default locomotion)")},
+                     {"clips", Json::object({{"type", "object"},
+                                             {"description", "Clip choice overrides: idle, walk, run, jump; directional: idle, forward, back, "
+                                                             "left, right, forward_left, forward_right, back_left, back_right"}})},
                      {"controller", Json::object({{"type", "object"}, {"description", "A full controller document instead of a preset"}})},
                      {"path", string("Where to save the controller (default: next to the library, <name>.animctl.json)")},
                      {"library", string("Animation library (.anim) if the character has none yet")},
@@ -253,6 +258,74 @@ void addAnimationTools(Engine& engine, ToolRegistry& reg) {
                          auto parsed = anim::ControllerDef::fromJson(a.get("controller"));
                          if (!parsed) return parsed.error();
                          def = std::move(*parsed);
+                     } else if (a.get("preset").asString("locomotion") == "directional") {
+                         const Json& pick = a.get("clips");
+                         auto [up, scale] = modelFrame(engine, ae);
+                         Json motions = Json::array();
+                         std::vector<std::string> used;
+                         struct Role {
+                             const char* name;
+                             std::initializer_list<const char*> words;
+                             Vec2 dir;  // (right, forward) unit direction when the clip has no root motion
+                         };
+                         const float d = 0.7071f;
+                         const Role roles[] = {{"idle", {"idle", "stand", "breath"}, {0, 0}},
+                                               {"forward", {"walk_f", "walk_fwd", "forward", "walk"}, {0, 1}},
+                                               {"back", {"walk_b", "backward", "back"}, {0, -1}},
+                                               {"left", {"strafe_l", "walk_l", "left"}, {-1, 0}},
+                                               {"right", {"strafe_r", "walk_r", "right"}, {1, 0}},
+                                               {"forward_left", {"forward_left", "fwd_l", "walk_fl"}, {-d, d}},
+                                               {"forward_right", {"forward_right", "fwd_r", "walk_fr"}, {d, d}},
+                                               {"back_left", {"back_left", "bwd_l", "walk_bl"}, {-d, -d}},
+                                               {"back_right", {"back_right", "bwd_r", "walk_br"}, {d, -d}}};
+                         Json placed = Json::object();
+                         for (const Role& r : roles) {
+                             std::string clip = pick.get(r.name).asString();
+                             if (clip.empty()) clip = findClip(L, r.words, used);
+                             if (clip.empty() || (std::string(r.name) != "idle" && clip == findClip(L, {"idle", "stand", "breath"}))) continue;
+                             const anim::Clip* c = L.clip(clip);
+                             if (!c) {
+                                 std::string near = str::closest(clip, L.clipNames(), 4);
+                                 return Error::make("unknown_clip", "no clip \"" + clip + "\" for " + r.name,
+                                                    near.empty() ? "animation_list lists the clips" : "did you mean \"" + near + "\"?");
+                             }
+                             used.push_back(clip);
+                             // The clip's measured root velocity (model faces +Z, its left is +X), else the role's direction.
+                             Vec2 v{0, 0};
+                             if (std::string(r.name) != "idle" && L.rootBone >= 0 && c->duration > 1e-4f) {
+                                 std::vector<Mat4> rest;
+                                 anim::computeGlobals(L.skeleton, anim::restPose(L.skeleton), rest);
+                                 int parent = L.skeleton.bones[static_cast<size_t>(L.rootBone)].parent;
+                                 Mat4 pm = parent >= 0 ? rest[static_cast<size_t>(parent)] : Mat4{};
+                                 Vec3 restT = L.skeleton.bones[static_cast<size_t>(L.rootBone)].rest.t;
+                                 Vec3 delta = pm.transformPoint(anim::sampleTranslation(*c, L.rootBone, c->duration, restT)) -
+                                              pm.transformPoint(anim::sampleTranslation(*c, L.rootBone, 0.f, restT));
+                                 delta = (delta - up * dot(delta, up)) * (scale / c->duration);
+                                 v = {-delta.x, delta.z};
+                                 if (std::sqrt(v.x * v.x + v.y * v.y) < 0.1f) v = r.dir * 1.4f;  // in-place clip
+                             }
+                             motions.push(Json::object({{"clip", clip}, {"pos", Json::array({round3(v.x), round3(v.y)})}}));
+                             placed[r.name] = clip;
+                         }
+                         if (motions.size() < 2) {
+                             return Error::make("no_clips", "found fewer than two directional clips",
+                                                "name them with `clips`, e.g. {\"forward\": \"Walk_F\", \"left\": \"Strafe_L\", ...}");
+                         }
+                         Json doc = Json::object(
+                             {{"parameters", Json::object({{"moveX", "float"}, {"moveY", "float"}})},
+                              {"layers", Json::array({Json::object(
+                                             {{"name", "Base"},
+                                              {"default", "Move"},
+                                              {"states", Json::object({{"Move", Json::object({{"blend2d", Json::object({{"x", "moveX"},
+                                                                                                                       {"y", "moveY"},
+                                                                                                                       {"mode", "directional"},
+                                                                                                                       {"motions", motions}})}})}})},
+                                              {"transitions", Json::array()}})})}});
+                         auto parsed = anim::ControllerDef::fromJson(doc);
+                         if (!parsed) return parsed.error();
+                         def = std::move(*parsed);
+                         drive.push("set_param(self, \"moveX\", <m/s right>) and set_param(self, \"moveY\", <m/s forward>) in the character's frame");
+                         drive.push(Json::object({{"placed", placed}}).dump());
                      } else if (a.get("preset").asString("locomotion") == "clips") {
                          std::string idle = findClip(L, {"idle", "stand", "breath"});
                          def = anim::simpleController(L.clipNames(), idle, true);

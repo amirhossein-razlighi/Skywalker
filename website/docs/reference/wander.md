@@ -5,14 +5,14 @@ title: "Wander builtins"
 
 # Wander builtins
 
-Every function a Wander script can call lives in one registry: name, typed parameters, return type, category, documentation and an example. The compiler checks calls against it (arity, types, did-you-mean), and this page is generated from it. **142 builtins** in 20 categories.
+Every function a Wander script can call lives in one registry: name, typed parameters, return type, category, documentation and an example. The compiler checks calls against it (arity, types, did-you-mean), and this page is generated from it. **146 builtins** in 20 categories.
 
 Agents get the same information from `wander_reference` (the guide) and `wander_reference {topic}` (structured entries for a category or a function). For the language itself, read the [Wander manual](../manual/wander/index.md).
 
 | Category | Builtins |
 |---|---|
 | [2d](#2d) | [`play_anim`](#2d-play_anim), [`set_tile`](#2d-set_tile), [`tile_at`](#2d-tile_at) |
-| [animation](#animation) | [`anim_state`](#animation-anim_state), [`play_animation`](#animation-play_animation), [`play_sequence`](#animation-play_sequence), [`set_param`](#animation-set_param), [`trigger`](#animation-trigger) |
+| [animation](#animation) | [`anim_state`](#animation-anim_state), [`foot_ik`](#animation-foot_ik), [`hand_ik`](#animation-hand_ik), [`look_at`](#animation-look_at), [`play_animation`](#animation-play_animation), [`play_sequence`](#animation-play_sequence), [`set_param`](#animation-set_param), [`trigger`](#animation-trigger), [`turn_in_place`](#animation-turn_in_place) |
 | [audio](#audio) | [`music`](#audio-music), [`play`](#audio-play), [`play_sound`](#audio-play_sound), [`set_volume`](#audio-set_volume), [`stop_sound`](#audio-stop_sound) |
 | [character](#character) | [`grounded`](#character-grounded), [`jump`](#character-jump), [`walk`](#character-walk) |
 | [color](#color) | [`color`](#color-color), [`hsv`](#color-hsv) |
@@ -130,6 +130,67 @@ Returns: `string`
 if anim_state(self) == "idle" then
 ```
 
+### `foot_ik` { #animation-foot_ik }
+
+```text
+foot_ik(entity: entity, on: bool, weight: number?)
+```
+
+Turns automatic foot planting on or off (feet on stairs, slopes and rocks, pelvis lowered, feet locked while planted); the optional weight fades it (0..1). Adds the characterIk component if needed.
+
+| Parameter | Type | |
+|---|---|---|
+| `entity` | entity |  |
+| `on` | bool |  |
+| `weight` | number | optional |
+
+Returns: `none`
+
+```text
+foot_ik(self, not swimming)
+```
+
+### `hand_ik` { #animation-hand_ik }
+
+```text
+hand_ik(entity: entity, side: string, target: none|entity, weight: number?)
+```
+
+Makes a character's hand reach an entity ("left" or "right"): a grip point on a staff held in the other hand, a ledge, a rail, a door handle. `none` (or weight 0) releases it. Adds the characterIk component if needed.
+
+| Parameter | Type | |
+|---|---|---|
+| `entity` | entity |  |
+| `side` | string |  |
+| `target` | none\|entity |  |
+| `weight` | number | optional |
+
+Returns: `none`
+
+```text
+hand_ik(self, "left", find("Staff Grip"), 1)
+```
+
+### `look_at` { #animation-look_at }
+
+```text
+look_at(entity: entity, target: none|entity, weight: number?)
+```
+
+Turns a character's head and upper spine toward an entity (look-at IK, clamped by animator.lookAtLimit), or stops with `none`; the turn fades in and out smoothly.
+
+| Parameter | Type | |
+|---|---|---|
+| `entity` | entity |  |
+| `target` | none\|entity |  |
+| `weight` | number | optional |
+
+Returns: `none`
+
+```text
+look_at(self, find("Player"), 0.8)
+```
+
 ### `play_animation` { #animation-play_animation }
 
 ```text
@@ -207,6 +268,25 @@ Returns: `none`
 
 ```text
 trigger(self, "jump")
+```
+
+### `turn_in_place` { #animation-turn_in_place }
+
+```text
+turn_in_place(entity: entity, toward: number|vector|entity)
+```
+
+Turns a standing character in place toward a world yaw (degrees, 0 = -Z) or to face a point / entity, at characterIk.turnSpeed; planted feet stay locked and re-plant in small steps. Controllers can read the float `turn` (degrees left) and bool `turning` parameters to play turn clips.
+
+| Parameter | Type | |
+|---|---|---|
+| `entity` | entity |  |
+| `toward` | number\|vector\|entity |  |
+
+Returns: `none`
+
+```text
+turn_in_place(self, find("Door"))
 ```
 
 ## audio { #audio }
@@ -2755,10 +2835,14 @@ let w = vehicle_wheel(self, "rear_left")
         tile_at(map: entity, position: vector|entity, layer: string?) -> number — Tile id of a tilemap at a world position (topmost non-empty layer, or the named layer); 0 = empty.
       [animation]
         anim_state(entity: entity) -> string — Name of the animator's current state.
+        foot_ik(entity: entity, on: bool, weight: number?) — Turns automatic foot planting on or off (feet on stairs, slopes and rocks, pelvis lowered, feet locked while planted); the optional weight fades it (0..1). Adds the characterIk component if needed.
+        hand_ik(entity: entity, side: string, target: none|entity, weight: number?) — Makes a character's hand reach an entity ("left" or "right"): a grip point on a staff held in the other hand, a ledge, a rail, a door handle. `none` (or weight 0) releases it. Adds the characterIk component if needed.
+        look_at(entity: entity, target: none|entity, weight: number?) — Turns a character's head and upper spine toward an entity (look-at IK, clamped by animator.lookAtLimit), or stops with `none`; the turn fades in and out smoothly.
         play_animation(entity: entity, clip: string, fade: number?, loop: bool?) — Crossfades straight to a clip or state (seconds of fade, default 0.2).
         play_sequence(entity: entity, start: number?) — Plays the entity's sequencer (a cutscene) from `start` seconds.
         set_param(entity: entity, name: string, value: bool|number) — Sets an animator controller parameter (blend spaces and transitions read them).
         trigger(entity: entity, name: string) — Fires an animator trigger (jump, attack, wave).
+        turn_in_place(entity: entity, toward: number|vector|entity) — Turns a standing character in place toward a world yaw (degrees, 0 = -Z) or to face a point / entity, at characterIk.turnSpeed; planted feet stay locked and re-plant in small steps. Controllers can read the float `turn` (degrees left) and bool `turning` parameters to play turn clips.
       [audio]
         music(clip: string, fade: number?) — Crossfades the music to a clip ("" fades out); fade in seconds.
         play(e: entity) — Starts the entity's audio component (its clip, volume, spatial settings).

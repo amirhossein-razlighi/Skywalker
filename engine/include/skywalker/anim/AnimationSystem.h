@@ -20,6 +20,7 @@
 #include <vector>
 
 #include "skywalker/anim/Animation.h"
+#include "skywalker/anim/CharacterIk.h"
 #include "skywalker/anim/Controller.h"
 #include "skywalker/anim/Sequence.h"
 #include "skywalker/render/Renderer.h"
@@ -27,6 +28,8 @@
 #include "skywalker/scene/Scene.h"
 
 namespace sky::anim {
+
+struct RetargetSetup;  // anim/Retarget.h
 
 class AnimationSystem {
 public:
@@ -38,6 +41,9 @@ public:
         /// Root motion hook (e.g. a physics character controller). Return true when the
         /// delta (world space, meters) was consumed; otherwise the Transform moves.
         std::function<bool(EntityId entity, Vec3 worldDelta)> rootMotion;
+        /// Foot IK ground probe: the nearest surface along a ray (world), ignoring `character` and
+        /// everything below it. Empty = no foot planting.
+        std::function<GroundProbe(Vec3 origin, Vec3 direction, float maxDistance, EntityId character)> ground;
     };
     Hooks hooks;
     /// Process modes (scene/Process.h): which sequencers and animators run this tick and how fast
@@ -89,7 +95,15 @@ public:
     /// The library an animator uses (its own field, its controller's, or its mesh's).
     Result<std::shared_ptr<const Library>> libraryOf(EntityId animatorEntity);
     /// A clip reference ("Walk" in `lib`, or "anims/dance.anim#Dance") posed for `lib`'s skeleton.
-    std::shared_ptr<const Clip> resolveClip(const std::shared_ptr<const Library>& lib, const std::string& ref);
+    /// Clips of another rig are retargeted per `mode` ("auto", "pose" or "name"; see Animator::retarget);
+    /// `fallbackLibrary` (Animator::retargetFrom) supplies clips that are not in `lib`.
+    std::shared_ptr<const Clip> resolveClip(const std::shared_ptr<const Library>& lib, const std::string& ref,
+                                            const std::string& mode = "auto", const std::string& fallbackLibrary = "");
+    /// Pose-space retargeting setup between two libraries (cached); error when either is not a humanoid.
+    Result<std::shared_ptr<const RetargetSetup>> retargetSetup(const std::shared_ptr<const Library>& source,
+                                                                      const std::shared_ptr<const Library>& target);
+    /// How a clip of `source` reaches `target` under `mode`: "same" (identical rigs), "pose" or "name".
+    std::string retargetMethod(const Library& source, const Library& target, const std::string& mode);
 
     // --- Control (tools, Wander, sequencer) ------------------------------------------------
     Status setParam(EntityId e, std::string_view name, const Json& value);
@@ -101,6 +115,17 @@ public:
     /// Editor/tool preview: hold an animator at a state or clip, `seconds` in.
     Status setPreview(EntityId animatorEntity, const std::string& stateOrClip, float seconds);
     void clearPreview(EntityId animatorEntity);
+
+    // --- Character tech (CharacterIk.cpp) ---------------------------------------------------
+    /// Turns the character (in place) to face `yawDegrees` (world yaw, 0 = -Z) at characterIk.turnSpeed;
+    /// controllers with a float `turn` / bool `turning` parameter get the angle left (turn clips).
+    Status turnInPlace(EntityId e, float yawDegrees);
+    /// Humanoid map, foot / hand IK status of the last solve, turn target.
+    Result<Json> characterStatus(EntityId e);
+    /// Bone segments (parent joint -> joint) of the current pose in world space (debug views).
+    std::vector<std::pair<Vec3, Vec3>> skeletonLines(EntityId e);
+    /// World capsules fitted to a skinned draw's mesh around its bones, in the current pose (BodyColliders.cpp).
+    std::vector<FxCollider> bodyColliders(EntityId drawEntity, const std::string& meshKey);
 
     Status playSequence(EntityId e, float from = 0.f);
     Status stopSequence(EntityId e);
@@ -125,6 +150,11 @@ private:
     void poseEditing(Instance& inst, EntityId e, const Animator& a);
     void finishPose(Instance& inst, EntityId e, const Animator& a);
     void applyLookAt(Instance& inst, EntityId e, const Animator& a);
+    void applyRootYaw(const Instance& inst, EntityId e, float yaw);
+    const HumanoidMap* humanoidOf(Instance& inst);
+    Mat4 freshWorld(EntityId target, EntityId character, Instance& inst);
+    void applyCharacterIk(Instance& inst, EntityId e);
+    void updateTurn(Instance& inst, EntityId e, float dt);
     void applyIk(Instance& inst, EntityId e);
     const std::vector<EntityId>* ikEffectors(EntityId animatorEntity);
     Mat4 modelToWorld(const Instance& inst, EntityId animatorEntity) const;
@@ -142,6 +172,7 @@ private:
     std::unordered_map<std::string, std::pair<std::shared_ptr<const ControllerDef>, std::string>> controllers_;
     std::unordered_map<std::string, std::pair<std::shared_ptr<const SequenceDef>, std::string>> sequences_;
     std::unordered_map<std::string, std::shared_ptr<const Clip>> retargeted_;
+    std::unordered_map<std::string, std::pair<std::shared_ptr<const RetargetSetup>, std::string>> retargetSetups_;
     std::unordered_map<EntityId, float> scrubs_;
     std::unordered_map<std::string, bool> warned_;
     std::unordered_map<EntityId, std::vector<EntityId>> ikIndex_;  // animator -> IK effectors (rebuilt per scene revision)

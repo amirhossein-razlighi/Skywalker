@@ -27,6 +27,19 @@ const TypeInfo& Animator::type() {
             SKY_FIELD_ENTITY(Animator, lookAt, "Entity the head and spine turn towards (look-at IK); empty = off"),
             SKY_FIELD_RANGE(Animator, lookAtWeight, Float, "How strongly the head follows lookAt", 0.f, 1.f),
             SKY_FIELD_RANGE(Animator, lookAtLimit, Float, "Maximum head/spine turn (degrees)", 0.f, 180.f),
+            SKY_FIELD(Animator, rootYaw, Bool,
+                      "With rootMotion: also turn the entity by the clip's root rotation (turn-in-place and curved-walk clips); "
+                      "the body keeps facing the entity's forward"),
+            SKY_FIELD(Animator, inPlace, Bool,
+                      "Play locomotion in place: the root's horizontal motion (and turn, with rootYaw) is removed and the "
+                      "entity does not move (gameplay code moves it)"),
+            SKY_FIELD(Animator, retargetFrom, String,
+                      "Clip library (*.anim or a rigged .glb) whose clips play on this character when they are not in its own "
+                      "library, e.g. a shared animation pack for a different rig (retargeted per `retarget`)"),
+            SKY_FIELD_ENUM(Animator, retarget,
+                           "How clips from another rig map onto this skeleton: auto = pose-space when both rigs are humanoids "
+                           "(different names, rest poses, proportions), else by bone name; pose = always pose-space; name = by bone name",
+                           "auto", "pose", "name"),
         }};
     return info;
 }

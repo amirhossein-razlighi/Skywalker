@@ -138,6 +138,8 @@ returns every view with its color legend. Unknown names fail with a did-you-mean
 | `sketch` | pencil contours and hatching |
 | `impostors` | the final image with foliage meshes tinted green and impostors magenta |
 | `motion` | the velocity buffer over a dimmed gray image: hue = direction, strength = speed on a log scale (faint at 0.25 px, full at 15 px per frame). Capture with `samples: 1` right after something moved (a `sim_control` step) |
+| `skeleton`, `ik_targets`, `groom_roots` | overlays on the final image: animated skeletons, foot / hand IK probes and targets, groom roots on the skin ([CHARACTERS.md](CHARACTERS.md#debug-views)) |
+| `sss_mask` | material models: skin red (brighter = more scattering), eye blue, cloth green, hair cards yellow |
 | `shadow_atlas` | the point and spot light shadow maps (4 quadrants), outlined per light: green re-rendered this frame, blue cached, orange waiting for the update budget (see [Point and spot light shadows](#point-and-spot-light-shadows)) |
 | `reflection_probes` | the final image tinted with the color of the reflection probe(s) lighting each pixel (`probe_info` `debugColor`; gray = sky only), every influence volume outlined (dashed where hidden), capture points as dots (see [Reflection probes](#reflection-probes)) |
 
@@ -303,7 +305,7 @@ precompiled `.metallib` removes.
 | `clearcoat` | A second glossy lobe on top (car paint, varnish, ceramics). |
 | `subsurface` | Wrap diffuse plus back-light transmission (skin, leaves, wax, snow, ice). |
 | `rim` | Stylized silhouette light. |
-| `shading` | `pbr`, `toon` (banded light, crisp highlight, hemispheric fill) or `unlit`. |
+| `shading` | `pbr`, `toon` (banded light, crisp highlight, hemispheric fill), `unlit`, `water`, or a character model: `skin`, `eye`, `cloth`, `hair_card` ([CHARACTERS.md](CHARACTERS.md#material-models-skin-eye-cloth-hair_card)). |
 | `outline` / `outlineColor` | Cartoon outline width in pixels: an inverted hull with constant screen-space width. |
 | `doubleSided`, `castShadows` | Self-explanatory. |
 | Specular anti-aliasing | Roughness is widened where normals vary within a pixel, so there is no sparkle on detailed normal maps. |
@@ -316,7 +318,8 @@ surfaces are sorted back to front and don't cast shadows.
 - `material_create {path, preset?}` starts from a built-in preset and lets other fields
   override it. Presets: `gold`, `silver`, `copper`, `chrome`, `brushed_steel`, `iron`,
   `plastic`, `rubber`, `ceramic`, `car_paint`, `glass`, `water`, `ice`, `skin`, `wax`,
-  `leaves`, `snow`, `velvet`, `neon`, `toon`, `toon_metal`, `clay`.
+  `leaves`, `snow`, `velvet`, `neon`, `toon`, `toon_metal`, `clay`, and the character models
+  `skin`, `eye`, `cloth`, `hair_card`.
 - `texture_generate {kind, name}` writes a seamless albedo, normal and ORM set. By default
   it also creates a triplanar material.
   - Kinds: `noise`, `marble`, `wood`, `planks`, `bricks`, `tiles`, `cobblestone`, `grass`,

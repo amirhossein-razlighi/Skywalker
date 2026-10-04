@@ -5,7 +5,7 @@ title: "Tools"
 
 # Tools
 
-Skywalker exposes **205 tools** (engine 0.1.0). The editor, its in-app agents, the CLI and every MCP client call the same tools with the same JSON arguments, so anything you read here works everywhere. 123 tools change the project; every such change is undoable and attributed to whoever made it.
+Skywalker exposes **208 tools** (engine 0.1.0). The editor, its in-app agents, the CLI and every MCP client call the same tools with the same JSON arguments, so anything you read here works everywhere. 124 tools change the project; every such change is undoable and attributed to whoever made it.
 
 Arguments are validated before a tool runs: unknown keys, wrong types and bad enum values fail with a *did you mean …?* hint. Each tool page shows the arguments, the annotations MCP clients use for approvals, and the same call as a tool call, a CLI command and a raw MCP request.
 
@@ -22,7 +22,7 @@ Arguments are validated before a tool runs: unknown keys, wrong types and bad en
 | [Code](code.md) | 4 | Native code: ahead-of-time compiled behaviors and C++ modules (trusted local code; clients ask first). |
 | [Simulation](sim.md) | 9 | Play, pause, step and stop; inject input; trace and inspect what runs. |
 | [Physics](physics.md) | 12 | Rigid bodies, characters, queries, settling and navigation meshes. |
-| [Animation](animation.md) | 12 | Skeletal animation, controllers, IK, bone attachments and cinematic sequences. |
+| [Animation](animation.md) | 15 | Skeletal animation, controllers, IK, bone attachments and cinematic sequences. |
 | [UI](ui.md) | 4 | Build, style, inspect and drive user interfaces. |
 | [Dialogue](dialogue.md) | 3 | Lint, preview and control branching dialogue. |
 | [Studio](studio.md) | 26 | The multi-agent studio: roster, board, feedback, decisions, loops, messages and playtests. |
@@ -163,10 +163,13 @@ Arguments are validated before a tool runs: unknown keys, wrong types and bad en
 | [`vehicle_tune`](physics.md#vehicle_tune) | Physics | Change a vehicle's handling parameters with validation (one undoable edit; works while playing: the vehicle is rebuilt keeping its speed). |
 | [`animation_list`](animation.md#animation_list) | Animation | Skeleton and clips of a rigged model or animated character. |
 | [`animation_preview`](animation.md#animation_preview) | Animation | Render a character posed at a clip or state at given times (editor preview; the scene is not changed). |
+| [`animation_retarget`](animation.md#animation_retarget) | Animation | Retarget clips from one humanoid rig to another in pose space and save them as a new library (.anim) on the target's skeleton: different bone names (mixamo / suffixed like thigh_l / generic, detected by name and topology), rest poses (T-pose vs A-pose), bone axes and proportions (the hips move by the source motion scaled by the leg-length ratio; bones keep their own lengths, so nothing stretches). |
 | [`animator_set`](animation.md#animator_set) | Animation | Set an animator's parameters and triggers, or play a state/clip with a crossfade — live while the simulation runs (same as Wander set_param / trigger / play_animation), or as the editor preview while editing. |
 | [`animator_setup`](animation.md#animator_setup) | Animation | Create a state machine controller (*.animctl.json) for a character and assign it. |
 | [`bone_attach`](animation.md#bone_attach) | Animation | Make an entity follow a bone of an animated character: a sword in the right hand, a hat on the head, a lantern on the hip. |
 | [`bone_ik`](animation.md#bone_ik) | Animation | Make a character's hand or foot reach a point with two-bone IK (the elbow/knee and shoulder/hip bend; bone lengths are kept): a hand on a door handle, rail or lever, a foot planted on a step. |
+| [`character_ik`](animation.md#character_ik) | Animation | Set up automatic foot IK, hand targets and turning for a humanoid character (adds or updates its characterIk component; undoable). |
+| [`character_inspect`](animation.md#character_inspect) | Animation | Everything about a character's animation and look in one call: the humanoid bone map of its skeleton (slots like hips, leftHand, rightFoot with the bone names found, convention mixamo / suffixed / generic, missing slots), key bone positions in the world, clips with their root speed (m/s) and root turn (degrees per cycle), root motion / in-place / root yaw settings, retargeting (retargetFrom and how its clips map), foot and hand IK status of the last solve (contact, locked, ground offset, slope, pelvis drop, hand reach error), hair and fur attachment (follows the skin?, bound roots, colliders), and the material model of every mesh part (skin, eye, cloth, hair_card, pbr). |
 | [`sequence_camera_shot`](animation.md#sequence_camera_shot) | Animation | Add a procedural camera move to a sequence — the quickest way to direct cinematics. |
 | [`sequence_create`](animation.md#sequence_create) | Animation | Create a cinematic sequence asset (*.sequence.json) and an entity whose `sequencer` plays it when the simulation starts. |
 | [`sequence_get`](animation.md#sequence_get) | Animation | A sequence's tracks (type, entity, property, key count and time span) and length; with `time`, the evaluated property values and live camera at that moment. |

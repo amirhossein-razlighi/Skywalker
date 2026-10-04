@@ -1,4 +1,5 @@
 #include "skywalker/engine/Engine.h"
+#include "CharacterHooks.h"  // character tech
 #include "skywalker/game/GameSettings.h"
 
 #include <algorithm>
@@ -110,6 +111,7 @@ Engine::Engine(EngineConfig config)
         return instantiatePrefabAsset(ref, placement);
     };
     scene_->setPrefabResolver([this](const std::string& ref) { return prefabTemplateAsset(ref); });  // linked prefabs
+    installCharacterHooks(*this);  // foot IK ground probes, groom body colliders (CharacterHooks.cpp)
     registerEngineBuiltins();
     runtime_->provide<Engine>(this);  // engine-side Wander builtins reach subsystems through this
     runtime_->setProjectDir(config_.projectDir);
@@ -763,6 +765,7 @@ FrameData Engine::buildFrameData(const CaptureOptions& opts) {
         GizmoFrame gf = Gizmo::frameFor(scene_->worldMatrix(selection_[0]), view, gizmo_.local);
         f.overlays = gizmo_.overlays(gf, gizmoHot_, gizmoDrag_ ? gizmoDrag_->axis : -1);
     }
+    if (debugViewIsOverlay(opts.debugView)) addCharacterDebugOverlays(*this, f);  // skeleton / IK / groom roots
     return f;
 }
 

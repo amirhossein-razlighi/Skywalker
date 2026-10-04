@@ -297,6 +297,16 @@ Strand hair and fur grown on the entity's mesh (or `target`'s), or loaded from a
 | `cardsBelow` | number | auto LOD: draw cards when the groom is smaller than this (pixels) | 0 .. 4096 |
 | `castShadows` | boolean | Cast sun shadows on the scene |  |
 | `seed` | integer | Random seed (a different head of the same style) |  |
+| `attach` | string | auto = roots follow the animated skin when the mesh is rigged (characters, creatures); rigid = follow the entity only; skinned = always bind to the skin | `auto` `rigid` `skinned` |
+| `follow` | number | Skinned: share of the skin's motion strands take rigidly before simulating (0 = all inertia, floppy; 1 = stiff); 0.5-0.8 keeps hair stable on running characters | 0 .. 1 |
+| `maxSpeed` | number | Strand points never move faster than this relative to their roots (m/s) | 0.1 .. 100 |
+| `bodyColliders` | boolean | Skinned: collide with capsules fitted to the character's skeleton (head, neck, torso, arms, legs) |  |
+| `maskBone` | string | Grow only on vertices skinned to this bone and its children (e.g. Head for scalp hair, beard and brows on a full-body mesh); character_inspect lists bones |  |
+| `maskSpace` | string | Coordinates of maskCenter / maskRadius: bounds = -1..1 across the bounding box of maskBone's vertices (rig independent: a beard is about [0, -0.6, -0.8] on a head facing -Z); bone = meters from maskBone's rest position; mesh = meters in the mesh; auto = bone with a maskBone, else mesh | `auto` `mesh` `bone` `bounds` |
+| `maskCenter` | number[3] | Region center (see maskSpace; mesh axes): imported characters face -Z, so a beard is at negative Z |  |
+| `maskRadius` | number[3] | Region ellipsoid radii (see maskSpace; 0 = no region): beards, eyebrows, sideburns |  |
+| `maskMirror` | boolean | Also grow in the region mirrored across the mesh's X = 0 plane (both eyebrows) |  |
+| `lodBias` | number | Real time: &gt; 1 keeps more strands at a distance, &lt; 1 fewer (stills draw all) | 0.05 .. 8 |
 
 === "Tool call"
 

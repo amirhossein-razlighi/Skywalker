@@ -272,6 +272,7 @@ Frame cost and scene complexity: GPU and CPU frame time, draw calls, lights, ter
 | `view` | any |  | Camera for the benchmark: "editor" (default), "scene", or {eye: [x,y,z], target: [x,y,z], fov: degrees} |  |
 | `quality` | string |  | Viewport quality tier to benchmark (default full, as in play mode and captures) | `full` `balanced` `fast` |
 | `passes` | boolean |  | Add the per-pass GPU timeline and CPU scopes (profile: passes, groups, cpu) |  |
+| `characters` | boolean |  | With frames: also benchmark with hair and fur hidden to measure what grooms cost to draw (characters.groomRenderGpuMs) |  |
 
 === "Tool call"
 
@@ -406,12 +407,12 @@ Emit particles from an emitter right now (explosions, muzzle flashes, impacts). 
 
 **Create hair or fur** <span class="sky-badge sky-badge--mut" title="Changes the project; undoable and attributed">mutating</span>
 
-Grow strand hair or fur on an entity's mesh (a head, a bust, an animal body) from a preset, ready to tweak. Presets: hair_straight, hair_wavy, hair_curly, hair_ponytail, hair_short (heads: they grow on the upper back of the mesh; set maskDirection/maskAngle or a vertex-color mask for your model), fur_short, fur_long (cover the whole mesh). `overrides` patches groom fields, e.g. {"melanin": 0.2, "length": 0.5, "strands": 100000}. Color is physically based: melanin 0 white .. 0.3 blond .. 0.8 brown .. 1 black, redness for auburn/ginger, dye for unnatural tints. Hair is simulated (gravity, wind, collisions with the mesh) and rendered as real strands with Marschner shading and self-shadowing. Example: {"entity": "Head", "preset": "hair_wavy", "overrides": {"melanin": 0.25}}.
+Grow strand hair or fur on an entity's mesh (a head, a bust, an animal body) from a preset, ready to tweak. Presets: hair_straight, hair_wavy, hair_curly, hair_ponytail, hair_short (heads: they grow on the upper back of the mesh; set maskDirection/maskAngle or a vertex-color mask for your model), fur_short, fur_long (cover the whole mesh); for rigged characters: hair_scalp (dense scalp hair on the Head bone's vertices), beard, eyebrows (regions in the head's bounds, mirrored brows), fur_dense (a creature's coat). On a rigged mesh the roots ride the animated skin (attach auto: rooted on triangles, follow, maxSpeed, capsules fitted to the skeleton as colliders); maskBone / maskCenter / maskRadius / maskSpace limit growth to a region. `overrides` patches groom fields, e.g. {"melanin": 0.2, "length": 0.5, "strands": 100000}. Color is physically based: melanin 0 white .. 0.3 blond .. 0.8 brown .. 1 black, redness for auburn/ginger, dye for unnatural tints. Hair is simulated (gravity, wind, collisions with the mesh) and rendered as real strands with Marschner shading and self-shadowing. Example: {"entity": "Head", "preset": "hair_wavy", "overrides": {"melanin": 0.25}}.
 
 | Argument | Type | Required | Description | Values |
 |---|---|---|---|---|
 | `entity` | integer \| string | yes | Entity with the mesh to grow on (gets the groom component) |  |
-| `preset` | string |  | Starting style | `hair_straight` `hair_wavy` `hair_curly` `hair_ponytail` `hair_short` `fur_short` `fur_long` |
+| `preset` | string |  | Starting style | `hair_straight` `hair_wavy` `hair_curly` `hair_ponytail` `hair_short` `fur_short` `fur_long` `beard` `eyebrows` `hair_scalp` `fur_dense` |
 | `overrides` | object |  | Groom fields to change |  |
 
 === "Tool call"
@@ -455,7 +456,7 @@ Change a groom's fields (or switch to another preset and then apply `fields`). G
 | Argument | Type | Required | Description | Values |
 |---|---|---|---|---|
 | `entity` | integer \| string | yes | Entity with a groom |  |
-| `preset` | string |  | Reset to this preset first | `hair_straight` `hair_wavy` `hair_curly` `hair_ponytail` `hair_short` `fur_short` `fur_long` |
+| `preset` | string |  | Reset to this preset first | `hair_straight` `hair_wavy` `hair_curly` `hair_ponytail` `hair_short` `fur_short` `fur_long` `beard` `eyebrows` `hair_scalp` `fur_dense` |
 | `fields` | object |  | Groom fields to change |  |
 
 === "Tool call"
@@ -504,13 +505,13 @@ Strand, guide and point counts, memory (CPU and GPU), generation time and the me
 === "Tool call"
 
     ```tool
-    groom_info {"entity": "Head"}
+    groom_info {"entity": "Hero Body"}
     ```
 
 === "CLI"
 
     ```bash
-    skywalker call groom_info '{"entity": "Head"}' --project my_game
+    skywalker call groom_info '{"entity": "Hero Body"}' --project my_game
     ```
 
 === "MCP request"
@@ -523,7 +524,7 @@ Strand, guide and point counts, memory (CPU and GPU), generation time and the me
       "params": {
         "name": "groom_info",
         "arguments": {
-          "entity": "Head"
+          "entity": "Hero Body"
         }
       }
     }
@@ -680,7 +681,7 @@ Render a cinematic to video or a PNG sequence, offline and deterministically (th
 | `shutter_timing` | string |  | Shutter interval relative to the frame time (default center) | `center` `open` `close` |
 | `quality` | string |  | Render quality tier (default full; fast for previews) | `full` `balanced` `fast` |
 | `clay` | boolean |  | Matte clay look (same move, for sketch -&gt; clay -&gt; final transitions) |  |
-| `debug_view` | string |  | Buffer visualization, shading debug view (wireframe, lod, unshaded, ...) or the pencil sketch look; see viewport_capture | `final` `albedo` `normals` `material` `gi` `reflections` `ao` `depth` `lighting` `sketch` `impostors` `wireframe` `overdraw` `unshaded` `lighting_only` `shadow_cascades` `light_complexity` `lod` `emission` `specular` `uv_checker` `texel_density` `motion` `shadow_atlas` `reflection_probes` `vehicles` |
+| `debug_view` | string |  | Buffer visualization, shading debug view (wireframe, lod, unshaded, ...) or the pencil sketch look; see viewport_capture | `final` `albedo` `normals` `material` `gi` `reflections` `ao` `depth` `lighting` `sketch` `impostors` `wireframe` `overdraw` `unshaded` `lighting_only` `shadow_cascades` `light_complexity` `lod` `emission` `specular` `uv_checker` `texel_density` `motion` `shadow_atlas` `reflection_probes` `vehicles` `skeleton` `ik_targets` `groom_roots` `sss_mask` |
 | `warmup` | integer |  | Frames rendered before the first one so temporal effects settle (default 4) |  |
 | `output` | string |  | Output path: .mp4 (H.264), .mov (ProRes 422 HQ), or a folder / name_####.png (PNG sequence); default renders/&lt;name&gt;.mp4 |  |
 | `outputs` | any[] |  | Several outputs from one render, e.g. ["renders/a.mp4", {"path": "renders/a.mov", "codec": "prores"}] |  |

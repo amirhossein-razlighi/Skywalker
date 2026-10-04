@@ -363,3 +363,4 @@ struct Environment {
 #include "skywalker/ecs/ReflectionProbeComponent.h"  // reflection_probe (render/ReflectionProbes.h)
 #include "skywalker/ecs/VehicleComponents.h"  // vehicle, chase_camera
 #include "skywalker/ecs/Particles2D.h"  // particles2d: pixel-art 2D particles (weather, leaves, fireflies)
+#include "skywalker/ecs/CharacterComponents.h"  // characterIk: foot planting, hand targets, turn in place

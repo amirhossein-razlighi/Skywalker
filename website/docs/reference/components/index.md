@@ -5,7 +5,7 @@ title: "Components"
 
 # Components
 
-Every component is a plain struct with a reflected field table. The same table drives JSON scene files, the JSON Schema agents read (`component_schema`), the editor's property grid and Wander access (`self.light.intensity`). There are **38 components** plus the scene-wide environment.
+Every component is a plain struct with a reflected field table. The same table drives JSON scene files, the JSON Schema agents read (`component_schema`), the editor's property grid and Wander access (`self.light.intensity`). There are **39 components** plus the scene-wide environment.
 
 Set them with `entity_create` / `entity_update` (component objects are merged field by field), from the editor's Details panel, or from Wander. Unknown fields fail with a *did you mean …?* hint.
 
@@ -47,6 +47,7 @@ Set them with `entity_create` / `entity_update` (component objects are merged fi
 | [`navmesh`](physics.md#navmesh) | Physics and navigation | Navigation-mesh bake settings and the saved bake (one per scene; nav_build creates it). Walkable surfaces come from static colliders and static meshes. |
 | [`nav_agent`](physics.md#nav_agent) | Physics and navigation | Path-finding agent on the navigation mesh with local avoidance (crowds). Wander: navigate(self, target), stop_navigation(self), arrived(self); fires `on event "arrived"`. With a character component it walks the controller; otherwise it moves the transform. |
 | [`animator`](animation.md#animator) | Animation | Skeletal animation for this entity's rigged meshes (and its children's): a state machine controller or one clip. Set parameters and triggers with animator_set or Wander set_param/trigger/play_animation. |
+| [`characterIk`](animation.md#characterIk) | Animation | Automatic foot planting (stairs, slopes, rocks), pelvis adjustment, feet aligned to the slope and locked while in contact, hand targets (two-handed grips, ledges, rails) and turn in place for a humanoid character. Put it on the entity with the animator; bones come from the skeleton's humanoid map (character_inspect shows it). |
 | [`attach`](animation.md#attach) | Animation | Keeps this entity on a bone of an animated character (weapon in a hand, hat on a head, lantern on a belt). |
 | [`ik`](animation.md#ik) | Animation | Two-bone IK effector: the character's hand or foot (and elbow or knee) reaches this entity's position. |
 | [`sequencer`](animation.md#sequencer) | Animation | Plays a cinematic sequence (*.sequence.json): camera shots and cuts, keyed properties, events and animations. Build sequences with the sequence_* tools. |

@@ -129,8 +129,10 @@ struct DrawUniforms {
     // --- appended (velocity buffer) ---
     simd_float4x4 prevModel;  // previous frame's model matrix (= model when static)
     simd_float4 motion;       // x = moves (prevModel differs or a previous skinned pose is bound)
+    // --- appended (character material models) ---
+    simd_float4 character[3];  // Surface::model (skin, eye, cloth, hair_card parameters)
 };
-static_assert(sizeof(DrawUniforms) == 336, "must match DrawUniforms in Common.metal");
+static_assert(sizeof(DrawUniforms) == 384, "must match DrawUniforms in Common.metal");
 
 struct PostUniforms {
     simd_float4 params;
@@ -605,6 +607,7 @@ public:
             const bool accumulateFrame = std::clamp(frame.samples, 1, 256) > 1 || frame.offline.enabled;
             const float renderScale = accumulateFrame ? 1.f : std::clamp(frame.environment.renderScale, 0.33f, 1.f);
             ensureTargets(frame.width, frame.height, renderScale);
+            ensureMsaaStorage(frame);  // [characters] dense hair needs MSAA targets that can spill
             // Upscaling: interactive editor tiers use the GPU-only MetalFX spatial scaler after our
             // own TAA (cheap, robust under load); full-quality frames use the temporal scaler.
             const bool scaled = !accumulateFrame && renderScale < 0.999f;
@@ -682,7 +685,13 @@ public:
             clusterIndexBuf_ = transient(grid.indices.data(), grid.indices.size() * sizeof(uint32_t));
             probeBlockBuf_ = transient(&probes_->block(), sizeof(probes::GpuProbeBlock));  // [reflection probes]
             probeMaskBuf_ = transient(probes_->clusterMasks().data(), probes_->clusterMasks().size() * sizeof(uint32_t));
-            encodeSkinning(cmd, frame);  // animation: posed vertices for every pass below
+            {  // animation: posed vertices for every pass below, in a command buffer committed before the
+               // effects' own (skinned hair and fur read this frame's pose)
+                id<MTLCommandBuffer> skinCmd = [queue_ commandBuffer];
+                skinCmd.label = @"Skinning";
+                encodeSkinning(skinCmd, frame);
+                [skinCmd commit];
+            }
             ensureCloudNoise(cmd);
             encodeEnvironment(cmd, frame, base);
             lodFrame_ = &frame;
@@ -772,7 +781,8 @@ public:
                 shadows_->encodeDebug(cmd, resolve_);
             } else if (frame.debugView == debugview::kReflectionProbes) {  // [reflection probes]
                 probes_->encodeDebug(cmd, resolve_, depthResolved_, frame, &base, sizeof(base));
-            } else if (frame.debugView > 0 && frame.debugView != debugview::kImpostors && frame.debugView != debugview::kLightingOnly) {
+            } else if (frame.debugView > 0 && frame.debugView != debugview::kImpostors && frame.debugView != debugview::kLightingOnly &&
+                       !debugViewIsOverlay(frame.debugView)) {  // [characters] overlays are drawn by the engine on the final image
                 PostUniforms pu{};
                 pu.params = simd_make_float4(static_cast<float>(frame.debugView), 0, 0, 0);
                 pu.texel = simd_make_float4(1.f / std::max(frame.width, 1), 1.f / std::max(frame.height, 1),
@@ -1164,13 +1174,36 @@ private:
         d.textureType = MTLTextureType2DMultisample;
         d.sampleCount = kSamples;
         d.usage = MTLTextureUsageRenderTarget;
-        d.storageMode = MTLStorageModeMemoryless;  // tile memory only on Apple GPUs
+        // Tile memory only on Apple GPUs; dense strand geometry switches to memory-backed targets
+        // (ensureMsaaStorage), which the GPU can flush to when its geometry buffer fills mid-pass.
+        d.storageMode = msaaMemoryless_ ? MTLStorageModeMemoryless : MTLStorageModePrivate;
         id<MTLTexture> t = [device_ newTextureWithDescriptor:d];
         if (!t) {
             d.storageMode = MTLStorageModePrivate;
             t = [device_ newTextureWithDescriptor:d];
         }
         return t;
+    }
+
+    /// [characters] A pass with memoryless attachments must fit all its geometry in the GPU's tiling
+    /// buffer at once; hundreds of thousands of hair strands (stills draw every one) overflow it
+    /// ("too much geometry for memoryless attachments"). Above a strand-point budget the MSAA targets
+    /// become memory-backed for the rest of the session (no thrashing): the pass then spills safely.
+    void ensureMsaaStorage(const FrameData& frame) {
+        if (!msaaMemoryless_ || !msaaColor_) return;
+        constexpr size_t kMemorylessStrandPoints = 2000000;
+        size_t points = 0;
+        for (const GroomItem& g : frame.grooms) {
+            if (g.data) points += g.data->strandCount() * std::max<size_t>(g.data->points, 1);
+        }
+        if (points <= kMemorylessStrandPoints) return;
+        msaaMemoryless_ = false;
+        const NSUInteger iw = msaaColor_.width, ih = msaaColor_.height;
+        msaaColor_ = targetMSAA(kHDRFormat, iw, ih);
+        msaaGbufA_ = targetMSAA(kGbufAFormat, iw, ih);
+        msaaGbufB_ = targetMSAA(kGbufBFormat, iw, ih);
+        msaaDepth_ = targetMSAA(kDepthFormat, iw, ih);
+        msaaVelocity_ = targetMSAA(kVelocityFormat, iw, ih);
     }
 
     /// Scene targets render at the internal resolution (renderScale x output); post-processing
@@ -1592,6 +1625,7 @@ private:
         du.material4 = simd_make_float4(s.alphaCutoff, s.textureAlphaOnly ? 1.f : 0.f, 0, 0);
         du.prevModel = du.model;  // static unless drawMesh knows better (velocity buffer)
         du.motion = simd_make_float4(0, static_cast<float>(d.layers & 0xFFFFFu), 0, 0);  // y = render layers (light masks)
+        for (int i = 0; i < 3; ++i) du.character[i] = simd_make_float4(s.model[i].x, s.model[i].y, s.model[i].z, s.model[i].w);
         return du;
     }
 
@@ -3397,6 +3431,7 @@ private:
     std::string envKey_;
     id<MTLDepthStencilState> depthWrite_, depthRead_, depthNone_;
     id<MTLTexture> resolve_, msaaColor_, msaaDepth_, shadowMap_, white_;
+    bool msaaMemoryless_ = true;  // [characters] false once dense hair needed spillable MSAA targets
     id<MTLCommandBuffer> lastCommand_;
     std::unordered_map<std::string, GpuMesh> meshes_;
     std::unordered_map<std::string, id<MTLTexture>> textures_;

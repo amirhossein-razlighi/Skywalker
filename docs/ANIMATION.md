@@ -16,6 +16,9 @@ component plus a set of tools, so agents and the editor drive it the same way.
 | `sequencer` component | Plays a sequence during the simulation; previews it while editing | same |
 | AnimationSystem | Runs all of the above, deterministically, in the fixed tick | `anim/AnimationSystem.h` |
 
+Humanoid bone maps, retargeting, root yaw, foot and hand IK, directional blend spaces, turn in
+place and hair on animated characters are in [CHARACTERS.md](CHARACTERS.md).
+
 ## Importing characters
 
 `asset_import` (or `asset_download`) of a glTF/GLB with skins or animations:
@@ -59,6 +62,8 @@ reloads identically. `asset_list type=animation|controller|sequence` lists the n
 | `rootMotion` | Move the entity by the clips' root (hips) motion; the hips stay over the entity |
 | `preview`, `time` | Editor only: `rest` (bind pose), `pose` (frame at `time` seconds into the default state) or `play` (live) |
 | `lookAt`, `lookAtWeight`, `lookAtLimit` | Look-at IK: the head (and neck/spine) turn toward an entity, at most `lookAtLimit` degrees |
+| `rootYaw`, `inPlace` | Root motion also turns the entity; or locomotion plays in place ([CHARACTERS.md](CHARACTERS.md)) |
+| `retargetFrom`, `retarget` | Clips from another rig's library, retargeted in pose space (`auto`, `pose`, `name`) |
 
 The animator lives on the character's root; rigged meshes anywhere below it are posed by
 it (multi-material characters are a root with one child per part).
@@ -97,7 +102,8 @@ it (multi-material characters are a root with one child per part).
 - **Parameters**: `float`, `int`, `bool`, `trigger`. A trigger stays armed until a
   transition consumes it, or for 0.25 s.
 - **States**: `clip`, `blend` (1D on one parameter, thresholds `at`) or `blend2d` (two
-  parameters, positions `pos`, gradient-band weights). Blended clips share one normalized
+  parameters, positions `pos`, gradient-band weights; `"mode": "directional"` blends direction
+  and speed separately for strafing sets). Blended clips share one normalized
   time, so feet stay in sync; the cycle length blends too. Optional `speed`,
   `speedParameter` (a multiplier), `loop`, `events` (normalized `time` 0..1, `name`).
 - **Transitions**: `from` (a state or `any`; any-state transitions are checked first),
@@ -149,6 +155,10 @@ character's space (knees `[0, 0, -1]`); zero keeps the animated bend plane. `bon
 an effector (or turns an existing object into one). Move or keyframe effectors like any
 entity — a reach in a cutscene is a `transform.position` track on the effector. IK runs
 after the state machine and look-at, every tick while playing and in editor previews.
+
+**Character IK** (`characterIk` component, `character_ik`): automatic foot planting on stairs
+and slopes with pelvis adjustment, contact locking and toe alignment, plus hand targets
+(two-handed props, ledges) — see [CHARACTERS.md](CHARACTERS.md).
 
 ## Sequences (`*.sequence.json`)
 
@@ -210,6 +220,9 @@ saved.
 | `animator_set` | Set parameters / triggers, play states or clips (live while playing, preview while editing), look-at, preview mode |
 | `bone_attach` | Attach a prop to a bone |
 | `bone_ik` | Make a hand or foot reach an object or point (two-bone IK effector) |
+| `character_inspect` | Humanoid bone map, key bones, clips with root speed / turn, IK status, parts, grooms |
+| `character_ik` | Foot planting, hand targets, turn in place |
+| `animation_retarget` | Retarget clips from another humanoid rig in pose space (preview or bake) |
 | `sequence_create` | New sequence asset + an entity that plays it |
 | `sequence_key` | Add/replace many keys at once: properties, camera cuts, events, animation keys |
 | `sequence_camera_shot` | Add an orbit/dolly/crane/track/pan/static/path/flyover shot (creates the camera, adds the cut) |
@@ -292,10 +305,7 @@ did-you-mean hints. The `animator` fields are also properties: `self.animator.sp
 ## Limits (v0.1)
 
 - No morph targets (blend shapes), no sparse accessors, no `KHR_animation_pointer`.
-- IK: look-at and two-bone effectors; no automatic foot planting on terrain (place foot
-  effectors from gameplay raycasts), no full-body IK.
-- Root motion is translation only (no root yaw).
-- Retargeting is by bone name with hips-translation scaling (no pose-space retargeting).
+- IK: look-at, two-bone effectors, foot planting and hand targets; no full-body IK.
 - Sequencer `mesh.color` / `mesh.emissive` keys show on entities with inline surfaces; an
   entity using a material asset (`mesh.material`) takes its look from the asset.
 

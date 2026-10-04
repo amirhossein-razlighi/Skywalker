@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <cstdio>
 #include <fstream>
 
@@ -55,6 +56,11 @@ Json groomInfo(Engine& engine, EntityId e) {
     j["boundsMin"] = reflect::vec3ToJson(data->bounds.min);
     j["boundsMax"] = reflect::vec3ToJson(data->bounds.max);
     j["simulated"] = g->simulate;
+    // Skinned characters: roots bound to the mesh's triangles follow the animated skin.
+    Json attach = Json::object({{"mode", g->attach}, {"bound", data->bound()}, {"boundRoots", data->childBind.size()}});
+    if (data->bindError > 0.f) attach["bindErrorM"] = std::round(data->bindError * 10000.f) / 10000.f;
+    if (!g->maskBone.empty()) attach["maskBone"] = g->maskBone;
+    j["attach"] = attach;
     Json stats = engine.renderer().stats();
     if (const Json* grooms = stats.find("grooms")) {
         for (const auto& item : grooms->elements()) {
@@ -81,7 +87,10 @@ void addHairTools(Engine& engine, ToolRegistry& reg) {
              "Grow strand hair or fur on an entity's mesh (a head, a bust, an animal body) from a preset, ready to tweak. "
              "Presets: hair_straight, hair_wavy, hair_curly, hair_ponytail, hair_short (heads: they grow on the upper back "
              "of the mesh; set maskDirection/maskAngle or a vertex-color mask for your model), fur_short, fur_long (cover "
-             "the whole mesh). `overrides` patches groom fields, e.g. {\"melanin\": 0.2, \"length\": 0.5, \"strands\": "
+             "the whole mesh); for rigged characters: hair_scalp (dense scalp hair on the Head bone's vertices), beard, eyebrows "
+             "(regions in the head's bounds, mirrored brows), fur_dense (a creature's coat). On a rigged mesh the roots ride "
+             "the animated skin (attach auto: rooted on triangles, follow, maxSpeed, capsules fitted to the skeleton as "
+             "colliders); maskBone / maskCenter / maskRadius / maskSpace limit growth to a region. `overrides` patches groom fields, e.g. {\"melanin\": 0.2, \"length\": 0.5, \"strands\": "
              "100000}. Color is physically based: melanin 0 white .. 0.3 blond .. 0.8 brown .. 1 black, redness for "
              "auburn/ginger, dye for unnatural tints. Hair is simulated (gravity, wind, collisions with the mesh) and "
              "rendered as real strands with Marschner shading and self-shadowing. Example: {\"entity\": \"Head\", "

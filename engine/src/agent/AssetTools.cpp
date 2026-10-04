@@ -247,7 +247,11 @@ void addAssetTools(Engine& engine, ToolRegistry& reg) {
 
     reg.add({"material_create", "Create material",
              "Create a reusable material asset (*.mat.json): color, metallic, roughness, emissive (glows with bloom), "
-             "albedo texture with tiling, unlit. Assign it with material_assign.",
+             "albedo texture with tiling, unlit. Character models: preset skin (scatterColor, scatterRadius mm, lobeMix, "
+             "microNormal), eye (irisCenter, irisRadius, irisDepth, corneaRoughness, eyeShadow), cloth (sheenColor, "
+             "sheenRoughness, fuzz), hair_card (hairShift, hairSpecular, hairDirection, alphaMode dither|coverage). "
+             "Assign it with material_assign. Example: {\"path\": \"materials/face.mat.json\", \"preset\": \"skin\", "
+             "\"texture\": \"textures/face.png\"}.",
              "asset", materialSchema(true), true, false, [&engine](const Json& a, ToolContext&) {
                  std::string path = a.get("path").asString();
                  if (assetTypeForPath(path) != AssetType::Material) {
