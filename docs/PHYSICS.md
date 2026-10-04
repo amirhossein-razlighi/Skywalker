@@ -14,6 +14,7 @@ The physics components:
 | child entities with `collider` | A compound shape: several colliders under one body |
 | `character` | A capsule character controller that walks, climbs steps and slides along walls |
 | `joint` | A constraint between two bodies (or a body and the world): fixed, hinge, ball, slider, distance or spring |
+| `vehicle` (+ `body`) | A wheeled vehicle: suspension, engine, gearbox, differentials and tyres, driven by input or Wander |
 | `physics_world` | Scene-wide settings: gravity, substeps, layer pairs that never collide, sleeping |
 | `navmesh` | Navigation-mesh bake settings and the saved bake (one per scene) |
 | `nav_agent` | An entity that finds paths on the navmesh and follows them with crowd avoidance |
@@ -273,6 +274,7 @@ without one it moves its transform along the navmesh, keeping its height above i
 | `physics_settle` | Simulate chosen objects for up to N seconds while editing and keep their resting poses as one undoable edit (natural prop scattering) |
 | `physics_debug` | Viewport capture with collider wireframes (orange awake, blue-gray asleep, green static, cyan kinematic, magenta trigger, yellow character) and stats/warnings |
 | `physics_settings` | Gravity, substeps, layer matrix, sleeping, on/off |
+| `vehicle_create`, `vehicle_tune`, `vehicle_info`, `vehicle_test_drive` | See Vehicles |
 | `nav_build`, `nav_path`, `nav_debug` | See Navigation |
 
 `raycast` (the older tool) and `Engine::raycast` still hit render meshes triangle-exactly, which
@@ -301,6 +303,148 @@ trigger_enter "player"` in Wander.
 **Physics puzzles.** Use `physics_query` overlap to verify a spot is free before spawning, shapecast
 to see where a dropped object lands, and `sim_trace` to record body positions over time.
 
+## Vehicles
+
+A `vehicle` component on an entity with a dynamic `body` makes a drivable wheeled vehicle, simulated by Jolt's vehicle
+constraint with its wheeled controller: raycast-free cylinder wheel contacts, spring/damper suspension, tire friction
+curves (longitudinal by slip ratio, lateral by slip angle), an engine with a torque curve and inertia, an automatic or
+manual gearbox with clutch and shift times, FWD/RWD/AWD limited-slip differentials, anti-roll bars, and aerodynamic
+downforce and drag. On top of that the engine adds driving assists, player controls, telemetry, wheel visuals, engine
+audio, a chase camera, a debug view and an autopilot that measures handling.
+
+### Setting one up
+
+The chassis entity holds the car model; its wheels are **child entities named `wheel*`** (`wheel_fl`, `wheel_fr`,
+`wheel_rl`, `wheel_rr`), modeled as separate meshes. When `vehicle.wheels` is empty they are fitted when play starts:
+position, radius and width come from their meshes; wheels are grouped into axles by position (forward is **-Z**), the
+front axle steers, and `drive` picks the driven axles. The suspension's rest length is computed from the weight on each
+wheel so the car rests at its modeled ride height. `vehicle_create` does all of it in one undoable edit:
+
+```jsonc
+{"tool": "vehicle_create", "args": {"entity": "Coupe", "preset": "sports", "handling": "arcade"}}
+```
+
+It adds the body (chassis mass, no linear damping), a **box collider fitted to the chassis above the wheel bottoms**
+(the wheels themselves never collide; the suspension holds the car up), the preset, a `chase_camera` on the scene
+camera, a looping `audio/engine_loop.wav` (synthesized) on the car, and the drive input actions. Its result lists the
+fitted wheels and any warnings. A model with the wheels baked into the body mesh cannot spin them: separate them first
+(`dcc_*` tools or a modeling app).
+
+### Component fields
+
+| Group | Fields |
+|---|---|
+| Chassis | `mass` (kg, replaces `body.mass`), `centerOfMass` (offset from the shape's center; lower = less roll), `maxTilt` (degrees before the chassis is held upright; 180 = can flip) |
+| Wheels | `wheels` (per-wheel overrides, see below), `wheelRadius`/`wheelWidth` (0 = measured), `suspensionMinLength`/`suspensionMaxLength`, `suspensionFrequency` (Hz), `suspensionDamping`, `steering` (front/rear/all/none), `maxSteerAngle`, `brakeTorque`, `handbrakeTorque` |
+| Tires | `longitudinalGrip`, `lateralGrip` (peak friction: roughly the skidpad g), `longitudinalCurve`, `lateralCurve` (`[[slip, 0..1], ...]`, empty = default) |
+| Drivetrain | `drive` (fwd/rwd/awd), `frontTorqueSplit` (awd), `limitedSlip` (1.05 locked .. >= 10 open), `differentialRatio` |
+| Engine | `maxTorque`, `minRpm`, `maxRpm`, `engineInertia`, `engineDamping`, `torqueCurve` (`[[rpm fraction, torque fraction], ...]`) |
+| Gearbox | `transmission` (auto/manual), `gearRatios`, `reverseRatio`, `shiftUpRpm`, `shiftDownRpm`, `shiftTime`, `clutchStrength` |
+| Chassis dynamics | `antiRollFront`, `antiRollRear` (0 none, 300 soft, 700 sporty, 2000 very stiff), `downforce`, `drag` (N per (m/s)^2) |
+| Control | `control` (player = drive actions, script = Wander/tools, none), `steerSpeed`, `speedSensitiveSteering`, `tractionControl`, `abs`, `driftAssist` (0..1), `autoReverse`, `engineAudio` |
+| Inputs (live) | `throttle`, `brake` (0..1), `steer` (-1 left .. 1 right), `handbrake` |
+| Telemetry (live) | `gear` (manual: write to shift), `speed` (km/h along the heading), `rpm`, `wheelsOnGround`, `skid` (0..1) |
+
+A `wheels` entry is `{entity, position, radius, width, steer, drive, handbrake, maxSteerAngle, brakeTorque,
+handbrakeTorque, suspensionMinLength, suspensionMaxLength, suspensionFrequency, suspensionDamping, longitudinalGrip,
+lateralGrip}`; every field is optional and overrides the vehicle default for that wheel (`position` is in the chassis'
+local space). `vehicle_tune {wheels: {rear: {...}}}` writes the list from the current fit the first time. Inputs,
+assists, aero and the control mode are read live every tick; the other fields rebuild the vehicle (keeping its speed and
+engine revs) when they change, also while playing.
+
+Surfaces: a tire gets its full grip on surfaces with friction >= 0.5 (the default; asphalt, concrete) and
+proportionally less below (ice 0.05, mud 0.25); per-collider `friction` overrides work, so an ice patch is a collider
+with `friction: 0.05`.
+
+### Driving
+
+- **Player**: with `control: "player"` the vehicle reads the input actions `throttle` (W/Up/right trigger), `brake`
+  (S/Down/left trigger), `steer` (A-D/arrows/left stick), `handbrake` (Space/gamepad A) and, for manual gearboxes,
+  `shift_up`/`shift_down` (E/Q/shoulders) every tick. Projects without those actions get the same default bindings;
+  `input_map {operation: "add_preset", preset: "drive"}` writes them to `input.json` for rebinding.
+- **Scripts**: `vehicle_drive(self, throttle, steer, brake?, handbrake?)` sets the inputs for this tick (it overrides
+  the player); `vehicle_shift(self, gear)` for manual gearboxes. With `control: "script"` only scripts and tools drive.
+- Holding brake at a standstill reverses (`autoReverse`); pressing throttle while rolling backward brakes first.
+- Pulling the handbrake declutches and locks the rear wheels (a locked tire slides and barely steers): flick into a
+  corner, then throttle and a little counter-steer to hold a drift.
+
+Assists (all live): `steerSpeed` rate-limits the steering like a rack, `speedSensitiveSteering` reduces lock at speed,
+`tractionControl` trims the throttle when wheelspin steps the car sideways (it leaves straight-line launches alone),
+`abs` brakes each tire at its peak friction and keeps its steering, `driftAssist` makes slides easier to start and hold
+(the rear lightens on power, speed is kept through the slide, and counter-steer and yaw damping only step in past ~30
+degrees of drift so it never turns into a spin).
+
+### Seeing and hooking in
+
+- `vehicle_info` returns live telemetry: speed, rpm, gear, inputs as asked and as applied after the assists, assist
+  activity, drift angle, lateral/longitudinal g, and per wheel: suspension length and compression, contact point and
+  surface, load, drive and cornering forces, slip ratio (+ spin, - lock) and slip angle, skid. While editing it shows the
+  fitted setup at rest. `capture: true` adds a picture with the debug view.
+- Debug view **`vehicles`** (`viewport_capture {debug_view: "vehicles"}`): suspension travel (gray) and current length
+  (white to orange), wheels (green on the ground, red sliding, gray airborne), contact points, and the tire forces at
+  them (blue load, orange drive/brake, red cornering; 0.6 m = a wheel's static load), velocity (cyan) and center of mass
+  (yellow). It is a CPU overlay on captures; the live viewport shows the final image.
+- Wander: `vehicle_speed(e)`, `vehicle_state(e)` (speed, rpm, gear, wheels_on_ground, skid, drift_angle, lateral_g,
+  longitudinal_g, load, `skidding` = contact points of sliding tires) and `vehicle_wheel(e, i or name)` (contact, point,
+  normal, surface, load, slip_ratio, slip_angle, skid, compression, steer, rpm, driven). Tire smoke: a `particles` child
+  per rear wheel (`worldSpace`, not emitting) and `burst()` it while that wheel's `skid` > 0.3; skid marks: `spawn` dark
+  planes at `point` (the Vehicle Yard demo does both).
+- Engine audio: with `engineAudio` the entity's `audio` component follows the engine (pitch from rpm, volume from load).
+- `chase_camera` (on a camera entity): `target`, `distance`, `height`, `targetHeight`, `lookAhead` (seconds of
+  velocity), `stiffness`, `turnStiffness` (the arm swings behind the direction of travel, so drifts stay framed),
+  `fovMin`/`fovMax`/`fovSpeed` (wider at speed), `collide` (pulls in when a wall blocks the view).
+- `perf_stats.vehicles`: vehicles, wheels and the per-tick CPU cost of the vehicle code (assists, aero, write-back).
+
+### Tuning by numbers
+
+`vehicle_test_drive` drives a copy of the vehicle in a private world (the scene is untouched; it works while editing)
+on a flat proving ground with full grip, or `track: "scene"` in the level, and returns metrics:
+
+| Maneuver | Measures |
+|---|---|
+| `accel` | 0-60 and 0-100 km/h, quarter mile time and speed, upshifts, seconds of wheelspin |
+| `braking` | distance and time from `speed` (100 km/h), mean and peak deceleration g, ABS activity, locked wheels, stability |
+| `slalom` | 8 cones every `cone_spacing` m; without `speed` it finds the fastest clean run (`maxCleanKmh`) |
+| `skidpad` | a `radius` m circle at a rising speed: lateral g, and whether the limit is understeer, oversteer or power |
+| `top_speed` | top speed within `duration` s |
+| `custom` | `inputs` keyframes `[{t, throttle, brake, steer, handbrake}]`, with `trace: true` for a sampled trace |
+| `all` | accel, braking, slalom and skidpad |
+
+`overrides` tries vehicle fields without editing; `vehicle_tune {set: {...}, test: "skidpad"}` edits and returns the
+before/after summary. Every run reports `maxLateralG`, `maxDriftAngle` and `maxRollDeg`.
+
+The presets on representative test chassis (proving ground, arcade handling):
+
+| Preset | 0-100 km/h | 100-0 km/h | Fastest clean slalom (18 m) | Skidpad (40 m) | Top speed |
+|---|---|---|---|---|---|
+| `sports` (1350 kg, 520 N m, RWD, 6 gears) | 4.8 s | 31.6 m | 60 km/h | 1.13 g | 269 km/h |
+| `hatchback` (1150 kg, 260 N m, FWD, 5 gears) | 9.1 s | 45.0 m | 55 km/h | 0.94 g | 202 km/h |
+| `truck` (2600 kg, 700 N m, AWD, 6 gears) | 8.1 s | 41.6 m | 50 km/h | 0.85 g | 203 km/h |
+| `kart` (170 kg, 42 N m, one gear) | 0-60 in 3.2 s | 24.6 m (from 92) | 65 km/h | 0.98 g | 92 km/h |
+
+Typical adjustments: more `lateralGrip` = more cornering g; a stiffer rear anti-roll bar (or less rear grip) = more
+oversteer; a lower `centerOfMass` = less roll; `drag` sets the top speed; `differentialRatio`/`gearRatios` trade
+acceleration for top speed; `suspensionFrequency` 1.3 soft .. 2.5 race.
+
+### Recipe: a drift car in five calls
+
+```jsonc
+{"tool": "vehicle_create", "args": {"entity": "Coupe", "preset": "sports"}}
+{"tool": "vehicle_tune", "args": {"entity": "Coupe", "set": {"driftAssist": 0.6, "antiRollRear": 700}, "test": "skidpad"}}
+{"tool": "vehicle_test_drive", "args": {"entity": "Coupe", "maneuver": "custom", "trace": true, "inputs": [
+  {"t": 0, "throttle": 1}, {"t": 3.4, "throttle": 0.3, "steer": -1, "handbrake": 1},
+  {"t": 3.9, "throttle": 1, "steer": -0.3, "handbrake": 0}, {"t": 4.3, "throttle": 1, "steer": 0.3}]}}
+{"tool": "sim_input", "args": {"hold": ["w", "a"]}}
+{"tool": "vehicle_info", "args": {"entity": "Coupe", "capture": true}}
+```
+
+The custom run's `maxDriftAngle` (and the trace's `driftAngle`) shows whether the slide is held (20-40 degrees) or
+spins (above 70). `examples/demo_vehicle_yard` is a proving ground with a slalom, a skidpad, ramps and a coupe whose
+`ShowcaseDrift` behavior drives this sequence when its `demo` var is true.
+
+Determinism: vehicles step inside the fixed tick like every body (entity order, unique constraint priorities), so the
+same inputs replay identically; everything resets when play stops.
+
 ## Limitations (v0.1)
 
 - One `joint` per entity (chain links joint the previous link); no ragdoll preset yet.
@@ -313,6 +457,11 @@ to see where a dropped object lands, and `sim_trace` to record body positions ov
   slightly off.
 - Large static levels: static geometry is re-validated every 8th tick (teleports every tick), so
   editing a static collider during play takes effect within 8 ticks.
+- Vehicles: wheels are vertical suspension struts (no camber/toe/caster settings yet), wheels never collide with
+  walls (the chassis collider does), the chassis should be uniformly scaled, motorcycles and tracked vehicles are not
+  exposed, and the `vehicles` debug view draws on captures only. Wheel speeds can alternate between spinning and
+  gripping from one tick to the next at the traction limit (Jolt's discrete tire model); the telemetry and assists
+  smooth over it.
 
 ## Implementation
 
@@ -328,4 +477,9 @@ to see where a dropped object lands, and `sim_trace` to record body positions ov
 | `src/agent/PhysicsTools.cpp`, `src/agent/NavTools.cpp` | tools |
 | `src/physics/DebugDraw.cpp` | overlay drawing for physics_debug / nav_debug |
 | `cmake/PhysicsDeps.cmake` | Jolt v5.6.0 and recastnavigation v1.6.0 via FetchContent |
-| `tests/test_physics.cpp`, `tests/test_nav.cpp` | tests |
+| `engine/include/skywalker/ecs/VehicleComponents.h` | `vehicle`, `chase_camera` |
+| `src/physics/Vehicles.cpp` | Jolt vehicle constraints: wheel fitting, assists, aero, telemetry, wheel visuals, engine audio |
+| `src/physics/VehiclePresets.cpp`, `VehicleControls.cpp` | presets; drive actions and the chase camera |
+| `src/physics/VehicleTestDrive.cpp`, `VehicleDebugDraw.cpp` | the test-drive autopilot; the `vehicles` overlay and telemetry JSON |
+| `src/agent/VehicleTools.cpp`, `src/engine/VehicleBuiltins.cpp` | tools and Wander builtins |
+| `tests/test_physics.cpp`, `tests/test_nav.cpp`, `tests/test_vehicle.cpp` | tests |

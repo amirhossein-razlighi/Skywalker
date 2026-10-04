@@ -20,12 +20,14 @@ std::unique_ptr<PhysicsWorld> PhysicsSystem::makeWorld(WorldOptions options) con
 void PhysicsSystem::beginPlay() {
     play_.reset();
     playing_ = true;
+    chaseCameras_.reset();
 }
 
 void PhysicsSystem::endPlay() {
     if (play_) collectWarnings(*play_);
     play_.reset();
     playing_ = false;
+    chaseCameras_.reset();
     editRevision_ = ~0ull;  // the scene is restored from the play snapshot
 }
 
@@ -70,6 +72,7 @@ void PhysicsSystem::step(float dt, wander::Runtime& runtime) {
         for (EntityId e : nav_->update(dt)) runtime.emit("arrived", e);
     }
     world.step(scene_, dt);
+    chaseCameras_.update(scene_, &world, dt);
     if (nav_) nav_->afterPhysics();
     for (const ContactEvent& ev : world.drainEvents()) {
         wander::Runtime::Contact c;

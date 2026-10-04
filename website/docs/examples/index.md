@@ -5,7 +5,7 @@ title: "Examples"
 
 # Examples
 
-24 sample projects ship in [`examples/`](https://github.com/amirhossein-razlighi/Skywalker/blob/main/examples). Most were built by agent crews through the engine's own tools, and every one is original: its own world, characters and story. Open any of them in the editor, render it from the command line, play it in the standalone player, or point an agent at it.
+25 sample projects ship in [`examples/`](https://github.com/amirhossein-razlighi/Skywalker/blob/main/examples). Most were built by agent crews through the engine's own tools, and every one is original: its own world, characters and story. Open any of them in the editor, render it from the command line, play it in the standalone player, or point an agent at it.
 
 <div class="sky-grid">
 <a class="sky-card" href="#tidebreak_isle"><img src="../assets/images/shots/tidebreak_isle/brig.webp" alt="Tidebreak Isle" loading="lazy"><div class="sky-card__body"><p class="sky-card__title">Tidebreak Isle</p><p class="sky-card__meta">Open-world Island Adventure</p><p class="sky-card__text">The storm left you one ship, one map and a cove nobody charts. Make landfall before dark.</p><div class="sky-tags"><span class="sky-tag">Eroded terrain</span><span class="sky-tag">FFT surf</span><span class="sky-tag">Sequences</span><span class="sky-tag">Terrain</span><span class="sky-tag">Foliage</span><span class="sky-tag">FFT water</span></div></div></a>
@@ -32,6 +32,7 @@ title: "Examples"
 <a class="sky-card" href="#sky_dash"><img src="../assets/images/examples/sky_dash.webp" alt="Sky Dash" loading="lazy"><div class="sky-card__body"><p class="sky-card__title">Sky Dash</p><p class="sky-card__meta">2D Platformer</p><p class="sky-card__text">Run, hop, grab every coin. Same engine, two dimensions.</p><div class="sky-tags"><span class="sky-tag">Shipping</span><span class="sky-tag">Wander</span></div></div></a>
 <a class="sky-card" href="#sky_village"><img src="../assets/images/examples/sky_village.webp" alt="Sky Village" loading="lazy"><div class="sky-card__body"><p class="sky-card__title">Sky Village</p><p class="sky-card__meta">Diorama</p><p class="sky-card__text">A floating village above the clouds.</p><div class="sky-tags"><span class="sky-tag">Wander</span></div></div></a>
 <a class="sky-card" href="#hello_sky"><img src="../assets/images/examples/hello_sky.webp" alt="Hello Sky" loading="lazy"><div class="sky-card__body"><p class="sky-card__title">Hello Sky</p><p class="sky-card__meta">Starter scene</p><p class="sky-card__text">The smallest scene that shows the loop.</p><div class="sky-tags"><span class="sky-tag">Wander</span></div></div></a>
+<a class="sky-card" href="#demo_vehicle_yard"><img src="../assets/images/shots/demo_vehicle_yard/drift_chase.webp" alt="Vehicle Yard" loading="lazy"><div class="sky-card__body"><p class="sky-card__title">Vehicle Yard</p><p class="sky-card__meta">Driving</p><p class="sky-card__text">A proving ground for the vehicle physics: slalom, skidpad, ramps and room to drift.</p><div class="sky-tags"><span class="sky-tag">Vehicle physics</span><span class="sky-tag">Chase camera</span><span class="sky-tag">Tire smoke and skid marks</span><span class="sky-tag">Particles</span><span class="sky-tag">Physics</span><span class="sky-tag">Audio</span></div></div></a>
 </div>
 
 ## Tidebreak Isle { #tidebreak_isle }
@@ -974,4 +975,43 @@ The starter scene used throughout the getting-started guide: a floating island, 
 
     ```bash
     skywalker mcp --project examples/hello_sky --scene scenes/main.sky.json
+    ```
+
+## Vehicle Yard { #demo_vehicle_yard }
+
+![Vehicle Yard](../assets/images/shots/demo_vehicle_yard/drift_chase.webp){ loading=lazy }
+
+*Driving* · A proving ground for the vehicle physics: slalom, skidpad, ramps and room to drift.
+
+A proving ground for the vehicle component: an original procedurally built coupe on a yard with a slalom, a skidpad and ramps. It drifts on its own (tire smoke, skid marks, engine sound by rpm), and vehicle_test_drive measures every preset's 0-100, braking, slalom and skidpad numbers.
+
+| | |
+|---|---|
+| Folder | [`examples/demo_vehicle_yard`](https://github.com/amirhossein-razlighi/Skywalker/blob/main/examples/demo_vehicle_yard) |
+| Scenes | `scenes/main.sky.json` |
+| Size | 216 entities, 3 behaviors |
+| Demonstrates | Vehicle physics, Chase camera, Tire smoke and skid marks, Particles, Physics, Audio, Wander, Atmosphere, Volumetric clouds |
+
+=== "Editor"
+
+    ```bash
+    open build/release/bin/Skywalker.app --args --project "$PWD/examples/demo_vehicle_yard"
+    ```
+
+=== "Render a still"
+
+    ```bash
+    skywalker render examples/demo_vehicle_yard/scenes/main.sky.json -o demo_vehicle_yard.png --scene-camera --samples 8
+    ```
+
+=== "Play it"
+
+    ```bash
+    skywalker-player examples/demo_vehicle_yard
+    ```
+
+=== "Agent"
+
+    ```bash
+    skywalker mcp --project examples/demo_vehicle_yard --scene scenes/main.sky.json
     ```

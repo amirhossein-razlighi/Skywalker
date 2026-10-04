@@ -7,7 +7,7 @@ title: "Physics tools"
 
 Rigid bodies, characters, queries, settling and navigation meshes.
 
-8 tools in the `physics` category. Badges: **read-only** tools never change the project; **mutating** tools are undoable and attributed; **open-world** tools reach outside the engine and MCP clients ask before running them.
+12 tools in the `physics` category. Badges: **read-only** tools never change the project; **mutating** tools are undoable and attributed; **open-world** tools reach outside the engine and MCP clients ask before running them.
 
 | Tool | Summary |
 |---|---|
@@ -19,6 +19,10 @@ Rigid bodies, characters, queries, settling and navigation meshes.
 | [`nav_build`](#nav_build) | Bake (or rebuild) the navigation mesh from static colliders and static meshes, save it to the project and record the settings in the scene's `navmesh` component (one undoable edit; creates an entity named "Navigation" if needed). |
 | [`nav_path`](#nav_path) | Walking path on the navmesh between two points or entities (bakes the navmesh first if needed). |
 | [`nav_debug`](#nav_debug) | Top-down map of the level with the navmesh drawn over it (teal = walkable), nav agents (yellow dots) with their current paths, and optionally a test path between two points (orange). |
+| [`vehicle_create`](#vehicle_create) | Make a drivable car, truck or kart from a chassis entity whose wheel meshes are child entities named wheel* (wheel_fl, wheel_fr, wheel_rl, wheel_rr; or pass `wheels`). |
+| [`vehicle_tune`](#vehicle_tune) | Change a vehicle's handling parameters with validation (one undoable edit; works while playing: the vehicle is rebuilt keeping its speed). |
+| [`vehicle_info`](#vehicle_info) | Live state of vehicles: speed (km/h), rpm, gear, inputs as asked and as applied after assists (steering smoothing, auto reverse, traction control, ABS, drift assist), drift angle, lateral/longitudinal g, and per wheel: suspension length/compression, contact point and surface, load (N), drive and cornering forces, slip ratio and slip angle, skid 0..1. |
+| [`vehicle_test_drive`](#vehicle_test_drive) | An autopilot drives a copy of the vehicle through standard maneuvers in a private physics world (the scene is not changed; works while editing) and returns handling metrics to tune by numbers: accel (0-60, 0-100 km/h, quarter mile, wheelspin, upshifts), braking (distance and g from `speed`, default 100 km/h; ABS activity, stability), slalom (8 cones every cone_spacing m at `speed`, default 60: completed, cones hit, average speed, line error), skidpad (circle of `radius` m, speed ramps until the car leaves the line: max lateral g, and whether it understeers, oversteers or runs out of power), top_speed (`duration` s), custom (`inputs` keyframes [{t, throttle, brake, steer, handbrake}]), all (accel, braking, slalom, skidpad). |
 
 ### `physics_add` { #physics_add }
 
@@ -397,6 +401,192 @@ Top-down map of the level with the navmesh drawn over it (teal = walkable), nav 
             -4
           ],
           "size": 800
+        }
+      }
+    }
+    ```
+
+### `vehicle_create` { #vehicle_create }
+
+**Create vehicle** <span class="sky-badge sky-badge--mut" title="Changes the project; undoable and attributed">mutating</span>
+
+Make a drivable car, truck or kart from a chassis entity whose wheel meshes are child entities named wheel* (wheel_fl, wheel_fr, wheel_rl, wheel_rr; or pass `wheels`). One undoable edit that adds: a dynamic body (chassis mass), a box collider fitted to the chassis above the wheels, the `vehicle` component from a preset (sports, hatchback, truck, kart) in a handling style (arcade = traction control, ABS, drift assist, roll protection; sim = raw), a chase camera on the scene camera, a looping engine sound pitched by rpm, and the drive input actions (throttle W/Up/right trigger, brake+reverse S/Down/left trigger, steer A-D/arrows/left stick, handbrake Space/A). Forward is -Z. Wheels are fitted from their meshes and spin, steer and follow the suspension while playing. Then: vehicle_test_drive for numbers, vehicle_tune to adjust, vehicle_info capture=true to see suspension and tire forces. Example: {"entity": "Coupe", "preset": "sports"}.
+
+| Argument | Type | Required | Description | Values |
+|---|---|---|---|---|
+| `entity` | integer \| string | yes | The chassis (root of the car model) |  |
+| `preset` | string |  | Vehicle type (default sports) | `sports` `hatchback` `truck` `kart` |
+| `handling` | string |  | arcade (assists, default) or sim | `arcade` `sim` |
+| `wheels` | integer \| string[] |  | Wheel entities (children of the chassis); default: children named wheel* |  |
+| `overrides` | object |  | vehicle component fields to set on top of the preset |  |
+| `chase_camera` | boolean |  | Make the scene camera a chase camera following this vehicle (default true) |  |
+| `engine_sound` | boolean |  | Add a looping engine sound pitched by rpm (default true) |  |
+| `input_actions` | boolean |  | Add the drive input actions to the project's input map if missing (default true) |  |
+| `collider` | string |  | auto = box fitted to the chassis above the wheels (default); keep = your own | `auto` `keep` |
+
+=== "Tool call"
+
+    ```tool
+    vehicle_create {"entity": "Coupe", "preset": "sports"}
+    ```
+
+=== "CLI"
+
+    ```bash
+    skywalker call vehicle_create '{"entity": "Coupe", "preset": "sports"}' --project my_game
+    ```
+
+=== "MCP request"
+
+    ```json
+    {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "method": "tools/call",
+      "params": {
+        "name": "vehicle_create",
+        "arguments": {
+          "entity": "Coupe",
+          "preset": "sports"
+        }
+      }
+    }
+    ```
+
+### `vehicle_tune` { #vehicle_tune }
+
+**Tune vehicle** <span class="sky-badge sky-badge--mut" title="Changes the project; undoable and attributed">mutating</span>
+
+Change a vehicle's handling parameters with validation (one undoable edit; works while playing: the vehicle is rebuilt keeping its speed). `set` takes vehicle component fields, e.g. {"maxTorque": 600, "lateralGrip": 1.6, "antiRollRear": 12000, "driftAssist": 0.5}; unknown fields fail with a did-you-mean. `preset` + `handling` re-apply a preset first. `wheels` overrides per axle or wheel ({"rear": {"lateralGrip": 1.2}, "front_left": {...}}): the wheel list is written out from the current fit the first time. `test` (a maneuver: accel, braking, slalom, skidpad, all) drives before and after the change and returns both summaries, so you can tune by numbers. Run vehicle_test_drive for details.
+
+| Argument | Type | Required | Description | Values |
+|---|---|---|---|---|
+| `entity` | integer \| string | yes | The vehicle |  |
+| `set` | object |  | vehicle fields to change |  |
+| `preset` | string |  | Re-apply a preset (before `set`) | `sports` `hatchback` `truck` `kart` |
+| `handling` | string |  | Handling style for `preset` (default arcade) | `arcade` `sim` |
+| `wheels` | object |  | Per-wheel overrides keyed by axle (front, rear) or wheel name (front_left, rear_right, axle1_left): {lateralGrip, longitudinalGrip, suspensionFrequency, suspensionDamping, brakeTorque, steer, drive, ...} |  |
+| `test` | string |  | Measure this maneuver before and after the change | `accel` `braking` `slalom` `skidpad` `top_speed` `all` |
+
+=== "Tool call"
+
+    ```tool
+    vehicle_tune {"entity": "Coupe", "set": {"maxTorque": 600, "lateralGrip": 1.2}, "test": "accel"}
+    ```
+
+=== "CLI"
+
+    ```bash
+    skywalker call vehicle_tune '{"entity": "Coupe", "set": {"maxTorque": 600, "lateralGrip": 1.2}, "test": "accel"}' --project my_game
+    ```
+
+=== "MCP request"
+
+    ```json
+    {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "method": "tools/call",
+      "params": {
+        "name": "vehicle_tune",
+        "arguments": {
+          "entity": "Coupe",
+          "set": {
+            "maxTorque": 600,
+            "lateralGrip": 1.2
+          },
+          "test": "accel"
+        }
+      }
+    }
+    ```
+
+### `vehicle_info` { #vehicle_info }
+
+**Vehicle telemetry** <span class="sky-badge sky-badge--ro" title="Never changes the scene">read-only</span>
+
+Live state of vehicles: speed (km/h), rpm, gear, inputs as asked and as applied after assists (steering smoothing, auto reverse, traction control, ABS, drift assist), drift angle, lateral/longitudinal g, and per wheel: suspension length/compression, contact point and surface, load (N), drive and cornering forces, slip ratio and slip angle, skid 0..1. While editing it shows the fitted setup at rest (wheel roles, radii) and build warnings. capture=true adds an image with the vehicles debug view (suspension rays, contacts, tire force vectors). Without `entity` it lists every vehicle. Pair with sim_control step / sim_input to watch a maneuver.
+
+| Argument | Type | Required | Description | Values |
+|---|---|---|---|---|
+| `entity` | integer \| string |  | A vehicle (default: all) |  |
+| `wheels` | boolean |  | Include per-wheel data (default true) |  |
+| `capture` | boolean |  | Add a picture with the vehicles debug view (default false) |  |
+| `width` | integer |  | Capture width (default 960) |  |
+| `height` | integer |  | Capture height (default 540) |  |
+
+=== "Tool call"
+
+    ```tool
+    vehicle_info {"entity": "Coupe", "capture": true}
+    ```
+
+=== "CLI"
+
+    ```bash
+    skywalker call vehicle_info '{"entity": "Coupe", "capture": true}' --project my_game
+    ```
+
+=== "MCP request"
+
+    ```json
+    {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "method": "tools/call",
+      "params": {
+        "name": "vehicle_info",
+        "arguments": {
+          "entity": "Coupe",
+          "capture": true
+        }
+      }
+    }
+    ```
+
+### `vehicle_test_drive` { #vehicle_test_drive }
+
+**Test drive** <span class="sky-badge sky-badge--ro" title="Never changes the scene">read-only</span>
+
+An autopilot drives a copy of the vehicle through standard maneuvers in a private physics world (the scene is not changed; works while editing) and returns handling metrics to tune by numbers: accel (0-60, 0-100 km/h, quarter mile, wheelspin, upshifts), braking (distance and g from `speed`, default 100 km/h; ABS activity, stability), slalom (8 cones every cone_spacing m at `speed`, default 60: completed, cones hit, average speed, line error), skidpad (circle of `radius` m, speed ramps until the car leaves the line: max lateral g, and whether it understeers, oversteers or runs out of power), top_speed (`duration` s), custom (`inputs` keyframes [{t, throttle, brake, steer, handbrake}]), all (accel, braking, slalom, skidpad). track=proving_ground (default: flat, full grip, comparable between cars) or scene (the level as it is). `overrides` tries vehicle fields without editing (e.g. {"lateralGrip": 1.6}). trace=true adds a sampled trace. Example: {"entity": "Coupe", "maneuver": "all"}.
+
+| Argument | Type | Required | Description | Values |
+|---|---|---|---|---|
+| `entity` | integer \| string | yes | The vehicle |  |
+| `maneuver` | string |  | What to drive (default all) | `accel` `braking` `slalom` `skidpad` `top_speed` `custom` `all` |
+| `speed` | number |  | km/h: braking start (100), slalom (60), skidpad start (30) |  |
+| `duration` | number |  | Seconds for top_speed (45) / custom |  |
+| `radius` | number |  | Skidpad radius in m (default 40) |  |
+| `cone_spacing` | number |  | Slalom cone spacing in m (default 18) |  |
+| `inputs` | object[] |  | custom: keyframes {t, throttle, brake, steer, handbrake} |  |
+| `overrides` | object |  | vehicle fields for this drive only |  |
+| `track` | string |  | Where to drive (default proving_ground) | `proving_ground` `scene` |
+| `trace` | boolean |  | Include a trace sampled every 0.25 s |  |
+
+=== "Tool call"
+
+    ```tool
+    vehicle_test_drive {"entity": "Coupe", "maneuver": "all"}
+    ```
+
+=== "CLI"
+
+    ```bash
+    skywalker call vehicle_test_drive '{"entity": "Coupe", "maneuver": "all"}' --project my_game
+    ```
+
+=== "MCP request"
+
+    ```json
+    {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "method": "tools/call",
+      "params": {
+        "name": "vehicle_test_drive",
+        "arguments": {
+          "entity": "Coupe",
+          "maneuver": "all"
         }
       }
     }

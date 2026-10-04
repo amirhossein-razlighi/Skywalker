@@ -45,7 +45,8 @@ constexpr int kTexelDensity = 21;
 constexpr int kMotion = 22;
 constexpr int kShadowAtlas = 23;
 constexpr int kReflectionProbes = 24;
-constexpr int kCount = 25;
+constexpr int kVehicles = 25;  // final image + CPU overlay of vehicle suspension, contacts and forces (captures)
+constexpr int kCount = 26;
 }  // namespace debugview
 
 struct DebugViewInfo {

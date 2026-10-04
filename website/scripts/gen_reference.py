@@ -65,8 +65,8 @@ COMPONENT_GROUPS = OrderedDict([
                ["sprite", "sprite_anim", "tilemap", "light2d", "parallax", "camera2d", "text", "ui_canvas", "ui",
                 "dialogue"])),
     ("audio", ("Audio", "Spatial sound sources and the listener.", ["audio", "listener"])),
-    ("physics", ("Physics and navigation", "Rigid bodies, colliders, characters, joints, world settings and navigation.",
-                 ["body", "collider", "character", "joint", "physics_world", "navmesh", "nav_agent"])),
+    ("physics", ("Physics and navigation", "Rigid bodies, colliders, characters, joints, vehicles, world settings and navigation.",
+                 ["body", "collider", "character", "joint", "vehicle", "chase_camera", "physics_world", "navmesh", "nav_agent"])),
     ("animation", ("Animation", "Animators, bone attachments, IK effectors and sequence players.",
                    ["animator", "attach", "ik", "sequencer"])),
 ])

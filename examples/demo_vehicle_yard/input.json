@@ -1,0 +1,130 @@
+{
+  "version": 1,
+  "actions": {
+    "move": {
+      "type": "axis2d",
+      "bindings": [
+        "wasd",
+        "arrows",
+        "pad:leftStick"
+      ],
+      "description": "Walk / steer: x right, y forward"
+    },
+    "look": {
+      "type": "axis2d",
+      "bindings": [
+        {
+          "source": "mouse:delta",
+          "scale": 0.1
+        },
+        {
+          "source": "pad:rightStick",
+          "scale": 3
+        }
+      ],
+      "description": "Camera turn per tick: x right, y up (mouse pixels * 0.1, right stick up to 3/tick)"
+    },
+    "jump": {
+      "type": "button",
+      "bindings": [
+        "key:space",
+        "pad:south"
+      ]
+    },
+    "fire": {
+      "type": "button",
+      "bindings": [
+        "mouse:left",
+        "pad:rightTrigger"
+      ],
+      "description": "Primary action"
+    },
+    "aim": {
+      "type": "button",
+      "bindings": [
+        "mouse:right",
+        "pad:leftTrigger"
+      ],
+      "description": "Secondary action / aim down sights"
+    },
+    "interact": {
+      "type": "button",
+      "bindings": [
+        "key:e",
+        "pad:west"
+      ]
+    },
+    "sprint": {
+      "type": "button",
+      "bindings": [
+        "key:shift",
+        "pad:leftStickButton"
+      ]
+    },
+    "pause": {
+      "type": "button",
+      "bindings": [
+        "key:escape",
+        "pad:start"
+      ]
+    },
+    "cursor": {
+      "type": "axis2d",
+      "bindings": [
+        "mouse:position"
+      ],
+      "description": "Mouse position in the viewport, 0..1 from the top-left"
+    },
+    "throttle": {
+      "type": "button",
+      "bindings": [
+        "key:w",
+        "key:up",
+        "pad:rightTrigger"
+      ],
+      "description": "Vehicle accelerator (analog on the right trigger)"
+    },
+    "brake": {
+      "type": "button",
+      "bindings": [
+        "key:s",
+        "key:down",
+        "pad:leftTrigger"
+      ],
+      "description": "Vehicle brake; held at a standstill it reverses"
+    },
+    "steer": {
+      "type": "axis",
+      "bindings": [
+        "ad",
+        "leftright",
+        "pad:leftStick.x"
+      ],
+      "description": "Vehicle steering: -1 left .. 1 right"
+    },
+    "handbrake": {
+      "type": "button",
+      "bindings": [
+        "key:space",
+        "pad:south"
+      ],
+      "description": "Vehicle handbrake (slides, drifts, hairpins)"
+    },
+    "shift_up": {
+      "type": "button",
+      "bindings": [
+        "key:e",
+        "pad:rightShoulder"
+      ],
+      "description": "Manual gearbox: next gear"
+    },
+    "shift_down": {
+      "type": "button",
+      "bindings": [
+        "key:q",
+        "pad:leftShoulder"
+      ],
+      "description": "Manual gearbox: previous gear"
+    }
+  }
+}

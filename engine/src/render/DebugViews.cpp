@@ -52,6 +52,11 @@ const std::vector<DebugViewInfo>& debugViews() {
          "which reflection probe lights each pixel: the scene tinted with each probe's color (probe_info debugColor; blends "
          "mix their colors, gray = sky only), every influence volume outlined in its color (dashed where hidden), capture "
          "points as dots"},
+        {kVehicles, "vehicles", "final",
+         "final image with every vehicle's suspension (gray travel, white-to-orange current length), wheels (green on the "
+         "ground, red when sliding, gray airborne), contact points and tire forces at them: blue load, orange drive/brake, "
+         "red cornering (0.6 m = a wheel's static load); cyan velocity (0.25 s), yellow center of mass. Captures only "
+         "(the live viewport shows the final image)"},
     };
     return kViews;
 }
@@ -76,15 +81,17 @@ Result<int> debugViewFromName(std::string_view name) {
 }
 
 const char* debugViewName(int id) {
-    const auto& views = debugViews();
-    if (id < 0 || id >= static_cast<int>(views.size())) return "final";
-    return views[static_cast<size_t>(id)].name;
+    for (const auto& v : debugViews()) {
+        if (v.id == id) return v.name;
+    }
+    return "final";
 }
 
 bool debugViewOverridesSurfaces(int id) {
-    const auto& views = debugViews();
-    if (id < 0 || id >= static_cast<int>(views.size())) return false;
-    return std::string_view(views[static_cast<size_t>(id)].kind) == "surface" || id == debugview::kWireframe;
+    for (const auto& v : debugViews()) {
+        if (v.id == id) return std::string_view(v.kind) == "surface" || id == debugview::kWireframe;
+    }
+    return false;
 }
 
 std::string debugViewHelp() {

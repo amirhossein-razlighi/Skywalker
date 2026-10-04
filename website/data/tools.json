@@ -1644,7 +1644,8 @@
        "texel_density",
        "motion",
        "shadow_atlas",
-       "reflection_probes"
+       "reflection_probes",
+       "vehicles"
       ],
       "description": "Diagnostic view instead of the final image. Buffers: albedo, normals, material (roughness red / metallic green), gi, reflections, ao, depth, lighting. Shading: unshaded, lighting_only (white material), emission, specular. Geometry: wireframe, overdraw (heat map), lod (green 0 .. red 3), uv_checker, texel_density (green = 512 texels/m). Lights: shadow_cascades (red/green/blue/yellow), light_complexity (lights per pixel heat map), shadow_atlas (point/spot shadow maps, outlined per light: green re-rendered, blue cached, orange waiting; see shadow_atlas_info), reflection_probes (which probe lights each pixel, their volumes; see probe_info). Motion: the velocity buffer (hue = direction, strength = speed). Also sketch, impostors. Full legend: viewport_debug_view {\"list\": true}"
      },
@@ -1857,7 +1858,8 @@
        "texel_density",
        "motion",
        "shadow_atlas",
-       "reflection_probes"
+       "reflection_probes",
+       "vehicles"
       ],
       "description": "Debug view to show (final = normal image); omit to read the current one"
      },
@@ -4805,7 +4807,7 @@
   {
    "name": "audio_generate",
    "title": "Generate sound or music",
-   "description": "Create a sound effect, ambience loop or piece of music as a WAV file in the project, procedurally and deterministically (the same seed and parameters always give the same audio) - no external generator needed. Presets: jump, coin, pickup, hit, explosion, laser, powerup, footstep_grass, footstep_stone, footstep_wood, door, ui_click, ui_hover, error, swoosh, shoot, wind_loop, rain_loop, fire_crackle_loop, ocean_waves_loop, ambient_drone, heartbeat. Names ending in _loop loop seamlessly (use them for ambience; set loop on the audio component). Use `seed` and `variations` for natural variety (footsteps!). Customize a preset with `pitch` (multiplier) and `volume`, or fully with `params`: layers of oscillators/noise with pitch slides, arpeggios, envelopes, filters and echo/reverb (call with list=true for the parameter reference). Music: pass `music` {mood: calm, happy, sad, tense, epic, mysterious, eerie, adventure, battle; tempo, key like \"A minor\", progression like \"i VI III VII\", bars, energy 0..1, reverb, and pad/bass/arp/melody/drums on/off}; it loops seamlessly. Pass `entity` to create or update that entity's audio component with the clip (loops, bus and spatial settings are chosen from the kind). The result includes loudness stats; check them with audio_info and audition with audio_play. Examples: {\"preset\":\"jump\",\"path\":\"audio/jump.wav\"}; {\"preset\":\"footstep_stone\",\"variations\":4}; {\"music\":{\"mood\":\"epic\",\"tempo\":110,\"bars\":16},\"path\":\"audio/theme.wav\"}.",
+   "description": "Create a sound effect, ambience loop or piece of music as a WAV file in the project, procedurally and deterministically (the same seed and parameters always give the same audio) - no external generator needed. Presets: jump, coin, pickup, hit, explosion, laser, powerup, footstep_grass, footstep_stone, footstep_wood, door, ui_click, ui_hover, error, swoosh, shoot, wind_loop, engine_loop, rain_loop, fire_crackle_loop, ocean_waves_loop, ambient_drone, heartbeat. Names ending in _loop loop seamlessly (use them for ambience; set loop on the audio component). Use `seed` and `variations` for natural variety (footsteps!). Customize a preset with `pitch` (multiplier) and `volume`, or fully with `params`: layers of oscillators/noise with pitch slides, arpeggios, envelopes, filters and echo/reverb (call with list=true for the parameter reference). Music: pass `music` {mood: calm, happy, sad, tense, epic, mysterious, eerie, adventure, battle; tempo, key like \"A minor\", progression like \"i VI III VII\", bars, energy 0..1, reverb, and pad/bass/arp/melody/drums on/off}; it loops seamlessly. Pass `entity` to create or update that entity's audio component with the clip (loops, bus and spatial settings are chosen from the kind). The result includes loudness stats; check them with audio_info and audition with audio_play. Examples: {\"preset\":\"jump\",\"path\":\"audio/jump.wav\"}; {\"preset\":\"footstep_stone\",\"variations\":4}; {\"music\":{\"mood\":\"epic\",\"tempo\":110,\"bars\":16},\"path\":\"audio/theme.wav\"}.",
    "inputSchema": {
     "type": "object",
     "properties": {
@@ -4829,6 +4831,7 @@
        "swoosh",
        "shoot",
        "wind_loop",
+       "engine_loop",
        "rain_loop",
        "fire_crackle_loop",
        "ocean_waves_loop",
@@ -5013,7 +5016,7 @@
   {
    "name": "input_map",
    "title": "Input actions",
-   "description": "Read or edit the project's input action map (input.json): named, device-independent actions bound to keyboard, mouse and gamepad. Scripts use action(\"jump\"), pressed(\"jump\"), axis(\"move\") and `on action \"jump\"` instead of raw keys, so one game works with keyboard+mouse and controllers and players can rebind. Defaults exist: move (WASD/arrows/left stick), look (mouse/right stick), jump, fire, aim, interact, sprint, pause, cursor. operation=get returns the map, the live state of every action and (with catalog=true) every valid binding source; set_action adds or replaces one action; remove_action deletes it; reset restores the defaults; set replaces everything. Action types: button (held/pressed/released), axis (-1..1), axis2d (x right, y forward/up). Binding strings: key:space, mouse:left, mouse:delta, pad:south, pad:leftStick, pad:rightTrigger; composites \"wasd\", \"arrows\", \"dpad\", \"ad\", \"qe\"; objects {source, scale, invertY, deadzone}. Example: set_action name=dash type=button bindings=[\"key:shift\", \"pad:east\"]. Test with sim_input.",
+   "description": "Read or edit the project's input action map (input.json): named, device-independent actions bound to keyboard, mouse and gamepad. Scripts use action(\"jump\"), pressed(\"jump\"), axis(\"move\") and `on action \"jump\"` instead of raw keys, so one game works with keyboard+mouse and controllers and players can rebind. Defaults exist: move (WASD/arrows/left stick), look (mouse/right stick), jump, fire, aim, interact, sprint, pause, cursor. operation=get returns the map, the live state of every action and (with catalog=true) every valid binding source; set_action adds or replaces one action; remove_action deletes it; reset restores the defaults; set replaces everything; add_preset preset=drive adds the vehicle actions (throttle W/Up/right trigger, brake S/Down/left trigger, steer A-D/arrows/left stick, handbrake Space/A, shift_up/shift_down E/Q/shoulders) that vehicles with control \"player\" read. Action types: button (held/pressed/released), axis (-1..1), axis2d (x right, y forward/up). Binding strings: key:space, mouse:left, mouse:delta, pad:south, pad:leftStick, pad:rightTrigger; composites \"wasd\", \"arrows\", \"dpad\", \"ad\", \"qe\"; objects {source, scale, invertY, deadzone}. Example: set_action name=dash type=button bindings=[\"key:shift\", \"pad:east\"]. Test with sim_input.",
    "inputSchema": {
     "type": "object",
     "properties": {
@@ -5024,9 +5027,17 @@
        "set_action",
        "remove_action",
        "reset",
-       "set"
+       "set",
+       "add_preset"
       ],
       "description": "What to do (default get)"
+     },
+     "preset": {
+      "type": "string",
+      "enum": [
+       "drive"
+      ],
+      "description": "add_preset: a group of actions (drive = vehicle controls)"
      },
      "name": {
       "type": "string",
@@ -9105,7 +9116,8 @@
        "texel_density",
        "motion",
        "shadow_atlas",
-       "reflection_probes"
+       "reflection_probes",
+       "vehicles"
       ],
       "description": "Buffer visualization, shading debug view (wireframe, lod, unshaded, ...) or the pencil sketch look; see viewport_capture"
      },
@@ -10742,6 +10754,282 @@
    },
    "_meta": {
     "skywalker/category": "view"
+   }
+  },
+  {
+   "name": "vehicle_create",
+   "title": "Create vehicle",
+   "description": "Make a drivable car, truck or kart from a chassis entity whose wheel meshes are child entities named wheel* (wheel_fl, wheel_fr, wheel_rl, wheel_rr; or pass `wheels`). One undoable edit that adds: a dynamic body (chassis mass), a box collider fitted to the chassis above the wheels, the `vehicle` component from a preset (sports, hatchback, truck, kart) in a handling style (arcade = traction control, ABS, drift assist, roll protection; sim = raw), a chase camera on the scene camera, a looping engine sound pitched by rpm, and the drive input actions (throttle W/Up/right trigger, brake+reverse S/Down/left trigger, steer A-D/arrows/left stick, handbrake Space/A). Forward is -Z. Wheels are fitted from their meshes and spin, steer and follow the suspension while playing. Then: vehicle_test_drive for numbers, vehicle_tune to adjust, vehicle_info capture=true to see suspension and tire forces. Example: {\"entity\": \"Coupe\", \"preset\": \"sports\"}.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "entity": {
+      "type": [
+       "integer",
+       "string"
+      ],
+      "description": "The chassis (root of the car model)"
+     },
+     "preset": {
+      "type": "string",
+      "enum": [
+       "sports",
+       "hatchback",
+       "truck",
+       "kart"
+      ],
+      "description": "Vehicle type (default sports)"
+     },
+     "handling": {
+      "type": "string",
+      "enum": [
+       "arcade",
+       "sim"
+      ],
+      "description": "arcade (assists, default) or sim"
+     },
+     "wheels": {
+      "type": "array",
+      "items": {
+       "type": [
+        "integer",
+        "string"
+       ],
+       "description": "Entity id (number) or exact name"
+      },
+      "description": "Wheel entities (children of the chassis); default: children named wheel*"
+     },
+     "overrides": {
+      "type": "object",
+      "description": "vehicle component fields to set on top of the preset"
+     },
+     "chase_camera": {
+      "type": "boolean",
+      "description": "Make the scene camera a chase camera following this vehicle (default true)"
+     },
+     "engine_sound": {
+      "type": "boolean",
+      "description": "Add a looping engine sound pitched by rpm (default true)"
+     },
+     "input_actions": {
+      "type": "boolean",
+      "description": "Add the drive input actions to the project's input map if missing (default true)"
+     },
+     "collider": {
+      "type": "string",
+      "enum": [
+       "auto",
+       "keep"
+      ],
+      "description": "auto = box fitted to the chassis above the wheels (default); keep = your own"
+     }
+    },
+    "additionalProperties": false,
+    "required": [
+     "entity"
+    ]
+   },
+   "annotations": {
+    "title": "Create vehicle",
+    "readOnlyHint": false,
+    "destructiveHint": false,
+    "openWorldHint": false
+   },
+   "_meta": {
+    "skywalker/category": "physics"
+   }
+  },
+  {
+   "name": "vehicle_tune",
+   "title": "Tune vehicle",
+   "description": "Change a vehicle's handling parameters with validation (one undoable edit; works while playing: the vehicle is rebuilt keeping its speed). `set` takes vehicle component fields, e.g. {\"maxTorque\": 600, \"lateralGrip\": 1.6, \"antiRollRear\": 12000, \"driftAssist\": 0.5}; unknown fields fail with a did-you-mean. `preset` + `handling` re-apply a preset first. `wheels` overrides per axle or wheel ({\"rear\": {\"lateralGrip\": 1.2}, \"front_left\": {...}}): the wheel list is written out from the current fit the first time. `test` (a maneuver: accel, braking, slalom, skidpad, all) drives before and after the change and returns both summaries, so you can tune by numbers. Run vehicle_test_drive for details.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "entity": {
+      "type": [
+       "integer",
+       "string"
+      ],
+      "description": "The vehicle"
+     },
+     "set": {
+      "type": "object",
+      "description": "vehicle fields to change"
+     },
+     "preset": {
+      "type": "string",
+      "enum": [
+       "sports",
+       "hatchback",
+       "truck",
+       "kart"
+      ],
+      "description": "Re-apply a preset (before `set`)"
+     },
+     "handling": {
+      "type": "string",
+      "enum": [
+       "arcade",
+       "sim"
+      ],
+      "description": "Handling style for `preset` (default arcade)"
+     },
+     "wheels": {
+      "type": "object",
+      "description": "Per-wheel overrides keyed by axle (front, rear) or wheel name (front_left, rear_right, axle1_left): {lateralGrip, longitudinalGrip, suspensionFrequency, suspensionDamping, brakeTorque, steer, drive, ...}"
+     },
+     "test": {
+      "type": "string",
+      "enum": [
+       "accel",
+       "braking",
+       "slalom",
+       "skidpad",
+       "top_speed",
+       "all"
+      ],
+      "description": "Measure this maneuver before and after the change"
+     }
+    },
+    "additionalProperties": false,
+    "required": [
+     "entity"
+    ]
+   },
+   "annotations": {
+    "title": "Tune vehicle",
+    "readOnlyHint": false,
+    "destructiveHint": false,
+    "openWorldHint": false
+   },
+   "_meta": {
+    "skywalker/category": "physics"
+   }
+  },
+  {
+   "name": "vehicle_info",
+   "title": "Vehicle telemetry",
+   "description": "Live state of vehicles: speed (km/h), rpm, gear, inputs as asked and as applied after assists (steering smoothing, auto reverse, traction control, ABS, drift assist), drift angle, lateral/longitudinal g, and per wheel: suspension length/compression, contact point and surface, load (N), drive and cornering forces, slip ratio and slip angle, skid 0..1. While editing it shows the fitted setup at rest (wheel roles, radii) and build warnings. capture=true adds an image with the vehicles debug view (suspension rays, contacts, tire force vectors). Without `entity` it lists every vehicle. Pair with sim_control step / sim_input to watch a maneuver.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "entity": {
+      "type": [
+       "integer",
+       "string"
+      ],
+      "description": "A vehicle (default: all)"
+     },
+     "wheels": {
+      "type": "boolean",
+      "description": "Include per-wheel data (default true)"
+     },
+     "capture": {
+      "type": "boolean",
+      "description": "Add a picture with the vehicles debug view (default false)"
+     },
+     "width": {
+      "type": "integer",
+      "description": "Capture width (default 960)"
+     },
+     "height": {
+      "type": "integer",
+      "description": "Capture height (default 540)"
+     }
+    },
+    "additionalProperties": false
+   },
+   "annotations": {
+    "title": "Vehicle telemetry",
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "openWorldHint": false
+   },
+   "_meta": {
+    "skywalker/category": "physics"
+   }
+  },
+  {
+   "name": "vehicle_test_drive",
+   "title": "Test drive",
+   "description": "An autopilot drives a copy of the vehicle through standard maneuvers in a private physics world (the scene is not changed; works while editing) and returns handling metrics to tune by numbers: accel (0-60, 0-100 km/h, quarter mile, wheelspin, upshifts), braking (distance and g from `speed`, default 100 km/h; ABS activity, stability), slalom (8 cones every cone_spacing m at `speed`, default 60: completed, cones hit, average speed, line error), skidpad (circle of `radius` m, speed ramps until the car leaves the line: max lateral g, and whether it understeers, oversteers or runs out of power), top_speed (`duration` s), custom (`inputs` keyframes [{t, throttle, brake, steer, handbrake}]), all (accel, braking, slalom, skidpad). track=proving_ground (default: flat, full grip, comparable between cars) or scene (the level as it is). `overrides` tries vehicle fields without editing (e.g. {\"lateralGrip\": 1.6}). trace=true adds a sampled trace. Example: {\"entity\": \"Coupe\", \"maneuver\": \"all\"}.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "entity": {
+      "type": [
+       "integer",
+       "string"
+      ],
+      "description": "The vehicle"
+     },
+     "maneuver": {
+      "type": "string",
+      "enum": [
+       "accel",
+       "braking",
+       "slalom",
+       "skidpad",
+       "top_speed",
+       "custom",
+       "all"
+      ],
+      "description": "What to drive (default all)"
+     },
+     "speed": {
+      "type": "number",
+      "description": "km/h: braking start (100), slalom (60), skidpad start (30)"
+     },
+     "duration": {
+      "type": "number",
+      "description": "Seconds for top_speed (45) / custom"
+     },
+     "radius": {
+      "type": "number",
+      "description": "Skidpad radius in m (default 40)"
+     },
+     "cone_spacing": {
+      "type": "number",
+      "description": "Slalom cone spacing in m (default 18)"
+     },
+     "inputs": {
+      "type": "array",
+      "items": {
+       "type": "object"
+      },
+      "description": "custom: keyframes {t, throttle, brake, steer, handbrake}"
+     },
+     "overrides": {
+      "type": "object",
+      "description": "vehicle fields for this drive only"
+     },
+     "track": {
+      "type": "string",
+      "enum": [
+       "proving_ground",
+       "scene"
+      ],
+      "description": "Where to drive (default proving_ground)"
+     },
+     "trace": {
+      "type": "boolean",
+      "description": "Include a trace sampled every 0.25 s"
+     }
+    },
+    "additionalProperties": false,
+    "required": [
+     "entity"
+    ]
+   },
+   "annotations": {
+    "title": "Test drive",
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "openWorldHint": false
+   },
+   "_meta": {
+    "skywalker/category": "physics"
    }
   }
  ]

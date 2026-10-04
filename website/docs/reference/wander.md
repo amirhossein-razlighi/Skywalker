@@ -5,7 +5,7 @@ title: "Wander builtins"
 
 # Wander builtins
 
-Every function a Wander script can call lives in one registry: name, typed parameters, return type, category, documentation and an example. The compiler checks calls against it (arity, types, did-you-mean), and this page is generated from it. **137 builtins** in 19 categories.
+Every function a Wander script can call lives in one registry: name, typed parameters, return type, category, documentation and an example. The compiler checks calls against it (arity, types, did-you-mean), and this page is generated from it. **142 builtins** in 20 categories.
 
 Agents get the same information from `wander_reference` (the guide) and `wander_reference {topic}` (structured entries for a category or a function). For the language itself, read the [Wander manual](../manual/wander/index.md).
 
@@ -30,6 +30,7 @@ Agents get the same information from `wander_reference` (the guide) and `wander_
 | [text](#text) | [`num`](#text-num), [`str`](#text-str), [`type_of`](#text-type_of), [`ends_with`](#text-ends_with), [`lower`](#text-lower), [`replace`](#text-replace), [`split`](#text-split), [`starts_with`](#text-starts_with), [`trim`](#text-trim), [`upper`](#text-upper) |
 | [time](#time) | [`is_paused`](#time-is_paused), [`pause_game`](#time-pause_game), [`resume_game`](#time-resume_game), [`teleport`](#time-teleport), [`time_scale`](#time-time_scale), [`unscaled_dt`](#time-unscaled_dt), [`unscaled_time`](#time-unscaled_time) |
 | [vector](#vector) | [`cross`](#vector-cross), [`direction`](#vector-direction), [`distance`](#vector-distance), [`dot`](#vector-dot), [`forward`](#vector-forward), [`length`](#vector-length), [`normalize`](#vector-normalize), [`right`](#vector-right), [`up`](#vector-up), [`vec`](#vector-vec), [`world_position`](#vector-world_position) |
+| [vehicle](#vehicle) | [`vehicle_drive`](#vehicle-vehicle_drive), [`vehicle_shift`](#vehicle-vehicle_shift), [`vehicle_speed`](#vehicle-vehicle_speed), [`vehicle_state`](#vehicle-vehicle_state), [`vehicle_wheel`](#vehicle-vehicle_wheel) |
 
 ## Subsystem triggers
 
@@ -2551,6 +2552,104 @@ Returns: `vector`
 world_position(self)
 ```
 
+## vehicle { #vehicle }
+
+### `vehicle_drive` { #vehicle-vehicle_drive }
+
+```text
+vehicle_drive(e: entity, throttle: number, steer: number, brake: number?, handbrake: number?)
+```
+
+Sets a vehicle's inputs for this tick: throttle 0..1, steer -1 (left)..1 (right), brake 0..1, handbrake 0..1. Overrides the player's drive actions this tick; with control "script" it is the only driver. Holding brake at a standstill reverses (autoReverse).
+
+| Parameter | Type | |
+|---|---|---|
+| `e` | entity |  |
+| `throttle` | number |  |
+| `steer` | number |  |
+| `brake` | number | optional |
+| `handbrake` | number | optional |
+
+Returns: `none`
+
+```text
+vehicle_drive(self, 1, axis("steer"), 0)
+```
+
+### `vehicle_shift` { #vehicle-vehicle_shift }
+
+```text
+vehicle_shift(e: entity, gear: number)
+```
+
+Manual gearbox: selects a gear (-1 reverse, 0 neutral, 1..). Automatic gearboxes shift by themselves.
+
+| Parameter | Type | |
+|---|---|---|
+| `e` | entity |  |
+| `gear` | number |  |
+
+Returns: `none`
+
+```text
+if pressed("shift_up") then vehicle_shift(self, self.vehicle.gear + 1) end
+```
+
+### `vehicle_speed` { #vehicle-vehicle_speed }
+
+```text
+vehicle_speed(e: entity) -> number
+```
+
+Speed along the vehicle's heading in km/h (negative reversing).
+
+| Parameter | Type | |
+|---|---|---|
+| `e` | entity |  |
+
+Returns: `number`
+
+```text
+if vehicle_speed(self) > 120 then ... end
+```
+
+### `vehicle_state` { #vehicle-vehicle_state }
+
+```text
+vehicle_state(e: entity) -> map
+```
+
+Live vehicle state: speed (km/h), rpm, gear, wheels_on_ground, skid 0..1, drift_angle (degrees), lateral_g, longitudinal_g, load 0..1 and skidding (a list of contact points of sliding wheels, for smoke and marks).
+
+| Parameter | Type | |
+|---|---|---|
+| `e` | entity |  |
+
+Returns: `map`
+
+```text
+let s = vehicle_state(self)
+```
+
+### `vehicle_wheel` { #vehicle-vehicle_wheel }
+
+```text
+vehicle_wheel(e: entity, wheel: number|string) -> none|map
+```
+
+One wheel's live state by index (0-based) or name ("rear_left"): contact, point, normal, surface, load (N), slip_ratio, slip_angle (degrees), skid 0..1, compression 0..1, steer, rpm, driven. none before play. Tire smoke and skid marks: spawn at `point` while `skid` > 0.3.
+
+| Parameter | Type | |
+|---|---|---|
+| `e` | entity |  |
+| `wheel` | number\|string |  |
+
+Returns: `none|map`
+
+```text
+let w = vehicle_wheel(self, "rear_left")
+```
+
 ## The guide agents read
 
 `wander_reference` without a topic returns this text: a compact language guide followed by the builtin list.
@@ -2806,6 +2905,12 @@ world_position(self)
         up(e: entity) -> vector — World direction of the entity's up axis (+Y).
         vec(x: number, y: number, z: number) -> vector — Makes a vector (same as (x, y, z)).
         world_position(e: entity) -> vector — World position (self.position is relative to the parent).
+      [vehicle]
+        vehicle_drive(e: entity, throttle: number, steer: number, brake: number?, handbrake: number?) — Sets a vehicle's inputs for this tick: throttle 0..1, steer -1 (left)..1 (right), brake 0..1, handbrake 0..1. Overrides the player's drive actions this tick; with control "script" it is the only driver. Holding brake at a standstill reverses (autoReverse).
+        vehicle_shift(e: entity, gear: number) — Manual gearbox: selects a gear (-1 reverse, 0 neutral, 1..). Automatic gearboxes shift by themselves.
+        vehicle_speed(e: entity) -> number — Speed along the vehicle's heading in km/h (negative reversing).
+        vehicle_state(e: entity) -> map — Live vehicle state: speed (km/h), rpm, gear, wheels_on_ground, skid 0..1, drift_angle (degrees), lateral_g, longitudinal_g, load 0..1 and skidding (a list of contact points of sliding wheels, for smoke and marks).
+        vehicle_wheel(e: entity, wheel: number|string) -> none|map — One wheel's live state by index (0-based) or name ("rear_left"): contact, point, normal, surface, load (N), slip_ratio, slip_angle (degrees), skid 0..1, compression 0..1, steer, rpm, driven. none before play. Tire smoke and skid marks: spawn at `point` while `skid` > 0.3.
     SUBSYSTEM TRIGGERS
         on action — An input action was pressed: on action "jump" (actions come from input.json).
         on collide — Two bodies touched: on collide ("name or tag")? — other, contact_point, contact_normal, impact.

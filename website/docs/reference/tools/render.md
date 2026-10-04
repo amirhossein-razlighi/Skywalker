@@ -678,7 +678,7 @@ Render a cinematic to video or a PNG sequence, offline and deterministically (th
 | `shutter_timing` | string |  | Shutter interval relative to the frame time (default center) | `center` `open` `close` |
 | `quality` | string |  | Render quality tier (default full; fast for previews) | `full` `balanced` `fast` |
 | `clay` | boolean |  | Matte clay look (same move, for sketch -&gt; clay -&gt; final transitions) |  |
-| `debug_view` | string |  | Buffer visualization, shading debug view (wireframe, lod, unshaded, ...) or the pencil sketch look; see viewport_capture | `final` `albedo` `normals` `material` `gi` `reflections` `ao` `depth` `lighting` `sketch` `impostors` `wireframe` `overdraw` `unshaded` `lighting_only` `shadow_cascades` `light_complexity` `lod` `emission` `specular` `uv_checker` `texel_density` `motion` `shadow_atlas` `reflection_probes` |
+| `debug_view` | string |  | Buffer visualization, shading debug view (wireframe, lod, unshaded, ...) or the pencil sketch look; see viewport_capture | `final` `albedo` `normals` `material` `gi` `reflections` `ao` `depth` `lighting` `sketch` `impostors` `wireframe` `overdraw` `unshaded` `lighting_only` `shadow_cascades` `light_complexity` `lod` `emission` `specular` `uv_checker` `texel_density` `motion` `shadow_atlas` `reflection_probes` `vehicles` |
 | `warmup` | integer |  | Frames rendered before the first one so temporal effects settle (default 4) |  |
 | `output` | string |  | Output path: .mp4 (H.264), .mov (ProRes 422 HQ), or a folder / name_####.png (PNG sequence); default renders/&lt;name&gt;.mp4 |  |
 | `outputs` | any[] |  | Several outputs from one render, e.g. ["renders/a.mp4", {"path": "renders/a.mov", "codec": "prores"}] |  |

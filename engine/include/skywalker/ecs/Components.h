@@ -361,3 +361,4 @@ struct Environment {
 #include "skywalker/ecs/GroomComponent.h"
 #include "skywalker/ecs/ProcessComponent.h"  // process: pause modes, run order, interpolation
 #include "skywalker/ecs/ReflectionProbeComponent.h"  // reflection_probe (render/ReflectionProbes.h)
+#include "skywalker/ecs/VehicleComponents.h"  // vehicle, chase_camera

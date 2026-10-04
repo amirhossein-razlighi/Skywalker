@@ -6,6 +6,7 @@
 #include "ToolHelpers.h"
 #include "skywalker/core/Strings.h"
 #include "skywalker/input/ActionMap.h"
+#include "skywalker/physics/Vehicle.h"
 
 namespace sky::tools {
 
@@ -165,13 +166,16 @@ void addInputTools(Engine& engine, ToolRegistry& reg) {
              "can rebind. Defaults exist: move (WASD/arrows/left stick), look (mouse/right stick), jump, fire, aim, "
              "interact, sprint, pause, cursor. operation=get returns the map, the live state of every action and (with "
              "catalog=true) every valid binding source; set_action adds or replaces one action; remove_action deletes it; "
-             "reset restores the defaults; set replaces everything. Action types: button (held/pressed/released), axis "
+             "reset restores the defaults; set replaces everything; add_preset preset=drive adds the vehicle actions (throttle "
+             "W/Up/right trigger, brake S/Down/left trigger, steer A-D/arrows/left stick, handbrake Space/A, shift_up/shift_down "
+             "E/Q/shoulders) that vehicles with control \"player\" read. Action types: button (held/pressed/released), axis "
              "(-1..1), axis2d (x right, y forward/up). Binding strings: key:space, mouse:left, mouse:delta, "
              "pad:south, pad:leftStick, pad:rightTrigger; composites \"wasd\", \"arrows\", \"dpad\", \"ad\", \"qe\"; "
              "objects {source, scale, invertY, deadzone}. Example: set_action name=dash type=button "
              "bindings=[\"key:shift\", \"pad:east\"]. Test with sim_input.",
              "sim",
-             object({{"operation", enumeration({"get", "set_action", "remove_action", "reset", "set"}, "What to do (default get)")},
+             object({{"operation", enumeration({"get", "set_action", "remove_action", "reset", "set", "add_preset"}, "What to do (default get)")},
+                     {"preset", enumeration({"drive"}, "add_preset: a group of actions (drive = vehicle controls)")},
                      {"name", string("Action name (set_action, remove_action)")},
                      {"type", enumeration({"button", "axis", "axis2d"}, "Action type (set_action, default button)")},
                      {"bindings", array(Json::object({{"description", "A source string like \"key:w\", a composite name like \"wasd\", or an "
@@ -209,9 +213,21 @@ void addInputTools(Engine& engine, ToolRegistry& reg) {
                      if (!parsed) return ToolResult::error(parsed.error());
                      map = std::move(*parsed);
                      changed = Json::object({{"replaced", true}});
+                 } else if (op == "add_preset") {
+                     const std::string preset = a.get("preset").asString("drive");
+                     if (preset != "drive") {
+                         return ToolResult::error(Error::make("invalid_arguments", "unknown action preset '" + preset + "'", "presets: drive"));
+                     }
+                     Json added = Json::array();
+                     for (auto& action : physics::driveActions()) {
+                         if (map.find(action.name)) continue;  // keep the project's own bindings
+                         added.push(action.name);
+                         map.set(std::move(action));
+                     }
+                     changed = Json::object({{"preset", preset}, {"added", added}});
                  } else if (op != "get") {
                      return ToolResult::error(Error::make("invalid_arguments", "unknown operation '" + op + "'",
-                                                          "use get, set_action, remove_action, reset or set"));
+                                                          "use get, set_action, remove_action, reset, set or add_preset"));
                  }
                  if (op != "get") {
                      if (Status s = engine.setActionMap(std::move(map)); !s) return fail(s);

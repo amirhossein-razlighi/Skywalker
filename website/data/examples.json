@@ -176,6 +176,15 @@
    "image": "images/examples/hello_sky.webp",
    "features": [],
    "description": "The starter scene used throughout the getting-started guide: a floating island, a tower, a cloud and a few behaviors. Small enough to read in full and the default target of the CLI examples."
+  },
+  "demo_vehicle_yard": {
+   "image": "images/shots/demo_vehicle_yard/drift_chase.webp",
+   "features": [
+    "Vehicle physics",
+    "Chase camera",
+    "Tire smoke and skid marks"
+   ],
+   "description": "A proving ground for the vehicle component: an original procedurally built coupe on a yard with a slalom, a skidpad and ramps. It drifts on its own (tire smoke, skid marks, engine sound by rpm), and vehicle_test_drive measures every preset's 0-100, braking, slalom and skidpad numbers."
   }
  }
 }

@@ -28,6 +28,7 @@
 #include "skywalker/engine/Movie.h"
 #include "skywalker/native/NativeModules.h"
 #include "skywalker/assets/Prefab.h"
+#include "skywalker/render/DebugViews.h"
 #include "skywalker/render/Gltf.h"
 #include "skywalker/render/Impostor.h"
 #include "skywalker/render/MeshData.h"
@@ -383,6 +384,7 @@ void Engine::step(int ticks) {
         if (i == ticks - 1) transformHistory_.capture(*scene_);  // render interpolation: the tick before the last
         const ProcessGate& gate = runtime_->processGate();
         actionMap_.evaluate(input_);  // device state + agent input -> actions for this tick
+        physics::applyVehicleControls(*scene_, input_);  // drive actions -> vehicles with control "player" (Wander may override)
         world2d_->preTick(*scene_, input_, *runtime_, kFixedDt);  // UI input, dialogue
         runtime_->tick(kFixedDt, input_);
         world2d_->postTick(*scene_, *runtime_, kFixedDt);  // sprite animation, 2D cameras
@@ -799,6 +801,8 @@ Result<Capture> Engine::capture(const CaptureOptions& opts) {
         c.frame.offline = opts.offline;
         c.frame.camera.motionBlur = 0.f;
     }
+    const bool vehicleOverlay = c.frame.debugView == debugview::kVehicles;  // a CPU overlay on the final image
+    if (vehicleOverlay) c.frame.debugView = debugview::kFinal;
     if (Status s = renderer_->render(c.frame); !s) return s.error();
     auto img = [&] {
         SKY_PROFILE_SCOPE("render.readback");  // waits for the GPU
@@ -806,6 +810,7 @@ Result<Capture> Engine::capture(const CaptureOptions& opts) {
     }();
     if (!img) return img.error();
     c.image = std::move(img.value());
+    if (vehicleOverlay) physics::drawVehicleOverlay(c.image, c.frame.camera, physics_->queryWorld());
     if (!opts.listVisible) return c;
     c.visible = visibleEntities(*scene_, c.frame);
     world2d_->refineVisible(c.frame, c.visible, *scene_);  // real boxes for sprites, tiles, text, UI
@@ -821,7 +826,7 @@ Status Engine::renderToSurface(void* surface, int width, int height) {
     opts.height = height;
     opts.samples = 1;  // real time: temporal anti-aliasing across frames
     opts.quality = playState_ == PlayState::Editing ? static_cast<int>(editQuality_) : 0;
-    opts.debugView = viewportDebugView_;  // [debug views]
+    opts.debugView = viewportDebugView_ == debugview::kVehicles ? debugview::kFinal : viewportDebugView_;  // [debug views]
     const bool live = playState_ == PlayState::Playing;
     if (live) {  // show the world between the last two ticks; cosmetic `on frame` handlers
         opts.interpolationAlpha = interpolationAlpha();

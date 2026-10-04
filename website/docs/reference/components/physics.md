@@ -5,7 +5,7 @@ title: "Physics and navigation"
 
 # Physics and navigation
 
-Rigid bodies, colliders, characters, joints, world settings and navigation.
+Rigid bodies, colliders, characters, joints, vehicles, world settings and navigation.
 
 ## `body` { #body }
 
@@ -134,6 +134,112 @@ Connects this entity's body to another body (`target`) or to the world. fixed = 
 
     ```text
     self.joint.kind          -- read or write any field
+    ```
+
+## `vehicle` { #vehicle }
+
+Drivable wheeled vehicle (Jolt vehicle constraint): suspension, tire friction curves, engine torque curve, auto/manual gearbox, FWD/RWD/AWD limited-slip differentials, anti-roll bars, downforce and drag. Needs a dynamic `body` on the same entity (the chassis). Child entities named wheel* are the wheels (fitted automatically when `wheels` is empty) and spin/steer/bounce while playing. Drive it with the inputs (throttle, brake, steer, handbrake): control=player reads the drive input actions, or set them from Wander (vehicle_drive(self, ...)). Build one with vehicle_create, tune by numbers with vehicle_tune + vehicle_test_drive, watch it with vehicle_info.
+
+| Field | Type | Description | Values |
+|---|---|---|---|
+| `preset` | string | Preset it was built from (informational): sports, hatchback, truck, kart, custom |  |
+| `mass` | number | Chassis mass in kg (kart 160, hatchback 1150, sports 1350, truck 2600) | 1 .. 1000000 |
+| `centerOfMass` | number[3] | Center-of-mass offset in m (local); lower y = less body roll, harder to flip |  |
+| `maxTilt` | number | Max pitch/roll in degrees before the chassis is held upright (180 = can flip) | 5 .. 180 |
+| `wheels` | object[] | Per-wheel setup in chassis space; empty = fitted at play from children named wheel*. Any field overrides the vehicle default for that wheel |  |
+| `wheelRadius` | number | Wheel radius in m (0 = measured from the wheel meshes) | 0 .. 10 |
+| `wheelWidth` | number | Wheel width in m (0 = measured) | 0 .. 10 |
+| `suspensionMinLength` | number | Suspension length fully compressed (m below the mount) | 0 .. 5 |
+| `suspensionMaxLength` | number | Suspension length fully extended (m below the mount) | 0.01 .. 5 |
+| `suspensionFrequency` | number | Spring frequency in Hz (1 soft, 1.6 road, 2.5+ race) | 0.1 .. 20 |
+| `suspensionDamping` | number | Damping ratio (0.3 floaty, 0.5 road, 1 stiff) | 0 .. 5 |
+| `steering` | string | Which wheels steer | `front` `rear` `all` `none` |
+| `maxSteerAngle` | number | Steering lock in degrees | 0 .. 89 |
+| `brakeTorque` | number | Brake torque per wheel in N m at full brake | 0 .. 1000000 |
+| `handbrakeTorque` | number | Handbrake torque per rear wheel in N m | 0 .. 1000000 |
+| `longitudinalGrip` | number | Peak tire friction accelerating/braking (1 economy tires, 1.25 sports, 1.6 slicks) | 0 .. 10 |
+| `lateralGrip` | number | Peak tire friction cornering: about the skidpad g (0.9 hatchback, 1.1 sports; lower = slides sooner) | 0 .. 10 |
+| `longitudinalCurve` | number[2][] | Tire friction vs slip ratio [[slip, 0..1], ...] (scaled by longitudinalGrip); empty = default |  |
+| `lateralCurve` | number[2][] | Tire friction vs slip angle [[degrees, 0..1], ...] (scaled by lateralGrip); empty = default |  |
+| `drive` | string | Driven wheels | `fwd` `rwd` `awd` |
+| `frontTorqueSplit` | number | AWD: share of the torque sent to the front axle | 0 .. 1 |
+| `limitedSlip` | number | Limited-slip ratio of the differentials (1.4 tight, &gt;= 10 open) | 1.01 .. 1000000 |
+| `differentialRatio` | number | Final drive ratio | 0.1 .. 50 |
+| `maxTorque` | number | Peak engine torque in N m | 0 .. 1000000 |
+| `minRpm` | number | Idle rpm | 0 .. 30000 |
+| `maxRpm` | number | Redline rpm | 100 .. 30000 |
+| `engineInertia` | number | Engine inertia in kg m^2 (lower revs faster) | 0.01 .. 100 |
+| `engineDamping` | number | Engine braking / internal friction | 0 .. 10 |
+| `torqueCurve` | number[2][] | Torque vs rpm [[rpm fraction, torque fraction], ...]; empty = default |  |
+| `transmission` | string | Gearbox: auto shifts by rpm; manual uses vehicle_shift / shift actions | `auto` `manual` |
+| `gearRatios` | number[] | Forward gear ratios, first gear first; empty = [2.66, 1.78, 1.3, 1.0, 0.74] |  |
+| `reverseRatio` | number | Reverse gear ratio (magnitude) | 0.1 .. 50 |
+| `shiftUpRpm` | number | Auto gearbox shifts up above this rpm | 100 .. 30000 |
+| `shiftDownRpm` | number | Auto gearbox shifts down below this rpm | 50 .. 30000 |
+| `shiftTime` | number | Seconds without drive while shifting | 0 .. 5 |
+| `clutchStrength` | number | Clutch coupling strength | 0.1 .. 1000 |
+| `antiRollFront` | number | Front anti-roll bar (0 none, 300 soft, 700 sporty, 2000 very stiff; above ~4000 the body can shake) | 0 .. 20000 |
+| `antiRollRear` | number | Rear anti-roll bar (stiffer than the front = more oversteer) | 0 .. 20000 |
+| `downforce` | number | Aero downforce in N per (m/s)^2 (0.4 road car, 2+ race car) | 0 .. 1000 |
+| `drag` | number | Aero drag in N per (m/s)^2 (limits top speed; ~0.5 * rho * Cd * area) | 0 .. 1000 |
+| `control` | string | Who sets the inputs: player = drive input actions, script = Wander/tools, none | `player` `script` `none` |
+| `steerSpeed` | number | Steering response: full lock per second (0 = instant) | 0 .. 100 |
+| `speedSensitiveSteering` | number | Less steering lock at speed, 0..1 | 0 .. 1 |
+| `tractionControl` | boolean | Traction control: limits wheelspin under throttle |  |
+| `abs` | boolean | Anti-lock brakes: keeps the wheels rolling (and steering) under hard braking |  |
+| `driftAssist` | number | Arcade drift help 0..1: easy slides that hold their angle | 0 .. 1 |
+| `autoReverse` | boolean | Holding brake at a standstill reverses |  |
+| `engineAudio` | boolean | Drive the entity's audio component: pitch from rpm, volume from load |  |
+| `throttle` | number | Input: accelerator 0..1 (live) | 0 .. 1 |
+| `brake` | number | Input: brake pedal 0..1 (live) | 0 .. 1 |
+| `steer` | number | Input: steering -1 left .. 1 right (live) | -1 .. 1 |
+| `handbrake` | number | Input: handbrake 0..1 (live) | 0 .. 1 |
+| `gear` | integer | Current gear (-1 reverse, 0 neutral); manual gearbox: write to shift |  |
+| `speed` | number | Telemetry: km/h along the heading (negative reversing) |  |
+| `rpm` | number | Telemetry: engine rpm |  |
+| `wheelsOnGround` | integer | Telemetry: wheels touching the ground |  |
+| `skid` | number | Telemetry: strongest tire slide 0..1 (tire smoke, skid marks, squeal) |  |
+
+=== "Tool call"
+
+    ```tool
+    entity_update {"entity": "Crate", "components": {"vehicle": {}}}
+    ```
+
+=== "Wander"
+
+    ```text
+    self.vehicle.preset          -- read or write any field
+    ```
+
+## `chase_camera` { #chase_camera }
+
+Spring-arm chase camera: follows `target` from behind with look-ahead into corners, collision pull-in and a field of view that widens with speed. Put it on an entity with a camera (vehicle_create chase_camera=true sets it up). Moves every tick while playing.
+
+| Field | Type | Description | Values |
+|---|---|---|---|
+| `target` | object \| string \| integer \| null | Entity to follow (the vehicle) — entity link: name ("Door"), "#id", {"id": 12} or null; read back as {"id", "name"} (follows renames; entity_refs lists links) |  |
+| `distance` | number | Distance behind the target in m | 0 .. 1000 |
+| `height` | number | Height above the target in m | -100 .. 1000 |
+| `targetHeight` | number | Aim point above the target origin in m | -100 .. 100 |
+| `lookAhead` | number | Seconds of velocity to aim ahead | 0 .. 5 |
+| `stiffness` | number | Position spring in 1/s (higher = tighter) | 0.1 .. 100 |
+| `turnStiffness` | number | How fast the arm swings behind the target in 1/s | 0.1 .. 100 |
+| `fovMin` | number | Field of view at a standstill (degrees) | 5 .. 170 |
+| `fovMax` | number | Field of view at fovSpeed (degrees) | 5 .. 170 |
+| `fovSpeed` | number | Speed in m/s where the field of view reaches fovMax | 0.1 .. 1000 |
+| `collide` | boolean | Pull the camera in when a wall blocks the view |  |
+
+=== "Tool call"
+
+    ```tool
+    entity_update {"entity": "Crate", "components": {"chase_camera": {}}}
+    ```
+
+=== "Wander"
+
+    ```text
+    self.chase_camera.target          -- read or write any field
     ```
 
 ## `physics_world` { #physics_world }

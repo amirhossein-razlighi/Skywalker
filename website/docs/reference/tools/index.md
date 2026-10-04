@@ -5,7 +5,7 @@ title: "Tools"
 
 # Tools
 
-Skywalker exposes **199 tools** (engine 0.1.0). The editor, its in-app agents, the CLI and every MCP client call the same tools with the same JSON arguments, so anything you read here works everywhere. 120 tools change the project; every such change is undoable and attributed to whoever made it.
+Skywalker exposes **203 tools** (engine 0.1.0). The editor, its in-app agents, the CLI and every MCP client call the same tools with the same JSON arguments, so anything you read here works everywhere. 122 tools change the project; every such change is undoable and attributed to whoever made it.
 
 Arguments are validated before a tool runs: unknown keys, wrong types and bad enum values fail with a *did you mean …?* hint. Each tool page shows the arguments, the annotations MCP clients use for approvals, and the same call as a tool call, a CLI command and a raw MCP request.
 
@@ -21,7 +21,7 @@ Arguments are validated before a tool runs: unknown keys, wrong types and bad en
 | [Wander](wander.md) | 9 | Write, check, test, graph and inspect Wander behaviors. |
 | [Code](code.md) | 4 | Native code: ahead-of-time compiled behaviors and C++ modules (trusted local code; clients ask first). |
 | [Simulation](sim.md) | 9 | Play, pause, step and stop; inject input; trace and inspect what runs. |
-| [Physics](physics.md) | 8 | Rigid bodies, characters, queries, settling and navigation meshes. |
+| [Physics](physics.md) | 12 | Rigid bodies, characters, queries, settling and navigation meshes. |
 | [Animation](animation.md) | 12 | Skeletal animation, controllers, IK, bone attachments and cinematic sequences. |
 | [UI](ui.md) | 4 | Build, style, inspect and drive user interfaces. |
 | [Dialogue](dialogue.md) | 3 | Lint, preview and control branching dialogue. |
@@ -155,6 +155,10 @@ Arguments are validated before a tool runs: unknown keys, wrong types and bad en
 | [`physics_query`](physics.md#physics_query) | Physics | Ask the collision world (colliders, not render meshes) — works while editing and playing. |
 | [`physics_settings`](physics.md#physics_settings) | Physics | Read or change scene-wide physics: gravity (m/s^2), substeps (stability for stacks/fast objects), which collision layers ignore each other (ignorePairs, e.g. |
 | [`physics_settle`](physics.md#physics_settle) | Physics | Drop objects with a real simulation and keep where they come to rest (simulate, then keep the poses). |
+| [`vehicle_create`](physics.md#vehicle_create) | Physics | Make a drivable car, truck or kart from a chassis entity whose wheel meshes are child entities named wheel* (wheel_fl, wheel_fr, wheel_rl, wheel_rr; or pass `wheels`). |
+| [`vehicle_info`](physics.md#vehicle_info) | Physics | Live state of vehicles: speed (km/h), rpm, gear, inputs as asked and as applied after assists (steering smoothing, auto reverse, traction control, ABS, drift assist), drift angle, lateral/longitudinal g, and per wheel: suspension length/compression, contact point and surface, load (N), drive and cornering forces, slip ratio and slip angle, skid 0..1. |
+| [`vehicle_test_drive`](physics.md#vehicle_test_drive) | Physics | An autopilot drives a copy of the vehicle through standard maneuvers in a private physics world (the scene is not changed; works while editing) and returns handling metrics to tune by numbers: accel (0-60, 0-100 km/h, quarter mile, wheelspin, upshifts), braking (distance and g from `speed`, default 100 km/h; ABS activity, stability), slalom (8 cones every cone_spacing m at `speed`, default 60: completed, cones hit, average speed, line error), skidpad (circle of `radius` m, speed ramps until the car leaves the line: max lateral g, and whether it understeers, oversteers or runs out of power), top_speed (`duration` s), custom (`inputs` keyframes [{t, throttle, brake, steer, handbrake}]), all (accel, braking, slalom, skidpad). |
+| [`vehicle_tune`](physics.md#vehicle_tune) | Physics | Change a vehicle's handling parameters with validation (one undoable edit; works while playing: the vehicle is rebuilt keeping its speed). |
 | [`animation_list`](animation.md#animation_list) | Animation | Skeleton and clips of a rigged model or animated character. |
 | [`animation_preview`](animation.md#animation_preview) | Animation | Render a character posed at a clip or state at given times (editor preview; the scene is not changed). |
 | [`animator_set`](animation.md#animator_set) | Animation | Set an animator's parameters and triggers, or play a state/clip with a crossfade — live while the simulation runs (same as Wander set_param / trigger / play_animation), or as the editor preview while editing. |
