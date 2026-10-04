@@ -292,11 +292,11 @@ the resolution and lens.
 
 **Measured on ashen_peaks** (M1 Pro, 1920×1080, full quality, 30-frame `perf_stats`):
 
-| View | Before | After |
-|---|---|---|
-| Aerial | 852 ms, 1.35 G triangles | ~20 ms |
-| Mid-valley | 2022 ms, 3.9 G triangles | ~52 ms |
-| Ground | 2002 ms, 3.2 G triangles | ~80 ms |
+| View | Before | After (full) | After (fast editing tier) |
+|---|---|---|---|
+| Aerial | 852 ms, 1.35 G triangles | 19 ms | 7 ms (before: 25 ms, most trees culled) |
+| Mid-valley | 2022 ms, 3.9 G triangles | 39 ms, 7.7 M triangles | 10 ms |
+| Ground | 2002 ms, 3.2 G triangles | 63 ms, 18 M triangles | 19 ms |
 
 The same scene without any foliage costs about 13 ms (aerial) and 17 ms (ground). What
 remains at ground level is mostly the jacaranda's 3.5M-triangle mesh near the camera and
