@@ -111,6 +111,44 @@ You can create and place prefabs in several ways:
 - **Scatter:** `scatter {prefab, count, …}`.
 - **At runtime:** from Wander, `spawn("prefab:prefabs/coin.prefab.json", (x, y, z))`.
 
+## Shared kits: `mounts` in game.json
+
+Several projects can share one asset kit (characters, props, materials, animation libraries) that lives outside them:
+
+```json
+{"id": "harbor", "title": "Harbor", "mounts": {"kit": "../_kit"}}
+```
+
+A mount maps a top-level folder name to a folder (relative to the project, absolute, or `~/...`). Every project path that
+starts with the name resolves into the mounted folder: `kit/characters/guard.prefab.json`, `asset:kit/props/crate.glb`,
+`kit/materials/ground/cobblestone.mat.json`, `kit/anims/ual1.anim#Walk_Loop`. The asset database scans mounted folders with
+the project, so their files have records, GUIDs and `.meta` import settings (sidecars are written in the kit), `asset_list`
+finds them and `relative()` maps their absolute paths back to `kit/...`. A real top-level project folder with the same name
+is shadowed by the mount. `game_settings {operation: "set", settings: {mounts: {...}}}` writes game.json and remounts
+immediately; `game_settings get` lists the mounted folders. `game_build` copies the mounted files the game references into
+the package under the mount name, so a shipped game needs no mount (docs/SHIPPING.md).
+
+## Pinned asset manifests (`media/demo/assetkit.py`)
+
+Projects with many third-party files keep them out of version control and reproducible with a manifest (`assets.json`):
+each entry has the URL(s) (or an itch.io free-download `source`), `sha256`, `size`, `license`, `author`, `source_page` and
+the local `path` under the manifest's `root` (default `downloads/`, gitignored). Archives unpack with include / exclude
+globs and `strip`.
+
+```bash
+python3 media/demo/assetkit.py add-polyhaven assets.json model wooden_crate_01 --res 2k   # or textures / hdri
+python3 media/demo/assetkit.py add-ambientcg assets.json Bricks090 --res 2K
+python3 media/demo/assetkit.py pin assets.json     # download once, record the hashes
+python3 media/demo/assetkit.py fetch assets.json   # parallel, resumable, sha256-verified; skips what is present
+python3 media/demo/assetkit.py check assets.json   # every license in the allowlist, every entry pinned
+python3 media/demo/assetkit.py credits assets.json # CREDITS.md grouped by license
+```
+
+The allowlist is CC0, CC-BY (with author), MIT, Apache-2.0, OFL and public domain; NC, ND, SA and unknown licenses are
+refused. Poly Haven model entries also fetch the separate alpha map of cut-out foliage (`merge_alpha` builds the RGBA
+texture: the glTF's JPEG has no alpha). The Python API (`Manifest`, `fetch`, `polyhaven_model`, `polyhaven_textures`,
+`polyhaven_hdri`, `ambientcg`, `pack_orm`, `write_credits`) is what showcase build scripts use.
+
 ## Agent tools
 
 | Tool | Use |

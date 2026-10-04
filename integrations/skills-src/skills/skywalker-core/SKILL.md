@@ -21,6 +21,7 @@ run `skywalker setup <claude|codex|gemini|cursor>` (or `/mcp` in Claude Code to 
    something looks right without having captured it.
 4. **Verify.** Behaviors: `sim_control step` + `logs` / `sim_trace`. Layout: `viewport_multi`. Looks: `debug_view`.
    Gameplay: `playtest_run`. Performance: `perf_stats` (`passes:true` for where the frame time goes).
+   Shot quality: `scene_audit {view:"scene", strict:true}` (visible primitives, primitive characters, untextured surfaces).
 5. **Fix or finish.** Wrong? `history {action:"undo"}` and retry differently. Done? `scene_save`, then report.
 
 ```text

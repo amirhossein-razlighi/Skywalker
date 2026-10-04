@@ -53,6 +53,15 @@ sim_control {action:"stop"}
 - Animation events (controller `events`, clip events) reach Wander as `on anim "footstep"` on the next tick.
 - Root motion is the hips' horizontal movement only (no yaw). With a physics `character` it becomes that controller's desired velocity (collides, climbs steps); otherwise it moves the Transform.
 
+### Characters and clip libraries from different files
+
+When the character and its animations come from different glTF files (a base mesh plus a shared clip library), set the
+animator's `library` to the **character's own** `.anim` (written at import, next to the mesh) and name every clip with its
+library: `"anims/ual1.anim#Walk_Loop"`. Clips are then retargeted onto the character's skeleton by bone name (rotations, plus
+the hips translation scaled to its proportions), so each body keeps its own bone lengths. Using the clip library's skeleton
+as the animator library instead poses the mesh with the *other* rig's proportions (stretched necks, sunk hips). A rig
+re-exported by a DCC must keep the source's root and hips frames (exporters sometimes fold a root rotation into the hips).
+
 ## Props, look-at and IK
 
 ```text

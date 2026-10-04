@@ -126,9 +126,30 @@ water, ice, skin, wax, leaves, snow, velvet, neon, toon, toon_metal, clay) and `
 `triplanar` so nothing stretches on scaled shapes. Real surfaces vary: add `normalMap`/`ormMap`, keep `roughness` between 0.3 and 0.9 for
 most dielectrics, `metallic` 0 or 1 (rarely in between), `subsurface` for leaves/skin/wax/snow, `clearcoat` for paint and varnish.
 
+## Quality gate: `scene_audit` (no placeholder shapes on camera)
+
+Showcase-grade shots contain **no builtin primitives** (cube, sphere, capsule, cylinder, plane, cone, quad, torus), no
+characters built from primitives, and no default grey or untextured surfaces. `scene_audit` checks exactly that for what a
+camera sees (CPU, occlusion-aware: a ground plane hidden under terrain or water does not count):
+
+```text
+scene_audit {view:"scene", strict:true}                       # the game camera; strict = fail above 0.1% primitive coverage
+scene_audit {camera:{eye:[0,1.7,6], target:[0,1.2,0], fov:40}}  # any view
+scene_audit {sequence:"sequences/hero.sequence.json", times:[1,4,8], strict:true}   # film shots (12 spread shots by default)
+```
+
+It returns `pass`, `primitives` (entity, mesh, screen coverage %), `primitiveCharacters` (an animator / character controller /
+nav agent on primitives, or a sphere head on a capsule body) with a `suggestion` (a kit character prefab when a kit is
+mounted), `materials` (`default` / `untextured`), and `warnings` [{severity, code, message, hint, entity}]: missing texture,
+mesh or HDRI files, big meshes without LODs, low texel density, a default sky, lights without shadows on hero meshes,
+characters that cast no shadow. Fix every `error`, then the warnings that are visible in the image. `stylized:true` accepts flat
+colors for a deliberate stylized look. For a whole showcase, `python3 media/demo/showcase_gate.py PROJECT` renders the 12-shot
+contact sheet, audits every shot, benchmarks the hero views with `perf_stats` and prints PASS / FAIL.
+
 ## Verification checklist before reporting done
 
 - Beauty shot at 16+ samples, `quality:"full"` (the default), overlays off, from the camera the game will use (`view:"scene"`).
+- `scene_audit {view:"scene", strict:true}` passes (no visible primitives, primitive characters or default materials).
 - At least one `debug_view` (`lighting` or `gi`) if you changed light terms.
 - `perf_stats {frames:30, passes:true}` if you added many lights (all lights shade surfaces through clusters; the 16 most important also light
   water, particles and fog) or volumetrics: `profile.groups` shows which area got expensive (`main`, `shadows`, `ssgi`, `clouds`, `volumetrics`,

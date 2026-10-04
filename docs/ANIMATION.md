@@ -38,6 +38,13 @@ Clips are shared between rigs **by bone name** (`mixamorig:Hips` matches `Hips`)
 controller can use `"anims/dance.anim#Dance"` from another file. Only the hips keep their
 translation when retargeting, scaled to the target's proportions.
 
+For a character whose clips come from a shared library (another rig of the same family), give the animator the
+character's **own** library (`animator.library` = the `.anim` written next to its mesh) and reference every clip as
+`library#Clip`: the clips are retargeted onto the character's skeleton, so it keeps its bone lengths. Playing the shared
+library's skeleton directly on the mesh would pose it with the other rig's proportions. When a DCC re-exports a rig, keep the
+source's root and hips local frames: hips translations are retargeted in the hips' parent frame, so an exporter that folds a
+root rotation into the hips makes the character sink or float.
+
 `.meta` import settings record `animation`, `turnAround`, `normalize` and `zUp`, so the mesh
 reloads identically. `asset_list type=animation|controller|sequence` lists the new assets.
 

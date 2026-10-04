@@ -81,6 +81,7 @@ typo never silently ships the wrong thing.
 | `include` | none | Extra files or folders to ship (globs `*` and `?`; a folder name includes everything below it). For assets that scripts load by computed names. |
 | `exclude` | none | Files to leave out even when referenced. The build warns about each referenced file you excluded. |
 | `render` | none | `{"layers": {"1": "world", "2": "hero"}}` names the 20 render layers ([RENDERING](RENDERING.md#render-layers)); tools and Wander `layer_mask()` accept the names. |
+| `mounts` | none | `{"kit": "../_kit"}`: shared folders outside the project, addressed as `kit/...` ([ASSETS](ASSETS.md#shared-kits-mounts-in-gamejson)). Names are letters, digits, `_` and `-`. |
 
 Command-line flags of the player and `skywalker build` override the file.
 
@@ -144,6 +145,9 @@ Build outside iCloud-synced folders (Documents, Desktop with iCloud Drive): the 
 and breaks the code signature. The build strips them (`xattr -cr`), but later syncing can add them again.
 
 ## What gets packaged
+
+Files of game.json `mounts` (a shared kit outside the project, see ASSETS.md) are copied into the package under the
+mount name when the game references them; the shipped game.json has no mounts.
 
 ```
 Sky Dash.app/Contents/
