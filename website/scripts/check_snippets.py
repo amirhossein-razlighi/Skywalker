@@ -115,6 +115,12 @@ def strip_line_comments(text: str) -> str:
     return "".join(out)
 
 
+def skills_closest(name: str, tools: dict) -> str:
+    import difflib
+    match = difflib.get_close_matches(name, list(tools), n=1)
+    return f" (did you mean `{match[0]}`?)" if match else ""
+
+
 def check_calls_in(block: str, tools: dict, where: str, problems: list[str]) -> int:
     count = 0
     for m in re.finditer(r"(?<![A-Za-z0-9_./-])([a-z][a-z0-9_]*)\s*\{", block):
@@ -148,6 +154,13 @@ def check_page(path: Path, tools: dict, words: set[str], commands: set[str], wan
         body = "\n".join(l[indent:] if l[:indent].strip() == "" else l for l in m.group("body").splitlines())
         line = text[:m.start()].count("\n") + 2
         where = f"{rel}:{line}"
+        if lang == "tool":
+            # In tool fences every call must name a real tool (other fences may mention JSON-ish non-tools).
+            for i, l in enumerate(body.splitlines()):
+                um = re.match(r"\s*([a-z][a-z0-9_]*)\s*\{", l)
+                if um and um.group(1) not in tools:
+                    hint = skills_closest(um.group(1), tools)
+                    problems.append(f"{rel}:{line + i}: unknown tool `{um.group(1)}`{hint}")
         if lang in ("tool", "text", "", "jsonc", "js", "javascript"):
             calls += check_calls_in(body, tools, where, problems)
         elif lang == "json":
