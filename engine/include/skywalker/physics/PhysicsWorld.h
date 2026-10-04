@@ -22,6 +22,7 @@
 #include <vector>
 
 #include "skywalker/math/Math.h"
+#include "skywalker/physics/Vehicle.h"
 #include "skywalker/scene/Scene.h"
 
 namespace sky {
@@ -69,6 +70,7 @@ struct ContactEvent {
 struct Stats {
     int bodies = 0, dynamicBodies = 0, kinematicBodies = 0, staticBodies = 0, triggers = 0;
     int activeBodies = 0, sleepingBodies = 0, characters = 0, joints = 0, contacts = 0;
+    int vehicles = 0;
 };
 
 /// Wireframe of one collider for debug views (line segment pairs in world space).
@@ -139,6 +141,16 @@ public:
     bool jump(EntityId e, float speed);
     std::optional<bool> grounded(EntityId e) const;
     bool hasCharacter(EntityId e) const;
+
+    // --- Vehicles (physics/Vehicles.cpp) ----------------------------------------------------------
+    std::vector<EntityId> vehicleEntities() const;
+    std::optional<VehicleTelemetry> vehicle(EntityId e) const;
+    /// Overrides the inputs read from the `vehicle` component (test drives, autopilots); nullopt
+    /// hands control back to the component.
+    bool setVehicleInput(EntityId e, std::optional<VehicleInput> input);
+    /// Manual gearbox: request a gear (-1 reverse, 0 neutral, 1..). False without a vehicle.
+    bool shiftVehicle(EntityId e, int gear);
+    VehicleStats vehicleStats() const;
 
     // --- Queries (colliders, deterministic order) -----------------------------------------------
     std::optional<Hit> raycast(Vec3 origin, Vec3 direction, float maxDistance, const QueryFilter& filter = {}) const;

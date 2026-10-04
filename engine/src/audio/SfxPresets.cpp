@@ -1,6 +1,7 @@
 // Sound-effect presets. Each is a recipe of layers; the seed nudges pitch and timing so the
 // same preset yields natural variants (footsteps, impacts) instead of identical copies.
 
+#include <cmath>
 #include <functional>
 
 #include "skywalker/audio/Synth.h"
@@ -396,6 +397,34 @@ const std::vector<Preset>& presets() {
              air.gain = 0.1f;
              SfxParams p = make({body, air});
              p.loopSeconds = 14.f;
+             return p;
+         }},
+        {"engine_loop", true,
+         "Seamless combustion engine at idle-ish revs (vehicles pitch it by rpm: the vehicle component's engineAudio)",
+         [](Random& r) {
+             float f = std::round(60.f * vary(r, 0.1f));  // whole Hz: the 1 s loop repeats in phase
+             SfxLayer body = layer("saw", f);
+             body.lowpass = 650.f;
+             body.resonance = 0.3f;
+             body.drive = 0.45f;
+             body.tremolo = 0.35f;
+             body.tremoloRate = f * 0.5f;  // firing pulses
+             body.sustain = 1.f;
+             SfxLayer bark = layer("square", f * 2.f);
+             bark.duty = 0.3f;
+             bark.lowpass = 1300.f;
+             bark.gain = 0.3f;
+             bark.sustain = 1.f;
+             SfxLayer sub = layer("triangle", f * 0.5f);
+             sub.gain = 0.45f;
+             sub.sustain = 1.f;
+             SfxLayer rumble = layer("brown", 200.f);
+             rumble.lowpass = 420.f;
+             rumble.gain = 0.22f;
+             rumble.ampWander = 0.3f;
+             rumble.sustain = 1.f;
+             SfxParams p = make({body, bark, sub, rumble});
+             p.loopSeconds = 1.f;
              return p;
          }},
         {"rain_loop", true, "Seamless steady rain with soft patter",

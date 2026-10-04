@@ -126,6 +126,15 @@ set(SKY_ENGINE_SOURCES
     src/physics/DebugDraw.cpp
     src/agent/PhysicsTools.cpp
     src/agent/NavTools.cpp
+    # Wheeled vehicles (docs/PHYSICS.md "Vehicles")
+    src/ecs/VehicleComponents.cpp
+    src/physics/Vehicles.cpp
+    src/physics/VehiclePresets.cpp
+    src/physics/VehicleControls.cpp
+    src/physics/VehicleTestDrive.cpp
+    src/physics/VehicleDebugDraw.cpp
+    src/engine/VehicleBuiltins.cpp
+    src/agent/VehicleTools.cpp
     # Animation (skinning, animator state machines, sequencer)
     src/anim/Animation.cpp
     src/anim/Controller.cpp

@@ -83,6 +83,7 @@ private:
     bool playing_ = false;
     nav::NavSystem* nav_ = nullptr;
     std::deque<std::string> warnings_;
+    ChaseCameras chaseCameras_;  // chase_camera components (follow after every physics step)
 };
 
 }  // namespace sky::physics

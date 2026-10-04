@@ -44,7 +44,9 @@ constexpr int kUvChecker = 20;
 constexpr int kTexelDensity = 21;
 constexpr int kMotion = 22;
 constexpr int kShadowAtlas = 23;
-constexpr int kCount = 24;
+// 24 is reserved for a view another workstream adds.
+constexpr int kVehicles = 25;  // final image + CPU overlay of vehicle suspension, contacts and forces (captures)
+constexpr int kCount = 26;     // ids are not contiguous: look views up by id (debugViews())
 }  // namespace debugview
 
 struct DebugViewInfo {

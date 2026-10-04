@@ -2,6 +2,7 @@
 
 #include "JoltCommon.h"
 #include "Shapes.h"
+#include "Vehicles.h"
 
 #include <Jolt/Core/JobSystemSingleThreaded.h>
 #include <Jolt/Physics/Body/BodyLock.h>
@@ -232,6 +233,7 @@ struct PhysicsWorld::Impl final : public JPH::ContactListener {
     std::vector<EntityId> brokenJoints;
     float lastDt = 1.f / 60.f;
     uint64_t syncCount = 0;
+    std::unique_ptr<VehicleSet> vehicles;  // wheeled vehicles (Vehicles.cpp)
 
     Impl(MeshProvider m, PathResolver p, WorldOptions o)
         : meshes(std::move(m)), paths(std::move(p)), options(std::move(o)) {
@@ -243,10 +245,21 @@ struct PhysicsWorld::Impl final : public JPH::ContactListener {
         system.SetContactListener(this);
         temp = std::make_unique<JPH::TempAllocatorImplWithMallocFallback>(8 * 1024 * 1024);
         if (!options.multithreaded) localJobs = std::make_unique<JPH::JobSystemSingleThreaded>(JPH::cMaxPhysicsJobs);
+        VehicleHost host;
+        host.system = &system;
+        host.bodyOf = [this](EntityId e) { return solidOf(e) ? solidOf(e)->id : JPH::BodyID(); };
+        host.entityOf = [this](uint32_t id) {
+            auto it = bodyEntity.find(id);
+            return it == bodyEntity.end() ? kNoEntity : it->second;
+        };
+        host.warn = [this](std::string msg) { warn(std::move(msg)); };
+        host.meshes = meshes;
+        vehicles = std::make_unique<VehicleSet>(std::move(host));
     }
 
     ~Impl() override {
         auto& bi = system.GetBodyInterfaceNoLock();
+        vehicles.reset();  // constraints before the bodies they reference
         for (auto& [k, j] : joints) system.RemoveConstraint(j.constraint);
         joints.clear();
         chars.clear();  // CharacterVirtual removes its inner body
@@ -395,6 +408,7 @@ struct PhysicsWorld::Impl final : public JPH::ContactListener {
         for (EntityId c : index.children(at)) {
             if (!s.get<Transform>(c) || !s.record(c)->enabled) continue;
             if (s.get<RigidBody>(c) || s.get<CharacterController>(c)) continue;
+            if (isWheelVisual(s, owner, c)) continue;  // a vehicle's wheels ride on the suspension, not the chassis shape
             Mat4 m = rel * s.get<Transform>(c)->local();
             if (const MeshRenderer* mr = s.get<MeshRenderer>(c)) {
                 // Imported meshes: the loaded data knows its bounds even before anything rendered it.
@@ -443,7 +457,10 @@ struct PhysicsWorld::Impl final : public JPH::ContactListener {
             h.pod(p.hasFallbackBounds);
             if (p.hasFallbackBounds) h.pod(p.fallbackBounds);
         }
-        (void)s;
+        if (const Vehicle* v = s.get<Vehicle>(d.entity)) {  // the chassis mass and center of mass
+            h.pod(v->mass);
+            h.pod(v->centerOfMass);
+        }
         return h.h;
     }
 
@@ -578,6 +595,8 @@ struct PhysicsWorld::Impl final : public JPH::ContactListener {
             warn("entity #" + std::to_string(d.entity) + ": no collision shape could be built");
             return false;
         }
+        const Vehicle* vehicle = dynamic && d.role == kRoleSolid ? s.get<Vehicle>(d.entity) : nullptr;
+        if (vehicle) shape = vehicleChassisShape(shape, *vehicle);
         Decomposed pose = decompose(d.world);
         JPH::BodyCreationSettings bcs(shape, JPH::RVec3(toJolt(pose.translation)), pose.rotation, d.motion, d.layer);
         bcs.mUserData = d.entity;
@@ -594,7 +613,7 @@ struct PhysicsWorld::Impl final : public JPH::ContactListener {
             if (dynamic) {
                 bcs.mAllowedDOFs = allowedDofs(rb->lockPosition, rb->lockRotation);
                 bcs.mOverrideMassProperties = JPH::EOverrideMassProperties::CalculateInertia;
-                bcs.mMassPropertiesOverride.mMass = std::max(rb->mass, 0.001f);
+                bcs.mMassPropertiesOverride.mMass = std::max(vehicle ? vehicle->mass : rb->mass, 0.001f);
                 bcs.mLinearVelocity = toJolt(rb->velocity);
                 bcs.mAngularVelocity = toJolt(rb->angularVelocity * (kPi / 180.f));
             }
@@ -1238,6 +1257,7 @@ void PhysicsWorld::sync(const Scene& scene, float dt) {
             ++it;
         }
     }
+    m.vehicles->forgetBodies(doomed);
     for (auto it = m.bodies.begin(); it != m.bodies.end();) {
         if (doomed.count(it->second.id.GetIndexAndSequenceNumber())) {
             auto next = std::next(it);
@@ -1259,6 +1279,7 @@ void PhysicsWorld::sync(const Scene& scene, float dt) {
     if (created > 32) m.system.OptimizeBroadPhase();
     m.syncCharacters(scene);
     m.syncJoints(scene);
+    m.vehicles->sync(scene);
 }
 
 void PhysicsWorld::step(Scene& scene, float dt) {
@@ -1267,6 +1288,7 @@ void PhysicsWorld::step(Scene& scene, float dt) {
     if ((!m.enabled && m.options.writeBack) || dt <= 0) return;
     m.lastDt = dt;
     if (m.options.writeBack) m.stepCharacters(dt);  // what-if worlds keep characters as still obstacles
+    m.vehicles->preStep(scene, dt);
     JPH::JobSystem& jobs = m.localJobs ? static_cast<JPH::JobSystem&>(*m.localJobs) : sharedJobSystem();
     {
         static std::mutex sharedPoolMutex;  // the shared pool steps one world at a time
@@ -1283,6 +1305,7 @@ void PhysicsWorld::step(Scene& scene, float dt) {
         m.writeBackBodies(scene);
         m.writeBackCharacters(scene);
     }
+    m.vehicles->postStep(m.options.writeBack ? &scene : nullptr, dt, m.substeps);  // after the chassis moved
 }
 
 std::vector<ContactEvent> PhysicsWorld::drainEvents() {
@@ -1392,6 +1415,18 @@ std::optional<bool> PhysicsWorld::grounded(EntityId e) const {
 }
 
 bool PhysicsWorld::hasCharacter(EntityId e) const { return impl_->chars.count(e) != 0; }
+
+// --- Vehicles ----------------------------------------------------------------------------------
+
+std::vector<EntityId> PhysicsWorld::vehicleEntities() const { return impl_->vehicles->entities(); }
+
+std::optional<VehicleTelemetry> PhysicsWorld::vehicle(EntityId e) const { return impl_->vehicles->telemetry(e); }
+
+bool PhysicsWorld::setVehicleInput(EntityId e, std::optional<VehicleInput> input) { return impl_->vehicles->setInput(e, input); }
+
+bool PhysicsWorld::shiftVehicle(EntityId e, int gear) { return impl_->vehicles->shift(e, gear); }
+
+VehicleStats PhysicsWorld::vehicleStats() const { return impl_->vehicles->stats(); }
 
 // --- Queries ---------------------------------------------------------------------------------
 
@@ -1531,6 +1566,7 @@ Stats PhysicsWorld::stats() const {
     st.characters = static_cast<int>(impl_->chars.size());
     st.joints = static_cast<int>(impl_->joints.size());
     st.contacts = static_cast<int>(impl_->presence.size());
+    st.vehicles = static_cast<int>(impl_->vehicles->size());
     return st;
 }
 
