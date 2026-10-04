@@ -1,6 +1,8 @@
 // wander_bench: measures Wander execution speed on representative gameplay workloads.
 //
-//   wander_bench [--ticks N] [--filter NAME] [--native]   (--native: AOT-compiled behaviors)
+//   wander_bench [--ticks N] [--filter NAME] [--native] [--debug-active]
+//     --native: AOT-compiled behaviors
+//     --debug-active: the Wander debugger watching (break on error), to measure the debug loop's cost
 //
 // Every scenario builds a scene of entities running one script and times fixed ticks
 // (1/60 s). Results are printed as a table and as JSON lines (for tracking over time).
@@ -15,6 +17,7 @@
 
 #include "skywalker/scene/Scene.h"
 #include "skywalker/wander/Aot.h"
+#include "skywalker/wander/Debugger.h"
 #include "skywalker/wander/Runtime.h"
 
 #include <filesystem>
@@ -119,11 +122,13 @@ double nowMs() {
 int main(int argc, char** argv) {
     int ticks = 120;
     bool native = false;
+    bool debugActive = false;
     std::string filter;
     for (int i = 1; i < argc; ++i) {
         if (!std::strcmp(argv[i], "--ticks") && i + 1 < argc) ticks = std::atoi(argv[++i]);
         else if (!std::strcmp(argv[i], "--filter") && i + 1 < argc) filter = argv[++i];
         else if (!std::strcmp(argv[i], "--native")) native = true;
+        else if (!std::strcmp(argv[i], "--debug-active")) debugActive = true;
     }
     std::printf("%-14s %10s %12s  %s\n", "scenario", "ms/tick", "entities", "description");
     for (const Scenario& sc : kScenarios) {
@@ -136,6 +141,7 @@ int main(int argc, char** argv) {
         wander::Runtime rt(scene);
         wander::InputState input;
         rt.compileScripts();
+        if (debugActive) rt.debugger().setBreakOnError(true);
         if (native) {
             // AOT: compile the scenario's program to native code and run it instead of the VM.
             auto prog = scene.get<Behavior>(scene.entities().front())->scripts[0].program;
