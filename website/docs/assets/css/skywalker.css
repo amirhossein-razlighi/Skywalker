@@ -121,9 +121,9 @@ a.sky-card:hover { transform: translateY(-2px); border-color: var(--sky-blue); }
   background: var(--sky-void);
 }
 .sky-hero video, .sky-hero > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border-radius: 0; box-shadow: none !important; }
-.sky-hero::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, #07091900 30%, #070919e6 92%); }
+.sky-hero::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, #070919f0 0%, #070919b8 42%, #07091920 78%), linear-gradient(180deg, #07091900 55%, #070919cc 100%); }
 .sky-hero__content { position: relative; z-index: 1; padding: 2rem 2.2rem; max-width: 44rem; }
-.md-typeset .sky-hero h1 { color: #fff; font-size: 2.3rem; line-height: 1.12; margin: 0 0 0.5rem; }
+.md-typeset .sky-hero h1 { color: #fff; font-size: 2rem; line-height: 1.12; margin: 0 0 0.5rem; }
 .md-typeset .sky-hero p { color: #d7dbef; font-size: 0.92rem; margin: 0 0 1rem; }
 .sky-hero .md-button { margin: 0.2rem 0.4rem 0.2rem 0; }
 .md-typeset .md-button--primary { background: var(--sky-blue); border-color: var(--sky-blue); color: #fff; }

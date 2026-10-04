@@ -657,7 +657,7 @@ def gen_examples(curated: dict) -> dict[str, str]:
             f"{len(projects)} sample projects ship in [`examples/`]({REPO}examples). Most were built by agent crews "
             "through the engine's own tools, and every one is original: its own world, characters and story. Open any of "
             "them in the editor, render it from the command line, play it in the standalone player, or point an agent at it.",
-            "", '<div class="sky-grid" markdown>', "", *cards, "", "</div>", "", *sections]
+            "", '<div class="sky-grid">', *cards, "</div>", "", *sections]
     return {"examples/index.md": "\n".join(page)}
 
 
@@ -674,7 +674,15 @@ def generate() -> dict[str, str]:
     pages.update(gen_cli(load("cli.json")))
     pages.update(gen_capi(load("capi.json")))
     pages.update(gen_examples(load("examples.json")))
-    return {k: v.rstrip() + "\n" for k, v in pages.items()}
+    out = {}
+    for rel, text in pages.items():
+        # Front matter gives the page its title (the banner comment would otherwise hide the first heading).
+        m = re.match(re.escape(BANNER) + r"\n?# (.+)\n", text)
+        if m:
+            title = m.group(1).replace('"', "'")
+            text = f'---\ntitle: "{title}"\n---\n' + text
+        out[rel] = text.rstrip() + "\n"
+    return out
 
 
 def main() -> int:
@@ -696,7 +704,7 @@ def main() -> int:
                 problems.append(f"website/docs/{rel} is stale")
         generated = {DOCS / rel for rel in pages}
         for path in list((DOCS / "reference").rglob("*.md")):
-            if path.read_text().startswith(BANNER) and path not in generated:
+            if BANNER in path.read_text()[:400] and path not in generated:
                 problems.append(f"website/docs/{path.relative_to(DOCS)} is no longer generated: delete it")
         for p in problems:
             print(p)

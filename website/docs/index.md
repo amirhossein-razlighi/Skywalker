@@ -1,11 +1,12 @@
 ---
-title: Skywalker
+title: The game engine built for AI agents
 hide:
   - navigation
   - toc
 ---
 
 <div class="sky-hero">
+  <img src="assets/video/tidebreak_isle/establishing.webp" alt="">
   <video autoplay muted loop playsinline preload="metadata" poster="assets/video/tidebreak_isle/establishing.webp">
     <source src="assets/video/tidebreak_isle/establishing.mp4" type="video/mp4">
   </video>
@@ -154,7 +155,7 @@ native code.
 
 ## Made with Skywalker
 
-<div class="sky-grid" markdown>
+<div class="sky-grid">
 <a class="sky-card" href="examples/#tidebreak_isle"><img src="assets/images/shots/tidebreak_isle/brig.webp" alt="Tidebreak Isle" loading="lazy"><div class="sky-card__body"><p class="sky-card__title">Tidebreak Isle</p><p class="sky-card__meta">Open-world island adventure</p><p class="sky-card__text">An island cove at golden hour with FFT surf, palms, a fort and a brig.</p></div></a>
 <a class="sky-card" href="examples/#neon_requiem"><img src="assets/images/shots/neon_requiem/hologram.webp" alt="Neon Requiem" loading="lazy"><div class="sky-card__body"><p class="sky-card__title">Neon Requiem</p><p class="sky-card__meta">Neo-noir RPG</p><p class="sky-card__text">A rain-soaked neon city lit by hundreds of clustered lights.</p></div></a>
 <a class="sky-card" href="examples/#berrybrook"><img src="assets/images/shots/berrybrook/berry_rows.webp" alt="Berrybrook" loading="lazy"><div class="sky-card__body"><p class="sky-card__title">Berrybrook</p><p class="sky-card__meta">Cozy farming sim</p><p class="sky-card__text">A berry farm with planting, harvest and a tilt-shift lens.</p></div></a>

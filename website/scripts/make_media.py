@@ -62,7 +62,21 @@ def convert() -> None:
     for img in sorted((ROOT / "docs" / "images").glob("*.jpg")):
         group = "vfx" if img.stem.startswith("vfx_") else "hair"
         to_webp(img, ASSETS / "images" / group / f"{img.stem}.webp")
+    social_card()
     print("converted existing media")
+
+
+def social_card() -> None:
+    """1200x630 link-preview card: an example shot, darkened, with the horizontal logo (needs rsvg-convert, magick)."""
+    with tempfile.TemporaryDirectory() as tmp:
+        logo = Path(tmp) / "logo.png"
+        subprocess.run(["rsvg-convert", "-w", "760", str(ROOT / "assets/brand/logo/horizontal-dark.svg"), "-o", str(logo)],
+                       check=True)
+        subprocess.run(["magick", str(ROOT / "examples/tidebreak_isle/shots/establishing.jpg"), "-resize", "1200x630^",
+                        "-gravity", "center", "-extent", "1200x630", "(", "-size", "1200x630",
+                        "gradient:#07091900-#070919f0", ")", "-compose", "over", "-composite", str(logo), "-gravity",
+                        "center", "-compose", "over", "-composite", "-strip", "-quality", "82",
+                        str(ASSETS / "images" / "social-card.jpg")], check=True)
 
 
 # ---------------------------------------------------------------------------------------------------------------
