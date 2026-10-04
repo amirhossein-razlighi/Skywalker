@@ -198,7 +198,7 @@ Scene-wide sky, sun, ambient light, fog and exposure.
 | `grain` | number | Film grain | 0 .. 1 |
 | `chromaticAberration` | number | Lens color fringing toward the frame edges | 0 .. 1 |
 | `look` | string | Color grading look | `none` `warm` `cool` `teal_orange` `golden_hour` `bleach` `noir` `vivid` `moonlight` `vintage` |
-| `lut` | string | Optional .cube 3D LUT file (project-relative) applied after the look |  |
+| `lut` | string | Optional .cube 3D LUT file (project-relative); when set it replaces the look (lookStrength blends it) |  |
 | `lookStrength` | number | Strength of the look / LUT | 0 .. 1 |
 | `skyMode` | string | gradient = two artist colors; atmosphere = physically inspired sky from the sun; hdri = a photographed .hdr panorama lights and backs the scene (set `hdri`) | `gradient` `atmosphere` `hdri` |
 | `hdri` | string | Equirectangular .hdr panorama, project-relative (skyMode hdri) |  |

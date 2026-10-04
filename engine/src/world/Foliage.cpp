@@ -39,7 +39,40 @@ float sstep(float e0, float e1, float x) {
 
 }  // namespace
 
-std::vector<FoliageLayer> foliageLayersFromJson(const Json& layers) {
+std::vector<std::string> terrainLayerNames(const Json& terrainLayers) {
+    std::vector<std::string> names;
+    for (const auto& l : terrainLayers.elements()) names.push_back(l.get("name").asString());
+    return names;
+}
+
+Result<int> resolveTerrainLayer(const Json& value, const std::vector<std::string>& names) {
+    const int count = static_cast<int>(names.size());
+    auto byIndex = [&](int64_t i) -> Result<int> {
+        if (i < 0 || (count > 0 && i >= count)) {
+            return Error::make("invalid_terrain_layer",
+                               "terrainLayer " + std::to_string(i) + " is out of range (the terrain has " +
+                                   std::to_string(count) + " layers)",
+                               "use an index from 0 to " + std::to_string(std::max(count - 1, 0)) + " or a layer name");
+        }
+        return static_cast<int>(i);
+    };
+    if (value.isNumber()) return value.asInt() < 0 ? -1 : byIndex(value.asInt());  // -1 = anywhere
+    const std::string name = value.asString();
+    if (!name.empty() && std::all_of(name.begin(), name.end(), [](char c) { return c >= '0' && c <= '9'; })) {
+        return byIndex(std::stoll(name));
+    }
+    for (int i = 0; i < count; ++i) {
+        if (str::lower(names[static_cast<size_t>(i)]) == str::lower(name)) return i;
+    }
+    std::string guess = str::closest(name, names);
+    std::string known;
+    for (const auto& n : names) known += (known.empty() ? "" : ", ") + n;
+    return Error::make("unknown_terrain_layer", "the terrain has no layer named '" + name + "'",
+                       guess.empty() ? (known.empty() ? "give the layer's index" : "layers: " + known)
+                                     : "did you mean '" + guess + "'?");
+}
+
+std::vector<FoliageLayer> foliageLayersFromJson(const Json& layers, const std::vector<std::string>& terrainLayerNames) {
     std::vector<FoliageLayer> out;
     if (!layers.isArray()) return out;
     for (size_t i = 0; i < layers.size(); ++i) {
@@ -65,7 +98,10 @@ std::vector<FoliageLayer> foliageLayersFromJson(const Json& layers) {
             rd("heightMax", l.heightMax), rd("layerThreshold", l.layerThreshold), rd("alignToNormal", l.alignToNormal),
             rd("clumping", l.clumping), rd("sink", l.sink), rd("colorVariation", l.colorVariation), rd("wind", l.wind),
             rd("cullDistance", l.cullDistance), rd("randomTilt", l.randomTilt);
-        if (src.contains("terrainLayer")) l.terrainLayer = static_cast<int>(src.get("terrainLayer").asInt(-1));
+        if (src.contains("terrainLayer") && !src.get("terrainLayer").isNull()) {
+            auto t = resolveTerrainLayer(src.get("terrainLayer"), terrainLayerNames);
+            l.terrainLayer = t ? *t : -1;
+        }
         if (src.contains("castShadows")) l.castShadows = src.get("castShadows").asBool(true);
         if (src.contains("seed")) l.seed = static_cast<uint32_t>(src.get("seed").asInt());
         l.impostors = src.get("impostors").asBool(true);

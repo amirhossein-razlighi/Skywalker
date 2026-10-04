@@ -3451,7 +3451,7 @@
    },
    "lut": {
     "type": "string",
-    "description": "Optional .cube 3D LUT file (project-relative) applied after the look"
+    "description": "Optional .cube 3D LUT file (project-relative); when set it replaces the look (lookStrength blends it)"
    },
    "lookStrength": {
     "type": "number",

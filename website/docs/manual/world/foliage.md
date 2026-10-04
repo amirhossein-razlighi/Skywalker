@@ -20,7 +20,7 @@ Placement is a pure function of the layer, the seed and the chunk coordinates. E
 | Density | `density` (instances per m², 0–64), times the component's `density` multiplier |
 | Slope | `slopeMin`, `slopeMax` (degrees) |
 | Height | `heightMin`, `heightMax` (**world** y) |
-| Painted layer | `terrainLayer` (index into the terrain's layers): only where that layer's weight exceeds `layerThreshold` (default 0.35) |
+| Painted layer | `terrainLayer` (the name of one of the terrain's layers, or its index): only where that layer's weight exceeds `layerThreshold` (default 0.35) |
 | Patches | `clumping` (0 uniform .. 1 patches) |
 
 Because a painted terrain layer can gate a foliage layer, painting with `terrain_paint` moves the foliage with it: paint a dirt path and the grass on it disappears.
@@ -144,10 +144,10 @@ The same scene without any foliage costs about 13 ms (aerial) and 17 ms (ground)
 
 ### Gate layers by painted terrain layers
 
-Pass the index of a terrain layer. On an `island_beach` terrain the stack is sand 0, seabed 1, grass 2, soil 3, rock 4:
+Pass the name (or the index) of a terrain layer. On an `island_beach` terrain the stack is sand 0, seabed 1, grass 2, soil 3, rock 4:
 
 ```tool
-foliage_add {"entity": "Island", "layers": [{"preset": "meadow_grass", "terrainLayer": 2}, {"preset": "ferns", "terrainLayer": 3}, {"preset": "shells", "heightMax": 1.2}]}
+foliage_add {"entity": "Island", "layers": [{"preset": "meadow_grass", "terrainLayer": "grass"}, {"preset": "ferns", "terrainLayer": "soil"}, {"preset": "shells", "heightMax": 1.2}]}
 terrain_paint {"entity": "Island", "layer": 0, "strokes": [{"x": 20, "z": 35, "radius": 3, "strength": 1}]}
 ```
 
@@ -197,7 +197,8 @@ viewport_capture {"eye": [10, 2, 80], "target": [10, 3, 0], "samples": 8}
 ## Pitfalls
 
 - **Heights are world heights.** `heightMin` and `heightMax` are world y, not heights above the terrain. Query the terrain first.
-- **`terrainLayer` is an index.** Use the layer's position in the terrain's `layers` (0 = base), not its name.
+- **`terrainLayer` must name a layer of the terrain the foliage grows on.** Names are matched without regard to case;
+  a typo fails with a did-you-mean hint, and an index counts from 0 (the base layer).
 - **Heavy meshes need low density.** A tree layer at grass density stalls the frame. Start trees at 0.001–0.02 per m² and check `perf_stats`.
 - **Impostors are static.** They do not sway in the wind, and their lighting uses the model's mean roughness. Up close they can look slightly brighter than the meshes, which show more inner-canopy shadowing. Keep the transition distance automatic unless the switch is visible.
 - **The first frames after a change draw meshes only.** Until its impostor is baked, a layer draws only its mesh range; bake ahead of renders with `impostor_bake`.

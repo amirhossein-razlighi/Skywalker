@@ -73,6 +73,7 @@ Generate seamless sets with `texture_generate {kind:"rock", name:"cliff", create
 `meadow_grass, tall_grass, dune_grass, flowers, ferns, beach_pebbles, shells, rocks_small, boulders, custom`.
 Layer fields: `preset, mesh, color, density (/m2), scaleMin/Max, slopeMin/Max, heightMin/Max (world y),
 terrainLayer, wind, cullDistance, castShadows, clumping, alignToNormal, impostorDistance`.
+`terrainLayer` takes the terrain layer's name (`"grass"`) or its index; an unknown name fails with a did-you-mean hint.
 
 ```text
 foliage_add {entity:"Terrain", layers:[

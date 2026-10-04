@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "skywalker/core/Json.h"
+#include "skywalker/core/Result.h"
 #include "skywalker/math/Math.h"
 
 namespace sky::world {
@@ -44,7 +45,7 @@ struct FoliageLayer {
     float scaleMin = 0.8f, scaleMax = 1.2f;
     float slopeMin = 0.f, slopeMax = 35.f;   // degrees
     float heightMin = -1e9f, heightMax = 1e9f;  // world height
-    int terrainLayer = -1;              // only where this terrain layer's weight exceeds `layerThreshold`
+    int terrainLayer = -1;              // only where this terrain layer's weight exceeds `layerThreshold` (JSON: index or name)
     float layerThreshold = 0.35f;
     float alignToNormal = 0.6f;         // 0 upright .. 1 follows the ground
     float clumping = 0.4f;              // 0 uniform .. 1 patches
@@ -63,7 +64,17 @@ struct FoliageLayer {
     int impostorFrames = 12;            // capture directions per atlas side (4..32)
 };
 
-std::vector<FoliageLayer> foliageLayersFromJson(const Json& layers);
+/// Parses foliage layers. `terrainLayerNames` (see terrainLayerNames) lets `terrainLayer` name a
+/// terrain material layer instead of giving its index; a name that does not resolve leaves the
+/// layer unrestricted (foliage_add rejects it up front with a did-you-mean hint).
+std::vector<FoliageLayer> foliageLayersFromJson(const Json& layers, const std::vector<std::string>& terrainLayerNames = {});
+/// The names of a terrain's material layers (`Terrain::layers`), in index order.
+std::vector<std::string> terrainLayerNames(const Json& terrainLayers);
+/// A foliage layer's `terrainLayer` value: an index (a number or a digit string) or a terrain
+/// layer name (case-insensitive). Fails with `unknown_terrain_layer` (did-you-mean hint) for an
+/// unknown name and `invalid_terrain_layer` for an index outside the terrain's layers. A negative
+/// index means "anywhere" (-1). With no names known, any index is accepted and names fail.
+Result<int> resolveTerrainLayer(const Json& value, const std::vector<std::string>& names);
 /// Named layer presets: meadow_grass, tall_grass, dune_grass, beach_pebbles, shells, flowers,
 /// ferns, rocks_small, boulders, pine_trees (with asset meshes when provided).
 const std::vector<std::string>& foliagePresets();

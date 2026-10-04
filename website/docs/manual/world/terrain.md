@@ -210,13 +210,13 @@ A small island with a wet beach, dune grass above the swash, shells at the water
 terrain_create {"name": "Island", "preset": "island_beach", "size": 400, "resolution": 513, "seed": 7, "water": true}
 terrain_query {"entity": "Island", "points": [[0, 0], [60, 20], [-80, 40], [120, 0]]}
 terrain_sculpt {"entity": "Island", "strokes": [{"x": 60, "z": 20, "radius": 12, "strength": 1, "mode": "flatten", "target": 6}, {"x": 60, "z": 20, "radius": 20, "strength": 0.5, "mode": "smooth"}]}
-foliage_add {"entity": "Island", "layers": [{"preset": "dune_grass", "heightMin": 1.5, "heightMax": 6}, {"preset": "shells", "heightMax": 1.2}, {"preset": "meadow_grass", "terrainLayer": 2}, {"preset": "rocks_small"}]}
+foliage_add {"entity": "Island", "layers": [{"preset": "dune_grass", "heightMin": 1.5, "heightMax": 6}, {"preset": "shells", "heightMax": 1.2}, {"preset": "meadow_grass", "terrainLayer": "grass"}, {"preset": "rocks_small"}]}
 entity_update {"entity": "Island", "components": {"terrain": {"wetBand": 1.8, "macroVariation": 0.5}}}
 environment_update {"preset": "sunset", "windSpeed": 6, "windDirection": 200}
 viewport_capture {"eye": [140, 40, 160], "target": [0, 5, 0], "samples": 8}
 ```
 
-`terrainLayer` 2 is the `grass` layer of the `island_beach` stack (sand 0, seabed 1, grass 2, soil 3, rock 4), so meadow grass grows only where grass is painted. See [Foliage](foliage.md) for layer fields and [Water](water.md) for the sea.
+`terrainLayer` names the `grass` layer of the `island_beach` stack (sand 0, seabed 1, grass 2, soil 3, rock 4; the index 2 works too), so meadow grass grows only where grass is painted. See [Foliage](foliage.md) for layer fields and [Water](water.md) for the sea.
 
 <figure markdown>
 ![A temple on a forested cliff above a valley](../../assets/images/shots/ashen_peaks/establishing.webp){ loading=lazy }

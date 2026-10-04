@@ -433,7 +433,7 @@ const TypeInfo& Environment::type() {
             SKY_FIELD_RANGE(Environment, chromaticAberration, Float, "Lens color fringing toward the frame edges", 0.f, 1.f),
             SKY_FIELD_ENUM(Environment, look, "Color grading look", "none", "warm", "cool", "teal_orange", "golden_hour", "bleach",
                            "noir", "vivid", "moonlight", "vintage"),
-            SKY_FIELD(Environment, lut, String, "Optional .cube 3D LUT file (project-relative) applied after the look"),
+            SKY_FIELD(Environment, lut, String, "Optional .cube 3D LUT file (project-relative); when set it replaces the look (lookStrength blends it)"),
             SKY_FIELD_RANGE(Environment, lookStrength, Float, "Strength of the look / LUT", 0.f, 1.f),
             SKY_FIELD_ENUM(Environment, skyMode,
                            "gradient = two artist colors; atmosphere = physically inspired sky from the sun; hdri = a "

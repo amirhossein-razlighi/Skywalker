@@ -229,17 +229,21 @@ void WorldRuntime::gather(const Scene& scene, const ViewCamera& view, FrameData&
         if (!fo || !fo->visible || !scene.isActive(e)) continue;
         liveFoliage.push_back(e);
         FoliageEntry& entry = foliage_[e];
+        // The surface: a terrain (self/parent) or the scene's meshes under `area`. The terrain's
+        // layer names let `terrainLayer` name a layer instead of giving its index.
+        EntityId te = fo->surface == "terrain" ? terrainFor(scene, e) : kNoEntity;
+        const Terrain* terrainComp = te != kNoEntity ? scene.get<Terrain>(te) : nullptr;
+        std::vector<std::string> terrainNames = terrainComp ? terrainLayerNames(terrainComp->layers) : std::vector<std::string>{};
         std::string layersKey = fo->layers.dump();
+        for (const auto& n : terrainNames) layersKey += "|" + n;
         if (entry.layersKey != layersKey) {
-            entry.layers = foliageLayersFromJson(fo->layers);
+            entry.layers = foliageLayersFromJson(fo->layers, terrainNames);
             entry.layersKey = layersKey;
         }
-        // The surface: a terrain (self/parent) or the scene's meshes under `area`.
         SurfaceFn surface;
         Vec2 areaMin, areaMax;
         uint64_t sig = fnv(layersKey) ^ (static_cast<uint64_t>(fo->seed) * 0x9E3779B97F4A7C15ull) ^
                        fnv(std::to_string(fo->density)) ^ fnv(fo->surface);
-        EntityId te = fo->surface == "terrain" ? terrainFor(scene, e) : kNoEntity;
         if (te != kNoEntity) {
             auto data = terrain(scene, te);
             if (!data) continue;
@@ -440,9 +444,14 @@ std::vector<WorldRuntime::LayerImpostor> WorldRuntime::impostorModels(const Scen
     const Foliage* fo = scene.get<Foliage>(e);
     if (!fo) return out;
     FoliageEntry& entry = foliage_[e];
+    // Same key and names as update(), so the two never re-parse each other's layers.
+    EntityId te = fo->surface == "terrain" ? terrainFor(scene, e) : kNoEntity;
+    const Terrain* terrainComp = te != kNoEntity ? scene.get<Terrain>(te) : nullptr;
+    std::vector<std::string> terrainNames = terrainComp ? terrainLayerNames(terrainComp->layers) : std::vector<std::string>{};
     std::string layersKey = fo->layers.dump();
+    for (const auto& n : terrainNames) layersKey += "|" + n;
     if (entry.layersKey != layersKey) {
-        entry.layers = foliageLayersFromJson(fo->layers);
+        entry.layers = foliageLayersFromJson(fo->layers, terrainNames);
         entry.layersKey = layersKey;
     }
     entry.models.resize(entry.layers.size());

@@ -301,7 +301,7 @@ struct Environment {
     float grain = 0.f;                 // film grain 0..1
     float chromaticAberration = 0.f;   // lens color fringing toward the edges 0..1
     std::string look = "none";         // color grading look: none | warm | cool | teal_orange | golden_hour | bleach | noir | vivid | moonlight | vintage
-    std::string lut;                   // optional .cube 3D LUT (project-relative), applied after the look
+    std::string lut;                   // optional .cube 3D LUT (project-relative); replaces the look when set
     float lookStrength = 1.f;          // blend of the look / LUT
     // Sky, atmosphere, lighting quality
     std::string skyMode = "gradient";  // gradient | atmosphere | hdri

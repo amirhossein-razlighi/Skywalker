@@ -478,7 +478,7 @@ void addWorldBuildTools(Engine& engine, ToolRegistry& reg) {
                      return out;
                  }() +
                  ". Layer fields: mesh, color, density (/m²), scaleMin/Max, slopeMin/Max, heightMin/Max (world y), "
-                 "terrainLayer (index; only where that layer is painted), wind, cullDistance, castShadows, clumping. Dense "
+                 "terrainLayer (a terrain layer's index or name, e.g. \"grass\"; only where that layer is painted), wind, cullDistance, castShadows, clumping. Dense "
                  "layers stream in around the camera. Heavy meshes (trees, bushes, rocks) switch to octahedral impostors "
                  "in the distance automatically; tune with impostorDistance (m; 0 auto, -1 off), impostorResolution and "
                  "impostorFrames, or impostors:false. Example: {\"entity\":\"Island\",\"layers\":[{\"preset\":\"dune_grass\","
@@ -502,6 +502,30 @@ void addWorldBuildTools(Engine& engine, ToolRegistry& reg) {
                              return ToolResult::error(Error::make("unknown_preset", "no foliage preset '" + p + "'",
                                                                   guess.empty() ? "" : "did you mean '" + guess + "'?"));
                          }
+                     }
+                 }
+                 // terrainLayer: an index or a layer name of the terrain it grows on (did-you-mean on typos).
+                 {
+                     const Terrain* terrain = engine.scene().get<Terrain>(*target);
+                     const std::vector<std::string> names =
+                         terrain ? world::terrainLayerNames(terrain->layers) : std::vector<std::string>{};
+                     size_t index = 0;
+                     for (const auto& l : a.get("layers").elements()) {
+                         if (l.contains("terrainLayer") && !l.get("terrainLayer").isNull()) {
+                             if (!terrain && !l.get("terrainLayer").isNumber()) {
+                                 return ToolResult::error(Error::make(
+                                     "invalid_terrain_layer", "layers[" + std::to_string(index) +
+                                                                  "].terrainLayer names a terrain layer, but the entity is not a terrain",
+                                     "grow the foliage on the terrain entity, or drop terrainLayer"));
+                             }
+                             auto r = world::resolveTerrainLayer(l.get("terrainLayer"), names);
+                             if (!r) {
+                                 Error err = r.error();
+                                 err.message = "layers[" + std::to_string(index) + "]: " + err.message;
+                                 return ToolResult::error(err);
+                             }
+                         }
+                         ++index;
                      }
                  }
                  // Presets that ask for procedural textures get them materialized in the project.

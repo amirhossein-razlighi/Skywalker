@@ -158,6 +158,49 @@ TEST_CASE("world: terrain and foliage tools, frame items and raycasts") {
     CHECK(!cap->frame.instances.empty());
 }
 
+TEST_CASE("world: foliage terrainLayer takes a terrain layer name or an index") {
+    const std::vector<std::string> names = {"sand", "grass", "rock"};
+    CHECK(*world::resolveTerrainLayer(Json(int64_t{2}), names) == 2);
+    CHECK(*world::resolveTerrainLayer(Json("1"), names) == 1);
+    CHECK(*world::resolveTerrainLayer(Json("Grass"), names) == 1);  // case-insensitive
+    CHECK(*world::resolveTerrainLayer(Json(int64_t{-1}), names) == -1);
+    auto typo = world::resolveTerrainLayer(Json("gras"), names);
+    REQUIRE(!typo);
+    CHECK(typo.error().code == "unknown_terrain_layer");
+    CHECK(typo.error().hint.find("grass") != std::string::npos);
+    auto out = world::resolveTerrainLayer(Json(int64_t{7}), names);
+    REQUIRE(!out);
+    CHECK(out.error().code == "invalid_terrain_layer");
+
+    auto layers = world::foliageLayersFromJson(
+        Json::parse(R"([{"preset":"ferns","terrainLayer":"rock"},{"preset":"ferns","terrainLayer":0},{"preset":"ferns"}])").value(),
+        names);
+    REQUIRE(layers.size() == 3);
+    CHECK(layers[0].terrainLayer == 2);
+    CHECK(layers[1].terrainLayer == 0);
+    CHECK(layers[2].terrainLayer == -1);
+
+    EngineConfig cfg;
+    cfg.renderer = RendererBackend::Null;
+    cfg.projectDir = (fs::temp_directory_path() / ("skywalker-world-" + AssetDatabase::newGuid().substr(0, 8))).string();
+    fs::create_directories(cfg.projectDir);
+    Engine e(cfg);
+    (void)e.newScene("World", false);
+    ToolResult r = e.callTool("terrain_create", Json::parse(R"({"preset":"island_beach","size":128,"resolution":65})").value(), "agent:test");
+    REQUIRE(!r.isError);
+    const auto terrainNames = world::terrainLayerNames(e.scene().get<Terrain>(static_cast<EntityId>(r.structured.get("entity").asInt()))->layers);
+    REQUIRE(std::find(terrainNames.begin(), terrainNames.end(), "rock") != terrainNames.end());
+    r = e.callTool("foliage_add", Json::parse(R"({"entity":"Terrain","layers":[{"preset":"ferns","terrainLayer":"rock"}]})").value(), "agent:test");
+    INFO(r.content.front().text);
+    CHECK(!r.isError);
+    r = e.callTool("foliage_add", Json::parse(R"({"entity":"Terrain","layers":[{"preset":"ferns","terrainLayer":"rokc"}]})").value(), "agent:test");
+    REQUIRE(r.isError);
+    CHECK(r.content.front().text.find("did you mean 'rock'") != std::string::npos);
+    r = e.callTool("foliage_add", Json::parse(R"({"entity":"Terrain","layers":[{"preset":"ferns","terrainLayer":42}]})").value(), "agent:test");
+    CHECK(r.isError);
+    fs::remove_all(cfg.projectDir);
+}
+
 TEST_CASE("world: vegetation meshes stand on the ground with sane sizes") {
     for (const char* name : {"grass", "grass_tall", "fern", "flowers", "pebbles", "shell", "rock"}) {
         INFO(name);
