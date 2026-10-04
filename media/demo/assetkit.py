@@ -7,6 +7,7 @@ of git: `fetch` downloads them into the manifest's `root` folder (gitignored `do
 default), in parallel, resuming partial downloads, verifying every hash, unpacking archives.
 
     python3 media/demo/assetkit.py fetch  path/to/assets.json [--only ID,ID] [--jobs 6]
+    python3 media/demo/assetkit.py fetch  path/to/project       # its assets.json and those of the kits it mounts
     python3 media/demo/assetkit.py pin    path/to/assets.json      # resolve + hash entries added without sha256
     python3 media/demo/assetkit.py check  path/to/assets.json      # licenses in the allowlist, every entry pinned
     python3 media/demo/assetkit.py credits path/to/assets.json [-o CREDITS.md]
@@ -356,6 +357,8 @@ def fetch_entry(manifest, entry, pin=False):
 
 def fetch(manifest, only=None, jobs=6, pin=False):
     """Fetches (or pins) every entry, in parallel. Returns {id: status}; raises on the first error after all ran."""
+    if not manifest.assets:
+        return {}
     os.makedirs(manifest.root, exist_ok=True)
     entries = [a for a in manifest.assets if not only or a["id"] in only or any(fnmatch.fnmatch(a["id"], o) for o in only)]
     if only and not entries:
@@ -571,7 +574,13 @@ def main(argv=None):
         m.save()
         log("run `pin` to download and record the hashes")
         return 0
-    m = Manifest.load(a.manifest)
+    project_arg = a.manifest
+    a.manifest = resolve_manifest_path(a.manifest)
+    if not os.path.exists(a.manifest) and a.cmd == "fetch" and mounted_manifests(project_arg):
+        m = Manifest(a.manifest)  # a project without its own downloads that only mounts a kit
+    else:
+        m = Manifest.load(a.manifest)
+    a.manifest = project_arg
     if a.cmd == "check":
         problems = check(m, require_pinned=not a.allow_unpinned)
         for pr in problems:
@@ -586,14 +595,44 @@ def main(argv=None):
         unpinned = [e["id"] for e in m.assets if not e.get("sha256") and not all(x.get("sha256") for x in e.get("files", [{}]))]
         fetch(m, only or unpinned or ["__none__"], a.jobs, pin=True) if (only or unpinned) else log("everything is pinned")
         return 0
-    problems = [p for p in check(m) if "not pinned" in p or "license" in p]
-    if problems:
-        log("refusing to fetch:\n  " + "\n  ".join(problems))
-        return 1
-    t0 = time.time()
-    res = fetch(m, only, a.jobs)
-    log(f"{len(res)} entries ready in {m.root} ({sum(1 for v in res.values() if v == 'cached')} cached, {time.time() - t0:.0f}s)")
-    return 0
+    status = 0
+    for mm in [m] + mounted_manifests(a.manifest):
+        problems = [p for p in check(mm) if "not pinned" in p or "license" in p]
+        if problems:
+            log(f"refusing to fetch {mm.path}:\n  " + "\n  ".join(problems))
+            status = 1
+            continue
+        t0 = time.time()
+        res = fetch(mm, only if mm is m else None, a.jobs)
+        log(f"{len(res)} entries ready in {mm.root} ({sum(1 for v in res.values() if v == 'cached')} cached, {time.time() - t0:.0f}s)")
+        builder = os.path.join(mm.dir, "tools", "build_kit.py")
+        if mm is not m and os.path.exists(builder) and not os.path.isdir(os.path.join(mm.dir, "generated")):
+            log(f"  the kit has generated content to build: python3 {builder}")
+    return status
+
+
+def resolve_manifest_path(path):
+    """A manifest file, or a project / kit folder holding assets.json."""
+    if os.path.isdir(path):
+        return os.path.join(path, "assets.json")
+    return path
+
+
+def mounted_manifests(path):
+    """Manifests of the folders a project mounts in game.json ("mounts": {"kit": "../_kit"})."""
+    folder = path if os.path.isdir(path) else os.path.dirname(os.path.abspath(path))
+    try:
+        with open(os.path.join(folder, "game.json")) as f:
+            mounts = json.load(f).get("mounts", {})
+    except (OSError, ValueError):
+        return []
+    out = []
+    for _name, rel in mounts.items():
+        root = os.path.normpath(os.path.join(folder, os.path.expanduser(rel)))
+        mp = os.path.join(root, "assets.json")
+        if os.path.exists(mp):
+            out.append(Manifest.load(mp))
+    return out
 
 
 if __name__ == "__main__":
