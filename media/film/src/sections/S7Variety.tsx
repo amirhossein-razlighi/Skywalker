@@ -37,6 +37,8 @@ const FOCUS = "var_strategy";
 const FOCUS_PLAY = 100;
 /** The map fills the frame on beat 11; from here the full-frame Strategy shot carries the same clip on. */
 const MAP_CUT = 198;
+/** Beat 16: cut to the Chancellor's office as Decree No. 14 arrives (the zoom has landed by then). */
+const DECREE_CUT = 288;
 const COLS = 4;
 const GAP = 14;
 const TW = (1920 - 2 * 96 - (COLS - 1) * GAP) / COLS; // 421
@@ -147,7 +149,7 @@ const Caption: React.FC<{ kicker: string; title: string; color: string; at: numb
 const Strategy: React.FC = () => (
   <AbsoluteFill>
     <Footage slot={FOCUS} offset={MAP_CUT - FOCUS_PLAY} placeholderLabel={false} />
-    <Caption kicker="Meridian Accord · grand strategy" title={"From the continent\nto the front line."} color={C.sunset} at={8} out={112} />
+    <Caption kicker="Meridian Accord" title={"From the continent\nto the front line."} color={C.sunset} at={6} out={78} />
   </AbsoluteFill>
 );
 
@@ -158,9 +160,9 @@ const Decree: React.FC = () => {
   return (
     <AbsoluteFill style={{ background: C.void }}>
       <AbsoluteFill style={{ transform: `scale(${lerp(1.06, 1, p)})` }}>
-        <Footage slot="var_decree" offset={4} placeholderLabel={false} />
+        <Footage slot="var_decree" offset={0} placeholderLabel={false} />
       </AbsoluteFill>
-      <Caption kicker="The Chancellor's Desk · political drama" title={"Documents, choices,\nconsequences."} color={C.gold} at={10} out={130} top={430} />
+      <Caption kicker="The Chancellor's Desk" title={"Documents, choices,\nconsequences."} color={C.gold} at={10} out={164} top={430} />
     </AbsoluteFill>
   );
 };
@@ -184,7 +186,7 @@ const Gloam: React.FC = () => {
       </AbsoluteFill>
       <AbsoluteFill style={{ alignItems: "center", justifyContent: "center", opacity: 1 - capOut }}>
         <div style={{ marginTop: -40, textAlign: "center" }}>
-          <Kicker text="Gloamwater · 2D metroidvania" at={14} color="#7ff4e4" />
+          <Kicker text="Gloamwater" at={14} color="#7ff4e4" />
           <div style={{ height: 14 }} />
           <Words text="Same engine. Two dimensions." at={18} size={78} weight={700} style={{ textShadow: "0 3px 40px rgba(0,0,0,0.7)" }} />
         </div>
@@ -198,10 +200,10 @@ export const S7Variety: React.FC = () => (
     <Sequence durationInFrames={MAP_CUT}>
       <Mosaic />
     </Sequence>
-    <Sequence from={MAP_CUT} durationInFrames={324 - MAP_CUT}>
+    <Sequence from={MAP_CUT} durationInFrames={DECREE_CUT - MAP_CUT}>
       <Strategy />
     </Sequence>
-    <Sequence from={324} durationInFrames={144}>
+    <Sequence from={DECREE_CUT} durationInFrames={468 - DECREE_CUT}>
       <Decree />
     </Sequence>
     <Sequence from={468} durationInFrames={180}>

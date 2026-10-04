@@ -102,7 +102,7 @@ export const SketchReveal: React.FC<{
 
   // Clay: a soft diagonal wipe with a bright leading edge.
   const wipePos = interpolate(clayP, [0, 1], [-25, 125]);
-  const clayMask = `linear-gradient(${wipeAngle}deg, black ${wipePos - 12}%, transparent ${wipePos + 2}%)`;
+  const clayMask = `linear-gradient(${wipeAngle}deg, black ${wipePos - 20}%, transparent ${wipePos + 4}%)`;
   // Final: a radial bloom from the light source.
   const r = interpolate(finalP, [0, 1], [0, 170]);
   const finalMask = `radial-gradient(circle at ${origin[0]}% ${origin[1]}%, black ${Math.max(0, r - 28)}%, transparent ${r}%)`;
@@ -144,7 +144,7 @@ export const SketchReveal: React.FC<{
         {clayP > 0 && clayP < 1 && (
           <AbsoluteFill
             style={{
-              background: `linear-gradient(${wipeAngle}deg, transparent ${wipePos - 14}%, rgba(200,210,255,${0.32 * Math.sin(Math.PI * clayP)}) ${wipePos - 3}%, transparent ${wipePos + 2}%)`,
+              background: `linear-gradient(${wipeAngle}deg, transparent ${wipePos - 14}%, rgba(200,210,255,${0.2 * Math.sin(Math.PI * clayP)}) ${wipePos - 3}%, transparent ${wipePos + 2}%)`,
               mixBlendMode: "screen",
             }}
           />
