@@ -15,6 +15,7 @@
 #include <sstream>
 
 #include "CustomToolsInternal.h"
+#include "skywalker/core/FileTime.h"
 #include "skywalker/core/Log.h"
 #include "skywalker/core/Strings.h"
 #include "skywalker/studio/Studio.h"
@@ -460,9 +461,7 @@ Error CustomTools::Impl::unknownTool(const std::string& name) const {
 
 ToolPolicy CustomTools::Impl::policy() const {
     fs::path file = fs::path(projectDir()) / "game.json";
-    std::error_code ec;
-    auto t = fs::last_write_time(file, ec);
-    int64_t mtime = ec ? -1 : static_cast<int64_t>(t.time_since_epoch().count());
+    int64_t mtime = fileModifiedNs(file);
     if (mtime == gameJsonTime) return cachedPolicy;
     gameJsonTime = mtime;
     cachedPolicy = ToolPolicy::Auto;

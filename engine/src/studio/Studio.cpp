@@ -11,6 +11,7 @@
 #include <sstream>
 #include <type_traits>
 
+#include "skywalker/core/FileTime.h"
 #include "skywalker/core/Log.h"
 #include "skywalker/core/Strings.h"
 #include "skywalker/studio/Catalog.h"
@@ -96,12 +97,7 @@ std::string readText(const std::string& path, bool* ok = nullptr) {
     return ss.str();
 }
 
-int64_t mtimeOf(const std::string& path) {
-    std::error_code ec;
-    auto t = fs::last_write_time(path, ec);
-    if (ec) return -1;
-    return static_cast<int64_t>(t.time_since_epoch().count());
-}
+int64_t mtimeOf(const std::string& path) { return fileModifiedNs(path); }
 
 std::string shortText(const std::string& s, size_t max) {
     if (s.size() <= max) return s;

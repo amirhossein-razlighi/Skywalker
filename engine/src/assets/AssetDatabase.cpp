@@ -6,6 +6,7 @@
 #include <random>
 #include <sstream>
 
+#include "skywalker/core/FileTime.h"
 #include "skywalker/core/Log.h"
 #include "skywalker/core/Strings.h"
 
@@ -171,12 +172,7 @@ bool skippedDir(const fs::path& p) {
     return name.empty() || name[0] == '.' || name == "build" || name == "node_modules" || name == "DerivedData";
 }
 
-int64_t mtimeOf(const fs::path& p) {
-    std::error_code ec;
-    auto t = fs::last_write_time(p, ec);
-    if (ec) return 0;
-    return std::chrono::duration_cast<std::chrono::nanoseconds>(t.time_since_epoch()).count();
-}
+int64_t mtimeOf(const fs::path& p) { return std::max<int64_t>(0, fileModifiedNs(p)); }
 
 Result<Json> readJsonFile(const fs::path& p) {
     std::ifstream f(p);

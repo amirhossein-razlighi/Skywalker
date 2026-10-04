@@ -95,7 +95,7 @@ jobs:
         if: always()
         run: ccache -s | head -12
 
-  # Linux is not a target yet: this keeps the portable core compiling with GCC (no tests).
+  # Linux runs the portable core with GCC and the CPU renderer: build plus the full test suite.
   headless-linux:
     name: Linux (headless build)
     if: github.event_name != 'push' && (github.event_name != 'workflow_dispatch' || inputs.full)
@@ -117,3 +117,5 @@ jobs:
         run: cmake --preset headless -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
       - name: Build
         run: cmake --build --preset headless
+      - name: Test
+        run: ctest --preset headless --output-on-failure

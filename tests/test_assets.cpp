@@ -1,9 +1,12 @@
 #include <doctest/doctest.h>
 
+#include <chrono>
+#include <cstdlib>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
 
+#include "skywalker/core/FileTime.h"
 #include "skywalker/core/Strings.h"
 #include "skywalker/engine/Engine.h"
 #include "skywalker/render/Gltf.h"
@@ -87,6 +90,19 @@ std::vector<uint8_t> makeTriangleGlb() {
 }
 
 }  // namespace
+
+TEST_CASE("assets: file times count from the Unix epoch on every standard library") {
+    // libstdc++'s file clock starts in 2174, so its raw counts are negative for real files; hot reload
+    // used to read that as "missing" on Linux (settings, terrain and sprite sheets never loaded).
+    TempProject p("filetime");
+    p.write("a.txt", "x");
+    const int64_t t = fileModifiedNs(p.dir / "a.txt");
+    CHECK(t > 0);
+    const int64_t now = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                            std::chrono::system_clock::now().time_since_epoch()).count();
+    CHECK(std::llabs(now - t) < int64_t{3600} * 1'000'000'000);  // within the hour: the epoch is 1970
+    CHECK(fileModifiedNs(p.dir / "missing.txt") == -1);
+}
 
 TEST_CASE("assets: database assigns stable GUIDs that survive moves") {
     TempProject p("db");
