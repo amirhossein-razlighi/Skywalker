@@ -34,18 +34,19 @@ std::string slug(const std::string& name) {
     return out.empty() ? "movie" : out;
 }
 
-Result<Output> parseOutput(Engine& engine, const Json& j, const Json& args) {
+/// `defaults` = the top-level codec / bitrate_mbps (they apply to `output` only).
+Result<Output> parseOutput(Engine& engine, const Json& j, const Json& defaults) {
     Output out;
     std::string path;
     std::string codec;
     if (j.isString()) {
         path = j.asString();
-        codec = args.get("codec").asString();
-        out.bitrateMbps = args.get("bitrate_mbps").asFloat(0.f);
+        codec = defaults.get("codec").asString();
+        out.bitrateMbps = defaults.get("bitrate_mbps").asNumber(0.0);
     } else if (j.isObject()) {
         path = j.get("path").asString();
         codec = j.get("codec").asString();
-        out.bitrateMbps = j.get("bitrate_mbps").asFloat(0.f);
+        out.bitrateMbps = j.get("bitrate_mbps").asNumber(0.0);
     }
     if (path.empty()) return Error::make("invalid_output", "an output needs a path", "e.g. \"renders/intro.mp4\" or \"renders/intro/frame_####.png\"");
     out.path = engine.resolvePath(path);
@@ -163,15 +164,16 @@ Result<Options> parseOptions(Engine& engine, const Json& a) {
         else if (!o.sequenceAsset.empty()) o.name = fs::path(o.sequenceAsset).stem().stem().string();
         else o.name = "movie";
     }
-    std::vector<Json> outs;
-    if (a.contains("output")) outs.push_back(a.get("output"));
-    for (const auto& j : a.get("outputs").elements()) outs.push_back(j);
+    std::vector<std::pair<Json, Json>> outs;  // (output, defaults)
+    const Json topLevel = Json::object({{"codec", a.get("codec")}, {"bitrate_mbps", a.get("bitrate_mbps")}});
+    if (a.contains("output")) outs.emplace_back(a.get("output"), topLevel);
+    for (const auto& j : a.get("outputs").elements()) outs.emplace_back(j, Json::object());
     if (outs.empty()) {
         std::string base = "renders/" + slug(o.name);
-        outs.push_back(Json(videoEncodingAvailable() && !o.resume ? base + ".mp4" : base + "/frame_####.png"));
+        outs.emplace_back(Json(videoEncodingAvailable() && !o.resume ? base + ".mp4" : base + "/frame_####.png"), topLevel);
     }
-    for (const auto& j : outs) {
-        auto out = parseOutput(engine, j, a);
+    for (const auto& [j, defaults] : outs) {
+        auto out = parseOutput(engine, j, defaults);
         if (!out) return out.error();
         if (isVideo(out->codec) && ((o.width % 2) || (o.height % 2))) {
             return Error::make("invalid_size", "video needs an even width and height", "e.g. 1920x1080");

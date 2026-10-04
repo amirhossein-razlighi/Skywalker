@@ -28,7 +28,8 @@ int movieUsage() {
                  "options:\n"
                  "  --project DIR        the project (default: current directory)\n"
                  "  -o, --output PATH    .mp4 (H.264), .mov (ProRes 422 HQ) or a folder / name_####.png (repeatable)\n"
-                 "  --codec C            h264 | hevc | prores | prores4444 | png\n"
+                 "  --codec C            codec of the -o before it: h264 | hevc | prores | prores4444 | png\n"
+                 "  --bitrate MBPS       H.264 / HEVC bitrate of the -o before it\n"
                  "  --sequence NAME      sequence entity or .sequence.json\n"
                  "  --camera-entity NAME look through this camera\n"
                  "  --start S --end S --duration S   time range in seconds\n"
@@ -77,7 +78,16 @@ int runMovie(const std::vector<std::string>& raw) {
         };
         if (a == "--project") project = value();
         else if (a == "-o" || a == "--output") outputs.push(Json(value()));
-        else if (a == "--codec") args["codec"] = value();
+        else if (a == "--codec" || a == "--bitrate") {  // applies to the -o before it
+            if (outputs.size() == 0) {
+                std::fprintf(stderr, "error: %s goes after the -o it applies to\n", a.c_str());
+                return 2;
+            }
+            Json& last = outputs.elements().back();
+            if (last.isString()) last = Json::object({{"path", last.asString()}});
+            if (a == "--codec") last["codec"] = value();
+            else last["bitrate_mbps"] = std::strtod(value().c_str(), nullptr);
+        }
         else if (a == "--sequence") args["sequence"] = value();
         else if (a == "--camera-entity") args["camera_entity"] = value();
         else if (a == "--start") number("start");

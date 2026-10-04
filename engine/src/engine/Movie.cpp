@@ -383,6 +383,14 @@ struct Job::Impl {
             if (!w) return w.error();
             videos.push_back(std::move(*w));
         }
+        // Canonical start: the scene exactly as saved (a JSON round trip, what every play session restores
+        // to on stop), so the first render after an edit matches every later one bit for bit.
+        {
+            ChangeObserver* observer = scene.observer();
+            Json saved = scene.toJson();
+            if (Status s = scene.loadJson(saved); !s) return s;
+            scene.setObserver(observer);
+        }
         // The play session: everything below is undone by stop().
         engine.play();
         engine.pause();  // the job advances the simulation itself

@@ -159,7 +159,7 @@ void addSequenceTools(Engine& engine, ToolRegistry& reg) {
     reg.add({"sequence_create", "Create sequence",
              "Create a cinematic sequence asset (*.sequence.json) and an entity whose `sequencer` plays it when the "
              "simulation starts. Then add content with sequence_key (keyed properties, camera cuts, events, animations) "
-             "and sequence_camera_shot (orbit / dolly / crane / track / pan / static / path moves), check frames with "
+             "and sequence_camera_shot (orbit / dolly / crane / track / pan / static / path / flyover moves), check frames with "
              "sequence_scrub and play with sequence_play. `tracks` may hold a full track list (see docs/ANIMATION.md). "
              "Example: {\"path\": \"cinematics/intro.sequence.json\", \"duration\": 10}.",
              "animation",
