@@ -27,7 +27,8 @@ full descriptions; `component_schema` and each tool's input schema list every fi
 | Editor camera | `camera_set {frame, eye, target, yaw, pitch, distance}` |
 | Pixel to entity | `viewport_pick {x*, y*, width, height}` |
 | Editor viewport tier | `viewport_quality {quality: fast\|balanced\|full}` (omit to read; the human's live view, captures stay `full` unless `quality` is passed) |
-| Performance | `perf_stats {frames, width, height, view, quality}` (draw calls, lights, GPU/CPU ms) |
+| Performance | `perf_stats {frames, width, height, view, quality, passes}` (draw calls, lights, GPU/CPU ms; `passes:true` adds `profile.passes` / `groups` / `cpu`) |
+| Debug views | `viewport_capture {debug_view}` or live `viewport_debug_view {view, list}`: wireframe, overdraw, unshaded, lighting_only, shadow_cascades, light_complexity, lod, emission, specular, uv_checker, texel_density, albedo, normals, material, gi, reflections, ao, depth, lighting, sketch, impostors |
 
 ## World
 

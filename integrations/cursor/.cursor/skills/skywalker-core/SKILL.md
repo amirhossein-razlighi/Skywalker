@@ -20,7 +20,7 @@ run `skywalker setup <claude|codex|gemini|cursor>` (or `/mcp` in Claude Code to 
 3. **Look.** `viewport_capture` returns a PNG and every visible entity with its screen box. Never claim
    something looks right without having captured it.
 4. **Verify.** Behaviors: `sim_control step` + `logs` / `sim_trace`. Layout: `viewport_multi`. Looks: `debug_view`.
-   Gameplay: `playtest_run`. Performance: `perf_stats`.
+   Gameplay: `playtest_run`. Performance: `perf_stats` (`passes:true` for where the frame time goes).
 5. **Fix or finish.** Wrong? `history {action:"undo"}` and retry differently. Done? `scene_save`, then report.
 
 ```text
@@ -66,7 +66,9 @@ viewport_capture {annotate:true}     # ids are drawn on the image
 | What the game camera sees | `viewport_capture {view:"scene"}` or `camera_entity` |
 | Frame an entity in the editor view | `camera_set {frame:"Tent"}` or `{frame:"all"}` |
 | What is under pixel (x,y) | `viewport_pick`, `raycast {x,y,width,height}` |
-| Why does it look wrong | `viewport_capture {debug_view: albedo|normals|material|ao|gi|reflections|depth|lighting}` |
+| Why does it look wrong | `viewport_capture {debug_view: albedo|normals|material|ao|gi|reflections|depth|lighting|unshaded|lighting_only|specular|emission}` |
+| Why is it slow | `perf_stats {frames:30, passes:true}` (GPU ms per pass and per area, CPU scopes), then `debug_view: overdraw|lod|light_complexity|wireframe` |
+| Show the human a debug view live | `viewport_debug_view {view:"wireframe"}` (`"final"` turns it off; `{list:true}` gives every view's color legend) |
 | Camera under the ground? | `terrain_query` / `raycast` straight down (terrain heights are absolute) |
 
 ## Simulation
