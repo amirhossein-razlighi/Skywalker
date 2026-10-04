@@ -6,6 +6,7 @@
 #include <chrono>
 #include <climits>
 #include <cmath>
+#include <cstdlib>
 #include <cstring>
 
 #include "skywalker/core/Log.h"
@@ -44,6 +45,16 @@ struct ImpostorBakeUniformsGpu {
 };
 
 constexpr NSUInteger kCullThreads = 128;
+
+// Indirect argument layout per chunk and view (written by foliageCullKernel): for each part and
+// mesh band an MTLDrawIndexedPrimitivesIndirectArguments (5 uints), then one
+// MTLDrawPrimitivesIndirectArguments (4 uints) for the impostor cards.
+constexpr NSUInteger kIndexedArgsBytes = 5 * sizeof(uint32_t);
+constexpr NSUInteger meshArgsOffset(uint32_t part, int band) { return (part * kBands + static_cast<NSUInteger>(band)) * kIndexedArgsBytes; }
+constexpr NSUInteger impostorArgsOffset(uint32_t parts) { return parts * kBands * kIndexedArgsBytes; }
+constexpr NSUInteger viewArgsBytes(uint32_t parts) { return impostorArgsOffset(parts) + 4 * sizeof(uint32_t); }
+static_assert(sizeof(MTLDrawIndexedPrimitivesIndirectArguments) == kIndexedArgsBytes);
+static_assert(sizeof(MTLDrawPrimitivesIndirectArguments) == 4 * sizeof(uint32_t));
 constexpr uint64_t kInstanceBufferIdleFrames = 180, kImpostorIdleFrames = 900;
 
 simd_float4x4 toSimd(const Mat4& m) {
@@ -124,6 +135,7 @@ struct MetalFoliage::Chunk {
     float dmin = 0.f, dmax = 0.f;
     float D = 0.f, W = 0.f;
     float bandFar[3] = {};
+    float bandFrac[4] = {};  // share of the footprint in each mesh band (triangle budget estimate)
     int firstImpostorCascade = 4;
     Impostor* imp = nullptr;
     FoliageUniformsGpu uniforms{};
@@ -137,6 +149,7 @@ struct MetalFoliage::Chunk {
 
 struct MetalFoliage::Counters {
     std::atomic<uint64_t> meshInstances{0}, impostors{0}, kiloTris{0}, shadowKiloTris{0}, shadowImpostors{0};
+    std::atomic<bool> gpuInvalid{false};  // a frame's indirect arguments failed validation
 };
 
 MetalFoliage::MetalFoliage(id<MTLDevice> device, id<MTLCommandQueue> queue, MeshLookup meshes, TextureLookup textures,
@@ -147,6 +160,7 @@ MetalFoliage::MetalFoliage(id<MTLDevice> device, id<MTLCommandQueue> queue, Mesh
       textures_(std::move(textures)),
       surfaceUniforms_(std::move(surfaceUniforms)),
       counters_(std::make_shared<Counters>()) {
+    if (const char* env = std::getenv("SKY_GPU_CULL"); env && std::string(env) == "0") gpuCull_ = false;
     MTLTextureDescriptor* wd = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA8Unorm width:1 height:1 mipmapped:NO];
     white_ = [device_ newTextureWithDescriptor:wd];
     const uint8_t px[4] = {255, 255, 255, 255};
@@ -227,13 +241,101 @@ id<MTLBuffer> MetalFoliage::instanceBuffer(const InstanceBatch& b) {
     return g.buffer;
 }
 
+namespace {
+
+// --- CPU reference of foliageCullKernel (Terrain.metal): the fallback path and its spec ------
+
+uint32_t binsFor(const FoliageCullParamsGpu& p, uint32_t view, float d, Vec3 center, float radius) {
+    for (int k = 0; k < 6; ++k) {
+        const simd_float4& pl = p.planes[view * 6 + static_cast<uint32_t>(k)];
+        if (pl.x * center.x + pl.y * center.y + pl.z * center.z + pl.w < -radius) return 0u;
+    }
+    const float D = p.eye.w;
+    const uint32_t band = d < p.bands.x ? 0u : (d < p.bands.y ? 1u : (d < p.bands.z ? 2u : 3u));
+    if (view == 0) {
+        if (D <= 0.f) return 1u << band;
+        const float t = std::clamp((d - (D - p.params.x)) / std::max(p.params.x, 1e-3f), 0.f, 1.f);
+        return (t < 1.f ? (1u << band) : 0u) | (t > 0.f ? 16u : 0u);
+    }
+    if (d > p.params.w) return 0u;
+    if (D > 0.f && (d >= D || static_cast<float>(view - 1) >= p.center.w)) return 16u;
+    return 1u << band;
+}
+
+/// The CPU path (SKY_GPU_CULL=0, or after a GPU validation failure): same lists and arguments.
+void cpuCull(const std::vector<world::FoliageInstance>& instances, const FoliageCullParamsGpu& p, uint8_t* listsOut,
+                           uint8_t* argsOut, uint32_t* stats) {
+    const uint32_t n = p.counts[0], views = std::min<uint32_t>(p.counts[2], kViews), stride = p.counts[3];
+    const uint32_t parts = std::min<uint32_t>(p.counts[1], kMaxParts);
+    std::vector<uint32_t> bins(static_cast<size_t>(n) * kViews, 0);
+    uint32_t counts[kViews][5] = {};
+    const Vec3 eye{p.eye.x, p.eye.y, p.eye.z}, mc{p.center.x, p.center.y, p.center.z};
+    for (uint32_t i = 0; i < n; ++i) {
+        const world::FoliageInstance& in = instances[i];
+        const Vec3 T{in.row0[3], in.row1[3], in.row2[3]};
+        const float d = distance(T, eye);
+        if (d > p.params.y * (0.72f + 0.28f * in.fade)) continue;
+        const Vec3 C{in.row0[0] * mc.x + in.row0[1] * mc.y + in.row0[2] * mc.z + T.x, in.row1[0] * mc.x + in.row1[1] * mc.y + in.row1[2] * mc.z + T.y,
+                     in.row2[0] * mc.x + in.row2[1] * mc.y + in.row2[2] * mc.z + T.z};
+        const float r = p.params.z * length(Vec3{in.row0[0], in.row1[0], in.row2[0]});
+        for (uint32_t v = 0; v < views; ++v) {
+            const uint32_t mask = binsFor(p, v, d, C, r);
+            bins[static_cast<size_t>(i) * kViews + v] = mask;
+            for (uint32_t b = 0; b < 5; ++b) counts[v][b] += (mask >> b) & 1u;
+        }
+    }
+    auto* lists = reinterpret_cast<uint32_t*>(listsOut);
+    auto* args = reinterpret_cast<uint32_t*>(argsOut);
+    const NSUInteger viewArgs = viewArgsBytes(parts) / sizeof(uint32_t);
+    double kiloTris = 0, shadowKiloTris = 0;
+    for (uint32_t v = 0; v < views; ++v) {
+        uint32_t offsets[5], off = 0;
+        for (uint32_t b = 0; b < 5; ++b) offsets[b] = off, off += counts[v][b];
+        uint32_t cursor[5] = {};
+        for (uint32_t i = 0; i < n; ++i) {
+            const uint32_t mask = bins[static_cast<size_t>(i) * kViews + v];
+            for (uint32_t b = 0; b < 5; ++b) {
+                if (!((mask >> b) & 1u)) continue;
+                const uint32_t slot = offsets[b] + cursor[b]++;
+                if (slot < stride) lists[v * stride + slot] = i;
+            }
+        }
+        const uint32_t table = v == 0 ? 0u : 1u;
+        uint32_t* a = args + v * viewArgs;
+        for (uint32_t part = 0; part < parts; ++part) {
+            for (uint32_t b = 0; b < 4; ++b) {
+                const uint32_t* lod = p.lods[table * kMaxParts * kBands + part * kBands + b];
+                uint32_t* x = a + (meshArgsOffset(part, static_cast<int>(b)) / sizeof(uint32_t));
+                x[0] = lod[1], x[1] = counts[v][b], x[2] = lod[0], x[3] = 0, x[4] = offsets[b];
+                (v == 0 ? kiloTris : shadowKiloTris) += static_cast<double>(counts[v][b]) * (lod[1] / 3) / 1024.0;
+            }
+        }
+        uint32_t* x = a + impostorArgsOffset(parts) / sizeof(uint32_t);
+        x[0] = 4, x[1] = counts[v][4], x[2] = 0, x[3] = offsets[4];
+        if (v == 0) {
+            stats[0] += counts[0][0] + counts[0][1] + counts[0][2] + counts[0][3];
+            stats[1] += counts[0][4];
+        } else {
+            stats[4] += counts[v][4];
+        }
+    }
+    stats[2] += static_cast<uint32_t>(kiloTris + 0.5);
+    stats[3] += static_cast<uint32_t>(shadowKiloTris + 0.5);
+}
+
+}  // namespace
+
 void MetalFoliage::prepare(id<MTLCommandBuffer> cmd, const FrameData& frame, const FoliageView& view, uint64_t frameIndex) {
     frameIndex_ = frameIndex;
     ring_ = static_cast<int>(frameIndex % kRing);
     chunks_.clear();
     frameStats_ = nil;
     frameImpostors_.assign(frame.impostors.size(), nullptr);
-    if (frame.instances.empty() || !cull_) return;
+    if (counters_->gpuInvalid.exchange(false) && gpuCull_) {
+        gpuCull_ = false;
+        log::error("render", "GPU foliage culling produced invalid draw arguments; using the CPU path");
+    }
+    if (frame.instances.empty() || !mesh_) return;
 
     // Impostors: ready ones are used; missing ones are baked (or loaded from the project cache)
     // within the frame's budget. Until then their layers draw meshes out to the cull distance.
@@ -282,6 +384,19 @@ void MetalFoliage::prepare(id<MTLCommandBuffer> cmd, const FrameData& frame, con
         c.firstImpostorCascade = c.D > 0.f ? (frame.quality >= 1 ? 1 : 2) : 4;
         const float meshRange = c.D > 0.f ? c.D : b.cullDistance;
         c.bandFar[0] = meshRange * 0.25f, c.bandFar[1] = meshRange * 0.5f, c.bandFar[2] = meshRange * 0.75f;
+        {  // share of the chunk's footprint in each mesh band (budget estimate)
+            const float midY = (b.bounds.min.y + b.bounds.max.y) * 0.5f, meshEnd = c.D > 0.f ? c.D : b.cullDistance;
+            for (int sy = 0; sy < 8; ++sy) {
+                for (int sx = 0; sx < 8; ++sx) {
+                    Vec3 q{b.bounds.min.x + (b.bounds.max.x - b.bounds.min.x) * (static_cast<float>(sx) + 0.5f) / 8.f, midY,
+                           b.bounds.min.z + (b.bounds.max.z - b.bounds.min.z) * (static_cast<float>(sy) + 0.5f) / 8.f};
+                    const float d = distance(eye, q);
+                    if (d >= meshEnd) continue;
+                    const int band = d < c.bandFar[0] ? 0 : d < c.bandFar[1] ? 1 : d < c.bandFar[2] ? 2 : 3;
+                    c.bandFrac[band] += 1.f / 64.f;
+                }
+            }
+        }
         c.parts = static_cast<uint32_t>(std::min<size_t>(b.parts->size(), kMaxParts));
         const auto n = static_cast<NSUInteger>(b.instances->size());
         const NSUInteger views = shadows ? kViews : 1;
@@ -289,7 +404,7 @@ void MetalFoliage::prepare(id<MTLCommandBuffer> cmd, const FrameData& frame, con
         c.listStride = 2 * n * sizeof(uint32_t);
         c.listOffset = listBytes;
         listBytes += (views * c.listStride + 255) & ~NSUInteger{255};
-        c.viewArgs = (c.parts * 20 + 4) * sizeof(uint32_t);
+        c.viewArgs = viewArgsBytes(c.parts);
         c.argsOffset = argBytes;
         argBytes += (views * c.viewArgs + 255) & ~NSUInteger{255};
         c.instances = instanceBuffer(b);
@@ -311,19 +426,70 @@ void MetalFoliage::prepare(id<MTLCommandBuffer> cmd, const FrameData& frame, con
     }
     if (chunks_.empty()) return;
 
+    // Mesh LOD of a part in a distance band, chosen at the band's near edge so the on-screen
+    // error stays under a pixel; `budgetBias_` coarsens everything when the frame would exceed
+    // the foliage triangle budget.
+    auto lodFor = [&](const Chunk& c, uint32_t part, int band, int table) {
+        const InstancePart& ip = (*c.batch->parts)[part];
+        const GpuMesh* m = meshes_(ip.mesh);
+        if (!m) return 0;
+        const float nearEdge = band == 0 ? 0.f : c.bandFar[band - 1];
+        const int bias = table + (frame.quality >= 2 ? 1 : 0) + budgetBias_;
+        int lod = m->lodFor(pixelsPerUnit(nearEdge) * c.batch->maxScale) + bias;
+        // Simplified leaf cards thin out: cap them (impostors take over the distance) unless the
+        // triangle budget forbids it.
+        if (ip.surface.alphaCutoff > 0.f && frame.quality < 2 && budgetBias_ == 0) lod = std::min(lod, (c.D > 0.f ? 2 : 1) + bias);
+        return std::clamp(lod, 0, m->lodCount - 1);
+    };
+    // Triangle budget (camera view): a hard safety net against frames long enough to trip the GPU
+    // watchdog. Estimated from each chunk's footprint split into the distance bands.
+    budgetBias_ = 0;
+    for (; budgetBias_ <= 4; ++budgetBias_) {
+        double total = 0;
+        for (const Chunk& c : chunks_) {
+            if (!(c.viewMask & 1u)) continue;
+            const double n = static_cast<double>(c.batch->instances->size());
+            for (int band = 0; band < kBands; ++band) {
+                if (c.bandFrac[band] <= 0.f) continue;
+                double tris = 0;
+                for (uint32_t part = 0; part < c.parts; ++part) {
+                    if (const GpuMesh* m = meshes_((*c.batch->parts)[part].mesh)) tris += m->lodCount_[lodFor(c, part, band, 0)] / 3;
+                }
+                total += n * c.bandFrac[band] * tris;
+            }
+        }
+        lastEstimate_ = static_cast<uint64_t>(total);
+        if (total <= static_cast<double>(kTriangleBudget) || budgetBias_ == 4) break;
+    }
+
+    // Lists and arguments live in shared memory (unified on Apple silicon): the CPU fallback
+    // writes them directly, and every frame's arguments are checked when the GPU is done.
     auto ensure = [&](id<MTLBuffer> __strong& buf, NSUInteger bytes) {
         if (buf && buf.length >= bytes) return;
-        buf = [device_ newBufferWithLength:std::max<NSUInteger>(bytes + bytes / 2, 1 << 16) options:MTLResourceStorageModePrivate];
+        buf = [device_ newBufferWithLength:std::max<NSUInteger>(bytes + bytes / 2, 1 << 16) options:MTLResourceStorageModeShared];
     };
     ensure(lists_[ring_], listBytes);
     ensure(args_[ring_], argBytes);
     frameStats_ = [device_ newBufferWithLength:8 * sizeof(uint32_t) options:MTLResourceStorageModeShared];
     std::memset(frameStats_.contents, 0, frameStats_.length);
+    frameArgBytes_ = argBytes;
+    frameChecks_.clear();
 
-    id<MTLComputeCommandEncoder> enc = [cmd computeCommandEncoderWithDispatchType:MTLDispatchTypeConcurrent];
-    enc.label = @"Foliage cull";
-    [enc setComputePipelineState:cull_];
-    [enc setBuffer:frameStats_ offset:0 atIndex:4];
+    const bool gpu = gpuCull_ && cull_;
+    id<MTLComputeCommandEncoder> enc = nil;
+    if (gpu) {
+        // Arguments the kernel does not write (views a chunk does not process) draw nothing.
+        id<MTLBlitCommandEncoder> blit = [cmd blitCommandEncoder];
+        blit.label = @"Foliage args clear";
+        [blit fillBuffer:args_[ring_] range:NSMakeRange(0, argBytes) value:0];
+        [blit endEncoding];
+        enc = [cmd computeCommandEncoderWithDispatchType:MTLDispatchTypeConcurrent];
+        enc.label = @"Foliage cull";
+        [enc setComputePipelineState:cull_];
+        [enc setBuffer:frameStats_ offset:0 atIndex:4];
+    } else {
+        std::memset(args_[ring_].contents, 0, argBytes);
+    }
     FoliageCullParamsGpu p{};
     std::memcpy(p.planes, planes, sizeof(planes));
     for (const Chunk& c : chunks_) {
@@ -339,8 +505,8 @@ void MetalFoliage::prepare(id<MTLCommandBuffer> cmd, const FrameData& frame, con
         p.counts[1] = c.parts;
         p.counts[2] = c.views;
         p.counts[3] = static_cast<uint32_t>(c.listStride / sizeof(uint32_t));
-        // Mesh LOD per part and distance band (camera; shadows one level coarser), chosen at the
-        // band's near edge so the on-screen error stays under a pixel.
+        uint32_t maxIndices = 0;
+        // Mesh LOD per part and distance band (camera; shadows one level coarser).
         for (int table = 0; table < 2; ++table) {
             for (uint32_t part = 0; part < kMaxParts; ++part) {
                 const GpuMesh* m = part < c.parts ? meshes_((*b.parts)[part].mesh) : nullptr;
@@ -350,25 +516,28 @@ void MetalFoliage::prepare(id<MTLCommandBuffer> cmd, const FrameData& frame, con
                         slot[0] = slot[1] = 0;
                         continue;
                     }
-                    const float nearEdge = band == 0 ? 0.f : c.bandFar[band - 1];
-                    int bias = table + (frame.quality >= 2 ? 1 : 0);
-                    int lod = m->lodFor(pixelsPerUnit(nearEdge) * b.maxScale) + bias;
-                    // Simplified leaf cards thin out: cap them (impostors take over the distance).
-                    if ((*b.parts)[part].surface.alphaCutoff > 0.f && frame.quality < 2) lod = std::min(lod, (c.D > 0.f ? 2 : 1) + bias);
-                    lod = std::clamp(lod, 0, m->lodCount - 1);
+                    const int lod = lodFor(c, part, band, table);
                     slot[0] = m->lodOffset[lod];
                     slot[1] = m->lodCount_[lod];
+                    maxIndices = std::max(maxIndices, slot[1]);
                 }
             }
         }
-        [enc setBuffer:c.instances offset:0 atIndex:0];
-        [enc setBytes:&p length:sizeof(p) atIndex:1];
-        [enc setBuffer:lists_[ring_] offset:c.listOffset atIndex:2];
-        [enc setBuffer:args_[ring_] offset:c.argsOffset atIndex:3];
-        [enc dispatchThreadgroups:MTLSizeMake(1, 1, 1) threadsPerThreadgroup:MTLSizeMake(kCullThreads, 1, 1)];
+        frameChecks_.push_back({c.argsOffset, c.viewArgs, c.views, c.parts, p.counts[0], p.counts[3], maxIndices});
+        if (gpu) {
+            [enc setBuffer:c.instances offset:0 atIndex:0];
+            [enc setBytes:&p length:sizeof(p) atIndex:1];
+            [enc setBuffer:lists_[ring_] offset:c.listOffset atIndex:2];
+            [enc setBuffer:args_[ring_] offset:c.argsOffset atIndex:3];
+            [enc dispatchThreadgroups:MTLSizeMake(1, 1, 1) threadsPerThreadgroup:MTLSizeMake(kCullThreads, 1, 1)];
+        } else {
+            cpuCull(*b.instances, p, static_cast<uint8_t*>(lists_[ring_].contents) + c.listOffset,
+                    static_cast<uint8_t*>(args_[ring_].contents) + c.argsOffset, static_cast<uint32_t*>(frameStats_.contents));
+        }
     }
-    [enc endEncoding];
+    if (enc) [enc endEncoding];
 }
+
 
 // --- Drawing -------------------------------------------------------------------------------------
 
@@ -429,7 +598,7 @@ void MetalFoliage::encodeShadows(id<MTLRenderCommandEncoder> enc, const FrameDat
                                    indexBuffer:m->indices
                              indexBufferOffset:0
                                 indirectBuffer:args_[ring_]
-                          indirectBufferOffset:args + (pi * kBands + static_cast<uint32_t>(band)) * 20];
+                          indirectBufferOffset:args + meshArgsOffset(pi, band)];
                 }
             }
         }
@@ -443,7 +612,7 @@ void MetalFoliage::encodeShadows(id<MTLRenderCommandEncoder> enc, const FrameDat
             [enc setFragmentBuffer:c.instances offset:0 atIndex:5];
             [enc setFragmentTexture:c.imp->albedo atIndex:0];
             [enc setFragmentTexture:c.imp->normal atIndex:2];
-            [enc drawPrimitives:MTLPrimitiveTypeTriangleStrip indirectBuffer:args_[ring_] indirectBufferOffset:args + c.parts * 20];
+            [enc drawPrimitives:MTLPrimitiveTypeTriangleStrip indirectBuffer:args_[ring_] indirectBufferOffset:args + impostorArgsOffset(c.parts)];
         }
     }
 }
@@ -477,7 +646,7 @@ void MetalFoliage::encodeMain(id<MTLRenderCommandEncoder> enc, const FrameData& 
                                indexBuffer:m->indices
                          indexBufferOffset:0
                             indirectBuffer:args_[ring_]
-                      indirectBufferOffset:c.argsOffset + (pi * kBands + static_cast<uint32_t>(band)) * 20];
+                      indirectBufferOffset:c.argsOffset + meshArgsOffset(pi, band)];
             }
         }
     }
@@ -497,7 +666,7 @@ void MetalFoliage::encodeMain(id<MTLRenderCommandEncoder> enc, const FrameData& 
         [enc setFragmentBuffer:c.instances offset:0 atIndex:5];
         [enc setFragmentTexture:c.imp->albedo atIndex:0];
         [enc setFragmentTexture:c.imp->normal atIndex:2];
-        [enc drawPrimitives:MTLPrimitiveTypeTriangleStrip indirectBuffer:args_[ring_] indirectBufferOffset:c.argsOffset + c.parts * 20];
+        [enc drawPrimitives:MTLPrimitiveTypeTriangleStrip indirectBuffer:args_[ring_] indirectBufferOffset:c.argsOffset + impostorArgsOffset(c.parts)];
     }
 }
 
@@ -506,8 +675,11 @@ void MetalFoliage::trackFrame(id<MTLCommandBuffer> cmd) {
         counters_->meshInstances = counters_->impostors = counters_->kiloTris = counters_->shadowKiloTris = counters_->shadowImpostors = 0;
         return;
     }
-    id<MTLBuffer> stats = frameStats_;
+    id<MTLBuffer> stats = frameStats_, args = args_[ring_];
     std::shared_ptr<Counters> counters = counters_;
+    // Every frame's indirect arguments are checked against what they may contain; a violation
+    // switches culling to the CPU path for the following frames.
+    auto checks = std::make_shared<std::vector<ArgCheck>>(gpuCull_ ? frameChecks_ : std::vector<ArgCheck>{});
     [cmd addCompletedHandler:^(id<MTLCommandBuffer>) {
         const auto* s = static_cast<const uint32_t*>(stats.contents);
         counters->meshInstances = s[0];
@@ -515,6 +687,26 @@ void MetalFoliage::trackFrame(id<MTLCommandBuffer> cmd) {
         counters->kiloTris = s[2];
         counters->shadowKiloTris = s[3];
         counters->shadowImpostors = s[4];
+        const auto* base = static_cast<const uint8_t*>(args.contents);
+        for (const ArgCheck& c : *checks) {
+            for (uint32_t v = 0; v < c.views; ++v) {
+                const uint8_t* view = base + c.argsOffset + v * c.viewArgs;
+                bool ok = true;
+                for (uint32_t part = 0; part < c.parts && ok; ++part) {
+                    for (int band = 0; band < kBands && ok; ++band) {
+                        const auto* x = reinterpret_cast<const uint32_t*>(view + meshArgsOffset(part, band));
+                        ok = x[0] <= c.maxIndices && x[0] % 3 == 0 && x[1] <= c.instances && x[3] == 0 &&
+                             static_cast<uint64_t>(x[4]) + x[1] <= c.listStride;
+                    }
+                }
+                const auto* x = reinterpret_cast<const uint32_t*>(view + impostorArgsOffset(c.parts));
+                ok = ok && (x[0] == 4 || x[0] == 0) && x[1] <= c.instances && x[2] == 0 && static_cast<uint64_t>(x[3]) + x[1] <= c.listStride;
+                if (!ok) {
+                    counters->gpuInvalid = true;
+                    return;
+                }
+            }
+        }
     }];
 }
 
@@ -543,6 +735,9 @@ Json MetalFoliage::stats() const {
                          {"foliageTriangles", static_cast<int64_t>(counters_->kiloTris.load() * 1024)},
                          {"foliageShadowTriangles", static_cast<int64_t>(counters_->shadowKiloTris.load() * 1024)},
                          {"foliageChunksDrawn", static_cast<int64_t>(chunks_.size())},
+                         {"foliageBudgetBias", budgetBias_},
+                         {"foliageGpuCulling", gpuCull_},
+                         {"foliageTriangleEstimate", static_cast<int64_t>(lastEstimate_)},
                          {"impostorsResident", static_cast<int64_t>(ready)},
                          {"impostorsBaked", static_cast<int64_t>(bakes_)},
                          {"impostorsLoaded", static_cast<int64_t>(cacheLoads_)},
@@ -702,80 +897,106 @@ Result<std::unique_ptr<MetalFoliage::Impostor>> MetalFoliage::bakeModel(const Im
     if (!resolved[0] || !resolved[1] || !resolved[2] || !msaa[0] || !msaa[1] || !msaa[2] || !depth || !reads[0] || !reads[1] || !reads[2]) {
         return Error::make("out_of_memory", "could not allocate a " + std::to_string(size) + " px impostor atlas");
     }
-    MTLRenderPassDescriptor* rp = [MTLRenderPassDescriptor renderPassDescriptor];
-    for (int i = 0; i < 3; ++i) {
-        rp.colorAttachments[i].texture = msaa[i];
-        rp.colorAttachments[i].resolveTexture = resolved[i];
-        rp.colorAttachments[i].loadAction = MTLLoadActionClear;
-        rp.colorAttachments[i].clearColor = MTLClearColorMake(0, 0, 0, 0);
-        rp.colorAttachments[i].storeAction = MTLStoreActionMultisampleResolve;
+    // Detail that the frame resolution can show: the LOD whose error stays under a texel (leaf
+    // cards at most one level down, sloppy simplification thins canopies).
+    std::vector<int> lods(meshes.size(), 0);
+    uint64_t trianglesPerFrame = 0;
+    for (size_t pi = 0; pi < meshes.size(); ++pi) {
+        const GpuMesh& m = *meshes[pi];
+        int lod = m.lodFor(static_cast<float>(tile) / (2.f * radius));
+        if ((*model.parts)[pi].surface.alphaCutoff > 0.f) lod = std::min(lod, 1);
+        lods[pi] = std::clamp(lod, 0, m.lodCount - 1);
+        trianglesPerFrame += m.lodCount_[lods[pi]] / 3;
     }
-    rp.depthAttachment.texture = depth;
-    rp.depthAttachment.loadAction = MTLLoadActionClear;
-    rp.depthAttachment.clearDepth = 1.0;
-    rp.depthAttachment.storeAction = MTLStoreActionDontCare;
-
-    id<MTLCommandBuffer> cmd = [queue_ commandBuffer];
-    cmd.label = @"Impostor bake";
+    // Bounded GPU work: frames are baked in batches of at most kBakeTrianglesPerBatch triangles,
+    // each batch its own short command buffer (a multi-second command buffer trips the GPU
+    // watchdog and stalls the desktop). A row of frames is one render target band; batches inside
+    // a row keep the MSAA contents between passes.
+    constexpr uint64_t kBakeTrianglesPerBatch = 12'000'000;
+    const int framesPerBatch = static_cast<int>(std::clamp<uint64_t>(kBakeTrianglesPerBatch / std::max<uint64_t>(trianglesPerFrame, 1), 1,
+                                                                     static_cast<uint64_t>(frames)));
+    id<MTLCommandBuffer> last = nil;
     for (int fy = 0; fy < frames; ++fy) {
-        id<MTLRenderCommandEncoder> enc = [cmd renderCommandEncoderWithDescriptor:rp];
-        enc.label = @"Impostor frames";
-        [enc setRenderPipelineState:bake_];
-        [enc setDepthStencilState:bakeDepth_];
-        [enc setFrontFacingWinding:MTLWindingCounterClockwise];
-        for (int fx = 0; fx < frames; ++fx) {
-            const impostor::Basis b = impostor::frameBasis(impostor::frameDirection(fx, fy, frames, model.hemi));
-            ImpostorBakeUniformsGpu bu{simd_make_float4(center.x, center.y, center.z, radius), simd_make_float4(b.right.x, b.right.y, b.right.z, 0),
-                                       simd_make_float4(b.up.x, b.up.y, b.up.z, 0), simd_make_float4(b.forward.x, b.forward.y, b.forward.z, 0)};
-            const double t = static_cast<double>(tile);
-            [enc setViewport:MTLViewport{fx * t, 0.0, t, t, 0.0, 1.0}];
-            [enc setScissorRect:MTLScissorRect{static_cast<NSUInteger>(fx * tile), 0, rowH, rowH}];
-            [enc setVertexBytes:&bu length:sizeof(bu) atIndex:2];
-            [enc setFragmentBytes:&bu length:sizeof(bu) atIndex:2];
-            for (size_t pi = 0; pi < meshes.size(); ++pi) {
-                const InstancePart& part = (*model.parts)[pi];
-                const Surface& s = part.surface;
-                id<MTLTexture> albedo = textures_(s.texture, true), normal = textures_(s.normalMap, false),
-                               orm = textures_(s.ormMap, false), emissive = textures_(s.emissiveMap, true);
-                FxDrawUniforms du = surfaceUniforms_(s, simd_make_float4(albedo ? 1 : 0, normal ? 1 : 0,
-                                                                         orm ? 1.f + s.occlusionStrength : 0.f, emissive ? 1 : 0));
-                du.model = toSimd(part.local);
-                du.normalMatrix = toSimd(part.local.inverse().transposed());
-                [enc setCullMode:s.doubleSided ? MTLCullModeNone : MTLCullModeBack];
-                [enc setVertexBuffer:meshes[pi]->vertices offset:0 atIndex:0];
-                [enc setVertexBytes:&du length:sizeof(du) atIndex:1];
-                [enc setFragmentBytes:&du length:sizeof(du) atIndex:0];
-                [enc setFragmentTexture:(albedo ?: white_) atIndex:0];
-                [enc setFragmentTexture:(normal ?: white_) atIndex:2];
-                [enc setFragmentTexture:(orm ?: white_) atIndex:3];
-                [enc setFragmentTexture:(emissive ?: white_) atIndex:4];
-                [enc drawIndexedPrimitives:MTLPrimitiveTypeTriangle
-                                indexCount:meshes[pi]->lodCount_[0]
-                                 indexType:MTLIndexTypeUInt32
-                               indexBuffer:meshes[pi]->indices
-                         indexBufferOffset:0];
+        for (int fx0 = 0; fx0 < frames; fx0 += framesPerBatch) {
+            const int fx1 = std::min(frames, fx0 + framesPerBatch);
+            const bool firstPass = fx0 == 0, lastPass = fx1 == frames;
+            MTLRenderPassDescriptor* rp = [MTLRenderPassDescriptor renderPassDescriptor];
+            for (int i = 0; i < 3; ++i) {
+                rp.colorAttachments[i].texture = msaa[i];
+                rp.colorAttachments[i].resolveTexture = lastPass ? resolved[i] : nil;
+                rp.colorAttachments[i].loadAction = firstPass ? MTLLoadActionClear : MTLLoadActionLoad;
+                rp.colorAttachments[i].clearColor = MTLClearColorMake(0, 0, 0, 0);
+                rp.colorAttachments[i].storeAction = lastPass ? MTLStoreActionMultisampleResolve : MTLStoreActionStore;
             }
+            rp.depthAttachment.texture = depth;
+            rp.depthAttachment.loadAction = firstPass ? MTLLoadActionClear : MTLLoadActionLoad;
+            rp.depthAttachment.clearDepth = 1.0;
+            rp.depthAttachment.storeAction = lastPass ? MTLStoreActionDontCare : MTLStoreActionStore;
+            id<MTLCommandBuffer> cmd = [queue_ commandBuffer];
+            cmd.label = @"Impostor bake";
+            id<MTLRenderCommandEncoder> enc = [cmd renderCommandEncoderWithDescriptor:rp];
+            enc.label = @"Impostor frames";
+            [enc setRenderPipelineState:bake_];
+            [enc setDepthStencilState:bakeDepth_];
+            [enc setFrontFacingWinding:MTLWindingCounterClockwise];
+            for (int fx = fx0; fx < fx1; ++fx) {
+                const impostor::Basis b = impostor::frameBasis(impostor::frameDirection(fx, fy, frames, model.hemi));
+                ImpostorBakeUniformsGpu bu{simd_make_float4(center.x, center.y, center.z, radius),
+                                           simd_make_float4(b.right.x, b.right.y, b.right.z, 0), simd_make_float4(b.up.x, b.up.y, b.up.z, 0),
+                                           simd_make_float4(b.forward.x, b.forward.y, b.forward.z, 0)};
+                const double t = static_cast<double>(tile);
+                [enc setViewport:MTLViewport{fx * t, 0.0, t, t, 0.0, 1.0}];
+                [enc setScissorRect:MTLScissorRect{static_cast<NSUInteger>(fx * tile), 0, rowH, rowH}];
+                [enc setVertexBytes:&bu length:sizeof(bu) atIndex:2];
+                [enc setFragmentBytes:&bu length:sizeof(bu) atIndex:2];
+                for (size_t pi = 0; pi < meshes.size(); ++pi) {
+                    const InstancePart& part = (*model.parts)[pi];
+                    const Surface& s = part.surface;
+                    id<MTLTexture> albedo = textures_(s.texture, true), normal = textures_(s.normalMap, false),
+                                   orm = textures_(s.ormMap, false), emissive = textures_(s.emissiveMap, true);
+                    FxDrawUniforms du = surfaceUniforms_(s, simd_make_float4(albedo ? 1 : 0, normal ? 1 : 0,
+                                                                             orm ? 1.f + s.occlusionStrength : 0.f, emissive ? 1 : 0));
+                    du.model = toSimd(part.local);
+                    du.normalMatrix = toSimd(part.local.inverse().transposed());
+                    [enc setCullMode:s.doubleSided ? MTLCullModeNone : MTLCullModeBack];
+                    [enc setVertexBuffer:meshes[pi]->vertices offset:0 atIndex:0];
+                    [enc setVertexBytes:&du length:sizeof(du) atIndex:1];
+                    [enc setFragmentBytes:&du length:sizeof(du) atIndex:0];
+                    [enc setFragmentTexture:(albedo ?: white_) atIndex:0];
+                    [enc setFragmentTexture:(normal ?: white_) atIndex:2];
+                    [enc setFragmentTexture:(orm ?: white_) atIndex:3];
+                    [enc setFragmentTexture:(emissive ?: white_) atIndex:4];
+                    const int lod = lods[pi];
+                    [enc drawIndexedPrimitives:MTLPrimitiveTypeTriangle
+                                    indexCount:meshes[pi]->lodCount_[lod]
+                                     indexType:MTLIndexTypeUInt32
+                                   indexBuffer:meshes[pi]->indices
+                             indexBufferOffset:meshes[pi]->lodOffset[lod] * sizeof(uint32_t)];
+                }
+            }
+            [enc endEncoding];
+            if (lastPass) {  // read the resolved row back for the CPU post-process and the cache
+                id<MTLBlitCommandEncoder> blit = [cmd blitCommandEncoder];
+                for (int i = 0; i < 3; ++i) {
+                    [blit copyFromTexture:resolved[i]
+                                     sourceSlice:0
+                                     sourceLevel:0
+                                    sourceOrigin:MTLOriginMake(0, 0, 0)
+                                      sourceSize:MTLSizeMake(n, rowH, 1)
+                                        toBuffer:reads[i]
+                               destinationOffset:static_cast<NSUInteger>(fy) * rowH * n * bpp[i]
+                          destinationBytesPerRow:n * bpp[i]
+                        destinationBytesPerImage:n * rowH * bpp[i]];
+                }
+                [blit endEncoding];
+            }
+            [cmd commit];
+            last = cmd;
         }
-        [enc endEncoding];
-        // Read the resolved row back for the CPU post-process and the project cache.
-        id<MTLBlitCommandEncoder> blit = [cmd blitCommandEncoder];
-        for (int i = 0; i < 3; ++i) {
-            [blit copyFromTexture:resolved[i]
-                             sourceSlice:0
-                             sourceLevel:0
-                            sourceOrigin:MTLOriginMake(0, 0, 0)
-                              sourceSize:MTLSizeMake(n, rowH, 1)
-                                toBuffer:reads[i]
-                       destinationOffset:static_cast<NSUInteger>(fy) * rowH * n * bpp[i]
-                  destinationBytesPerRow:n * bpp[i]
-                destinationBytesPerImage:n * rowH * bpp[i]];
-        }
-        [blit endEncoding];
     }
-    [cmd commit];
-    [cmd waitUntilCompleted];
-    if (cmd.status == MTLCommandBufferStatusError) {
-        return Error::make("gpu_error", cmd.error ? cmd.error.localizedDescription.UTF8String : "the impostor bake failed");
+    [last waitUntilCompleted];  // same queue: every earlier batch has completed too
+    if (last.status == MTLCommandBufferStatusError) {
+        return Error::make("gpu_error", last.error ? last.error.localizedDescription.UTF8String : "the impostor bake failed");
     }
     const NSUInteger rgbaBytes = n * n * 4;
     id<MTLBuffer> readA = reads[0], readB = reads[1], readR = reads[2];

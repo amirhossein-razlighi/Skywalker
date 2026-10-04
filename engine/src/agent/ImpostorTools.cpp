@@ -1,8 +1,14 @@
 // Foliage impostor tools: bake (or rebake) the octahedral impostors that draw distant
 // instances of heavy foliage layers, and inspect their atlases.
 
+#include <fcntl.h>
+#include <sys/file.h>
+#include <unistd.h>
+
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
+#include <filesystem>
 #include <sstream>
 
 #include "ToolHelpers.h"
@@ -14,6 +20,30 @@ namespace sky::tools {
 namespace {
 
 using namespace schema;
+
+/// Bakes take turns on the GPU with every other Skywalker process's offline renders (the same
+/// ~/.skywalker/gpu.lock that captures and benchmarks hold).
+class GpuJobLock {
+public:
+    GpuJobLock() {
+        const char* home = std::getenv("HOME");
+        std::string dir = std::string(home && *home ? home : "/tmp") + "/.skywalker";
+        std::error_code ec;
+        std::filesystem::create_directories(dir, ec);
+        fd_ = ::open((dir + "/gpu.lock").c_str(), O_CREAT | O_RDWR | O_CLOEXEC, 0644);
+        if (fd_ >= 0) ::flock(fd_, LOCK_EX);
+    }
+    ~GpuJobLock() {
+        if (fd_ < 0) return;
+        ::flock(fd_, LOCK_UN);
+        ::close(fd_);
+    }
+    GpuJobLock(const GpuJobLock&) = delete;
+    GpuJobLock& operator=(const GpuJobLock&) = delete;
+
+private:
+    int fd_ = -1;
+};
 
 }  // namespace
 
@@ -83,6 +113,7 @@ void addImpostorTools(Engine& engine, ToolRegistry& reg) {
                  }
                  std::vector<ImpostorModel> models;
                  for (const auto& l : layers) models.push_back(l.model);
+                 GpuJobLock gpuLock;
                  auto baked = engine.renderer().bakeImpostors(models, a.get("rebake").asBool(false));
                  if (!baked) return ToolResult::error(baked.error());
                  Json out = Json::array();

@@ -409,14 +409,15 @@ kernel void foliageCullKernel(const device FoliageInstanceGpu* instances [[buffe
                 for (uint b = 0; b < kFoliageBins; ++b) {
                     if (!(mask & (1u << b))) continue;
                     uint slot = atomic_fetch_add_explicit(&counters[v * kFoliageBins + b], 1u, memory_order_relaxed);
-                    if (pass == 1) lists[v * stride + offsets[v * kFoliageBins + b] + slot] = i;
+                    uint at = offsets[v * kFoliageBins + b] + slot;
+                    if (pass == 1 && at < stride) lists[v * stride + at] = i;  // bounds-checked
                 }
             }
         }
         threadgroup_barrier(mem_flags::mem_threadgroup);
         if (pass > 0) break;
         if (tid == 0) {
-            const uint parts = p.counts.y, viewArgs = parts * 20u + 4u;
+            const uint parts = min(p.counts.y, 8u), viewArgs = parts * 20u + 4u;
             float kiloTris = 0.0, shadowKiloTris = 0.0;
             uint meshInstances = 0, impostors = 0, shadowImpostors = 0;
             for (uint v = 0; v < views; ++v) {
@@ -430,7 +431,7 @@ kernel void foliageCullKernel(const device FoliageInstanceGpu* instances [[buffe
                 for (uint part = 0; part < parts; ++part) {
                     for (uint b = 0; b < 4; ++b) {
                         uint2 lod = p.lods[table * 32u + part * 4u + b];
-                        uint count = atomic_load_explicit(&counters[v * kFoliageBins + b], memory_order_relaxed);
+                        uint count = min(atomic_load_explicit(&counters[v * kFoliageBins + b], memory_order_relaxed), n);
                         device uint* x = a + (part * 4u + b) * 5u;  // MTLDrawIndexedPrimitivesIndirectArguments
                         x[0] = lod.y;
                         x[1] = count;
@@ -442,7 +443,7 @@ kernel void foliageCullKernel(const device FoliageInstanceGpu* instances [[buffe
                         if (v == 0 && part == 0) meshInstances += count;
                     }
                 }
-                uint imp = atomic_load_explicit(&counters[v * kFoliageBins + 4], memory_order_relaxed);
+                uint imp = min(atomic_load_explicit(&counters[v * kFoliageBins + 4], memory_order_relaxed), n);
                 device uint* x = a + parts * 20u;  // MTLDrawPrimitivesIndirectArguments (a 4-vertex strip)
                 x[0] = 4u;
                 x[1] = imp;

@@ -113,6 +113,15 @@ private:
     id<MTLBuffer> lists_[kRing], args_[kRing];
     int ring_ = 0;
     std::vector<Chunk> chunks_;
+    // GPU culling can be switched off (SKY_GPU_CULL=0); it also turns itself off when a frame's
+    // indirect arguments fail validation (checked on the CPU when the frame completes).
+    bool gpuCull_ = true;
+    struct ArgCheck {
+        NSUInteger argsOffset, viewArgs;
+        uint32_t views, parts, instances, listStride, maxIndices;
+    };
+    std::vector<ArgCheck> frameChecks_;
+    NSUInteger frameArgBytes_ = 0;
     std::vector<Impostor*> frameImpostors_;  // per FrameData::impostors index (null = not ready)
     id<MTLBuffer> frameStats_;
 
@@ -124,6 +133,11 @@ private:
     std::unordered_map<uint64_t, InstanceGpu> instanceBuffers_;
     uint64_t frameIndex_ = 0;
     std::shared_ptr<Counters> counters_;
+    /// Camera-view foliage triangles allowed per frame before every LOD is coarsened (the
+    /// safety net against GPU watchdog stalls; impostors normally keep frames far below it).
+    static constexpr uint64_t kTriangleBudget = 120'000'000;
+    int budgetBias_ = 0;
+    uint64_t lastEstimate_ = 0;
     size_t bakes_ = 0, cacheLoads_ = 0;
     double bakeMs_ = 0.0;
 };
