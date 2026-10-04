@@ -1,7 +1,9 @@
 #include <zlib.h>
 
 #include <cstdio>
+#include <filesystem>
 #include <memory>
+#include <system_error>
 
 #include "skywalker/render/Image.h"
 
@@ -63,6 +65,9 @@ std::vector<uint8_t> encodePng(const Image& image) {
 Status writePng(const Image& image, const std::string& path) {
     std::vector<uint8_t> data = encodePng(image);
     if (data.empty()) return Error::make("encode_failed", "could not encode PNG");
+    // Save paths often name a fresh folder (e.g. "lookdev/shot.png"): create it.
+    std::error_code ec;
+    if (auto parent = std::filesystem::path(path).parent_path(); !parent.empty()) std::filesystem::create_directories(parent, ec);
     std::unique_ptr<FILE, int (*)(FILE*)> f(std::fopen(path.c_str(), "wb"), &std::fclose);
     if (!f) return Error::make("io_error", "cannot write " + path);
     if (std::fwrite(data.data(), 1, data.size(), f.get()) != data.size()) return Error::make("io_error", "short write to " + path);
