@@ -10,6 +10,8 @@
 #include <vector>
 
 #include "skywalker/core/Log.h"
+#include "MetalProfiler.h"     // [profiler] per-pass GPU timing
+#include "MetalShaderCache.h"  // [shader cache] pipelines through the binary archive
 
 namespace sky {
 
@@ -114,7 +116,7 @@ bool MetalRenderer2D::init() {
         pd.fragmentFunction = [spriteLib_ newFunctionWithName:@"occluderFragment"];
         pd.colorAttachments[0].pixelFormat = MTLPixelFormatR8Unorm;
         NSError* error = nil;
-        occluderPipeline_ = [device_ newRenderPipelineStateWithDescriptor:pd error:&error];
+        occluderPipeline_ = newRenderPipeline(device_, pd, &error);
         if (!occluderPipeline_) {
             log::error("render", std::string("2D occluder pipeline: ") + (error ? error.localizedDescription.UTF8String : "?"));
             return false;
@@ -210,7 +212,7 @@ id<MTLRenderPipelineState> MetalRenderer2D::worldPipeline(MTLRenderPassDescripto
     if (depth) pd.depthAttachmentPixelFormat = depth.pixelFormat;
     if (id<MTLTexture> stencil = pass.stencilAttachment.texture) pd.stencilAttachmentPixelFormat = stencil.pixelFormat;
     NSError* error = nil;
-    id<MTLRenderPipelineState> pso = [device_ newRenderPipelineStateWithDescriptor:pd error:&error];
+    id<MTLRenderPipelineState> pso = newRenderPipeline(device_, pd, &error);
     if (!pso) log::error("render", std::string("2D sprite pipeline: ") + (error ? error.localizedDescription.UTF8String : "?"));
     pipelines_[key] = pso;
     return pso;
@@ -231,7 +233,7 @@ id<MTLRenderPipelineState> MetalRenderer2D::uiPipeline(MTLPixelFormat color, MTL
     ca.destinationAlphaBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
     pd.depthAttachmentPixelFormat = depth;
     NSError* error = nil;
-    id<MTLRenderPipelineState> pso = [device_ newRenderPipelineStateWithDescriptor:pd error:&error];
+    id<MTLRenderPipelineState> pso = newRenderPipeline(device_, pd, &error);
     if (!pso) log::error("render", std::string("UI pipeline: ") + (error ? error.localizedDescription.UTF8String : "?"));
     pipelines_[key] = pso;
     return pso;
@@ -259,6 +261,7 @@ void MetalRenderer2D::encodeOccluders(id<MTLCommandBuffer> cmd, const FrameData&
     rp.colorAttachments[0].loadAction = MTLLoadActionClear;
     rp.colorAttachments[0].clearColor = MTLClearColorMake(0, 0, 0, 0);
     rp.colorAttachments[0].storeAction = MTLStoreActionStore;
+    profileRenderPass(rp, "2D occluders", "2d");
     id<MTLRenderCommandEncoder> enc = [cmd renderCommandEncoderWithDescriptor:rp];
     enc.label = @"2D occluders";
     [enc setRenderPipelineState:occluderPipeline_];
@@ -353,6 +356,7 @@ void MetalRenderer2D::encodeUI(id<MTLCommandBuffer> cmd, const FrameData& frame,
     }
     id<MTLRenderPipelineState> pso = uiPipeline(target.pixelFormat, useDepth ? depth.pixelFormat : MTLPixelFormatInvalid);
     if (!pso) return;
+    profileRenderPass(rp, "UI", "ui");
     id<MTLRenderCommandEncoder> enc = [cmd renderCommandEncoderWithDescriptor:rp];
     enc.label = @"UI";
     [enc setRenderPipelineState:pso];

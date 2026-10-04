@@ -240,6 +240,27 @@ fragment MainOut meshFragment(MeshOut in [[stage_in]],
     SurfaceData s = m.s;
     float3 Ngeo = m.Ngeo;
     float3 emissive = m.emissive;
+    // [debug views] lighting_only: a white diffuse material; other surface views replace the color.
+    const int dbg = debugMode(f);
+    if (dbg == kDbgLightingOnly) {
+        s.albedo = float3(1.0);
+        s.metallic = 0.0;
+        emissive = 0.0;
+    } else if (debugReplacesColor(dbg)) {
+        DebugSurface ds;
+        ds.worldPos = in.worldPos;
+        ds.N = s.N;
+        ds.uv = in.uv;
+        ds.texUV = in.uv * d.material2.xy;
+        ds.texSize = d.maps.x > 0.5 ? float(albedoTex.get_width()) : 0.0;
+        ds.albedo = s.albedo;
+        ds.emissive = emissive;
+        ds.metallic = s.metallic;
+        ds.roughness = s.roughness;
+        ds.lod = max(d.material4.w - 1.0, 0.0);
+        ds.lights = float(clusterCells[clusterOf(f, in.position.xy, in.worldPos)].y);
+        return mainOut(float4(debugSurfaceColor(dbg, ds, f), s.alpha), s.albedo, 1.0, Ngeo, 1.0, kGbufNoLighting);
+    }
 
     int shading = int(d.material.w + 0.5);
     if (shading == 2) {  // unlit: flat color, still emissive

@@ -138,6 +138,10 @@ set(SKY_ENGINE_SOURCES
     src/render/MovieWriter.cpp
     src/engine/Movie.cpp
     src/agent/MovieTools.cpp
+    # Profiler, debug views and the shader cache (W3/W4: docs/RENDERING.md "Profiling and debug views")
+    src/core/Profiler.cpp
+    src/render/DebugViews.cpp
+    src/render/ShaderCache.cpp
 )
 
 # DCC bridge: the Python helper library and the Blender add-on are embedded so the engine can
@@ -251,7 +255,7 @@ if(SKY_HAS_METAL)
     # by agents and does not require the offline Metal toolchain).
     # The standard shader library is several modules concatenated in dependency order.
     set(_shader_dir ${CMAKE_CURRENT_SOURCE_DIR}/platform/metal/shaders)
-    set(_shader_modules Common.metal Clouds.metal Sky.metal Surface.metal Terrain.metal Lighting.metal Effects.metal Post.metal GpuParticles.metal Hair.metal)
+    set(_shader_modules Common.metal Debug.metal Clouds.metal Sky.metal Surface.metal Terrain.metal Lighting.metal Effects.metal Post.metal GpuParticles.metal Hair.metal)
     list(TRANSFORM _shader_modules PREPEND ${_shader_dir}/ OUTPUT_VARIABLE _shader_src)
     string(REPLACE ";" "," _shader_list "${_shader_modules}")
     set(_shader_inc ${CMAKE_CURRENT_BINARY_DIR}/generated/ShaderSource.inc)
@@ -285,7 +289,44 @@ if(SKY_HAS_METAL)
         COMMENT "Embedding Metal skinning shader source")
     target_sources(skywalker_engine PRIVATE platform/metal/MetalRenderer.mm platform/metal/MetalRenderer2D.mm
         platform/metal/MetalFx.mm platform/metal/MetalGpuParticles.mm platform/metal/MetalHair.mm platform/metal/MetalFoliage.mm
+        platform/metal/MetalProfiler.mm platform/metal/MetalShaderCache.mm
         ${_shader_inc} ${_skin_inc} ${_extra_shader_incs})
+    # Precompiled shader library: with the offline Metal toolchain installed, the standard library is
+    # compiled to a .metallib at build time and embedded (#embed), so startup skips the MSL compile.
+    # Without it the engine compiles the embedded source at runtime (also used for shader_set hot
+    # reload and SKY_SHADER_SOURCE=1). Install: xcodebuild -downloadComponent MetalToolchain
+    option(SKY_PRECOMPILE_SHADERS "Precompile the Metal shader library (.metallib) when the Metal toolchain is installed" ON)
+    if(SKY_PRECOMPILE_SHADERS)
+        execute_process(COMMAND xcrun -sdk macosx metal --version RESULT_VARIABLE _sky_metal_rc OUTPUT_QUIET ERROR_QUIET)
+        if(_sky_metal_rc EQUAL 0)
+            set(_shader_cat ${CMAKE_CURRENT_BINARY_DIR}/generated/ShaderLibrary.metal)
+            set(_shader_lib ${CMAKE_CURRENT_BINARY_DIR}/generated/ShaderLibrary.metallib)
+            add_custom_command(
+                OUTPUT ${_shader_cat}
+                COMMAND ${CMAKE_COMMAND} -DDIR=${_shader_dir} -DFILES=${_shader_list} -DOUTPUT=${_shader_cat} -DRAW=ON
+                        -P ${PROJECT_SOURCE_DIR}/cmake/EmbedText.cmake
+                DEPENDS ${_shader_src} ${PROJECT_SOURCE_DIR}/cmake/EmbedText.cmake
+                COMMENT "Concatenating the Metal shader library")
+            set(_metal_min)
+            if(CMAKE_OSX_DEPLOYMENT_TARGET)
+                set(_metal_min -mmacosx-version-min=${CMAKE_OSX_DEPLOYMENT_TARGET})
+            endif()
+            add_custom_command(
+                OUTPUT ${_shader_lib}
+                COMMAND xcrun -sdk macosx metal ${_metal_min} -ffast-math -o ${_shader_lib} ${_shader_cat}
+                DEPENDS ${_shader_cat}
+                COMMENT "Precompiling the Metal shader library (.metallib)"
+                VERBATIM)
+            target_sources(skywalker_engine PRIVATE ${_shader_lib})
+            set_source_files_properties(platform/metal/MetalShaderCache.mm PROPERTIES
+                OBJECT_DEPENDS ${_shader_lib}
+                COMPILE_DEFINITIONS "SKY_SHADER_METALLIB_FILE=\"${_shader_lib}\"")
+            message(STATUS "Skywalker: precompiling Metal shaders to ${_shader_lib}")
+        else()
+            message(STATUS "Skywalker: Metal toolchain not installed; shaders compile at runtime "
+                           "(xcodebuild -downloadComponent MetalToolchain enables the precompiled .metallib)")
+        endif()
+    endif()
     target_include_directories(skywalker_engine PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/generated)
     target_compile_definitions(skywalker_engine PUBLIC $<$<COMPILE_LANGUAGE:C,CXX,OBJCXX>:SKY_HAS_METAL=1>)
     target_link_libraries(skywalker_engine PUBLIC

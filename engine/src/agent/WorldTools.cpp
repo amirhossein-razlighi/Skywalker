@@ -9,6 +9,7 @@
 #include <sstream>
 
 #include "ToolHelpers.h"
+#include "skywalker/core/Profiler.h"
 #include "skywalker/core/Random.h"
 #include "skywalker/core/Strings.h"
 
@@ -501,8 +502,13 @@ void addWorldTools(Engine& engine, ToolRegistry& reg) {
              "current view at width x height (temporal AA, no supersampling) and get average/min/max GPU ms. Check "
              "after big scatters, generators or look changes; 16.6 ms = 60 fps. view is \"editor\", \"scene\" or a "
              "custom camera {eye, target, fov}; quality benchmarks an editor viewport tier. The gpu section includes "
-             "foliage impostor stats (impostorInstances, meshInstances, impostorsBaked, impostorBakeMs). Example: "
-             "{\"frames\":30,\"view\":{\"eye\":[0,300,-600],\"target\":[0,80,0]}}.",
+             "foliage impostor stats (impostorInstances, meshInstances, impostorsBaked, impostorBakeMs). passes=true adds "
+             "where the frame time goes: profile.passes = GPU time per render pass (Main, Shadow cascades, SSGI, SSR, Lighting "
+             "resolve, TAA, Bloom, Composite, Foliage cull, GPU particles, Hair ...; rolling 60-frame avg/min/max), "
+             "profile.groups = the same summed by area (shadows, main, ao, ssgi, ssr, resolve, effects, volumetrics, clouds, "
+             "temporal, post, foliage, particles, hair, ui ...) and profile.cpu = CPU scopes (frame.build, scene.buildFrame, "
+             "world.gather, render.encode ...). With frames > 0 the profile covers exactly the benchmark frames. Example: "
+             "{\"frames\":30,\"passes\":true,\"view\":{\"eye\":[0,300,-600],\"target\":[0,80,0]}}.",
              "render",
              object({{"frames", integer("Benchmark this many real-time frames first (default 0 = just report)")},
                      {"width", integer("Benchmark width (default 1920)")},
@@ -510,7 +516,8 @@ void addWorldTools(Engine& engine, ToolRegistry& reg) {
                      {"view", any("Camera for the benchmark: \"editor\" (default), \"scene\", or {eye: [x,y,z], target: "
                                   "[x,y,z], fov: degrees}")},
                      {"quality", enumeration({"full", "balanced", "fast"},
-                                             "Viewport quality tier to benchmark (default full, as in play mode and captures)")}}),
+                                             "Viewport quality tier to benchmark (default full, as in play mode and captures)")},
+                     {"passes", boolean("Add the per-pass GPU timeline and CPU scopes (profile: passes, groups, cpu)")}}),
              false, false, [&engine](const Json& a, ToolContext&) {
                  Json bench = Json::object();
                  int frames = static_cast<int>(std::clamp<int64_t>(a.get("frames").asInt(0), 0, 600));
@@ -537,6 +544,10 @@ void addWorldTools(Engine& engine, ToolRegistry& reg) {
                      const std::string q = a.get("quality").asString("full");
                      o.quality = q == "fast" ? 2 : q == "balanced" ? 1 : 0;
                      o.editorOverlays = false;
+                     if (a.get("passes").asBool(false)) {  // the profile covers exactly the benchmark frames
+                         engine.renderer().resetPassProfile();
+                         prof::CpuProfiler::instance().reset();
+                     }
                      double sum = 0, lo = 1e9, hi = 0, cpu = 0;
                      for (int i = 0; i < frames + 3; ++i) {  // 3 warm-up frames
                          auto t0 = std::chrono::steady_clock::now();
@@ -574,6 +585,22 @@ void addWorldTools(Engine& engine, ToolRegistry& reg) {
                                                                  {"foliageChunks", static_cast<int64_t>(engine.world().stats().foliageChunks)},
                                                                  {"foliageInstances", static_cast<int64_t>(engine.world().stats().foliageInstances)}})}});
                  if (frames > 0) j["benchmark"] = bench;
+                 Json warnings = Json::array();
+                 if (a.get("passes").asBool(false)) {
+                     Json profile = engine.renderer().passProfile();
+                     profile["cpu"] = prof::CpuProfiler::instance().toJson();
+                     if (!profile.get("supported").asBool(false)) {
+                         warnings.push("per-pass GPU timing is unavailable on this renderer/GPU (" +
+                                       profile.get("mode").asString("unsupported") + "); CPU scopes still apply");
+                     } else if (profile.get("frames").asInt(0) == 0) {
+                         warnings.push("no profiled frames yet: pass frames (e.g. 30) to benchmark, or let the editor viewport run");
+                     }
+                     if (profile.get("droppedPasses").asInt(0) > 0) {
+                         warnings.push("some passes were not timed (timestamp buffer full); totals are a lower bound");
+                     }
+                     j["profile"] = profile;
+                 }
+                 if (warnings.size() > 0) j["warnings"] = warnings;
                  std::ostringstream os;
                  os << "frame build " << j.get("cpuFrameMs").dump() << " ms, " << st.draws << " draws, " << st.lights
                     << " lights; " << s.size() << " entities (" << meshes << " meshes, " << behaviors

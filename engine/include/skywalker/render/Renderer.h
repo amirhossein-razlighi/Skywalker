@@ -279,9 +279,10 @@ struct FrameData {
     int samples = 1;
     /// Discards temporal history (camera cuts). Large camera jumps are detected automatically.
     bool resetHistory = false;
-    /// Buffer visualization instead of the final image: 0 off, 1 albedo, 2 normals,
-    /// 3 roughness/metallic, 4 GI, 5 reflections, 6 AO, 7 depth, 8 lighting before GI, 9 sketch,
-    /// 10 impostors (the final image with foliage meshes tinted green and impostors magenta).
+    /// Buffer visualization / shading override instead of the final image (render/DebugViews.h:
+    /// 0 off, 1 albedo, 2 normals, ... 11 wireframe, 12 overdraw, 13 unshaded, 14 lighting_only,
+    /// 15 shadow_cascades, 16 light_complexity, 17 lod, 18 emission, 19 specular, 20 uv_checker,
+    /// 21 texel_density).
     int debugView = 0;
     /// Viewport quality: 0 full (play, captures), 1 balanced, 2 fast (editing a heavy world).
     /// Lower tiers pick coarser LODs and cheaper shadows; the engine also trims the environment.
@@ -348,6 +349,9 @@ bool sceneCamera(const Scene& scene, ViewCamera& out, EntityId preferred = kNoEn
 struct RendererInfo {
     std::string backend;  // "metal", "null"
     std::string device;   // GPU name
+    /// Shader library and pipeline cache: {library: "metallib"|"source", shaderCompileMs, startupMs,
+    /// pipelineCache: {...}} (see docs/RENDERING.md "Shader library and pipeline cache").
+    Json shaders = Json::object();
 };
 
 class Renderer {
@@ -371,6 +375,11 @@ public:
     virtual std::vector<LightItem> effectLights() const { return {}; }
     /// Backend statistics of the last completed frame (GPU time in ms, items drawn, effects...).
     virtual Json stats() const { return Json::object(); }
+    /// Per-pass GPU timing over the last frames (rolling 60-frame window): {supported, mode,
+    /// frames, spanMs, sumMs, passes: [{pass, group, ms, avgMs, minMs, maxMs, count}], groups}.
+    virtual Json passProfile() const { return Json::object({{"supported", false}, {"mode", "unsupported"}}); }
+    /// Clears the pass timeline (e.g. before a benchmark).
+    virtual void resetPassProfile() {}
     /// Bakes the impostors of these models now (or loads them from their cache files unless
     /// `force`). Returns one entry per model: key, label, atlas size, frames, tile, bake time,
     /// whether it came from the cache, and the cache path.

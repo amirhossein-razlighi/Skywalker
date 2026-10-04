@@ -10,6 +10,9 @@
 #include <cstring>
 
 #include "skywalker/core/Log.h"
+#include "MetalProfiler.h"     // [profiler] per-pass GPU timing
+#include "MetalShaderCache.h"  // [shader cache] pipelines through the binary archive
+#include "skywalker/render/DebugViews.h"
 #include "skywalker/render/Impostor.h"
 
 namespace sky {
@@ -138,6 +141,7 @@ struct MetalFoliage::Chunk {
     float cull = 0.f;  // effective cull distance this frame
     float bandFar[3] = {};
     float bandFrac[4] = {};  // share of the footprint in each mesh band (triangle budget estimate)
+    uint8_t bandLod[kMaxParts][kBands] = {};  // camera mesh LOD per part and band (lod debug view)
     int firstImpostorCascade = 4;
     Impostor* imp = nullptr;
     FoliageUniformsGpu uniforms{};
@@ -202,9 +206,9 @@ Status MetalFoliage::build(id<MTLLibrary> lib, const FoliageFormats& fmt) {
             d.colorAttachments[1].pixelFormat = fmt.gbufA;
             d.colorAttachments[2].pixelFormat = fmt.gbufB;
         }
-        return [device_ newRenderPipelineStateWithDescriptor:d error:&e];
+        return newRenderPipeline(device_, d, &e);
     };
-    id<MTLComputePipelineState> cull = [device_ newComputePipelineStateWithFunction:fn("foliageCullKernel") error:&e];
+    id<MTLComputePipelineState> cull = newComputePipeline(device_, fn("foliageCullKernel"), &e);
     id<MTLRenderPipelineState> mesh = cull ? make("foliageVertex", "meshFragment", true, false) : nil;
     id<MTLRenderPipelineState> cutout = mesh ? make("foliageVertex", "meshFragment", true, true) : nil;
     id<MTLRenderPipelineState> shadow = cutout ? make("foliageShadowVertex", nullptr, false, false) : nil;
@@ -221,7 +225,7 @@ Status MetalFoliage::build(id<MTLLibrary> lib, const FoliageFormats& fmt) {
         d.colorAttachments[1].pixelFormat = MTLPixelFormatRGBA8Unorm;
         d.colorAttachments[2].pixelFormat = MTLPixelFormatR8Unorm;
         d.depthAttachmentPixelFormat = MTLPixelFormatDepth32Float;
-        bake = [device_ newRenderPipelineStateWithDescriptor:d error:&e];
+        bake = newRenderPipeline(device_, d, &e);
     }
     if (!bake) {
         return Error::make("pipeline_error", e ? std::string(e.localizedDescription.UTF8String) : "foliage pipeline creation failed");
@@ -229,6 +233,29 @@ Status MetalFoliage::build(id<MTLLibrary> lib, const FoliageFormats& fmt) {
     cull_ = cull;
     mesh_ = mesh;
     meshCutout_ = cutout;
+    {  // [debug views] overdraw: every fragment adds 1 (additive, G-buffer untouched); optional
+        auto overdraw = [&](const char* vs) -> id<MTLRenderPipelineState> {
+            id<MTLFunction> f = fn("overdrawFragment");
+            if (!f) return nil;
+            MTLRenderPipelineDescriptor* d = [MTLRenderPipelineDescriptor new];
+            d.vertexFunction = fn(vs);
+            d.fragmentFunction = f;
+            d.depthAttachmentPixelFormat = fmt.depth;
+            d.rasterSampleCount = fmt.samples;
+            d.colorAttachments[0].pixelFormat = fmt.hdr;
+            d.colorAttachments[0].blendingEnabled = YES;
+            d.colorAttachments[0].sourceRGBBlendFactor = d.colorAttachments[0].destinationRGBBlendFactor = MTLBlendFactorOne;
+            d.colorAttachments[0].sourceAlphaBlendFactor = d.colorAttachments[0].destinationAlphaBlendFactor = MTLBlendFactorOne;
+            d.colorAttachments[1].pixelFormat = fmt.gbufA;
+            d.colorAttachments[1].writeMask = MTLColorWriteMaskNone;
+            d.colorAttachments[2].pixelFormat = fmt.gbufB;
+            d.colorAttachments[2].writeMask = MTLColorWriteMaskNone;
+            NSError* oe = nil;
+            return newRenderPipeline(device_, d, &oe);
+        };
+        overdrawMesh_ = overdraw("foliageVertex");
+        overdrawImpostor_ = overdrawMesh_ ? overdraw("impostorVertex") : nil;
+    }
     meshShadow_ = shadow;
     meshShadowAlpha_ = shadowAlpha;
     impostor_ = imp;
@@ -509,12 +536,10 @@ void MetalFoliage::prepare(id<MTLCommandBuffer> cmd, const FrameData& frame, con
     id<MTLComputeCommandEncoder> enc = nil;
     if (gpu) {
         // Arguments the kernel does not write (views a chunk does not process) draw nothing.
-        id<MTLBlitCommandEncoder> blit = [cmd blitCommandEncoder];
-        blit.label = @"Foliage args clear";
+        id<MTLBlitCommandEncoder> blit = profiledBlit(cmd, "Foliage args clear", "foliage");
         [blit fillBuffer:args_[ring_] range:NSMakeRange(0, argBytes) value:0];
         [blit endEncoding];
-        enc = [cmd computeCommandEncoderWithDispatchType:MTLDispatchTypeConcurrent];
-        enc.label = @"Foliage cull";
+        enc = profiledCompute(cmd, "Foliage cull", "foliage", MTLDispatchTypeConcurrent);
         [enc setComputePipelineState:cull_];
         [enc setBuffer:frameStats_ offset:0 atIndex:4];
     } else {
@@ -522,7 +547,7 @@ void MetalFoliage::prepare(id<MTLCommandBuffer> cmd, const FrameData& frame, con
     }
     FoliageCullParamsGpu p{};
     std::memcpy(p.planes, planes, sizeof(planes));
-    for (const Chunk& c : chunks_) {
+    for (Chunk& c : chunks_) {
         const InstanceBatch& b = *c.batch;
         const Vec3 center = b.modelBounds.center();
         p.eye = simd_make_float4(eye.x, eye.y, eye.z, c.D);
@@ -547,6 +572,7 @@ void MetalFoliage::prepare(id<MTLCommandBuffer> cmd, const FrameData& frame, con
                         continue;
                     }
                     const int lod = lodFor(c, part, band, table);
+                    if (table == 0) c.bandLod[part][band] = static_cast<uint8_t>(lod);
                     slot[0] = m->lodOffset[lod];
                     slot[1] = m->lodCount_[lod];
                     maxIndices = std::max(maxIndices, slot[1]);
@@ -649,7 +675,8 @@ void MetalFoliage::encodeShadows(id<MTLRenderCommandEncoder> enc, const FrameDat
 }
 
 void MetalFoliage::encodeMain(id<MTLRenderCommandEncoder> enc, const FrameData& frame) {
-    (void)frame;
+    const bool lodDebug = frame.debugView == debugview::kLod;
+    const bool overdraw = frame.debugView == debugview::kOverdraw && overdrawMesh_ && overdrawImpostor_;
     bool cutBound = false, first = true;
     for (Chunk& c : chunks_) {
         if (debugSkip_ & 1u) break;
@@ -661,7 +688,7 @@ void MetalFoliage::encodeMain(id<MTLRenderCommandEncoder> enc, const FrameData& 
             bool cut = false;
             bindPart(enc, part, false, cut);
             if (first || cut != cutBound) {
-                [enc setRenderPipelineState:cut ? meshCutout_ : mesh_];
+                [enc setRenderPipelineState:overdraw ? overdrawMesh_ : (cut ? meshCutout_ : mesh_)];
                 cutBound = cut;
                 first = false;
             }
@@ -671,8 +698,19 @@ void MetalFoliage::encodeMain(id<MTLRenderCommandEncoder> enc, const FrameData& 
             [enc setVertexBuffer:c.instances offset:0 atIndex:3];
             [enc setVertexBytes:&c.uniforms length:sizeof(c.uniforms) atIndex:4];
             [enc setVertexBuffer:lists_[ring_] offset:c.listOffset atIndex:5];
+            FxDrawUniforms lodUniforms{};
+            if (lodDebug) {  // [debug views] the lod view tints each band by its mesh LOD
+                const Surface& s = part.surface;
+                lodUniforms = surfaceUniforms_(s, simd_make_float4(textures_(s.texture, true) ? 1 : 0, textures_(s.normalMap, false) ? 1 : 0,
+                                                                   textures_(s.ormMap, false) ? 1.f + s.occlusionStrength : 0.f,
+                                                                   textures_(s.emissiveMap, true) ? 1 : 0));
+            }
             for (int band = 0; band < kBands; ++band) {
                 if (!c.bandOverlaps(band)) continue;
+                if (lodDebug) {
+                    lodUniforms.material4.w = 1.f + static_cast<float>(c.bandLod[pi][band]);
+                    [enc setFragmentBytes:&lodUniforms length:sizeof(lodUniforms) atIndex:0];
+                }
                 [enc drawIndexedPrimitives:MTLPrimitiveTypeTriangle
                                  indexType:MTLIndexTypeUInt32
                                indexBuffer:m->indices
@@ -687,7 +725,7 @@ void MetalFoliage::encodeMain(id<MTLRenderCommandEncoder> enc, const FrameData& 
     for (Chunk& c : chunks_) {
         if (!(c.viewMask & 1u) || !c.imp || c.D <= 0.f || c.dmax <= c.D - c.W) continue;
         if (!impBound) {
-            [enc setRenderPipelineState:impostor_];
+            [enc setRenderPipelineState:overdraw ? overdrawImpostor_ : impostor_];
             [enc setCullMode:MTLCullModeNone];
             impBound = true;
         }

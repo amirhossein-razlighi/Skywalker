@@ -10,6 +10,7 @@
 #include "skywalker/wander/Compiler.h"
 #include "ToolHelpers.h"
 #include "skywalker/render/Hdr.h"
+#include "skywalker/render/DebugViews.h"
 
 namespace sky {
 
@@ -155,7 +156,9 @@ using namespace tools;
 
 void addSceneTools(Engine& engine, ToolRegistry& reg) {
     reg.add({"engine_info", "Engine info",
-             "Version, renderer, play state, component types and tool categories. Call once at the start of a session.",
+             "Version, renderer, play state, component types and tool categories. Call once at the start of a session. "
+             "shaders reports how the shader library was loaded (library \"metallib\" precompiled or \"source\" compiled at "
+             "startup), shaderCompileMs, renderer startupMs and the pipeline cache (hits/misses, archive path).",
              "scene", object({}), false, false, [&engine](const Json&, ToolContext&) {
                  RendererInfo ri = engine.renderer().info();
                  Json cats = Json::object();
@@ -169,6 +172,11 @@ void addSceneTools(Engine& engine, ToolRegistry& reg) {
                                         {"tools", cats},
                                         {"conventions", "meters, +Y up, entities face -Z, rotations in Euler degrees "
                                                         "[pitch, yaw, roll], colors as \"#rrggbb\""}});
+                 j["shaders"] = ri.shaders;  // [shader cache] library origin, compile/startup ms, pipeline archive
+                 if (ri.shaders.contains("shaderCompileMs")) {
+                     j["shaderCompileMs"] = ri.shaders.get("shaderCompileMs");
+                     j["rendererStartupMs"] = ri.shaders.get("startupMs");
+                 }
                  for (const auto& n : engine.scene().componentNames()) j["components"].push(n);
                  for (const auto& p : MeshRenderer::primitives()) j["primitives"].push(p);
                  return ToolResult::json(j);
@@ -638,10 +646,13 @@ void addViewTools(Engine& engine, ToolRegistry& reg) {
                      {"samples", integer("Supersampling: jittered sub-frames accumulated (default 4; 1 = fastest preview, "
                                          "16-32 = final-quality stills with noise-free GI and reflections)")},
                      {"clay", boolean("Render every surface as matte white clay (judge form and light; film 'sketch to fill' beats)")},
-                     {"debug_view", enumeration({"final", "albedo", "normals", "material", "gi", "reflections", "ao", "depth", "lighting", "sketch", "impostors"},
-                                                "Buffer visualization for diagnosing looks: material = roughness (red) / metallic (green), "
-                                                "gi = bounce light, lighting = before screen-space GI/reflections, impostors = the final image "
-                                                "with foliage meshes tinted green and distant impostors magenta")},
+                     {"debug_view", enumeration(debugViewNames(),
+                                                "Diagnostic view instead of the final image. Buffers: albedo, normals, material (roughness red / "
+                                                "metallic green), gi, reflections, ao, depth, lighting. Shading: unshaded, lighting_only (white "
+                                                "material), emission, specular. Geometry: wireframe, overdraw (heat map), lod (green 0 .. red 3), "
+                                                "uv_checker, texel_density (green = 512 texels/m). Lights: shadow_cascades (red/green/blue/yellow), "
+                                                "light_complexity (lights per pixel heat map). Also sketch, impostors. Full legend: "
+                                                "viewport_debug_view {\"list\": true}")},
                      {"quality", enumeration({"full", "balanced", "fast"}, "Viewport quality tier (default full; fast/balanced preview what the editor shows while editing)")},
                      {"include_image", boolean("Return the image (default true); false = only the entity list")},
                      {"save_path", string("Also write the PNG to this project-relative path")}}),
@@ -670,9 +681,9 @@ void addViewTools(Engine& engine, ToolRegistry& reg) {
                  o.editorOverlays = a.get("overlays").asBool(true);
                  o.samples = static_cast<int>(std::clamp<int64_t>(a.get("samples").asInt(4), 1, 64));
                  {
-                     static const char* kViews[] = {"final", "albedo", "normals", "material", "gi", "reflections", "ao", "depth", "lighting", "sketch", "impostors"};
-                     std::string dv = a.get("debug_view").asString();
-                     for (int i = 0; i < 11; ++i) if (dv == kViews[i]) o.debugView = i;
+                     auto dv = debugViewFromName(a.get("debug_view").asString());
+                     if (!dv) return ToolResult::error(dv.error());
+                     o.debugView = *dv;
                      o.clay = a.get("clay").asBool(false);
                      std::string q = a.get("quality").asString();
                      o.quality = q == "fast" ? 2 : q == "balanced" ? 1 : 0;
@@ -793,6 +804,36 @@ void addViewTools(Engine& engine, ToolRegistry& reg) {
                  ToolResult r = ToolResult::text("viewport quality: " + cur);
                  r.structured = Json::object({{"quality", cur}});
                  return r;
+             }});
+
+    reg.add({"viewport_debug_view", "Viewport debug view",
+             "Show a debug visualization in the live editor viewport (the human sees it too), or list every view with its "
+             "color legend (list=true). Views: wireframe, overdraw, unshaded, lighting_only, shadow_cascades, light_complexity, "
+             "lod, emission, specular, uv_checker, texel_density, plus the buffers albedo, normals, material, gi, reflections, "
+             "ao, depth, lighting and sketch/impostors. \"final\" turns it off. For a one-off image use viewport_capture "
+             "{debug_view}. Example: {\"view\": \"overdraw\"}.",
+             "view",
+             object({{"view", enumeration(debugViewNames(), "Debug view to show (final = normal image); omit to read the current one")},
+                     {"list", boolean("Return every view with its kind and color legend")}}),
+             false, false, [&engine](const Json& a, ToolContext&) {
+                 if (a.contains("view")) {
+                     auto dv = debugViewFromName(a.get("view").asString());
+                     if (!dv) return ToolResult::error(dv.error());
+                     engine.setViewportDebugView(*dv);
+                 }
+                 const int cur = engine.viewportDebugView();
+                 Json j = Json::object({{"view", debugViewName(cur)}});
+                 for (const auto& v : debugViews()) {
+                     if (v.id == cur) j["legend"] = v.description;
+                 }
+                 if (a.get("list").asBool(false)) {
+                     Json list = Json::array();
+                     for (const auto& v : debugViews()) {
+                         list.push(Json::object({{"view", v.name}, {"kind", v.kind}, {"legend", v.description}}));
+                     }
+                     j["views"] = list;
+                 }
+                 return ToolResult::json(j, std::string("viewport debug view: ") + debugViewName(cur));
              }});
 
     reg.add({"selection_get", "Get selection",

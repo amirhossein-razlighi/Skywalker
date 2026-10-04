@@ -105,19 +105,41 @@ See the `terrain_*` and `foliage_add` tools.
   Premiere / Unreal format) and overrides the look. `lookStrength` blends either.
 - **Lens character:** `grain`, `chromaticAberration`, `vignette`, `sharpen`.
 
-### Debug and film views (`viewport_capture`)
+### Debug and film views (`viewport_capture`, `viewport_debug_view`)
 
-`debug_view` is one of:
-- `albedo`, `normals`, `material` (roughness/metallic), `gi`, `reflections`, `ao`,
-  `depth`, `lighting` (before GI);
-- `sketch`: pencil contours and hatching;
-- `impostors`: the final image with foliage meshes tinted green and impostors magenta.
+`debug_view` (captures, movie renders) and `viewport_debug_view {view}` (the live editor
+viewport, which the human sees too) take one of these views. `viewport_debug_view {list: true}`
+returns every view with its color legend. Unknown names fail with a did-you-mean hint.
+
+| View | Shows |
+|---|---|
+| `albedo`, `normals`, `material`, `gi`, `reflections`, `ao`, `depth`, `lighting` | G-buffer and lighting buffers (`material`: roughness red, metallic green; `lighting`: before screen-space GI/reflections) |
+| `unshaded` | albedo + emission, no lights, shadows or fog |
+| `lighting_only` | the lighting on a white material: light placement, shadows and GI without textures |
+| `emission` | emissive light only |
+| `specular` | specular reflectance F0 × glossiness: dielectrics dark gray, metals their tint |
+| `wireframe` | dark surfaces with every mesh and terrain triangle edge in cyan (depth-tested) |
+| `overdraw` | fragments per pixel, no depth test (meshes, terrain, foliage, impostors): black 0, dark blue 1, blue 2, cyan 3, green 4, yellow 5–6, orange 7–9, red 10–15, white 16+ |
+| `lod` | level of detail: green LOD0, yellow 1, orange 2, red 3, magenta 4+; foliage by its distance band's LOD, impostors purple, terrain by CDLOD node level |
+| `uv_checker` | an 8×8 checker per UV0 tile tinted by U (red) and V (green): stretching, seams, flips; terrain shows one cell per texture repeat |
+| `texel_density` | base-color texels per meter: blue < 128, cyan 256, green 512 (target), yellow 1024, red > 2048; gray = untextured |
+| `shadow_cascades` | sun cascade per pixel: red 0 (nearest), green 1, blue 2, yellow 3, gray beyond the shadow distance |
+| `light_complexity` | point/spot lights in each pixel's light cluster, same ramp as overdraw |
+| `sketch` | pencil contours and hatching |
+| `impostors` | the final image with foliage meshes tinted green and impostors magenta |
+
+Surface views (`unshaded` … `light_complexity`) replace each lit surface's color in the
+shaders (`FrameUniforms.debug`, `shaders/Debug.metal`) and are shown without tonemapping,
+so the legend colors are exact; the sky becomes a neutral backdrop. Water, particles and
+fluids are not part of them.
 
 `clay: true` renders every surface as matte white clay. Sketch, clay and final make
 "sketch to fill" sequences.
 
 ### Performance
 
+- `perf_stats {passes: true}` shows where the frame time goes (see
+  [Profiling and debug views](#profiling-and-debug-views)).
 - `perf_stats` reports GPU frame time, triangles drawn, terrain nodes, foliage instances,
   draw calls and effect timings. `perf_stats {frames: 30}` benchmarks the current view in
   real time; `view: {eye, target, fov}` benchmarks any camera and `quality` an editor tier.
@@ -129,6 +151,94 @@ See the `terrain_*` and `foliage_add` tools.
 - Per-frame data uses a triple-buffered ring with a frames-in-flight semaphore. Static
   geometry, terrain and instance buffers are uploaded once and cached. Terrain and
   instance textures use unified memory on Apple silicon (no staging copies).
+
+## Profiling and debug views
+
+**GPU passes.** Every render, compute and blit pass samples GPU timestamps at its stage
+boundaries (`MTLCounterSampleBuffer`, `engine/platform/metal/MetalProfiler.mm`). The samples
+of a frame are resolved when it completes and kept as rolling 60-frame statistics per pass
+label. `perf_stats {passes: true}` returns them as `profile`:
+
+- `passes`: `[{pass, group, ms, avgMs, minMs, maxMs, vertexMs, count, seen}]` in encode
+  order. `ms` is the latest frame; `count` merges repeated encoders (bloom levels, still
+  sub-samples); `seen` is the number of frames in the window the pass ran in (the sky
+  bake runs once).
+- `groups`: milliseconds per frame by area: `shadows`, `main`, `ao`, `ssgi`, `ssr`,
+  `resolve`, `effects`, `volumetrics`, `clouds`, `temporal`, `upscale`, `post`, `foliage`,
+  `particles`, `hair`, `skinning`, `environment`, `2d`, `ui`, `overlays`, `debug`.
+- `cpu`: CPU scopes (`SKY_PROFILE_SCOPE`): `frame.build`, `scene.buildFrame`, `world.gather`
+  (terrain and foliage chunks), `particles.gather`, `2d.gather`, `render.encode`,
+  `render.readback` (waits for the GPU), `render.present`, `sim.step`.
+- `spanMs` (first to last sample), `sumMs` (sum of `groups`), `frameGpuMs` (command-buffer
+  time), `droppedPasses` (passes beyond the 4096-sample buffer; normally 0).
+
+A render pass's time is its **fragment** span. Apple GPUs run the vertex work of later
+passes early, overlapped with earlier fragment work, so vertex spans would overlap and
+double count; they are reported separately as `vertexMs` (geometry-heavy passes: `Main`,
+`Shadow cascades`). Fragment spans run in sequence, so `sumMs` ≈ `frameGpuMs`. Foliage and
+terrain draw inside `Main` and `Shadow cascades`; their own passes are the culling compute
+(`Foliage cull`) and the args clear. MetalFX upscaling is not sampled (it encodes its own
+work). With `frames > 0` the timeline is reset first, so it covers exactly the benchmark.
+In the editor, click the stats overlay's frame line to expand the same list.
+
+**Debug views** are listed in [Debug and film views](#debug-and-film-views-viewport_capture-viewport_debug_view).
+
+### Recipe: find and fix a slow frame
+
+1. `perf_stats {"frames": 30, "passes": true, "view": "scene"}` — read `profile.groups`
+   for the expensive area and `profile.passes` for the pass.
+2. `main` or `shadows` high: look at `viewport_capture {"debug_view": "overdraw"}` (stacked
+   transparent quads, dense grass) and `{"debug_view": "lod"}` (red/magenta near the
+   camera is fine; green far away means LODs are missing or `lodBias` is off).
+3. Many lights: `{"debug_view": "light_complexity"}` — orange/red areas evaluate 7+ lights
+   per pixel; shorten `range` or merge lights.
+4. `ssgi`/`ssr`/`clouds`/`volumetrics` high: lower `gi`, `ssr`, cloud quality or `godRays`
+   with `environment_update`, or benchmark `quality: "balanced"`.
+5. Repeat step 1 and compare `profile.groups`.
+
+Textures: `{"debug_view": "texel_density"}` should be mostly green (512 texels/m) near the
+camera; `{"debug_view": "uv_checker"}` shows stretched or flipped UVs.
+
+## Shader library and pipeline cache
+
+- **Precompiled library.** When the offline Metal toolchain is installed
+  (`xcodebuild -downloadComponent MetalToolchain`), the build compiles the standard shader
+  library to `ShaderLibrary.metallib` (CMake option `SKY_PRECOMPILE_SHADERS`, on by
+  default), embeds it, and the engine loads it with `newLibraryWithData` instead of
+  compiling ~6k lines of MSL at startup. Without the toolchain the build prints a notice
+  and the engine compiles the embedded source (the previous behavior).
+  `SKY_SHADER_SOURCE=1` forces the source path; `shader_set` hot reloads always compile
+  source.
+- **Pipeline cache.** Every pipeline state goes through an `MTLBinaryArchive` at
+  `~/Library/Caches/Skywalker/shaders/pipelines-<key>.binarchive`. The key hashes the shader
+  source, engine version, GPU and OS build, so a changed shader never loads stale binaries;
+  older archives are pruned (the 3 newest are kept). A hit skips the GPU back-end compile
+  even when the system's own Metal cache was flushed (OS or Xcode update, a new build).
+  `SKY_SHADER_CACHE=0` disables it, `SKY_SHADER_CACHE_DIR` moves it. It is off under Metal
+  validation (`MTL_DEBUG_LAYER` / `MTL_SHADER_VALIDATION`): loading an archive through the
+  GPU validation device crashes inside Metal.
+- **Async pipelines.** `MetalPipelineCache::requestRender` / `requestCompute` and
+  `compileShaderLibraryAsync` build on a background queue and return a handle to poll
+  (`ready()`), so a renderer draws a fallback until a custom pipeline is ready. Surface
+  shaders build on this.
+- **Measure.** `engine_info` → `shaderCompileMs` and `rendererStartupMs`, and in detail
+  `shaders`: `library` (`metallib` or `source`), `libraryMs`,
+  `pipelinesMs`, `shaderCompileMs`, renderer `startupMs`, and `pipelineCache` (`hits`,
+  `misses`, `loadMs`, `saveMs`, `bytes`, `path`). `SKY_SHADER_NONCE=<text>` appends a
+  comment to the library source, which forces a cold compile for benchmarking.
+
+Startup on an M1 Pro (`skywalker call engine_info`, release build, no Metal toolchain):
+
+| Case | Renderer startup | Library compile | Pipelines (86) |
+|---|---|---|---|
+| Cold: first launch after a shader change | 2464 ms | 1201 ms | 1203 ms |
+| Warm: system Metal cache and pipeline archive | 48–51 ms | 3 ms | 4 ms |
+
+macOS keeps its own per-user Metal compiler cache, so warm launches were already fast before
+the archive. The archive pays off when that cache misses while the archive hits (after an OS
+or Xcode update, a cache purge, or a shipped game whose archive was pre-warmed); recording
+it costs one ~0.3 s write on the cold launch. The cold library compile (1.2 s) is what the
+precompiled `.metallib` removes.
 
 ## Surfaces (`mesh` component and material assets)
 

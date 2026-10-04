@@ -63,6 +63,10 @@ Details and per-look numbers are in [references/recipes.md](references/recipes.m
 | Materials look plastic or wrong | `"albedo"`, `"material"` (roughness red, metallic green) | Albedo too bright/saturated; roughness uniform |
 | Reflections absent or noisy | `"reflections"` | `ssr` too low, floor too rough, `samples` too low |
 | Wrong shape / scale | `"depth"` | Near/far planes, scale errors |
+| Is it the light or the material? | `"lighting_only"` (white material), `"unshaded"` (albedo + emission) | Light placement and shadows vs. texture/albedo problems |
+| Glossy/metal looks wrong | `"specular"` (F0 x glossiness) | Dielectrics should be dark gray; metals tinted; a green/colored dielectric means a wrong `metallic` or ORM blue channel |
+| Shadows blocky or missing in the distance | `"shadow_cascades"` (red, green, blue, yellow, gray = none) | `shadowDistance` too short or too long for the shot |
+| Texture blurry or swimming | `"texel_density"` (green = 512 texels/m), `"uv_checker"` | Texture too small for its size on screen, stretched or flipped UVs, wrong `tiling` |
 
 4. **Change one group, recapture, compare.** Keep what improved. Stop when the rubric passes, not when you run out of ideas.
 
@@ -109,5 +113,7 @@ most dielectrics, `metallic` 0 or 1 (rarely in between), `subsurface` for leaves
 
 - Beauty shot at 16+ samples, `quality:"full"` (the default), overlays off, from the camera the game will use (`view:"scene"`).
 - At least one `debug_view` (`lighting` or `gi`) if you changed light terms.
-- `perf_stats` if you added many lights (16 punctual lights are used per frame; directional first) or volumetrics.
+- `perf_stats {frames:30, passes:true}` if you added many lights (16 punctual lights are used per frame; directional first) or volumetrics:
+  `profile.groups` shows which area got expensive (`main`, `shadows`, `ssgi`, `clouds`, `volumetrics`, `post` ...), and
+  `debug_view:"light_complexity"` shows where lights stack up (orange/red = 7+ lights per pixel).
 - Report the final `environment_get` values so the look is reproducible.

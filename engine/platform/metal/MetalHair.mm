@@ -6,6 +6,8 @@
 #include <cstring>
 
 #include "MetalFxInternal.h"
+#include "MetalProfiler.h"     // [profiler] per-pass GPU timing
+#include "MetalShaderCache.h"  // [shader cache] pipelines through the binary archive
 #include "skywalker/core/Log.h"
 #include "skywalker/fx/Groom.h"
 
@@ -39,7 +41,7 @@ bool MetalHair::build(id<MTLLibrary> lib, const FxFormats& fmt) {
     NSError* err = nil;
     for (const char* k : {"hairReset", "hairSimulate", "hairInterpolate"}) {
         id<MTLFunction> f = [lib newFunctionWithName:[NSString stringWithUTF8String:k]];
-        id<MTLComputePipelineState> ps = f ? [device_ newComputePipelineStateWithFunction:f error:&err] : nil;
+        id<MTLComputePipelineState> ps = f ? newComputePipeline(device_, f, &err) : nil;
         if (!ps) {
             log::warn("render", std::string("hair disabled: missing or invalid kernel ") + k);
             return false;
@@ -57,7 +59,7 @@ bool MetalHair::build(id<MTLLibrary> lib, const FxFormats& fmt) {
         d.colorAttachments[1].pixelFormat = fmt.gbufA;
         d.colorAttachments[2].pixelFormat = fmt.gbufB;
         d.depthAttachmentPixelFormat = fmt.depth;
-        return [device_ newRenderPipelineStateWithDescriptor:d error:&err];
+        return newRenderPipeline(device_, d, &err);
     };
     auto depthOnly = [&](const char* vs, const char* fs) -> id<MTLRenderPipelineState> {
         MTLRenderPipelineDescriptor* d = [MTLRenderPipelineDescriptor new];
@@ -65,7 +67,7 @@ bool MetalHair::build(id<MTLLibrary> lib, const FxFormats& fmt) {
         d.fragmentFunction = fn(fs);
         if (!d.vertexFunction || (fs && !d.fragmentFunction)) return nil;
         d.depthAttachmentPixelFormat = MTLPixelFormatDepth32Float;
-        return [device_ newRenderPipelineStateWithDescriptor:d error:&err];
+        return newRenderPipeline(device_, d, &err);
     };
     strandPipeline_ = mainPass("hairVertex", "hairFragment");
 
@@ -82,7 +84,7 @@ bool MetalHair::build(id<MTLLibrary> lib, const FxFormats& fmt) {
     dd.colorAttachments[0].destinationRGBBlendFactor = MTLBlendFactorOne;
     dd.colorAttachments[0].sourceAlphaBlendFactor = MTLBlendFactorOne;
     dd.colorAttachments[0].destinationAlphaBlendFactor = MTLBlendFactorOne;
-    domDensityPipeline_ = dd.vertexFunction && dd.fragmentFunction ? [device_ newRenderPipelineStateWithDescriptor:dd error:&err] : nil;
+    domDensityPipeline_ = dd.vertexFunction && dd.fragmentFunction ? newRenderPipeline(device_, dd, &err) : nil;
     if (!strandPipeline_ || !cardPipeline_ || !shadowPipeline_ || !domDepthPipeline_ || !domMeshPipeline_ || !domDensityPipeline_) {
         log::warn("render", "hair disabled: " + (err ? std::string(err.localizedDescription.UTF8String) : std::string("missing shaders")));
         return false;
@@ -161,8 +163,7 @@ void MetalHair::simulate(id<MTLCommandBuffer> cmd, const FrameData& frame) {
     const float H = static_cast<float>(std::max(frame.height, 1));
     const bool ortho = cam.orthographic;
     const float pixelAt1m = ortho ? cam.orthoSize * 2.f / H : 2.f * std::tan(radians(cam.fovDeg) * 0.5f) / H;
-    id<MTLComputeCommandEncoder> enc = [cmd computeCommandEncoder];
-    enc.label = @"Hair simulation";
+    id<MTLComputeCommandEncoder> enc = profiledCompute(cmd, "Hair simulation", "hair");
     for (const GroomItem& item : frame.grooms) {
         if (!item.data || item.data->children.empty() || item.data->points < 3) continue;
         GroomGpu& g = grooms_[item.entity];
@@ -310,6 +311,7 @@ void MetalHair::renderDom(id<MTLCommandBuffer> cmd, GroomGpu& g, const GroomItem
         rp.depthAttachment.loadAction = MTLLoadActionClear;
         rp.depthAttachment.clearDepth = 1.0;
         rp.depthAttachment.storeAction = MTLStoreActionStore;
+        profileRenderPass(rp, "Hair DOM opaque", "hair");
         id<MTLRenderCommandEncoder> enc = [cmd renderCommandEncoderWithDescriptor:rp];
         enc.label = @"Hair DOM opaque";
         [enc setViewport:vpt];
@@ -342,6 +344,7 @@ void MetalHair::renderDom(id<MTLCommandBuffer> cmd, GroomGpu& g, const GroomItem
         rp.depthAttachment.loadAction = MTLLoadActionClear;
         rp.depthAttachment.clearDepth = 1.0;
         rp.depthAttachment.storeAction = MTLStoreActionStore;
+        profileRenderPass(rp, "Hair DOM depth", "hair");
         id<MTLRenderCommandEncoder> enc = [cmd renderCommandEncoderWithDescriptor:rp];
         enc.label = @"Hair DOM depth";
         [enc setViewport:vpt];
@@ -362,6 +365,7 @@ void MetalHair::renderDom(id<MTLCommandBuffer> cmd, GroomGpu& g, const GroomItem
         rp.colorAttachments[0].loadAction = MTLLoadActionClear;
         rp.colorAttachments[0].clearColor = MTLClearColorMake(0, 0, 0, 0);
         rp.colorAttachments[0].storeAction = MTLStoreActionStore;
+        profileRenderPass(rp, "Hair DOM density", "hair");
         id<MTLRenderCommandEncoder> enc = [cmd renderCommandEncoderWithDescriptor:rp];
         enc.label = @"Hair DOM density";
         [enc setViewport:vpt];

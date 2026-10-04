@@ -82,7 +82,9 @@ void sky_set_view_scene_camera(SkyEngine* engine, int on);
 /* Editor camera state for overlays: yaw, pitch (degrees). */
 void sky_camera_angles(SkyEngine* engine, float* yaw, float* pitch);
 
-/* Frame statistics: {"cpuMs":..,"draws":..,"lights":..,"entities":..,"renderer":".."} */
+/* Frame statistics: {"cpuMs":..,"draws":..,"lights":..,"entities":..,"renderer":"..","gpuMs":..,
+   "debugView":"final", "profile":{"supported":bool,"spanMs":..,"passes":[{"pass","group","ms","avgMs","maxMs"}],
+   "groups":{..},"cpu":[{"scope","avgMs","maxMs"}]}} (profile: rolling 60-frame per-pass GPU timing) */
 char* sky_frame_stats(SkyEngine* engine);
 
 /* Game input (forwarded to Wander while playing) ---------------------------- */

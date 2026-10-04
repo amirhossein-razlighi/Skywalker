@@ -3,7 +3,10 @@
 ## Build
 
 Requires macOS 15+, Xcode 16+ (Swift 6), CMake ≥ 3.29 and Ninja. The offline Metal
-toolchain is *not* required: shaders compile at runtime.
+toolchain is optional: with it (`xcodebuild -downloadComponent MetalToolchain`, then
+reconfigure) the shader library is precompiled to a `.metallib` and startup skips the MSL
+compile; without it shaders compile at runtime (see RENDERING.md, "Shader library and
+pipeline cache").
 
 | Preset | Purpose |
 |---|---|
@@ -64,8 +67,22 @@ ctest --preset debug --output-on-failure
 | ThreadSanitizer | `cmake --preset tsan && cmake --build --preset tsan && ./build/tsan/tests/skywalker_tests` |
 | Leak check | `leaks --atExit -- ./build/debug/bin/skywalker run examples/hello_sky/scenes/main.sky.json --ticks 600 -o /tmp/x.png` (expected: `0 leaks`) |
 | CPU profiling | Instruments → Time Profiler on `Skywalker.app`, or `xcrun xctrace record --template 'Time Profiler' --launch -- ./build/release/bin/skywalker run …` |
-| GPU profiling | Instruments → Metal System Trace; or Xcode → Debug → Capture GPU Workload (attach to the editor) |
-| Frame stats | The viewport stats overlay (fps, CPU ms per frame, draws) and `sky_frame_stats` in the C API |
+| GPU profiling | `perf_stats {"frames": 30, "passes": true}` (per-pass GPU times, CPU scopes); Instruments → Metal System Trace; or Xcode → Debug → Capture GPU Workload (attach to the editor) |
+| Frame stats | The viewport stats overlay (fps, CPU/GPU ms, click it for the pass list) and `sky_frame_stats` in the C API |
+| CPU scopes | `SKY_PROFILE_SCOPE("area.name")` (`skywalker/core/Profiler.h`) times a block; it shows up in `perf_stats {passes: true}` → `profile.cpu` |
+
+Renderer environment switches (benchmarking and debugging):
+
+| Variable | Effect |
+|---|---|
+| `SKY_GPU_PROFILER=0` | no per-pass GPU timestamps |
+| `SKY_SHADER_SOURCE=1` | compile the embedded MSL source even when a `.metallib` is embedded |
+| `SKY_SHADER_METALLIB=<file>` | load the shader library from this `.metallib` (falls back to source when it lacks a function) |
+| `SKY_SHADER_CACHE=0` / `SKY_SHADER_CACHE_DIR=<dir>` | disable / move the pipeline binary archive |
+| `SKY_SHADER_NONCE=<text>` | change the library source by a comment: a cold shader compile, for startup benchmarks |
+
+`MTL_DEBUG_LAYER=1 MTL_SHADER_VALIDATION=1` turn the pipeline archive off automatically (Metal
+crashes loading archives through the validation device).
 
 At v0.0.1: the test suite runs clean under ASan/UBSan, and `leaks` reports **0 leaks** for
 both a 600-tick simulation with a Metal render and the full test suite.

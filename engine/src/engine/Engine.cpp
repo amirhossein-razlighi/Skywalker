@@ -21,6 +21,7 @@
 
 #include "skywalker/agent/SocketServer.h"
 #include "skywalker/core/Log.h"
+#include "skywalker/core/Profiler.h"
 #include "skywalker/core/Strings.h"
 #include "skywalker/engine/Movie.h"
 #include "skywalker/native/NativeModules.h"
@@ -357,6 +358,7 @@ void Engine::step(int ticks) {
         play();
         pause();
     }
+    SKY_PROFILE_SCOPE("sim.step");
     for (int i = 0; i < ticks; ++i) {
         actionMap_.evaluate(input_);  // device state + agent input -> actions for this tick
         world2d_->preTick(*scene_, input_, *runtime_, kFixedDt);  // UI input, dialogue
@@ -587,6 +589,7 @@ void applyViewportQuality(FrameData& f, int quality) {
 }  // namespace
 
 FrameData Engine::frame(const CaptureOptions& opts) {
+    SKY_PROFILE_SCOPE("frame.build");
     // Animation previews while editing (sequencer scrub, bone attachments) hold for this frame only.
     struct PreviewGuard {
         anim::AnimationSystem& a;
@@ -620,13 +623,22 @@ FrameData Engine::frame(const CaptureOptions& opts) {
     for (EntityId e : scene_->entities()) {
         if (const auto* m = scene_->get<MeshRenderer>(e)) ensureMeshUploaded(m->mesh);
     }
-    FrameData f = buildFrame(*scene_, view, opts.width, opts.height, bo);
+    FrameData f = [&] {
+        SKY_PROFILE_SCOPE("scene.buildFrame");
+        return buildFrame(*scene_, view, opts.width, opts.height, bo);
+    }();
     f.samples = opts.samples;
     f.debugView = opts.debugView;
     if (!opts.fog) f.environment.fogDensity = 0;
-    world2d_->gather(*scene_, f, bo.editorOverlays ? selection_ : std::vector<EntityId>{}, bo.time, texelSnap);  // 2D + UI
+    {
+        SKY_PROFILE_SCOPE("2d.gather");
+        world2d_->gather(*scene_, f, bo.editorOverlays ? selection_ : std::vector<EntityId>{}, bo.time, texelSnap);  // 2D + UI
+    }
     // Effects: simulated particles (+ the light fires cast) and FFT water.
-    particles_.gather(*scene_, view, f.particles, f.lights);
+    {
+        SKY_PROFILE_SCOPE("particles.gather");
+        particles_.gather(*scene_, view, f.particles, f.lights);
+    }
     {  // [hair+vfx] GPU particles, hair grooms, and the lights GPU effects cast (from a recent frame)
         auto meshes = [this](const std::string& key) { return cpuMesh(key); };
         auto paths = [this](const std::string& path) { return resolvePath(path); };
@@ -663,7 +675,10 @@ FrameData Engine::frame(const CaptureOptions& opts) {
     // Terrain and foliage (resolved texture paths included). Captures generate all foliage
     // in range; the live viewport streams a few chunks per frame.
     f.quality = opts.quality;  // impostor transition distances depend on the tier
-    world_->gather(*scene_, view, f, opts.samples <= 1 && !opts.offline.enabled);
+    {
+        SKY_PROFILE_SCOPE("world.gather");  // terrain + foliage chunks
+        world_->gather(*scene_, view, f, opts.samples <= 1 && !opts.offline.enabled);
+    }
     {
         std::vector<std::string> meshes;
         for (const auto& b : f.instances) {
@@ -766,7 +781,10 @@ Result<Capture> Engine::capture(const CaptureOptions& opts) {
         c.frame.camera.motionBlur = 0.f;
     }
     if (Status s = renderer_->render(c.frame); !s) return s.error();
-    auto img = renderer_->readback();
+    auto img = [&] {
+        SKY_PROFILE_SCOPE("render.readback");  // waits for the GPU
+        return renderer_->readback();
+    }();
     if (!img) return img.error();
     c.image = std::move(img.value());
     if (!opts.listVisible) return c;
@@ -784,13 +802,17 @@ Status Engine::renderToSurface(void* surface, int width, int height) {
     opts.height = height;
     opts.samples = 1;  // real time: temporal anti-aliasing across frames
     opts.quality = playState_ == PlayState::Editing ? static_cast<int>(editQuality_) : 0;
+    opts.debugView = viewportDebugView_;  // [debug views]
     world2d_->setViewport(width, height);  // the UI maps the normalized mouse into this view
     drainStreamedMeshes();
     streamMeshes_ = true;
     FrameData f = frame(opts);
     streamMeshes_ = false;
     Status s = renderer_->render(f);
-    if (s) s = renderer_->present(surface);
+    if (s) {
+        SKY_PROFILE_SCOPE("render.present");
+        s = renderer_->present(surface);
+    }
     double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
     stats_.cpuMs = stats_.cpuMs * 0.9 + ms * 0.1;  // smoothed
     stats_.draws = f.draws.size();

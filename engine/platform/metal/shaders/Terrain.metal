@@ -25,6 +25,7 @@ struct TerrainOut {
     float4 position [[position]];
     float3 worldPos;
     float2 uv;        // 0..1 over the terrain
+    float lod [[flat]];  // CDLOD node level (0 = finest), for the lod debug view
 };
 
 static float terrainHeight(texture2d<float> heightTex, float2 uv, float res) {
@@ -63,6 +64,7 @@ vertex TerrainOut terrainVertex(uint vid [[vertex_id]], uint iid [[instance_id]]
     o.position = f.viewProj * float4(world, 1.0);
     o.worldPos = world;
     o.uv = uv;
+    o.lod = n.node.w;
     return o;
 }
 
@@ -256,6 +258,26 @@ fragment MainOut terrainFragment(TerrainOut in [[stage_in]],
     s.clearcoat = 0.0;
     s.subsurface = 0.0;
     s.N = N;
+    const int dbg = debugMode(f);  // [debug views]
+    if (dbg == kDbgLightingOnly) {
+        s.albedo = float3(1.0);
+        s.metallic = 0.0;
+        overlayGlow = 0.0;
+    } else if (debugReplacesColor(dbg)) {
+        DebugSurface ds;
+        ds.worldPos = wp;
+        ds.N = N;
+        ds.texUV = wp.xz * tu.layerParams[0].x;  // layer 0 texture coordinates
+        ds.uv = ds.texUV * 0.125;                // uv_checker: one check per texture repeat
+        ds.texSize = l0a.get_width() > 1 ? float(l0a.get_width()) : 0.0;
+        ds.albedo = s.albedo;
+        ds.emissive = overlayGlow;
+        ds.metallic = s.metallic;
+        ds.roughness = s.roughness;
+        ds.lod = in.lod;
+        ds.lights = float(clusterCells[clusterOf(f, in.position.xy, wp)].y);
+        return mainOut(float4(debugSurfaceColor(dbg, ds, f), 1.0), s.albedo, 1.0, Ngeo, 1.0, kGbufNoLighting);
+    }
     float3 color = shadeSurface(s, Ngeo, wp, in.position.xy, V, false, 0.0, f, lights, clusterCells, clusterIndices, shadowAtlas,
                                 envTex, brdfLut, cloudShape) + overlayGlow;
     if (tu.water.z > 0.5) color = mix(color, float3(1.0, 0.5, 0.1), 0.15);  // selection tint
@@ -752,10 +774,29 @@ fragment ImpostorFragmentOut impostorFragment(ImpostorOut in [[stage_in]],
     a = sqrt(a * a + min(0.5 * dot(dn, dn), 0.18));
     s.roughness = clamp(sqrt(a), 0.045, 1.0);
     float3 V = ortho ? -f.cameraForward.xyz : normalize(f.cameraPos.xyz - worldPos);
-    float3 color = shadeSurface(s, N, worldPos, in.position.xy, V, false, 0.0, f, lights, clusterCells, clusterIndices, shadowAtlas,
-                                envTex, brdfLut, cloudShape);
-    color = applyFog(color, worldPos, V, f);
-    MainOut m = mainOut(float4(color, alpha), s.albedo, 1.0, N, s.roughness, 0.0);
+    const int dbg = debugMode(f);  // [debug views]
+    if (dbg == kDbgLightingOnly) s.albedo = float3(1.0);
+    MainOut m;
+    if (debugReplacesColor(dbg)) {
+        DebugSurface ds;
+        ds.worldPos = worldPos;
+        ds.N = N;
+        ds.uv = float2(0.0);
+        ds.texUV = float2(0.0);
+        ds.texSize = 0.0;
+        ds.albedo = s.albedo;
+        ds.emissive = float3(0.0);
+        ds.metallic = 0.0;
+        ds.roughness = s.roughness;
+        ds.lod = -1.0;  // impostor
+        ds.lights = float(clusterCells[clusterOf(f, in.position.xy, worldPos)].y);
+        m = mainOut(float4(debugSurfaceColor(dbg, ds, f), alpha), s.albedo, 1.0, N, 1.0, kGbufNoLighting);
+    } else {
+        float3 color = shadeSurface(s, N, worldPos, in.position.xy, V, false, 0.0, f, lights, clusterCells, clusterIndices,
+                                    shadowAtlas, envTex, brdfLut, cloudShape);
+        color = applyFog(color, worldPos, V, f);
+        m = mainOut(float4(color, alpha), s.albedo, 1.0, N, s.roughness, 0.0);
+    }
     ImpostorFragmentOut o;
     o.color = m.color;
     o.gbufA = m.gbufA;

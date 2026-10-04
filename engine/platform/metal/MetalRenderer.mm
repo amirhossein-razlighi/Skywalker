@@ -31,6 +31,7 @@
 #include <atomic>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <filesystem>
 #include <functional>
@@ -49,6 +50,11 @@
 #include "skywalker/render/MeshData.h"
 #include "skywalker/render/Renderer.h"
 #include "MetalRenderer2D.h"  // 2D world quads + UI (Frame2D)
+#include "MetalProfiler.h"     // [profiler] per-pass GPU timing
+#include "MetalShaderCache.h"  // [shader cache] metallib, binary archive, async pipelines
+#include "skywalker/core/Profiler.h"
+#include "skywalker/render/DebugViews.h"
+#include "skywalker/render/ShaderCache.h"
 
 namespace sky {
 
@@ -101,7 +107,9 @@ struct FrameUniforms {
     simd_float4 clouds2;
     simd_float4 cluster;
     simd_float4 cluster2;
+    simd_float4 debug;  // [debug views] x = surface debug view id (0 = off), yzw = unused
 };
+static_assert(sizeof(FrameUniforms) == 832, "FrameUniforms must match Common.metal (grow only at the end)");
 
 struct DrawUniforms {
     simd_float4x4 model;
@@ -300,6 +308,18 @@ Cascades computeCascades(const FrameData& frame) {
     return c;
 }
 
+/// [profiler] Timeline group of a pass label (perf_stats {passes: true} sums groups).
+const char* passGroup(NSString* label) {
+    static const std::pair<NSString*, const char*> kPrefixes[] = {
+        {@"SSGI", "ssgi"},           {@"SSR", "ssr"},          {@"SSAO", "ao"},         {@"Clouds", "clouds"},
+        {@"Lighting resolve", "resolve"}, {@"TAA", "temporal"}, {@"Accumulate", "temporal"}, {@"Scene resolve", "temporal"},
+        {@"Motion vectors", "upscale"}, {@"Debug view", "debug"}, {@"BRDF LUT", "environment"}};
+    for (const auto& [prefix, group] : kPrefixes) {
+        if ([label hasPrefix:prefix]) return group;
+    }
+    return "post";  // bloom, exposure, depth of field, motion blur, composite
+}
+
 class MetalRenderer final : public Renderer {
     struct OceanGpu {
         id<MTLTexture> disp[OceanCascades::kCascades];
@@ -330,9 +350,20 @@ class MetalRenderer final : public Renderer {
 
 public:
     bool init() {
+        const auto initStart = std::chrono::steady_clock::now();
         device_ = MTLCreateSystemDefaultDevice();
         if (!device_) return false;
         queue_ = [device_ newCommandQueue];
+        profiler_ = std::make_unique<MetalPassProfiler>(device_);  // [profiler]
+        {  // [shader cache] pipeline binaries persisted per shader source / engine / GPU / OS
+            builtinSource_ = kDefaultShaderSource;
+            // SKY_SHADER_NONCE (benchmarking): a different library source, i.e. a cold shader compile.
+            if (const char* nonce = std::getenv("SKY_SHADER_NONCE"); nonce && *nonce) builtinSource_ += "\n// nonce " + std::string(nonce) + "\n";
+            NSString* os = [[NSProcessInfo processInfo] operatingSystemVersionString];
+            pipelineCache_ = MetalPipelineCache::acquire(
+                device_, shadercache::cacheKey(builtinSource_ + kSkinningShaderSource, SKY_VERSION_STRING,
+                                               device_.name.UTF8String, os.UTF8String));
+        }
         textureLoader_ = [[MTKTextureLoader alloc] initWithDevice:device_];
         fx_ = std::make_unique<MetalFx>(  // [hair+vfx]
             device_, queue_,
@@ -353,12 +384,12 @@ public:
                 std::memcpy(&out, &du, sizeof(du));
                 return out;
             });
-        Status s = buildPipelines(kDefaultShaderSource);
+        Status s = buildPipelines(builtinSource_, true);
         if (!s) {
             log::error("render", "built-in shaders failed to compile: " + s.error().message);
             return false;
         }
-        source_ = kDefaultShaderSource;
+        source_ = builtinSource_;
         buildSkinningPipeline();  // animation
 
         MTLDepthStencilDescriptor* ds = [MTLDepthStencilDescriptor new];
@@ -424,6 +455,10 @@ public:
         clearCloud_ = [device_ newTextureWithDescriptor:cd1];
         const __fp16 clear[4] = {0, 0, 0, 1};
         [clearCloud_ replaceRegion:MTLRegionMake2D(0, 0, 1, 1) mipmapLevel:0 withBytes:clear bytesPerRow:8];
+        if (pipelineCache_) {  // [shader cache] record new pipeline binaries now (off the first frame)
+            if (Status cs = pipelineCache_->save(); !cs) log::warn("render", cs.error().message);
+        }
+        startupMs_ = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - initStart).count();
         return true;
     }
 
@@ -453,7 +488,29 @@ public:
         }
     }
 
-    RendererInfo info() const override { return {"metal", device_ ? std::string(device_.name.UTF8String) : ""}; }
+    RendererInfo info() const override {
+        RendererInfo ri{"metal", device_ ? std::string(device_.name.UTF8String) : "", Json::object()};
+        auto r2 = [](double v) { return std::round(v * 100.0) / 100.0; };
+        ri.shaders = Json::object({{"library", shaderLibraryOrigin_},
+                                   {"precompiledAvailable", hasPrecompiledShaderLibrary()},
+                                   {"libraryMs", r2(libraryMs_)},
+                                   {"pipelinesMs", r2(pipelinesMs_)},
+                                   {"shaderCompileMs", r2(libraryMs_ + pipelinesMs_)},
+                                   {"startupMs", r2(startupMs_)},
+                                   {"hotReloaded", source_ != builtinSource_}});
+        if (!shaderNote_.empty()) ri.shaders["note"] = shaderNote_;
+        if (pipelineCache_) ri.shaders["pipelineCache"] = pipelineCache_->stats();
+        return ri;
+    }
+
+    Json passProfile() const override {  // [profiler]
+        Json j = profiler_ ? profiler_->toJson() : Json::object({{"supported", false}, {"mode", "unsupported"}});
+        j["frameGpuMs"] = std::round(gpuMs_->load() * 100.0) / 100.0;
+        return j;
+    }
+    void resetPassProfile() override {
+        if (profiler_) profiler_->reset();
+    }
 
     std::string shaderSource() const override { return source_; }
     std::vector<LightItem> effectLights() const override { return fx_->effectLights(); }  // [hair+vfx]
@@ -487,6 +544,7 @@ public:
 
     Status render(const FrameData& frame) override {
         @autoreleasepool {
+            SKY_PROFILE_SCOPE("render.encode");
             // Offline (movie) sub-frames are accumulated by the caller: always the still path.
             const bool accumulateFrame = std::clamp(frame.samples, 1, 256) > 1 || frame.offline.enabled;
             const float renderScale = accumulateFrame ? 1.f : std::clamp(frame.environment.renderScale, 0.33f, 1.f);
@@ -524,6 +582,7 @@ public:
             dispatch_semaphore_wait(inFlight_, DISPATCH_TIME_FOREVER);
             ringIndex_ = (ringIndex_ + 1) % kFramesInFlight;
             ringOffset_ = 0;
+            profiler_->beginFrame();  // [profiler] every pass below samples GPU timestamps
             // Accumulated stills commit one command buffer per sub-sample: a single multi-second
             // command buffer trips the GPU watchdog ("progress timeout") and starves the window
             // server, while short ones let the system interleave its own work.
@@ -572,7 +631,7 @@ public:
                 int mode = accumulate ? 2 : (env.taa && historyValid_ && !upscale ? 1 : 0);
                 encodeTemporal(cmd, frame, fu, mode, 1.f / static_cast<float>(i + 1));
                 if (upscale) encodeUpscale(cmd, fu, j);
-                id<MTLBlitCommandEncoder> blit = [cmd blitCommandEncoder];
+                id<MTLBlitCommandEncoder> blit = profiledBlit(cmd, "Depth history", "temporal");
                 [blit copyFromTexture:depthResolved_ toTexture:depthPrev_];
                 [blit endEncoding];
                 if (!accumulate) historyValid_ = true;
@@ -586,7 +645,8 @@ public:
             if (spatialUpscale) encodeSpatialUpscale(cmd);
             postSource_ = upscale || spatialUpscale ? upscaled_ : taa_[taaCurrent_];
             encodePost(cmd, frame, accumulate, base);
-            if (frame.debugView > 0 && frame.debugView != 10) {  // 10 (impostors) tints the final image instead
+            // impostors tints the final image and lighting_only only changes materials: no debug pass.
+            if (frame.debugView > 0 && frame.debugView != debugview::kImpostors && frame.debugView != debugview::kLightingOnly) {
                 PostUniforms pu{};
                 pu.params = simd_make_float4(static_cast<float>(frame.debugView), 0, 0, 0);
                 pu.texel = simd_make_float4(1.f / std::max(frame.width, 1), 1.f / std::max(frame.height, 1), 0, 0);
@@ -610,6 +670,7 @@ public:
                     dispatch_semaphore_signal(sem);
                 }];
             }
+            profiler_->endFrame(cmd);  // [profiler] samples resolve when the frame completes
             [cmd commit];
             lastCommand_ = cmd;
             evictWorldCaches();
@@ -709,36 +770,60 @@ private:
         return move > std::max(2.f, viewDist * 0.35f) || dot(f0, f1) < 0.94f;
     }
 
-    Status buildPipelines(const std::string& source) {
-        NSError* error = nil;
-        MTLCompileOptions* opts = [MTLCompileOptions new];
-        opts.mathMode = MTLMathModeFast;
-        id<MTLLibrary> lib = [device_ newLibraryWithSource:[NSString stringWithUTF8String:source.c_str()]
-                                                   options:opts
-                                                     error:&error];
-        if (!lib) {
-            return Error::make("shader_compile_error",
-                               error ? std::string(error.localizedDescription.UTF8String) : "unknown error");
+    static const std::vector<const char*>& requiredFunctions() {
+        static const std::vector<const char*> kRequired = {
+            "fullscreenVertex", "skyFragment", "meshVertex", "meshFragment", "shadowVertex",
+            "gridVertex", "gridFragment", "presentFragment", "outlineVertex",
+            "outlineFragment", "overlayFragment", "bloomPrefilter", "bloomDown", "bloomUp",
+            "compositeFragment", "envSkyFragment", "envPrefilterFragment", "brdfLutFragment",
+            "ssaoFragment", "aoBlurFragment", "shadowAlphaVertex", "shadowAlphaFragment",
+            "waterVertex", "waterFragment", "particleVertex", "particleFragment",
+            "volumeVertex", "volumeFragment", "fluidAdvect", "fluidCorrect", "fluidCombust",
+            "fluidCurl", "fluidForces", "fluidDivergence", "fluidJacobi", "fluidProject", "volumetricFragment",
+            "ssgiFragment", "ssrFragment", "ssTemporalFragment", "lightingResolveFragment",
+            "temporalFragment", "debugViewFragment", "terrainVertex", "terrainFragment",
+            "terrainShadowVertex", "cloudsFragment",
+            "cloudTemporalFragment", "cloudShapeKernel", "cloudDetailKernel", "lumaFragment",
+            "exposureFragment", "motionBlurFragment", "dofCocFragment", "dofBlurFragment",
+            "dofCombineFragment", "motionVectorFragment", "wireframeFragment", "overdrawFragment"};
+        return kRequired;
+    }
+
+    /// `builtin`: the engine's own library (precompiled .metallib when available, pipelines
+    /// cached in the binary archive); otherwise a `shader_set` source compiled at runtime.
+    Status buildPipelines(const std::string& source, bool builtin = false) {
+        auto t0 = std::chrono::steady_clock::now();
+        id<MTLLibrary> lib = nil;
+        std::string origin = "source", note;
+        if (builtin) {
+            ShaderLibraryLoad load = loadBuiltinShaderLibrary(device_, source, requiredFunctions());
+            lib = load.library;
+            origin = load.origin;
+            note = load.note;
+            if (!lib) return Error::make("shader_compile_error", load.note);
+        } else {
+            NSError* error = nil;
+            lib = compileShaderLibrary(device_, source, &error);
+            if (!lib) {
+                return Error::make("shader_compile_error",
+                                   error ? std::string(error.localizedDescription.UTF8String) : "unknown error");
+            }
         }
+        const double libMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+        t0 = std::chrono::steady_clock::now();
         auto fn = [&](const char* name) { return [lib newFunctionWithName:[NSString stringWithUTF8String:name]]; };
-        for (const char* required : {"fullscreenVertex", "skyFragment", "meshVertex", "meshFragment", "shadowVertex",
-                                     "gridVertex", "gridFragment", "presentFragment", "outlineVertex",
-                                     "outlineFragment", "overlayFragment", "bloomPrefilter", "bloomDown", "bloomUp",
-                                     "compositeFragment", "envSkyFragment", "envPrefilterFragment", "brdfLutFragment",
-                                     "ssaoFragment", "aoBlurFragment", "shadowAlphaVertex", "shadowAlphaFragment",
-                                     "waterVertex", "waterFragment", "particleVertex", "particleFragment",
-                                     "volumeVertex", "volumeFragment", "fluidAdvect", "fluidCorrect", "fluidCombust",
-                                     "fluidCurl", "fluidForces", "fluidDivergence", "fluidJacobi", "fluidProject", "volumetricFragment",
-                                     "ssgiFragment", "ssrFragment", "ssTemporalFragment", "lightingResolveFragment",
-                                     "temporalFragment", "debugViewFragment", "terrainVertex", "terrainFragment",
-                                     "terrainShadowVertex", "cloudsFragment",
-                                     "cloudTemporalFragment", "cloudShapeKernel", "cloudDetailKernel", "lumaFragment",
-                                     "exposureFragment", "motionBlurFragment", "dofCocFragment", "dofBlurFragment",
-                                     "dofCombineFragment", "motionVectorFragment"}) {
+        for (const char* required : requiredFunctions()) {
             if (!fn(required)) {
                 return Error::make("shader_missing_function", std::string("shader source must define ") + required);
             }
         }
+        if (pipelineCache_) pipelineCache_->setBypass(!builtin);  // hot-reloaded sources are not archived
+        struct BypassReset {  // every return path below re-enables the archive
+            MetalPipelineCache* cache;
+            ~BypassReset() {
+                if (cache) cache->setBypass(false);
+            }
+        } bypassReset{pipelineCache_.get()};
 
         enum class Blend { None, Alpha, Additive, Premultiplied };
         // `mainPass` pipelines render into the scene pass: HDR color + HDR indirect light.
@@ -783,7 +868,7 @@ private:
                 }
             }
             if (depth) d.depthAttachmentPixelFormat = kDepthFormat;
-            return [device_ newRenderPipelineStateWithDescriptor:d error:err];
+            return newRenderPipeline(device_, d, err);  // [shader cache]
         };
 
         NSError* e = nil;
@@ -823,8 +908,8 @@ private:
         id<MTLRenderPipelineState> terrainShadow = terrain ? make("terrainShadowVertex", nullptr, MTLPixelFormatInvalid, 1, Blend::None, true, &e) : nil;
         id<MTLRenderPipelineState> clouds = terrainShadow ? make("fullscreenVertex", "cloudsFragment", kHDRFormat, 1, Blend::None, false, &e) : nil;
         id<MTLRenderPipelineState> cloudTemporal = clouds ? make("fullscreenVertex", "cloudTemporalFragment", kHDRFormat, 1, Blend::None, false, &e) : nil;
-        id<MTLComputePipelineState> cloudShapeK = cloudTemporal ? [device_ newComputePipelineStateWithFunction:fn("cloudShapeKernel") error:&e] : nil;
-        id<MTLComputePipelineState> cloudDetailK = cloudShapeK ? [device_ newComputePipelineStateWithFunction:fn("cloudDetailKernel") error:&e] : nil;
+        id<MTLComputePipelineState> cloudShapeK = cloudTemporal ? newComputePipeline(device_, fn("cloudShapeKernel"), &e) : nil;
+        id<MTLComputePipelineState> cloudDetailK = cloudShapeK ? newComputePipeline(device_, fn("cloudDetailKernel"), &e) : nil;
         id<MTLRenderPipelineState> luma = cloudDetailK ? make("fullscreenVertex", "lumaFragment", MTLPixelFormatRG16Float, 1, Blend::None, false, &e) : nil;
         id<MTLRenderPipelineState> exposure = luma ? make("fullscreenVertex", "exposureFragment", MTLPixelFormatR32Float, 1, Blend::None, false, &e) : nil;
         id<MTLRenderPipelineState> motionBlur = exposure ? make("fullscreenVertex", "motionBlurFragment", kHDRFormat, 1, Blend::None, false, &e) : nil;
@@ -832,12 +917,17 @@ private:
         id<MTLRenderPipelineState> dofBlur = dofCoc ? make("fullscreenVertex", "dofBlurFragment", kHDRFormat, 1, Blend::None, false, &e) : nil;
         id<MTLRenderPipelineState> dofCombine = dofBlur ? make("fullscreenVertex", "dofCombineFragment", kHDRFormat, 1, Blend::None, false, &e) : nil;
         id<MTLRenderPipelineState> motionVec = dofCombine ? make("fullscreenVertex", "motionVectorFragment", MTLPixelFormatRG16Float, 1, Blend::None, false, &e) : nil;
-        if (!motionVec) volume = nil;
+        // [debug views] wireframe lines and overdraw counting (main pass, G-buffer untouched)
+        id<MTLRenderPipelineState> wire = motionVec ? make("meshVertex", "wireframeFragment", kHDRFormat, kSamples, Blend::Alpha, true, &e, true) : nil;
+        id<MTLRenderPipelineState> overdraw = wire ? make("meshVertex", "overdrawFragment", kHDRFormat, kSamples, Blend::Additive, true, &e, true) : nil;
+        id<MTLRenderPipelineState> terrainWire = overdraw ? make("terrainVertex", "wireframeFragment", kHDRFormat, kSamples, Blend::Alpha, true, &e, true) : nil;
+        id<MTLRenderPipelineState> terrainOverdraw = terrainWire ? make("terrainVertex", "overdrawFragment", kHDRFormat, kSamples, Blend::Additive, true, &e, true) : nil;
+        if (!terrainOverdraw) volume = nil;
         if (volume) {
             for (const char* k : {"fluidAdvect", "fluidCorrect", "fluidCombust", "fluidCurl", "fluidForces", "fluidDivergence",
                                   "fluidJacobi", "fluidProject"}) {
                 id<MTLFunction> f = fn(k);
-                id<MTLComputePipelineState> cps = f ? [device_ newComputePipelineStateWithFunction:f error:&e] : nil;
+                id<MTLComputePipelineState> cps = f ? newComputePipeline(device_, f, &e) : nil;
                 if (!cps) {
                     volume = nil;
                     break;
@@ -893,7 +983,15 @@ private:
         dofBlurPipeline_ = dofBlur;
         dofCombinePipeline_ = dofCombine;
         motionPipeline_ = motionVec;
+        wireframePipeline_ = wire;
+        overdrawPipeline_ = overdraw;
+        terrainWirePipeline_ = terrainWire;
+        terrainOverdrawPipeline_ = terrainOverdraw;
         if (fx_) fx_->build(lib, FxFormats{kHDRFormat, kGbufAFormat, kGbufBFormat, kDepthFormat, kSamples, kShadowAtlas / 2});  // [hair+vfx]
+        libraryMs_ = libMs;  // [shader cache] engine_info.shaders
+        pipelinesMs_ = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+        shaderLibraryOrigin_ = builtin ? origin : "source (shader_set)";
+        shaderNote_ = note;
         return {};
     }
 
@@ -1095,9 +1193,11 @@ private:
     // --- Animation: GPU skinning -----------------------------------------------------------
     void buildSkinningPipeline() {
         NSError* error = nil;
+        const auto t0 = std::chrono::steady_clock::now();
         id<MTLLibrary> lib = [device_ newLibraryWithSource:[NSString stringWithUTF8String:kSkinningShaderSource] options:nil error:&error];
         id<MTLFunction> fn = lib ? [lib newFunctionWithName:@"skinVertices"] : nil;
-        skinPipeline_ = fn ? [device_ newComputePipelineStateWithFunction:fn error:&error] : nil;
+        skinPipeline_ = fn ? newComputePipeline(device_, fn, &error) : nil;
+        libraryMs_ += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
         if (!skinPipeline_) {
             log::warn("render", std::string("GPU skinning unavailable, characters show their rest pose: ") +
                                     (error ? error.localizedDescription.UTF8String : "no skinVertices kernel"));
@@ -1138,8 +1238,7 @@ private:
                 palettes[s.palette.get()] = pal;
             }
             if (!enc) {
-                enc = [cmd computeCommandEncoder];
-                enc.label = @"Skinning";
+                enc = profiledCompute(cmd, "Skinning", "skinning");
                 [enc setComputePipelineState:skinPipeline_];
             }
             SkinParams sp{base->vertexCount, static_cast<uint32_t>(s.palette->size()), 0, 0};
@@ -1273,6 +1372,7 @@ private:
                                    hdri_ ? static_cast<float>(hdri_.mipmapLevelCount) : 0.f);
         fu.clouds = simd_make_float4(0.f, env.cloudHeight, env.cloudThickness, env.cloudDensity);
         fu.clouds2 = simd_make_float4(env.cloudScale, env.cloudSpeed, env.cloudMode == "flat" ? 1.f : 0.f, radians(env.windDirection));
+        fu.debug = simd_make_float4(debugViewOverridesSurfaces(frame.debugView) ? static_cast<float>(frame.debugView) : 0.f, 0, 0, 0);
         return fu;
     }
 
@@ -1346,6 +1446,7 @@ private:
             rp.colorAttachments[0].level = 0;
             rp.colorAttachments[0].loadAction = MTLLoadActionDontCare;
             rp.colorAttachments[0].storeAction = MTLStoreActionStore;
+            profileRenderPass(rp, "Env sky", "environment");
             id<MTLRenderCommandEncoder> enc = [cmd renderCommandEncoderWithDescriptor:rp];
             enc.label = @"Env sky";
             [enc setRenderPipelineState:envSkyPipeline_];
@@ -1358,7 +1459,7 @@ private:
             [enc drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:3];
             [enc endEncoding];
         }
-        id<MTLBlitCommandEncoder> blit = [cmd blitCommandEncoder];
+        id<MTLBlitCommandEncoder> blit = profiledBlit(cmd, "Env mips", "environment");
         [blit generateMipmapsForTexture:skyCube_];
         [blit endEncoding];
         for (NSUInteger mip = 0; mip < kEnvMips; ++mip) {
@@ -1370,6 +1471,7 @@ private:
                 rp.colorAttachments[0].level = mip;
                 rp.colorAttachments[0].loadAction = MTLLoadActionDontCare;
                 rp.colorAttachments[0].storeAction = MTLStoreActionStore;
+                profileRenderPass(rp, "Env prefilter", "environment");
                 id<MTLRenderCommandEncoder> enc = [cmd renderCommandEncoderWithDescriptor:rp];
                 enc.label = @"Env prefilter";
                 [enc setRenderPipelineState:envPrefilterPipeline_];
@@ -1389,6 +1491,7 @@ private:
         rp.depthAttachment.loadAction = MTLLoadActionClear;
         rp.depthAttachment.clearDepth = 1.0;
         rp.depthAttachment.storeAction = MTLStoreActionStore;
+        profileRenderPass(rp, "Shadow cascades", "shadows");
         id<MTLRenderCommandEncoder> enc = [cmd renderCommandEncoderWithDescriptor:rp];
         enc.label = @"Shadow cascades";
         if (fu.params.z > 0.5f) {
@@ -1674,9 +1777,10 @@ private:
         return u;
     }
 
-    void drawTerrains(id<MTLRenderCommandEncoder> enc, const FrameData& frame, const Frustum& fr) {
+    void drawTerrains(id<MTLRenderCommandEncoder> enc, const FrameData& frame, const Frustum& fr,
+                      id<MTLRenderPipelineState> pso = nil) {
         if (frame.terrains.empty()) return;
-        [enc setRenderPipelineState:terrainPipeline_];
+        [enc setRenderPipelineState:pso ?: terrainPipeline_];
         [enc setCullMode:MTLCullModeNone];
         for (const TerrainItem& item : frame.terrains) {
             if (!item.data) continue;
@@ -1773,6 +1877,8 @@ private:
         // maps.z: 0 = no ORM map, otherwise 1 + occlusion strength.
         DrawUniforms du = drawUniforms(d, simd_make_float4(albedo ? 1 : 0, normal ? 1 : 0, orm ? 1.f + s.occlusionStrength : 0.f,
                                                            emissive ? 1 : 0));
+        const int lod = lodForDraw(*m, d);
+        du.material4.w = static_cast<float>(std::clamp(lod, 0, m->lodCount - 1) + 1);  // [debug views] lod
         bool twoSided = s.doubleSided || d.mesh == "plane" || d.mesh == "quad";
         [enc setCullMode:twoSided ? MTLCullModeNone : MTLCullModeBack];
         [enc setVertexBuffer:m->vertices offset:0 atIndex:0];
@@ -1782,7 +1888,7 @@ private:
         [enc setFragmentTexture:(normal ?: white_) atIndex:2];
         [enc setFragmentTexture:(orm ?: white_) atIndex:3];
         [enc setFragmentTexture:(emissive ?: white_) atIndex:4];
-        drawLod(enc, *m, lodForDraw(*m, d));
+        drawLod(enc, *m, lod);
     }
 
     void drawOutline(id<MTLRenderCommandEncoder> enc, const DrawItem& d, float width, simd_float4 color) {
@@ -1826,9 +1932,15 @@ private:
         rp.depthAttachment.clearDepth = 1.0;
         rp.depthAttachment.storeAction = MTLStoreActionMultisampleResolve;
 
+        profileRenderPass(rp, "Main", "main");
         id<MTLRenderCommandEncoder> enc = [cmd renderCommandEncoderWithDescriptor:rp];
         enc.label = @"Main";
         [enc setFrontFacingWinding:MTLWindingCounterClockwise];
+        if (frame.debugView == debugview::kOverdraw) {  // [debug views] count fragments, nothing else
+            encodeOverdraw(enc, frame, fu);
+            [enc endEncoding];
+            return;
+        }
 
         // Sky
         [enc setRenderPipelineState:skyPipeline_];
@@ -1880,6 +1992,21 @@ private:
         foliage_->encodeMain(enc, frame);  // [foliage] GPU-culled instances, mesh LOD bands, impostors
         [enc setRenderPipelineState:meshPipeline_];
         [enc setDepthStencilState:depthWrite_];
+        if (frame.debugView == debugview::kWireframe) {  // [debug views] edges over the opaque meshes
+            [enc setRenderPipelineState:wireframePipeline_];
+            [enc setDepthStencilState:depthRead_];
+            [enc setTriangleFillMode:MTLTriangleFillModeLines];
+            [enc setDepthBias:-4.0f slopeScale:-2.0f clamp:0.f];
+            for (const DrawItem& d : frame.draws) {
+                if (d.surface.color.w >= 0.999f && frustum.intersects(d.worldBounds)) drawMesh(enc, d);
+            }
+            drawTerrains(enc, frame, frustum, terrainWirePipeline_);
+            [enc setTriangleFillMode:MTLTriangleFillModeFill];
+            [enc setDepthBias:0.f slopeScale:0.f clamp:0.f];
+            [enc setRenderPipelineState:meshPipeline_];
+            [enc setDepthStencilState:depthWrite_];
+            [enc setFragmentTexture:cloudShape_ atIndex:7];
+        }
 
         // Toon outlines (inverted hulls; depth-tested so they only show at silhouettes)
         if (!outlined.empty()) {
@@ -1925,6 +2052,25 @@ private:
 
         if (r2d_) r2d_->encodeWorld(enc, rp, frame);  // 2D: sprites, tiles, world text (depth-tested)
         [enc endEncoding];
+    }
+
+    /// [debug views] overdraw: every mesh, terrain and foliage fragment adds 1 (no depth test, no
+    /// sky); the debug pass turns the counts into a heat map.
+    void encodeOverdraw(id<MTLRenderCommandEncoder> enc, const FrameData& frame, const FrameUniforms& fu) {
+        [enc setVertexBytes:&fu length:sizeof(fu) atIndex:2];
+        [enc setFragmentBytes:&fu length:sizeof(fu) atIndex:1];
+        [enc setRenderPipelineState:overdrawPipeline_];
+        [enc setDepthStencilState:depthNone_];
+        const Frustum frustum(frame.viewProjection());
+        culled_ = 0;
+        for (const DrawItem& d : frame.draws) {
+            if (frustum.intersects(d.worldBounds)) drawMesh(enc, d);
+            else ++culled_;
+        }
+        terrainNodesDrawn_ = 0;
+        drawTerrains(enc, frame, frustum, terrainOverdrawPipeline_);
+        [enc setDepthStencilState:depthNone_];
+        foliage_->encodeMain(enc, frame);  // uses its overdraw pipelines in this view
     }
 
     // --- Effects: FFT water and particles (single-sample, over the resolved scene) -----------
@@ -2041,7 +2187,7 @@ private:
         NSUInteger bpp = t.pixelFormat == MTLPixelFormatR32Float ? 4 : 8;
         NSUInteger row = t.width * bpp, image = row * t.height;
         id<MTLBuffer> zeros = [device_ newBufferWithLength:image * t.depth options:MTLResourceStorageModePrivate];
-        id<MTLBlitCommandEncoder> b = [cmd blitCommandEncoder];
+        id<MTLBlitCommandEncoder> b = profiledBlit(cmd, "Fluid clear", "effects");
         [b fillBuffer:zeros range:NSMakeRange(0, zeros.length) value:0];
         [b copyFromBuffer:zeros
                    sourceOffset:0
@@ -2114,8 +2260,7 @@ private:
         fp.wind = simd_make_float4(windLocal.x, windLocal.y, windLocal.z, 0.f);
         float fwd = 1.f, bwd = -1.f;
 
-        id<MTLComputeCommandEncoder> enc = [cmd computeCommandEncoder];
-        enc.label = @"Fluid step";
+        id<MTLComputeCommandEncoder> enc = profiledCompute(cmd, "Fluid step", "effects");
         [enc setBytes:&fp length:sizeof(fp) atIndex:0];
         // Advect velocity and scalars (MacCormack), each with the old velocity field.
         for (int field = 0; field < 2; ++field) {
@@ -2206,6 +2351,7 @@ private:
         rp.colorAttachments[0].texture = lit_;
         rp.colorAttachments[0].loadAction = MTLLoadActionLoad;
         rp.colorAttachments[0].storeAction = MTLStoreActionStore;
+        profileRenderPass(rp, "Volumes", "effects");
         id<MTLRenderCommandEncoder> enc = [cmd renderCommandEncoderWithDescriptor:rp];
         enc.label = @"Volumes";
         [enc setRenderPipelineState:volumePipeline_];
@@ -2260,7 +2406,7 @@ private:
         }
         if (simulate) simulateFluids(cmd, frame);
         // Copies of the opaque scene: water refracts/reflects them; particles fade against depth.
-        id<MTLBlitCommandEncoder> blit = [cmd blitCommandEncoder];
+        id<MTLBlitCommandEncoder> blit = profiledBlit(cmd, "Scene copy", "effects");
         if (anyWater) [blit copyFromTexture:lit_ toTexture:sceneCopy_];
         [blit copyFromTexture:depthResolved_ toTexture:depthCopy_];
         [blit endEncoding];
@@ -2274,6 +2420,7 @@ private:
             rp.depthAttachment.texture = depthResolved_;
             rp.depthAttachment.loadAction = MTLLoadActionLoad;
             rp.depthAttachment.storeAction = MTLStoreActionStore;
+            profileRenderPass(rp, "Water", "effects");
             id<MTLRenderCommandEncoder> enc = [cmd renderCommandEncoderWithDescriptor:rp];
             enc.label = @"Water";
             [enc setRenderPipelineState:waterPipeline_];
@@ -2331,7 +2478,7 @@ private:
             [enc endEncoding];
             std::erase_if(oceans_, [&](const auto& kv) { return std::find(live.begin(), live.end(), kv.first) == live.end(); });
             // Particles must fade against the water surface too.
-            blit = [cmd blitCommandEncoder];
+            blit = profiledBlit(cmd, "Depth copy", "effects");
             [blit copyFromTexture:depthResolved_ toTexture:depthCopy_];
             [blit endEncoding];
         }
@@ -2346,6 +2493,7 @@ private:
             rp.colorAttachments[0].texture = lit_;
             rp.colorAttachments[0].loadAction = MTLLoadActionLoad;
             rp.colorAttachments[0].storeAction = MTLStoreActionStore;
+            profileRenderPass(rp, "Particles", "particles");
             id<MTLRenderCommandEncoder> enc = [cmd renderCommandEncoderWithDescriptor:rp];
             enc.label = @"Particles";
             [enc setRenderPipelineState:particlePipeline_];
@@ -2379,6 +2527,7 @@ private:
         rp.colorAttachments[0].texture = volumetric_;
         rp.colorAttachments[0].loadAction = MTLLoadActionDontCare;
         rp.colorAttachments[0].storeAction = MTLStoreActionStore;
+        profileRenderPass(rp, "Volumetric light", "volumetrics");
         id<MTLRenderCommandEncoder> enc = [cmd renderCommandEncoderWithDescriptor:rp];
         enc.label = @"Volumetric light";
         [enc setRenderPipelineState:volumetricPipeline_];
@@ -2399,6 +2548,7 @@ private:
         rp.colorAttachments[0].texture = target;
         rp.colorAttachments[0].loadAction = MTLLoadActionDontCare;
         rp.colorAttachments[0].storeAction = MTLStoreActionStore;
+        profileRenderPass(rp, label.UTF8String, passGroup(label));
         id<MTLRenderCommandEncoder> enc = [cmd renderCommandEncoderWithDescriptor:rp];
         enc.label = label;
         [enc setRenderPipelineState:pso];
@@ -2412,8 +2562,7 @@ private:
 
     void ensureCloudNoise(id<MTLCommandBuffer> cmd) {
         if (cloudNoiseReady_) return;
-        id<MTLComputeCommandEncoder> enc = [cmd computeCommandEncoder];
-        enc.label = @"Cloud noise";
+        id<MTLComputeCommandEncoder> enc = profiledCompute(cmd, "Cloud noise", "clouds");
         for (auto [k, t] : {std::pair{cloudShapeKernel_, cloudShape_}, std::pair{cloudDetailKernel_, cloudDetail_}}) {
             [enc setComputePipelineState:k];
             [enc setTexture:t atIndex:0];
@@ -2544,6 +2693,7 @@ private:
         rp.colorAttachments[0].texture = resolve_;
         rp.colorAttachments[0].loadAction = MTLLoadActionLoad;
         rp.colorAttachments[0].storeAction = MTLStoreActionStore;
+        profileRenderPass(rp, "Overlays", "overlays");
         id<MTLRenderCommandEncoder> enc = [cmd renderCommandEncoderWithDescriptor:rp];
         enc.label = @"Overlays";
         [enc setFrontFacingWinding:MTLWindingCounterClockwise];
@@ -2576,6 +2726,7 @@ private:
         rp.colorAttachments[0].texture = target;
         rp.colorAttachments[0].loadAction = load ? MTLLoadActionLoad : MTLLoadActionDontCare;
         rp.colorAttachments[0].storeAction = MTLStoreActionStore;
+        profileRenderPass(rp, label.UTF8String, passGroup(label));
         id<MTLRenderCommandEncoder> enc = [cmd renderCommandEncoderWithDescriptor:rp];
         enc.label = label;
         [enc setRenderPipelineState:pso];
@@ -2660,7 +2811,7 @@ private:
         const bool autoExp = env.autoExposure;
         if (autoExp) {
             fullscreen(cmd, lumaPipeline_, lum_, {src}, &lu, sizeof(lu), false, @"Exposure metering");
-            id<MTLBlitCommandEncoder> blit = [cmd blitCommandEncoder];
+            id<MTLBlitCommandEncoder> blit = profiledBlit(cmd, "Exposure mips", "post");
             [blit generateMipmapsForTexture:lum_];
             [blit endEncoding];
             // Stills converge instantly; real time and offline movie frames adapt over time (offline:
@@ -2708,6 +2859,7 @@ private:
         rp.colorAttachments[0].texture = resolve_;
         rp.colorAttachments[0].loadAction = MTLLoadActionDontCare;
         rp.colorAttachments[0].storeAction = MTLStoreActionStore;
+        profileRenderPass(rp, "Composite", "post");
         id<MTLRenderCommandEncoder> enc = [cmd renderCommandEncoderWithDescriptor:rp];
         enc.label = @"Composite";
         [enc setRenderPipelineState:compositePipeline_];
@@ -2804,6 +2956,13 @@ private:
     std::unique_ptr<MetalRenderer2D> r2d_;  // 2D world quads + UI
     std::unique_ptr<MetalFx> fx_;  // [hair+vfx]
     std::unique_ptr<MetalFoliage> foliage_;  // [foliage]
+    // [profiler] per-pass GPU timing; [shader cache] library origin, compile times, pipeline archive
+    std::unique_ptr<MetalPassProfiler> profiler_;
+    std::shared_ptr<MetalPipelineCache> pipelineCache_;
+    std::string shaderLibraryOrigin_ = "source", shaderNote_, builtinSource_;
+    double libraryMs_ = 0, pipelinesMs_ = 0, startupMs_ = 0;
+    // [debug views]
+    id<MTLRenderPipelineState> wireframePipeline_, overdrawPipeline_, terrainWirePipeline_, terrainOverdrawPipeline_;
 };
 
 }  // namespace

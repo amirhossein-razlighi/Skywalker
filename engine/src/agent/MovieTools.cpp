@@ -10,6 +10,7 @@
 #include "ToolHelpers.h"
 #include "skywalker/core/Strings.h"
 #include "skywalker/engine/Movie.h"
+#include "skywalker/render/DebugViews.h"
 
 namespace sky {
 
@@ -148,11 +149,9 @@ Result<Options> parseOptions(Engine& engine, const Json& a) {
     {
         std::string q = a.get("quality").asString("full");
         o.quality = q == "fast" ? 2 : q == "balanced" ? 1 : 0;
-        static const char* kViews[] = {"final", "albedo", "normals", "material", "gi", "reflections", "ao", "depth", "lighting", "sketch"};
-        std::string dv = a.get("debug_view").asString("final");
-        for (int i = 0; i < 10; ++i) {
-            if (dv == kViews[i]) o.debugView = i;
-        }
+        auto dv = debugViewFromName(a.get("debug_view").asString("final"));
+        if (!dv) return dv.error();
+        o.debugView = *dv;
         o.clay = a.get("clay").asBool(false);
     }
     o.warmup = static_cast<int>(std::clamp<int64_t>(a.get("warmup").asInt(4), 0, 240));
@@ -224,8 +223,8 @@ void addMovieTools(Engine& engine, ToolRegistry& reg) {
                      {"shutter_timing", enumeration({"center", "open", "close"}, "Shutter interval relative to the frame time (default center)")},
                      {"quality", enumeration({"full", "balanced", "fast"}, "Render quality tier (default full; fast for previews)")},
                      {"clay", boolean("Matte clay look (same move, for sketch -> clay -> final transitions)")},
-                     {"debug_view", enumeration({"final", "albedo", "normals", "material", "gi", "reflections", "ao", "depth", "lighting", "sketch"},
-                                                "Buffer visualization or the pencil sketch look")},
+                     {"debug_view", enumeration(debugViewNames(), "Buffer visualization, shading debug view (wireframe, lod, "
+                                                                  "unshaded, ...) or the pencil sketch look; see viewport_capture")},
                      {"warmup", integer("Frames rendered before the first one so temporal effects settle (default 4)")},
                      {"output", string("Output path: .mp4 (H.264), .mov (ProRes 422 HQ), or a folder / name_####.png (PNG sequence); "
                                        "default renders/<name>.mp4")},

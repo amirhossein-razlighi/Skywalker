@@ -184,6 +184,9 @@ public:
     void setViewThroughSceneCamera(bool on) { viewSceneCamera_ = on; }
     void setViewportQuality(ViewportQuality q) { editQuality_ = q; }
     ViewportQuality viewportQuality() const { return editQuality_; }
+    /// Debug view of the live editor viewport (render/DebugViews.h id; 0 = final image).
+    void setViewportDebugView(int view) { viewportDebugView_ = view; }
+    int viewportDebugView() const { return viewportDebugView_; }
     bool viewThroughSceneCamera() const { return viewSceneCamera_; }
     /// Highlights the handle under the cursor. Returns the axis or -1.
     int gizmoHover(float x, float y, int width, int height);
@@ -380,6 +383,7 @@ private:
     Gizmo gizmo_;
     bool viewSceneCamera_ = false;
     ViewportQuality editQuality_ = ViewportQuality::Fast;
+    int viewportDebugView_ = 0;  // [debug views] live viewport
     int gizmoHot_ = -1;
     std::optional<Gizmo::DragStart> gizmoDrag_;
     EntityId gizmoEntity_ = kNoEntity;
