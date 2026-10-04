@@ -13,6 +13,7 @@
 namespace sky {
 
 void registerRenderLayerBuiltins(wander::BuiltinRegistry& reg);  // RenderBuiltins.cpp: layer_mask
+void registerSceneFlowBuiltins(wander::BuiltinRegistry& reg);  // game/SceneFlowBuiltins.cpp: change_scene, load_additive...
 
 namespace {
 
@@ -160,6 +161,7 @@ void registerEngineBuiltins() {
         registerFlowBuiltins(reg);  // pause_game, time_scale, teleport (EngineFlow.cpp)
         // Subsystem builtins: one line each.
         registerRenderLayerBuiltins(reg);  // render layers (RenderBuiltins.cpp)
+        registerSceneFlowBuiltins(reg);  // runtime scene flow (game/SceneFlowBuiltins.cpp)
     });
 }
 

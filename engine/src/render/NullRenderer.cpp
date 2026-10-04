@@ -83,6 +83,16 @@ public:
         // 2D: sprites, tiles, world text and lights, then UI (so headless captures show HUDs and menus).
         raster2d::drawWorld(image_, frame, textures_);
         raster2d::drawUI(image_, frame, textures_);
+        if (frame.fade.alpha > 0.f) {  // scene transition: fade the whole picture toward a color
+            const float a = std::clamp(frame.fade.alpha, 0.f, 1.f);
+            const uint8_t target[3] = {toByte(frame.fade.color.x), toByte(frame.fade.color.y), toByte(frame.fade.color.z)};
+            for (int y = 0; y < frame.height; ++y) {
+                for (int x = 0; x < frame.width; ++x) {
+                    uint8_t* p = image_.at(x, y);
+                    for (int c = 0; c < 3; ++c) p[c] = static_cast<uint8_t>(p[c] + (target[c] - p[c]) * a + 0.5f);
+                }
+            }
+        }
         return {};
     }
 

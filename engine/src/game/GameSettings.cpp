@@ -9,6 +9,7 @@
 
 #include "skywalker/core/Strings.h"
 #include "skywalker/ecs/Components.h"
+#include "skywalker/game/SceneFlow.h"
 
 namespace sky::game {
 
@@ -150,7 +151,8 @@ Result<GameSettings> GameSettings::fromJson(const Json& j) {
     GameSettings g;
     static const std::vector<std::string> keys{"id", "title", "genre", "mood", "pitch", "assets", "startScene", "window", "quality",
                                                "renderScale", "quitOnEscape", "pauseOnFocusLoss", "icon", "bundleId",
-                                               "version", "copyright", "include", "exclude", "render", "mounts"};
+                                               "version", "copyright", "include", "exclude", "render", "mounts",
+                                               "scenes", "sceneFlow"};
     if (Status s = checkKeys(j, "game.json", keys); !s) return s.error();
     for (auto [key, out] : std::initializer_list<std::pair<const char*, std::string*>>{
              {"id", &g.id}, {"title", &g.title}, {"genre", &g.genre}, {"mood", &g.mood}, {"pitch", &g.pitch}, {"assets", &g.assets},
@@ -209,6 +211,13 @@ Result<GameSettings> GameSettings::fromJson(const Json& j) {
             if (!folder.isString() || folder.asString().empty()) return typeError("mounts." + name, "a folder path", folder);
             g.mounts.emplace_back(name, folder.asString());
         }
+    }
+
+    if (j.contains("scenes") || j.contains("sceneFlow")) {  // runtime scene flow: validated by SceneFlowSettings
+        auto flow = SceneFlowSettings::fromJson(j.get("scenes"), j.get("sceneFlow"));
+        if (!flow) return flow.error();
+        g.scenes = j.get("scenes");
+        g.sceneFlow = j.get("sceneFlow");
     }
 
     if (!validVersion(g.version)) {
@@ -275,6 +284,8 @@ Json GameSettings::toJson() const {
         j["mounts"] = std::move(m);
     }
     if (Json layers = renderLayers.toJson(); !layers.members().empty()) j["render"] = Json::object({{"layers", layers}});
+    if (!scenes.isNull()) j["scenes"] = scenes;
+    if (!sceneFlow.isNull()) j["sceneFlow"] = sceneFlow;
     return j;
 }
 

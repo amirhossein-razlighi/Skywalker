@@ -51,6 +51,10 @@ struct GameSettings {
     std::vector<std::pair<std::string, std::string>> mounts;
     // Rendering: "render": {"layers": {"1": "world", "2": "player"}} names the 20 render layers
     render::LayerNames renderLayers;
+    // Runtime scene flow (game/SceneFlow.h): "scenes": {"menu": "scenes/menu.sky.json"} aliases and
+    // "sceneFlow": {"persistent": [...], "loadingScene": "loading", "transition": {"kind": "fade", "duration": 0.4}}
+    Json scenes;
+    Json sceneFlow;
 
     bool fromFile = false;  // a game.json was found
 

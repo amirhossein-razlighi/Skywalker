@@ -98,6 +98,7 @@ void Scene::registerKinds() {
     kinds_.push_back(makeReflectedKind<IkTarget>());
     kinds_.push_back(makeReflectedKind<Groom>());
     kinds_.push_back(makeReflectedKind<Process>());  // pause modes, run order, interpolation (scene/Process.h)
+    kinds_.push_back(makeReflectedKind<Persistent>());  // runtime scene changes (game/SceneFlow.h)
 }
 
 const ComponentKind* Scene::componentKind(std::string_view n) const {

@@ -254,6 +254,11 @@ public:
     void setRecordSceneWrites(bool on) { recordSceneWrites_ = on; }
     bool recordSceneWrites() const { return recordSceneWrites_; }
 
+    // --- Runtime scene changes (RuntimeScenes.cpp; docs/SCENE_FLOW.md) ------------------------
+    /// Drops the instances, vars, queued events and contacts of entities that no longer exist (a scene
+    /// change or an additive unload removed them between ticks). Entities that still exist keep running.
+    void forgetMissingEntities();
+
     /// Execution budget per handler run, in instructions (loops charge their length per
     /// iteration, calls the callee's length).
     static constexpr int64_t kBudget = 1'000'000;

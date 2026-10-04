@@ -70,5 +70,6 @@ void addLegalTools(Engine& engine, ToolRegistry& reg);  // LegalTools.cpp: legal
 void addCustomToolTools(Engine& engine, ToolRegistry& reg);  // CustomToolTools.cpp: tool_define, tool_test, ... (docs/CUSTOM_TOOLS.md)
 void addAgentLinkTools(Engine& engine, ToolRegistry& reg);  // AgentLinkTools.cpp: events_poll, tool_host_* (docs/PYTHON_AGENTS.md)
 void addAuditTools(Engine& engine, ToolRegistry& reg);   // AuditTools.cpp: scene_audit (look-dev quality gate)
+void addSceneFlowTools(Engine& engine, ToolRegistry& reg);  // SceneFlowTools.cpp: scene_flow_info, scene_change, scene_additive_*
 
 }  // namespace sky::tools
