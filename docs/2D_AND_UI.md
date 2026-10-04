@@ -26,7 +26,8 @@ Conventions:
 
 | Component | What it is | Key fields |
 |---|---|---|
-| `sprite` | Textured quad | `texture` (png / `*.atlas.json`), `frame` (name or index), `columns`/`rows` (grid sheets), `region`, `pivot` ([0.5, 0] = feet), `size` or `pixelsPerUnit`, `color`, `flipX/Y`, `sortingLayer`, `order`, `filter` (nearest for pixel art), `normalMap`, `emissive`, `billboard` (none/y/full for 2.5D), `lit`, `castShadows`, `alphaCutoff`, `ySort` (top-down depth), `palette` (palette swap) |
+| `sprite` | Textured quad | `texture` (png / `*.atlas.json`), `frame` (name or index), `columns`/`rows` (grid sheets), `region`, `pivot` ([0.5, 0] = feet), `size` or `pixelsPerUnit`, `color`, `flipX/Y`, `sortingLayer`, `order`, `filter` (nearest for pixel art), `normalMap`, `emissive`, `billboard` (none/y/full for 2.5D), `lit`, `castShadows`, `alphaCutoff`, `ySort` (top-down depth), `palette` (palette swap), `blur` (depth of field, texels), `sway` (wind/cloth bend), `blend` (alpha/add), `flash` (hit flash) |
+| `sprite_trail` | Afterimages | `count`, `interval`, `minSpeed`, `color`, `opacity`, `emissive`, `additive`, `emitting` |
 | `sprite_anim` | Flipbook | `clips` `{"run": {"frames": "4-11" \| [..] \| "run_*", "fps": 12, "loop": true, "events": {"3": "footstep"}, "texture"?}}`, `clip`, `playing`, `speed`. Frame events reach the entity's behaviors as `on anim "footstep"`, a non-looping clip's end as `on anim "finished"` |
 | `tilemap` | Layers of tiles | `tileset` (png or `*.tileset.json`), `tileSize`, `cellSize`, `width`, `height`, `layers` (`[{name, data, solid, z, tint, sortingLayer, order, ySort}]`), `solidTiles`, `autotile` (terrains), `sortingLayer`, `filter`, `lit`, `castShadows`, `palette` |
 | `particles2d` | Pixel-art particles | `texture` (sheet/atlas, or empty for solid `pixelSize` rectangles), `columns`/`rows`, `frames`, `animate` (random/life/loop), `rate`, `burst`, `lifetime`, `area`, `wrap` (weather fills any view), `velocity`, `gravity`, `sway`, `flutter`, `color`, `emissive`, `pulse`, `fadeIn`/`fadeOut`, `sortingLayer`, `lit`, `seed` |
@@ -209,6 +210,8 @@ editor with `ui_create {"template": "dialogue"}`. Set `ui: "none"` to draw your 
 | `tilemap_inspect` | ASCII view of every layer with a legend, plus merged collision rectangles |
 | `particles2d_create` | Pixel particles from a preset: rain, drizzle, snow, leaves, petals, fireflies, smoke, ripples, dust, sparkle |
 | `particles2d_info` | Live particle counts, caps and bounds of `particles2d` emitters |
+| `sprite_sheet_import` | Pack rendered animation frames (one folder per clip, plus a normal pass) into normal-mapped atlases with clips; apply them to an entity |
+| `game_feel` | Try hit-stop, camera shake and sprite flashes on the running game; read their state |
 
 Captures (`viewport_capture`) include sprites, tiles, world text and UI, with real screen boxes
 for each — also on machines without a GPU (the CPU rasterizer draws the same Frame2D).
@@ -339,6 +342,58 @@ layers) and simulate on fixed ticks with a seeded generator, so runs replay exac
 `animate: "life"` plays a sheet over each particle's life (ripple rings, smoke puffs); `pulse` twinkles
 fireflies; `flutter` makes them wander. `burst(find("Dust"), 6)` in Wander spawns particles on the next
 tick (a tilled-soil puff). `particles2d_create` makes tuned ones from presets.
+
+### Painted 2D: depth, motion and impact
+
+Hand-painted action games lean on a few cheap effects; each is a field or a builtin.
+
+**Rendered animation.** Characters animated in a DCC (Blender: rig, animate, cel-shade with ink lines) come in as one folder of
+numbered PNGs per clip plus a parallel folder of camera-space normal passes. `sprite_sheet_import` trims and packs them (spilling
+whole clips into further atlases when one would exceed `max_size`; those clips name their `texture`), averages supersampled
+renders (`downsample`), writes a normal-map atlas with the same layout and names it in the atlas (`"normalMap": "hero_n.png"`).
+Any atlas with a `normalMap` lights its frames with 2D lights; a sprite's own `normalMap` still wins.
+
+```json
+sprite_sheet_import {"folder": "renders/heroine", "normals": "renders/heroine_normals", "output": "art/heroine/heroine",
+                     "downsample": 2, "fps": 30, "clips": {"attack1": {"loop": false, "events": {"4": "hit"}}},
+                     "entity": "Heroine", "pivot": [0.5, 0.15], "pixels_per_unit": 128}
+```
+
+**Depth.** `sprite.blur` blurs a sprite by a radius in texture pixels (a disk of taps on a coarser mip, averaged in premultiplied
+alpha): out-of-focus foreground silhouettes and far layers. `sprite.blend: "add"` adds light instead of covering (god rays, light
+shafts, glows, sparks; additive sprites leave the G-buffer alone). `sprite.sway = [amplitude, Hz, waves, pin]` bends the image inside
+its quad (curtains and hanging silk with pin 1, grass and banners with pin 0); each sprite gets its own phase. `particles2d` emitters
+take `filter: "linear"` (smooth sub-pixel motion for painted motes), `blend: "add"` and `sizeJitter`.
+
+**Motion.** `sprite_trail` records the sprite's pose and animation frame while it moves faster than `minSpeed` and draws the last
+`count` poses behind it, tinted and fading (`additive` for energy streaks). Toggle `emitting` around a dash.
+
+**Impact.** Wander builtins (deterministic: counted in fixed ticks, reset when play stops):
+
+| Builtin | Effect |
+|---|---|
+| `hit_stop(seconds, scale?)` | Freeze frames: the game clock runs at `scale` (0 = frozen) for `seconds` of real time. UI, camera shake and real-clock entities keep going |
+| `camera_shake(trauma, camera?)` | Adds trauma (0..1) to the 2D camera; offset = trauma^2 x `camera2d.shakeAmplitude`, noise at `shakeFrequency`, decaying by `shakeDecay`/s |
+| `flash(entity, seconds?, color?)` | The sprite turns `color` and fades back (`sprite.flash` holds a constant one) |
+| `hit_stop_left()` | Real seconds of hit-stop left |
+
+`process.timeScale` slows (or freezes) one entity and its children on top of the game time scale: a per-entity hit-stop, a slowed
+boss arm. `game_feel` runs the same effects from tools on a playing game and reports their state.
+
+```wander
+on anim "hit"
+  for e in find_all("enemy")
+    if distance(e, self) < 1.8 then
+      emit "hit" with {dmg: 1} to e
+      hit_stop(0.07)
+      camera_shake(0.25)
+    end
+  end
+end
+on event "hit"            -- on the enemy
+  flash(self, 0.12, #ffffff)
+end
+```
 
 ## Limits
 

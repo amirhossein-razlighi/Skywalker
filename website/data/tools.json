@@ -10743,6 +10743,244 @@
    "_meta": {
     "skywalker/category": "view"
    }
+  },
+  {
+   "name": "particles2d_create",
+   "title": "Create 2D particles",
+   "description": "Create pixel-art particles for a 2D game from a preset, ready to tweak: rain (streaks over the whole view), drizzle, snow (drifting flakes), leaves and petals (falling, swaying), fireflies (glowing, twinkling, wandering), smoke (chimney puffs), ripples (puddle rings while it rains), dust (motes in sunlight), sparkle (water glints). Weather presets (rain, drizzle, snow, ripples) wrap: their box tiles endlessly so they fill whatever the camera shows, wherever the entity is. Untextured particles are solid pixel rectangles (`pixelSize` texels); give a `texture` sheet (with `columns`/`rows`, `frames`, `animate` random|life|loop) for leaves, flakes or ripple rings. `overrides` patches fields, e.g. {\"rate\": 400, \"color\": \"#9fc4ff\", \"pixelsPerUnit\": 16}. Simulated on fixed ticks while playing (deterministic, reset on stop). Example: particles2d_create {\"preset\": \"fireflies\", \"position\": [12, 4, 0], \"overrides\": {\"area\": [14, 6]}}.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "preset": {
+      "type": "string",
+      "enum": [
+       "rain",
+       "drizzle",
+       "snow",
+       "leaves",
+       "petals",
+       "fireflies",
+       "smoke",
+       "ripples",
+       "dust",
+       "sparkle"
+      ],
+      "description": "Preset"
+     },
+     "name": {
+      "type": "string",
+      "description": "Entity name (default: the preset's name)"
+     },
+     "position": {
+      "type": "array",
+      "items": {
+       "type": "number"
+      },
+      "minItems": 3,
+      "maxItems": 3,
+      "description": "World position (center of the emission box)"
+     },
+     "parent": {
+      "type": [
+       "integer",
+       "string"
+      ],
+      "description": "Parent entity (e.g. a chimney)"
+     },
+     "overrides": {
+      "type": "object",
+      "description": "particles2d fields to change"
+     }
+    },
+    "additionalProperties": false,
+    "required": [
+     "preset"
+    ]
+   },
+   "annotations": {
+    "title": "Create 2D particles",
+    "readOnlyHint": false,
+    "destructiveHint": false,
+    "openWorldHint": false
+   },
+   "_meta": {
+    "skywalker/category": "render"
+   }
+  },
+  {
+   "name": "particles2d_info",
+   "title": "2D particle stats",
+   "description": "Live state of particles2d emitters: particles alive, cap, rate, box, wrap, and the bounds the live particles cover (world units). Use it to check that weather is running while playing, or to find emitters that hit their maxParticles cap. Without `entity` lists every emitter in the scene.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "entity": {
+      "type": [
+       "integer",
+       "string"
+      ],
+      "description": "Emitter (default: all)"
+     }
+    },
+    "additionalProperties": false
+   },
+   "annotations": {
+    "title": "2D particle stats",
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "openWorldHint": false
+   },
+   "_meta": {
+    "skywalker/category": "render"
+   }
+  },
+  {
+   "name": "sprite_sheet_import",
+   "title": "Import rendered sprite animations",
+   "description": "Turn rendered animation frames (a Blender/DCC render: one subfolder of numbered PNGs per clip, e.g. renders/heroine/run/0001.png; folders starting with _ or . are skipped) into packed sprite atlases with sprite_anim clips, plus a matching normal-map atlas (from a parallel folder of normal-pass frames) so 2D lights shade the animation. Frames are trimmed and packed; clips that do not fit one atlas spill into more (each clip then names its texture). `downsample` averages supersampled renders (2 = render at 2x for smooth edges). `entity` applies sprite (pivot, size), sprite_anim (clips) and lighting in one undoable step. Example: {\"folder\": \"renders/heroine\", \"normals\": \"renders/heroine_normals\", \"output\": \"art/heroine/heroine\", \"downsample\": 2, \"fps\": 30, \"clips\": {\"attack1\": {\"loop\": false, \"events\": {\"4\": \"hit\"}}}, \"entity\": \"Heroine\", \"pivot\": [0.5, 0.08], \"pixels_per_unit\": 150}",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "folder": {
+      "type": "string",
+      "description": "Folder with one subfolder of numbered PNG frames per clip (project-relative)"
+     },
+     "normals": {
+      "type": "string",
+      "description": "Folder with the same clip subfolders holding normal-pass frames (optional)"
+     },
+     "output": {
+      "type": "string",
+      "description": "Output path without extension: writes <output>.png, <output>_n.png, <output>.atlas.json (and _2, _3 ... when clips spill over)"
+     },
+     "clips": {
+      "type": "object",
+      "description": "Per clip: {fps, loop, events: {\"frame\": \"name\"}, name (rename)}; clips not listed use fps and loop true"
+     },
+     "only": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "Import only these clip folders"
+     },
+     "fps": {
+      "type": "number",
+      "description": "Default frames per second (default 24)"
+     },
+     "downsample": {
+      "type": "integer",
+      "description": "Average NxN source pixels into one (1-4, default 1)"
+     },
+     "max_size": {
+      "type": "integer",
+      "description": "Maximum atlas size in pixels (default 4096)"
+     },
+     "padding": {
+      "type": "integer",
+      "description": "Pixels between frames (default 2)"
+     },
+     "entity": {
+      "type": [
+       "integer",
+       "string"
+      ],
+      "description": "Apply the sprite, animations and normal map to this entity"
+     },
+     "pivot": {
+      "type": "array",
+      "items": {
+       "type": "number"
+      },
+      "description": "With entity: pivot in the untrimmed frame (0..1, [0.5, 0] = feet)"
+     },
+     "pixels_per_unit": {
+      "type": "number",
+      "description": "With entity: sprite pixelsPerUnit (after downsampling)"
+     },
+     "clip": {
+      "type": "string",
+      "description": "With entity: clip to start (default: the first)"
+     }
+    },
+    "additionalProperties": false,
+    "required": [
+     "folder",
+     "output"
+    ]
+   },
+   "annotations": {
+    "title": "Import rendered sprite animations",
+    "readOnlyHint": false,
+    "destructiveHint": false,
+    "openWorldHint": false
+   },
+   "_meta": {
+    "skywalker/category": "asset"
+   }
+  },
+  {
+   "name": "game_feel",
+   "title": "Game feel (hit-stop, shake, flash)",
+   "description": "Try impact feedback on the running game exactly as Wander does: `hit_stop` freezes the game clock for `seconds` (or slows it to `scale`), `shake` adds trauma (0..1) to the 2D camera (`camera`, default the active one), `flash` flashes an entity's sprite `color` fading over `seconds`; `info` reads the hit-stop left, each camera2d's trauma and offset, and active flashes. Use while playing (sim_control play), then step and capture. Example: {\"action\": \"shake\", \"trauma\": 0.5}",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "action": {
+      "type": "string",
+      "enum": [
+       "hit_stop",
+       "shake",
+       "flash",
+       "info"
+      ],
+      "description": "What to do"
+     },
+     "seconds": {
+      "type": "number",
+      "description": "hit_stop / flash duration (default 0.08 / 0.12)"
+     },
+     "scale": {
+      "type": "number",
+      "description": "hit_stop: clock speed during the stop (0 = frozen)"
+     },
+     "trauma": {
+      "type": "number",
+      "description": "shake: trauma added (0..1, default 0.4)"
+     },
+     "camera": {
+      "type": [
+       "integer",
+       "string"
+      ],
+      "description": "shake: camera entity with camera2d"
+     },
+     "entity": {
+      "type": [
+       "integer",
+       "string"
+      ],
+      "description": "flash: sprite entity"
+     },
+     "color": {
+      "type": "string",
+      "description": "flash: color (default #ffffff)"
+     }
+    },
+    "additionalProperties": false,
+    "required": [
+     "action"
+    ]
+   },
+   "annotations": {
+    "title": "Game feel (hit-stop, shake, flash)",
+    "readOnlyHint": false,
+    "destructiveHint": false,
+    "openWorldHint": false
+   },
+   "_meta": {
+    "skywalker/category": "sim"
+   }
   }
  ]
 }

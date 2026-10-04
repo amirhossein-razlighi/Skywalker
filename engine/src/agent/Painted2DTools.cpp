@@ -152,7 +152,7 @@ Image normalAtlas(const render2d::Atlas& atlas, const std::map<std::string, cons
 void addPainted2DTools(Engine& engine, ToolRegistry& reg) {
     reg.add({"sprite_sheet_import", "Import rendered sprite animations",
              "Turn rendered animation frames (a Blender/DCC render: one subfolder of numbered PNGs per clip, e.g. "
-             "renders/heroine/run/0001.png) into packed sprite atlases with sprite_anim clips, plus a matching normal-map "
+             "renders/heroine/run/0001.png; folders starting with _ or . are skipped) into packed sprite atlases with sprite_anim clips, plus a matching normal-map "
              "atlas (from a parallel folder of normal-pass frames) so 2D lights shade the animation. Frames are trimmed and "
              "packed; clips that do not fit one atlas spill into more (each clip then names its texture). `downsample` "
              "averages supersampled renders (2 = render at 2x for smooth edges). `entity` applies sprite (pivot, size), "
@@ -198,7 +198,8 @@ void addPainted2DTools(Engine& engine, ToolRegistry& reg) {
                  // Read every clip folder.
                  std::vector<std::string> dirs;
                  for (const auto& entry : fs::directory_iterator(folder, ec)) {
-                     if (entry.is_directory()) dirs.push_back(entry.path().filename().string());
+                     const std::string dn = entry.path().filename().string();
+                     if (entry.is_directory() && !dn.empty() && dn[0] != '_' && dn[0] != '.') dirs.push_back(dn);  // _textures etc. are not clips
                  }
                  std::sort(dirs.begin(), dirs.end(), naturalLess);
                  for (const auto& o : only) {
@@ -362,7 +363,7 @@ void addPainted2DTools(Engine& engine, ToolRegistry& reg) {
              "flashes an entity's sprite `color` fading over `seconds`; `info` reads the hit-stop left, each camera2d's trauma "
              "and offset, and active flashes. Use while playing (sim_control play), then step and capture. Example: "
              "{\"action\": \"shake\", \"trauma\": 0.5}",
-             "simulation",
+             "sim",
              object({{"action", enumeration({"hit_stop", "shake", "flash", "info"}, "What to do")},
                      {"seconds", number("hit_stop / flash duration (default 0.08 / 0.12)")},
                      {"scale", number("hit_stop: clock speed during the stop (0 = frozen)")},

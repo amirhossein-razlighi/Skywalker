@@ -1330,6 +1330,40 @@
    "visible": {
     "type": "boolean",
     "description": "Whether the sprite is drawn"
+   },
+   "ySort": {
+    "type": "boolean",
+    "description": "Top-down depth: among ySort sprites and tile rows of the same layer and order, the one lower on screen (smaller world y at the pivot) draws in front"
+   },
+   "palette": {
+    "type": "string",
+    "description": "Palette swap: *.palette.json ({\"swap\": {\"#3a7d44\": \"#d8e4ec\"}}) or a 2-row png (row 0 source colors, row 1 targets); recolors the texture (seasons, variants)"
+   },
+   "blur": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 64,
+    "description": "Depth-of-field blur radius in texture pixels: soft out-of-focus foreground silhouettes and far layers (0 = sharp; 4-24 typical)"
+   },
+   "sway": {
+    "type": "array",
+    "items": {
+     "type": "number"
+    },
+    "minItems": 1,
+    "maxItems": 4,
+    "description": "Wind/cloth sway (the image bends inside its quad): [amplitude as a fraction of the width (0.02-0.1), speed Hz, waves along the height, pin: 0 = bottom fixed (grass, banners on poles), 1 = top fixed (curtains, hanging silk)]; amplitude 0 = off"
+   },
+   "blend": {
+    "type": "string",
+    "enum": [
+     "alpha",
+     "add"
+    ],
+    "description": "alpha (normal) or add (light shafts, god rays, glows, sparks: brightens what is behind)"
+   },
+   "flash": {
+    "description": "Hit flash: rgb mixed over the sprite by alpha (0 = none). Wander flash(e, 0.12) plays a fading one — hex string \"#rrggbb[aa]\" or [r,g,b(,a)] in 0..1"
    }
   },
   "additionalProperties": false
@@ -1392,7 +1426,7 @@
      "type": "object"
     },
     "x-sky-json": true,
-    "description": "[{name, data, solid (true | \"tiles\"), visible, z, tint, sortingLayer, order}] bottom to top"
+    "description": "[{name, data, solid (true | \"tiles\"), visible, z, tint, sortingLayer, order, ySort}] bottom to top; a ySort layer draws row by row, interleaved with ySort sprites (tall tiles: the tileset's sortOffset)"
    },
    "solidTiles": {
     "type": "array",
@@ -1437,6 +1471,10 @@
    "castShadows": {
     "type": "boolean",
     "description": "Solid tiles block shadow-casting 2D lights"
+   },
+   "palette": {
+    "type": "string",
+    "description": "Palette swap for the tileset image (*.palette.json or a 2-row png strip)"
    }
   },
   "additionalProperties": false
@@ -1514,6 +1552,10 @@
     "minimum": 0,
     "maximum": 1,
     "description": "Candle/torch flicker amount"
+   },
+   "bands": {
+    "type": "integer",
+    "description": "Pixel-art falloff: 0 = smooth gradient; n = n stepped rings joined by an ordered dither on the art's texel grid (no 8-bit banding; 4-8 suits pixel art)"
    }
   },
   "additionalProperties": false
@@ -1623,6 +1665,24 @@
     "minItems": 1,
     "maxItems": 4,
     "description": "[minX, minY, maxX, maxY] the view stays inside (all 0 = unbounded)"
+   },
+   "shakeAmplitude": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 100,
+    "description": "camera_shake: world units of offset at full trauma"
+   },
+   "shakeFrequency": {
+    "type": "number",
+    "minimum": 0.1,
+    "maximum": 120,
+    "description": "camera_shake: noise frequency (Hz)"
+   },
+   "shakeDecay": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 100,
+    "description": "camera_shake: trauma lost per second"
    }
   },
   "additionalProperties": false
@@ -3314,6 +3374,12 @@
      "off"
     ],
     "description": "inherit | on (motion is smoothed between ticks on screen) | off (shown exactly at tick positions: snapping things, pixel-art)"
+   },
+   "timeScale": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 10,
+    "description": "This entity's own clock speed (multiplied with its parents' and the game time_scale): 0.2 slows one enemy or a boss arm, 0 freezes it (a per-entity hit-stop)"
    }
   },
   "additionalProperties": false
@@ -3440,6 +3506,284 @@
     "minimum": 0,
     "maximum": 20000,
     "description": "Capture far plane in meters (0 = automatic from the volume)"
+   }
+  },
+  "additionalProperties": false
+ },
+ "particles2d": {
+  "type": "object",
+  "description": "Pixel-art particles on the 2D plane: rain streaks, snow, falling leaves and petals, fireflies, chimney puffs, puddle ripples. Drawn as sprites (nearest sampling, texel snapping, sorting layers) from a sheet or as solid pixel rectangles; simulated deterministically on fixed ticks. wrap = true tiles the emission box endlessly so weather fills whatever the camera shows. Create tuned ones with particles2d_create.",
+  "properties": {
+   "emitting": {
+    "type": "boolean",
+    "description": "Spawn new particles (live ones finish their life)"
+   },
+   "texture": {
+    "type": "string",
+    "description": "Grid sheet (png) or atlas; empty = solid rectangles of pixelSize texels"
+   },
+   "columns": {
+    "type": "integer",
+    "description": "Sheet columns"
+   },
+   "rows": {
+    "type": "integer",
+    "description": "Sheet rows"
+   },
+   "frames": {
+    "type": "string",
+    "description": "Frames to use (\"0-3,6\"; empty = all)"
+   },
+   "animate": {
+    "type": "string",
+    "enum": [
+     "random",
+     "life",
+     "loop"
+    ],
+    "description": "random: each particle keeps one frame; life: frames play over its life; loop: at fps"
+   },
+   "fps": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 120,
+    "description": "Frames per second (animate = loop)"
+   },
+   "pixelsPerUnit": {
+    "type": "number",
+    "minimum": 0.01,
+    "maximum": 100000,
+    "description": "Texels per world unit (match the art, e.g. 16)"
+   },
+   "pixelSize": {
+    "type": "array",
+    "items": {
+     "type": "number"
+    },
+    "minItems": 2,
+    "maxItems": 2,
+    "description": "Untextured particles: [w, h] in texels (rain streak: [1, 4])"
+   },
+   "rate": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 100000,
+    "description": "Particles per second"
+   },
+   "burst": {
+    "type": "integer",
+    "description": "Particles emitted at once when play starts"
+   },
+   "maxParticles": {
+    "type": "integer",
+    "description": "Cap on live particles"
+   },
+   "lifetime": {
+    "type": "number",
+    "minimum": 0.01,
+    "maximum": 600,
+    "description": "Seconds a particle lives"
+   },
+   "lifetimeJitter": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1,
+    "description": "Random fraction of the lifetime"
+   },
+   "area": {
+    "type": "array",
+    "items": {
+     "type": "number"
+    },
+    "minItems": 2,
+    "maxItems": 2,
+    "description": "Emission box [w, h] in world units, centered on the entity"
+   },
+   "wrap": {
+    "type": "boolean",
+    "description": "Tile the box endlessly around the view (weather that fills any camera)"
+   },
+   "velocity": {
+    "type": "array",
+    "items": {
+     "type": "number"
+    },
+    "minItems": 2,
+    "maxItems": 2,
+    "description": "Initial velocity (world units/s)"
+   },
+   "velocityJitter": {
+    "type": "array",
+    "items": {
+     "type": "number"
+    },
+    "minItems": 2,
+    "maxItems": 2,
+    "description": "Random +- added per axis"
+   },
+   "gravity": {
+    "type": "array",
+    "items": {
+     "type": "number"
+    },
+    "minItems": 2,
+    "maxItems": 2,
+    "description": "Acceleration (world units/s^2); [0.3, 0] works as wind"
+   },
+   "drag": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 100,
+    "description": "Velocity damping per second"
+   },
+   "sway": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 100,
+    "description": "Side-to-side drift speed (leaves, snow)"
+   },
+   "swayFrequency": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 50,
+    "description": "Sway cycles per second"
+   },
+   "flutter": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 100,
+    "description": "Random-walk wander (fireflies, butterflies)"
+   },
+   "color": {
+    "description": "Tint and opacity — hex string \"#rrggbb[aa]\" or [r,g,b(,a)] in 0..1"
+   },
+   "colorJitter": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1,
+    "description": "Per-particle brightness variation"
+   },
+   "emissive": {
+    "description": "Glow color, alpha = strength (blooms) — hex string \"#rrggbb[aa]\" or [r,g,b(,a)] in 0..1"
+   },
+   "pulse": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1,
+    "description": "Twinkle depth of opacity and glow (fireflies)"
+   },
+   "pulseFrequency": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 50,
+    "description": "Twinkles per second"
+   },
+   "fadeIn": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1,
+    "description": "Fraction of the life spent fading in"
+   },
+   "fadeOut": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1,
+    "description": "Fraction of the life spent fading out"
+   },
+   "sortingLayer": {
+    "type": "string",
+    "enum": [
+     "background",
+     "midground",
+     "default",
+     "foreground",
+     "overlay"
+    ],
+    "description": "Draw layer"
+   },
+   "order": {
+    "type": "integer",
+    "description": "Order within the layer"
+   },
+   "lit": {
+    "type": "boolean",
+    "description": "Lit by 2D lights (else full bright)"
+   },
+   "prewarm": {
+    "type": "boolean",
+    "description": "Start as if it had been running for a while"
+   },
+   "seed": {
+    "type": "integer",
+    "description": "Random seed (same seed, same particles)"
+   },
+   "filter": {
+    "type": "string",
+    "enum": [
+     "nearest",
+     "linear"
+    ],
+    "description": "nearest (pixel art, texel-snapped) or linear (painted motes, smooth sub-pixel motion)"
+   },
+   "blend": {
+    "type": "string",
+    "enum": [
+     "alpha",
+     "add"
+    ],
+    "description": "alpha (normal) or add (sparks, embers, glowing spores)"
+   },
+   "sizeJitter": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1,
+    "description": "Random size per particle: 0.5 = 50% to 150%"
+   }
+  },
+  "additionalProperties": false
+ },
+ "sprite_trail": {
+  "type": "object",
+  "description": "Afterimages behind a moving sprite: dashes, lunges, fast slashes, a swooping boss. While the entity moves faster than minSpeed it records its pose and animation frame every `interval` seconds; the last `count` poses are drawn behind the sprite in `color`, fading out with age. Toggle `emitting` from Wander around a dash.",
+  "properties": {
+   "emitting": {
+    "type": "boolean",
+    "description": "Record new afterimages (existing ones still fade out)"
+   },
+   "count": {
+    "type": "integer",
+    "description": "Afterimages drawn at most (3-10)"
+   },
+   "interval": {
+    "type": "number",
+    "minimum": 0.005,
+    "maximum": 2,
+    "description": "Seconds between afterimages (0.02-0.06)"
+   },
+   "minSpeed": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1000,
+    "description": "World units per second needed to record (0 = always)"
+   },
+   "color": {
+    "description": "Tint of the afterimages — hex string \"#rrggbb[aa]\" or [r,g,b(,a)] in 0..1"
+   },
+   "opacity": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 1,
+    "description": "Opacity of the newest afterimage"
+   },
+   "emissive": {
+    "type": "number",
+    "minimum": 0,
+    "maximum": 50,
+    "description": "Glow of the afterimages (blooms in HDR)"
+   },
+   "additive": {
+    "type": "boolean",
+    "description": "Blend additively (energy streaks) instead of as translucent copies"
    }
   },
   "additionalProperties": false

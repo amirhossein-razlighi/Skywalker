@@ -7,7 +7,7 @@ title: "Asset tools"
 
 The asset database, import and download, materials, textures, prefabs, audio generation and previews.
 
-27 tools in the `asset` category. Badges: **read-only** tools never change the project; **mutating** tools are undoable and attributed; **open-world** tools reach outside the engine and MCP clients ask before running them.
+28 tools in the `asset` category. Badges: **read-only** tools never change the project; **mutating** tools are undoable and attributed; **open-world** tools reach outside the engine and MCP clients ask before running them.
 
 | Tool | Summary |
 |---|---|
@@ -38,6 +38,7 @@ The asset database, import and download, materials, textures, prefabs, audio gen
 | [`prefab_apply`](#prefab_apply) | Push an instance's overrides into its prefab file so every instance (in all scenes) gets them. |
 | [`prefab_unpack`](#prefab_unpack) | Make an instance local: its entities stay exactly as they are but are no longer linked to the prefab (edits to the prefab stop reaching it, and the scene saves it in full); also known as "make local". |
 | [`prefab_relink`](#prefab_relink) | Link existing copies of a prefab (made before prefabs were linked, or by copying entities) back to it. |
+| [`sprite_sheet_import`](#sprite_sheet_import) | Turn rendered animation frames (a Blender/DCC render: one subfolder of numbered PNGs per clip, e.g. |
 
 ### `asset_import_mesh` { #asset_import_mesh }
 
@@ -1259,6 +1260,74 @@ Link existing copies of a prefab (made before prefabs were linked, or by copying
         "arguments": {
           "prefab": "prefabs/tree.prefab.json",
           "dry_run": true
+        }
+      }
+    }
+    ```
+
+### `sprite_sheet_import` { #sprite_sheet_import }
+
+**Import rendered sprite animations** <span class="sky-badge sky-badge--mut" title="Changes the project; undoable and attributed">mutating</span>
+
+Turn rendered animation frames (a Blender/DCC render: one subfolder of numbered PNGs per clip, e.g. renders/heroine/run/0001.png; folders starting with _ or . are skipped) into packed sprite atlases with sprite_anim clips, plus a matching normal-map atlas (from a parallel folder of normal-pass frames) so 2D lights shade the animation. Frames are trimmed and packed; clips that do not fit one atlas spill into more (each clip then names its texture). `downsample` averages supersampled renders (2 = render at 2x for smooth edges). `entity` applies sprite (pivot, size), sprite_anim (clips) and lighting in one undoable step. Example: {"folder": "renders/heroine", "normals": "renders/heroine_normals", "output": "art/heroine/heroine", "downsample": 2, "fps": 30, "clips": {"attack1": {"loop": false, "events": {"4": "hit"}}}, "entity": "Heroine", "pivot": [0.5, 0.08], "pixels_per_unit": 150}
+
+| Argument | Type | Required | Description | Values |
+|---|---|---|---|---|
+| `folder` | string | yes | Folder with one subfolder of numbered PNG frames per clip (project-relative) |  |
+| `normals` | string |  | Folder with the same clip subfolders holding normal-pass frames (optional) |  |
+| `output` | string | yes | Output path without extension: writes &lt;output&gt;.png, &lt;output&gt;_n.png, &lt;output&gt;.atlas.json (and _2, _3 ... when clips spill over) |  |
+| `clips` | object |  | Per clip: {fps, loop, events: {"frame": "name"}, name (rename)}; clips not listed use fps and loop true |  |
+| `only` | string[] |  | Import only these clip folders |  |
+| `fps` | number |  | Default frames per second (default 24) |  |
+| `downsample` | integer |  | Average NxN source pixels into one (1-4, default 1) |  |
+| `max_size` | integer |  | Maximum atlas size in pixels (default 4096) |  |
+| `padding` | integer |  | Pixels between frames (default 2) |  |
+| `entity` | integer \| string |  | Apply the sprite, animations and normal map to this entity |  |
+| `pivot` | number[] |  | With entity: pivot in the untrimmed frame (0..1, [0.5, 0] = feet) |  |
+| `pixels_per_unit` | number |  | With entity: sprite pixelsPerUnit (after downsampling) |  |
+| `clip` | string |  | With entity: clip to start (default: the first) |  |
+
+=== "Tool call"
+
+    ```tool
+    sprite_sheet_import {"folder": "renders/heroine", "normals": "renders/heroine_normals", "output": "art/heroine/heroine", "downsample": 2, "fps": 30, "clips": {"attack1": {"loop": false, "events": {"4": "hit"}}}, "entity": "Heroine", "pivot": [0.5, 0.08], "pixels_per_unit": 150}
+    ```
+
+=== "CLI"
+
+    ```bash
+    skywalker call sprite_sheet_import '{"folder": "renders/heroine", "normals": "renders/heroine_normals", "output": "art/heroine/heroine", "downsample": 2, "fps": 30, "clips": {"attack1": {"loop": false, "events": {"4": "hit"}}}, "entity": "Heroine", "pivot": [0.5, 0.08], "pixels_per_unit": 150}' --project my_game
+    ```
+
+=== "MCP request"
+
+    ```json
+    {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "method": "tools/call",
+      "params": {
+        "name": "sprite_sheet_import",
+        "arguments": {
+          "folder": "renders/heroine",
+          "normals": "renders/heroine_normals",
+          "output": "art/heroine/heroine",
+          "downsample": 2,
+          "fps": 30,
+          "clips": {
+            "attack1": {
+              "loop": false,
+              "events": {
+                "4": "hit"
+              }
+            }
+          },
+          "entity": "Heroine",
+          "pivot": [
+            0.5,
+            0.08
+          ],
+          "pixels_per_unit": 150
         }
       }
     }
