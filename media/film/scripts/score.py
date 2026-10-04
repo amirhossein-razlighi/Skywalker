@@ -425,6 +425,50 @@ for s in TL["sections"][1:]:
     if s["startBar"] not in riser_ends:
         add(fx, swell(0.7, 800, 7000), t_of_bar(s["startBar"]) - 0.7, 0.07)
 
+# ---------------------------------------------------------------- UI sound design (cues from timeline.json)
+FPS = TL["fps"]
+
+
+def ui_click(pitch=2400.0, dur=0.05):
+    n = int(dur * SR)
+    t = np.arange(n) / SR
+    y = fft_filter(rng.standard_normal(n), lo=pitch * 0.6, hi=pitch * 2.5) * np.exp(-t / 0.006)
+    y += 0.5 * np.sin(2 * np.pi * pitch * t) * np.exp(-t / 0.01)
+    return y / (np.abs(y).max() + 1e-9)
+
+
+def ui_thock():
+    n = int(0.25 * SR)
+    t = np.arange(n) / SR
+    y = np.sin(2 * np.pi * (140 + 120 * np.exp(-t / 0.02)) * t) * np.exp(-t / 0.06)
+    y += 0.3 * fft_filter(rng.standard_normal(n), lo=300, hi=3000) * np.exp(-t / 0.01)
+    return y / np.abs(y).max()
+
+
+def ui_pop():
+    n = int(0.16 * SR)
+    t = np.arange(n) / SR
+    f = 620 + 520 * (1 - np.exp(-t / 0.03))
+    y = np.sin(2 * np.pi * np.cumsum(f) / SR) * np.exp(-t / 0.045) * np.minimum(1, t / 0.002)
+    return y
+
+
+sfx = TL.get("sfx", {})
+for f in sfx.get("click", []):
+    add(fx, ui_click(), f / FPS, 0.09)
+for f in sfx.get("thock", []):
+    add(fx, ui_thock(), f / FPS, 0.16)
+for f in sfx.get("pop", []):
+    add(fx, ui_pop(), f / FPS, 0.08)
+for a, b, step in sfx.get("ticks", []):
+    for k, f in enumerate(range(a, b, step)):
+        add(fx, ui_click(3200 + 140 * (k % 5), 0.03), f / FPS, 0.035)
+for a, b in sfx.get("typing", []):
+    t = a / FPS
+    while t < b / FPS:
+        add(fx, ui_click(1800 + 900 * rng.random(), 0.025), t, 0.03 + 0.02 * rng.random())
+        t += 0.045 + 0.05 * rng.random()
+
 # ---------------------------------------------------------------- ducking (sidechain from the kick)
 duck = np.ones(N)
 tt = np.arange(int(0.35 * SR)) / SR

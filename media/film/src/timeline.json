@@ -26,5 +26,13 @@
     { "fromBar": 6,  "toBar": 8 },
     { "fromBar": 47, "toBar": 49 },
     { "fromBar": 80, "toBar": 82 }
-  ]
+  ],
+  "sfx": {
+    "comment": "Absolute film frames of on-screen UI events, for the score's sound design. Keep in sync when moving UI beats.",
+    "click": [822, 846, 870, 918],
+    "thock": [954, 972, 990, 1008, 2638, 2660, 2682],
+    "pop": [2362, 2408, 2462, 2977, 5532],
+    "ticks": [[1662, 1717, 5]],
+    "typing": [[2904, 2960], [5070, 5096], [5440, 5481]]
+  }
 }

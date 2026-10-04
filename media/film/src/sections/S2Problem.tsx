@@ -176,7 +176,7 @@ export const S2Problem: React.FC = () => {
             />
             <ToolStream from={330} />
             <AbsoluteFill style={{ alignItems: "center", justifyContent: "center" }}>
-              <Words text="But the builders have changed." at={268} out={350} size={92} weight={600} />
+              <Words text="But the builders have changed." at={252} out={350} size={92} weight={600} />
             </AbsoluteFill>
             <AbsoluteFill style={{ alignItems: "center", justifyContent: "center" }}>
               <Words text={"Agents don't click.\nThey *call* *tools.*"} at={368} size={118} weight={700} />

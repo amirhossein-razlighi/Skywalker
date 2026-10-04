@@ -34,7 +34,7 @@ const Caption: React.FC<{ text: string; at: number; out: number }> = ({ text, at
 
 export const S1Open: React.FC = () => {
   const frame = useCurrentFrame();
-  const t = { draw: [8, 250] as [number, number], sketch: [150, 280] as [number, number], clay: [292, 372] as [number, number], final: [410, 492] as [number, number] };
+  const t = { draw: [6, 200] as [number, number], sketch: [110, 230] as [number, number], clay: [236, 316] as [number, number], final: [356, 440] as [number, number] };
   // dip to black right before the logo hit
   const dip = prog(frame, LOGO_AT - 14, LOGO_AT, EASE.in);
   const fadeIn = prog(frame, 0, 20);
@@ -52,11 +52,11 @@ export const S1Open: React.FC = () => {
             wipeAngle={96}
             move={{ from: [0.6, 0.4, 1.02], to: [-0.8, -0.2, 1.13], duration: LOGO_AT }}
           />
-          <LightLeak t={interpolate(frame, [440, 560], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" })} x0={80} x1={10} strength={0.5} />
+          <LightLeak t={interpolate(frame, [400, 560], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" })} x0={80} x1={10} strength={0.5} />
           <AbsoluteFill style={{ background: "linear-gradient(0deg, rgba(0,0,0,0.45) 0%, rgba(0,0,0,0) 28%)" }} />
-          <Caption text="Every world starts as a sketch." at={56} out={226} />
-          <Caption text="Then it takes shape." at={300} out={392} />
-          <Caption text="Then it comes to life." at={430} out={540} />
+          <Caption text="Every world starts as a sketch." at={40} out={200} />
+          <Caption text="Then it takes shape." at={246} out={336} />
+          <Caption text="Then it comes to life." at={378} out={540} />
         </AbsoluteFill>
       )}
       {logo && (
@@ -78,8 +78,8 @@ export const S1Open: React.FC = () => {
       {/* white flash on the hit */}
       <AbsoluteFill
         style={{
-          background: "#dfe6ff",
-          opacity: interpolate(frame, [LOGO_AT, LOGO_AT + 2, LOGO_AT + 14], [0, 0.32, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }),
+          background: "radial-gradient(60% 70% at 50% 50%, #eeeaff 0%, rgba(154,134,255,0.45) 45%, transparent 80%)",
+          opacity: interpolate(frame, [LOGO_AT, LOGO_AT + 2, LOGO_AT + 14], [0, 0.45, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }),
           mixBlendMode: "screen",
         }}
       />

@@ -319,7 +319,7 @@ const Graph: React.FC<{ t: number; frame: number; fade: number }> = ({ t, frame,
 const Native: React.FC<{ t: number; frame: number }> = ({ t, frame }) => {
   const stats = [
     { v: "5–13.7×", l: "faster register VM than Wander 1", at: 70 },
-    { v: "33×", l: "with AOT-compiled C++", at: 82 },
+    { v: "Up to 33×", l: "on hot loops, compiled ahead of time to C++", at: 82 },
     { v: "0.24 ms", l: "an empty tick across 5,000 entities", at: 94 },
   ];
   return (
