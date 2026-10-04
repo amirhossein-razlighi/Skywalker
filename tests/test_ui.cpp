@@ -171,6 +171,19 @@ TEST_CASE("ui: row/column stacks, gaps, padding, align, justify, flex and fit-co
     lay = ui.computeLayout(s, 1000, 500);
     CHECK(rectOf(lay, para).w == doctest::Approx(120.f));
     CHECK(rectOf(lay, para).h > 60.f);
+
+    // A flexible fit-to-content child in a row (a dialogue box: portrait + text column) shrinks to the
+    // space that is left, and its stretched text wraps instead of running past the box.
+    EntityId box = element(s, c, "Box", R"({"anchor": "top_left", "position": [0, 0], "size": [400, 200], "layout": "row",
+                                           "gap": 10, "align": "stretch"})");
+    element(s, box, "Portrait", R"({"widget": "image", "size": [100, 120]})");
+    EntityId body = element(s, box, "Body", R"({"layout": "column", "flex": 1, "fit": "both", "align": "stretch"})");
+    EntityId line = element(s, body, "Line", R"({"widget": "text", "fit": "both", "text":
+        "A line far too long for the dialogue box it is spoken in, which has to wrap onto several lines"})");
+    lay = ui.computeLayout(s, 1000, 500);
+    CHECK(rectOf(lay, body) == ui::Rect{110, 0, 290, 200});
+    CHECK(rectOf(lay, line).w == doctest::Approx(290.f));
+    CHECK(rectOf(lay, line).h > 40.f);
 }
 
 TEST_CASE("ui: grids and scroll views") {
