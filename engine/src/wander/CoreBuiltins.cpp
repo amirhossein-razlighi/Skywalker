@@ -336,9 +336,12 @@ void registerCoreBuiltins(BuiltinRegistry& r) {
        });
 
     // --- entities & scene ---------------------------------------------------------------------
-    fn(r, "find", {{"name", S}}, E | kTNone, "scene", "Entity by name (or \"#id\"); none if missing.", "let door = find(\"Door\")",
-       [](CallContext& c) {
-           EntityId id = c.scene().find(c.string(0));
+    fn(r, "find", {{"name", S}}, E | kTNone, "scene",
+       "Entity by name (or \"#id\"); none if missing. \"%Name\" finds the entity marked unique (entity_update "
+       "unique=true) inside this prefab instance, else in the scene, so each copy of a prefab finds its own part.",
+       "let muzzle = find(\"%Muzzle\")", [](CallContext& c) {
+           const std::string& n = c.string(0);
+           EntityId id = !n.empty() && n[0] == '%' ? c.scene().findUnique(n, c.self()) : c.scene().find(n);
            return id ? Value::entity(id) : Value();
        });
     fn(r, "find_all", {{"tag", S}}, L, "scene", "Active entities with a tag, in scene order.",

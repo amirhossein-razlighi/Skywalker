@@ -660,6 +660,17 @@ Value getField(ExecState& st, const Value& obj, const FieldRef& f, SourceLoc loc
             const Vec4 v = *reinterpret_cast<const Vec4*>(base);
             return Value::list({Value::number(v.x), Value::number(v.y), Value::number(v.z), Value::number(v.w)});
         }
+        case FieldType::Entity: {  // the linked entity, or none (unset / dangling)
+            EntityId t = st.scene.resolve(*reinterpret_cast<const EntityLink*>(base), id);
+            return t ? Value::entity(t) : Value();
+        }
+        case FieldType::EntityList: {
+            std::vector<Value> out;
+            for (const auto& l : *reinterpret_cast<const std::vector<EntityLink>*>(base)) {
+                if (EntityId t = st.scene.resolve(l, id)) out.push_back(Value::entity(t));
+            }
+            return Value::list(std::move(out));
+        }
     }
     return {};
 }
@@ -694,10 +705,24 @@ void setField(ExecState& st, const Value& obj, const FieldRef& f, const Value& v
                 if (!v.isColor()) raise(loc, what + " must be a color like #ff8800, got " + typeName(v.type()));
                 *reinterpret_cast<Vec4*>(base) = v.c();
                 return;
+            case FieldType::Entity:
+                // An entity value links by id (rename-proof); a string is a name ("Player", "%Muzzle", "#12").
+                if (v.isEntity()) {
+                    EntityLink l;
+                    l.id = v.e();
+                    if (const EntityRecord* t = st.scene.record(v.e())) l.name = t->name;
+                    *reinterpret_cast<EntityLink*>(base) = l;
+                    return;
+                }
+                if (!v.isString() && !v.isNone()) {
+                    raise(loc, what + " must be an entity, a name or none, got " + typeName(v.type()));
+                }
+                break;  // names and none: parsed by reflection, then bound
             case FieldType::String:
             case FieldType::Enum:
             case FieldType::Vec2:  // vectors (z ignored), lists and numbers: parsed by reflection
             case FieldType::Vec4:
+            case FieldType::EntityList:  // lists of entities / names: {"$entity"} values parse as links
             case FieldType::Json: break;  // validated through reflection below
         }
     }

@@ -1987,6 +1987,8 @@ private:
                 case FieldType::Vec2: return kTVec;  // read as (x, y, 0)
                 case FieldType::Vec4:
                 case FieldType::Json: return kTAny;
+                case FieldType::Entity: return kTEntity | kTNone;  // read as the linked entity (none if unset)
+                case FieldType::EntityList: return kTList;
             }
         }
         return kTAny;

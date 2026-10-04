@@ -408,7 +408,7 @@ void tickCameras(Scene& scene, float dt) {
     for (EntityId e : scene.entities()) {
         const Camera2D* c2 = scene.get<Camera2D>(e);
         if (!c2 || c2->follow.empty() || !scene.isActive(e)) continue;
-        EntityId target = scene.find(c2->follow);
+        EntityId target = scene.resolve(c2->follow, e);
         if (!target || target == e) continue;
         Transform* t = scene.get<Transform>(e);
         if (!t) continue;

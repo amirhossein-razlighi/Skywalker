@@ -8,6 +8,8 @@ set(SKY_ENGINE_SOURCES
     src/ecs/Components.cpp
     src/scene/Scene.cpp
     src/scene/History.cpp
+    src/scene/SceneLinks.cpp
+    src/scene/PrefabLink.cpp
     src/wander/Value.cpp
     src/wander/Parser.cpp
     src/wander/Format.cpp

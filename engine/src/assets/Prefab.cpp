@@ -5,54 +5,25 @@
 
 namespace sky {
 
-namespace {
+Json prefabFromEntity(const Scene& scene, EntityId root) { return prefab::documentFromScene(scene, root, true); }
 
-Json nodeFor(const Scene& s, EntityId id) {
-    Json doc = s.entityToJson(id);
-    doc.erase("id");
-    doc.erase("parent");
-    Json children = Json::array();
-    for (EntityId c : s.children(id)) children.push(nodeFor(s, c));
-    if (children.size()) doc["children"] = children;
-    return doc;
-}
-
-Result<EntityId> build(Scene& s, const Json& node, EntityId parent, const std::string& nameOverride) {
-    if (!node.isObject()) return Error::make("invalid_prefab", "prefab node must be an object");
-    std::string name = nameOverride.empty() ? node.get("name").asString("Entity") : nameOverride;
-    EntityId id = s.create(name, parent);
-    Json body = node;
-    body.erase("children");
-    body.erase("name");
-    if (Status st = s.applyEntityJson(id, body); !st) return st.error();
-    for (const auto& child : node.get("children").elements()) {
-        auto c = build(s, child, id, "");
-        if (!c) return c.error();
-    }
-    return id;
-}
-
-}  // namespace
-
-Json prefabFromEntity(const Scene& scene, EntityId root) {
-    Json node = nodeFor(scene, root);
-    // Store the root at the origin; keep its rotation and scale.
-    if (Json* t = node["components"].find("transform")) (*t)["position"] = Json::array({0, 0, 0});
-    return Json::object({{"format", "skywalker.prefab"}, {"version", 1}, {"name", node.get("name")}, {"root", node}});
-}
-
-Result<EntityId> instantiatePrefab(Scene& scene, const Json& prefab, const PrefabPlacement& p) {
-    if (prefab.get("format").asString() != "skywalker.prefab" || !prefab.get("root").isObject()) {
-        return Error::make("invalid_prefab", "not a skywalker prefab (missing \"format\": \"skywalker.prefab\")");
-    }
-    auto root = build(scene, prefab.get("root"), p.parent, p.name);
+Result<EntityId> instantiatePrefab(Scene& scene, const std::shared_ptr<const PrefabTemplate>& tmpl,
+                                   const PrefabPlacement& p, bool linked) {
+    auto root = prefab::instantiate(scene, tmpl, p.parent, p.name);
     if (!root) return root;
     if (Transform* t = scene.get<Transform>(*root)) {
         if (p.hasPosition) t->position = p.position;
         if (p.hasYaw) t->rotation.y = p.yaw;
         t->scale = t->scale * p.scale;
     }
+    if (!linked || tmpl->source.empty()) prefab::unpack(scene, *root);
     return root;
+}
+
+Result<EntityId> instantiatePrefab(Scene& scene, const Json& prefab, const PrefabPlacement& p) {
+    auto t = buildPrefabTemplate(prefab);
+    if (!t) return t.error();
+    return instantiatePrefab(scene, *t, p, false);
 }
 
 Result<Json> loadPrefab(const std::string& path) {

@@ -4,6 +4,7 @@
 #include <charconv>
 
 #include "skywalker/core/Strings.h"
+#include "skywalker/scene/PrefabLink.h"
 
 namespace sky {
 
@@ -33,6 +34,14 @@ ComponentKind makeReflectedKind() {
         if (!st) return st;
         s.add<T>(id) = std::move(tmp);
         return {};
+    };
+    k.copy = [](Scene& dst, EntityId d, const Scene& src, EntityId sid) {
+        if (const T* c = src.get<T>(sid)) {
+            T copy = *c;  // copy first: src may be dst
+            dst.add<T>(d) = std::move(copy);
+        } else if (dst.get<T>(d)) {
+            dst.registry().remove<T>(dst.handle(d));
+        }
     };
     return k;
 }
@@ -142,6 +151,8 @@ void Scene::clear() {
     order_.clear();
     nextId_ = 1;
     environment_ = Environment{};
+    loadWarnings_.clear();
+    // prefabTemplates_ is kept on purpose: restoring a play snapshot must diff against the version it was built from.
     ++revision_;
     ++behaviorsRevision_;
 }
@@ -281,7 +292,9 @@ Status Scene::patchComponent(EntityId id, std::string_view component, const Json
         return {};
     }
     notify(id);
-    return kind->apply(*this, id, patch);
+    Status st = kind->apply(*this, id, patch);
+    if (st) bindLinks(id);  // names typed by agents become rename-proof ids when unambiguous
+    return st;
 }
 
 Status Scene::setBehaviors(EntityId id, const Json& behaviors) {
@@ -325,6 +338,20 @@ Status Scene::setBehaviors(EntityId id, const Json& behaviors) {
     return {};
 }
 
+Status Scene::setUnique(EntityId id, bool unique) {
+    if (!exists(id)) return notFound(id);
+    notify(id);
+    records_[id].unique = unique;
+    return {};
+}
+
+Status Scene::setPrefabMembership(EntityId id, PrefabMembership membership) {
+    if (!exists(id)) return notFound(id);
+    notify(id);
+    records_[id].prefab = std::move(membership);
+    return {};
+}
+
 Status Scene::patchEnvironment(const Json& patch) {
     if (observer_) observer_->beforeEnvironmentChange();
     ++revision_;
@@ -334,8 +361,13 @@ Status Scene::patchEnvironment(const Json& patch) {
 Status Scene::applyEntityJson(EntityId id, const Json& doc) {
     if (!exists(id)) return notFound(id);
     if (!doc.isObject()) return Error::make("invalid_value", "entity document must be an object");
-    static const std::vector<std::string> kKeys{"id", "name", "tags", "parent", "enabled", "vars", "components", "behaviors"};
+    static const std::vector<std::string> kKeys{"id",         "name",      "tags",   "parent", "enabled",
+                                                "vars",       "components", "behaviors", "unique", "process"};
     for (const auto& [key, value] : doc.members()) {
+        if (key == "prefab") {
+            return Error::make("invalid_value", "prefab links are managed by the prefab tools",
+                               "use prefab_instantiate, prefab_relink, prefab_unpack or prefab_overrides");
+        }
         if (std::find(kKeys.begin(), kKeys.end(), key) == kKeys.end()) {
             // Be forgiving: a top-level component name is treated as a component patch.
             if (componentKind(key)) continue;
@@ -362,6 +394,15 @@ Status Scene::applyEntityJson(EntityId id, const Json& doc) {
     }
     if (const Json* v = doc.find("enabled"); v && v->isBool()) {
         if (Status s = setEnabled(id, v->asBool()); !s) return s;
+    }
+    if (const Json* v = doc.find("unique")) {
+        if (!v->isBool()) return Error::make("invalid_value", "unique must be true or false");
+        if (Status s = setUnique(id, v->asBool()); !s) return s;
+    }
+    if (const Json* v = doc.find("process")) {
+        if (!v->isString() && !v->isNull()) return Error::make("invalid_value", "process must be a string");
+        notify(id);
+        records_[id].process = v->asString();
     }
     if (const Json* v = doc.find("vars"); v && v->isObject()) {
         if (Status s = patchVars(id, *v); !s) return s;
@@ -417,7 +458,28 @@ Json Scene::entityToJson(EntityId id) const {
     for (const auto& t : rec->tags) tags.push(t);
     Json comps = Json::object();
     for (const auto& k : kinds_) {
-        if (k.has(*this, id)) comps[k.name] = k.toJson(*this, id);
+        if (!k.has(*this, id)) continue;
+        Json c = k.toJson(*this, id);
+        // Links are written with their target's current name, so files stay readable after renames.
+        if (k.info) {
+            const void* raw = k.ptr(const_cast<Scene&>(*this), id);
+            for (const FieldInfo& f : k.info->fields) {
+                if (!raw || (f.type != FieldType::Entity && f.type != FieldType::EntityList)) continue;
+                auto named = [this](EntityLink l) {
+                    if (const EntityRecord* t = l.id ? record(l.id) : nullptr) l.name = t->name;
+                    return l;
+                };
+                const char* p = static_cast<const char*>(raw) + f.offset;
+                if (f.type == FieldType::Entity) {
+                    c[f.name] = reflect::entityLinkToJson(named(*reinterpret_cast<const EntityLink*>(p)));
+                } else {
+                    std::vector<EntityLink> list = *reinterpret_cast<const std::vector<EntityLink>*>(p);
+                    for (auto& l : list) l = named(l);
+                    c[f.name] = reflect::entityLinksToJson(list);
+                }
+            }
+        }
+        comps[k.name] = std::move(c);
     }
     Json doc = Json::object({{"id", rec->id},
                              {"name", rec->name},
@@ -426,10 +488,33 @@ Json Scene::entityToJson(EntityId id) const {
                              {"tags", tags},
                              {"vars", rec->vars},
                              {"components", comps}});
+    if (rec->unique) doc["unique"] = true;
+    if (!rec->process.empty()) doc["process"] = rec->process;
+    if (rec->prefab.linked() || !rec->prefab.pending.isNull()) {
+        const PrefabMembership& m = rec->prefab;
+        Json pj = Json::object({{"instance", m.instance}, {"pid", m.pid}});
+        if (!m.source.empty()) pj["source"] = m.source;
+        if (!m.guid.empty()) pj["guid"] = m.guid;
+        if (!m.pending.isNull()) pj["pending"] = m.pending;
+        doc["prefab"] = pj;
+    }
     const Behavior* b = registry_.get<Behavior>(rec->handle);
     if (b && !b->scripts.empty()) doc["behaviors"] = behaviorsToJson(b);
     return doc;
 }
+
+namespace {
+PrefabMembership membershipFromJson(const Json& j) {
+    PrefabMembership m;
+    if (!j.isObject()) return m;
+    m.instance = static_cast<EntityId>(j.get("instance").asInt());
+    m.pid = static_cast<uint32_t>(j.get("pid").asInt());
+    m.source = j.get("source").asString();
+    m.guid = j.get("guid").asString();
+    if (const Json* p = j.find("pending"); p && !p->isNull()) m.pending = *p;
+    return m;
+}
+}  // namespace
 
 Json Scene::snapshotEntity(EntityId id) const {
     Json snap = entityToJson(id);
@@ -458,6 +543,9 @@ void Scene::restoreEntity(EntityId id, const Json& snap) {
     rec.vars = snap.get("vars").isObject() ? snap.get("vars") : Json::object();
     rec.tags.clear();
     for (const auto& t : snap.get("tags").elements()) rec.tags.push_back(t.asString());
+    rec.unique = snap.get("unique").asBool(false);
+    rec.process = snap.get("process").asString();
+    rec.prefab = membershipFromJson(snap.get("prefab"));
     for (const auto& k : kinds_) {
         if (k.name != "transform") k.remove(*this, id);
     }
@@ -493,21 +581,43 @@ Status Scene::loadJson(const Json& doc) {
     if (const Json* env = doc.find("environment")) {
         if (Status s = reflect::applyJson(&environment_, Environment::type(), *env); !s) result = s;
     }
-    // Two passes: create all entities (so parents resolve regardless of order), then apply.
-    for (const auto& e : doc.get("entities").elements()) {
-        create(e.get("name").asString(), kNoEntity, static_cast<EntityId>(e.get("id").asInt()));
+    const Json& entities = doc.get("entities");
+    // Reserve every id the document names (entities and the members of saved prefab instances), so ids handed
+    // out while expanding prefabs never collide with ids that are created later.
+    EntityId maxId = 0;
+    for (const auto& e : entities.elements()) {
+        maxId = std::max(maxId, static_cast<EntityId>(e.get("id").asInt()));
+        for (const auto& [pid, mid] : e.get("prefab").get("ids").members()) {
+            maxId = std::max(maxId, static_cast<EntityId>(mid.asInt()));
+        }
     }
-    size_t index = 0;
-    for (const auto& e : doc.get("entities").elements()) {
-        EntityId id = static_cast<EntityId>(e.get("id").asInt());
-        if (id == kNoEntity) id = order_[index];
-        ++index;
-        Json body = e;
+    nextId_ = std::max(nextId_, maxId + 1);
+    // Pass 1: create all entities (so parents resolve regardless of order).
+    std::vector<EntityId> created;
+    created.reserve(entities.size());
+    for (const auto& e : entities.elements()) {
+        created.push_back(create(e.get("name").asString(), kNoEntity, static_cast<EntityId>(e.get("id").asInt())));
+    }
+    // Pass 2: expand prefab instances saved as source + overrides (docs/PREFABS.md).
+    for (size_t i = 0; i < created.size(); ++i) {
+        const Json& block = entities[i].get("prefab");
+        if (block.isObject() && !block.contains("instance")) prefab::expandSaved(*this, created[i], block, loadWarnings_);
+    }
+    // Pass 3: apply each entity's own data.
+    for (size_t i = 0; i < created.size(); ++i) {
+        EntityId id = created[i];
+        Json body = entities[i];
         body.erase("id");
+        if (const Json* block = body.find("prefab"); block && block->contains("instance")) {
+            records_[id].prefab = membershipFromJson(*block);  // a live (expanded) snapshot
+        }
+        body.erase("prefab");
         if (Status s = applyEntityJson(id, body); !s && result.ok()) {
             result = Error::make(s.error().code, "entity " + formatEntityRef(id) + ": " + s.error().message, s.error().hint);
         }
     }
+    // Pass 4: bind links written as names ("Door") to ids now that every entity exists.
+    for (EntityId id : std::vector<EntityId>(order_)) bindLinks(id);
     observer_ = saved;
     ++revision_;
     return result;

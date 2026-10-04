@@ -7,6 +7,7 @@
 // (`self.light.intensity`). Adding a component = write a struct + one table.
 
 #include <cstddef>
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -16,10 +17,24 @@
 
 namespace sky {
 
+/// A reference from a component to another entity (joint targets, camera follow, look-at, bone attachment...).
+/// It stores the entity's stable id plus its name: the id keeps the link working through renames, the name keeps
+/// files readable and is the fallback for hand-written JSON ("Door") until the scene binds it to an id.
+/// Scene::resolve() turns a link into a live entity; Scene::entityToJson() always writes the target's current name.
+struct EntityLink {
+    uint64_t id = 0;   // 0 = not bound to an id (empty, or a name that is resolved on use)
+    std::string name;  // last known name of the target (or the name to look up when id is 0)
+
+    bool empty() const { return id == 0 && name.empty(); }
+    bool operator==(const EntityLink& o) const { return id == o.id && name == o.name; }
+    bool operator!=(const EntityLink& o) const { return !(*this == o); }
+};
+
 /// Json fields hold structured data (lists of layers, clips, curves...) as a sky::Json member;
 /// `jsonSchema` (JSON text) describes it to agents and the editor.
 /// Vec2/Vec4 store sky::Vec2/Vec4 (Vec4 accepts CSS-style shorthand for paddings/margins).
-enum class FieldType { Float, Int, Bool, String, Vec3, Color, Enum, Json, Vec2, Vec4 };
+/// Entity stores an EntityLink; EntityList a std::vector<EntityLink> (e.g. collider sets).
+enum class FieldType { Float, Int, Bool, String, Vec3, Color, Enum, Json, Vec2, Vec4, Entity, EntityList };
 
 const char* toString(FieldType t);
 
@@ -73,6 +88,13 @@ Json vec2ToJson(Vec2 v);
 /// Accepts [a, b, c, d], a number (uniform), or CSS shorthand [v, h] / [top, h, bottom].
 bool jsonToVec4(const Json& j, Vec4& out);
 Json vec4ToJson(Vec4 v);
+/// Entity links accept "#12", "Door", 12, {"id": 12, "name": "Door"}, {"pid": 3} (prefab-local id inside prefab
+/// files), {"$entity": 12} (Wander values) and null / "" (no entity). Written as {"id", "name"} or null.
+bool jsonToEntityLink(const Json& j, EntityLink& out);
+Json entityLinkToJson(const EntityLink& link);
+/// Lists accept an array of links or a comma-separated string of names ("Shoulders, Hands").
+bool jsonToEntityLinks(const Json& j, std::vector<EntityLink>& out);
+Json entityLinksToJson(const std::vector<EntityLink>& links);
 
 }  // namespace reflect
 
@@ -83,6 +105,11 @@ Json vec4ToJson(Vec4 v);
     ::sky::FieldInfo { #member, ::sky::FieldType::ftype, offsetof(Type, member), docstr, {}, lo, hi, {} }
 #define SKY_FIELD_JSON(Type, member, docstr, schemaText) \
     ::sky::FieldInfo { #member, ::sky::FieldType::Json, offsetof(Type, member), docstr, {}, -1e30f, 1e30f, schemaText }
+/// An EntityLink (FieldType::Entity) or std::vector<EntityLink> (FieldType::EntityList) member.
+#define SKY_FIELD_ENTITY(Type, member, docstr) \
+    ::sky::FieldInfo { #member, ::sky::FieldType::Entity, offsetof(Type, member), docstr, {}, -1e30f, 1e30f, {} }
+#define SKY_FIELD_ENTITIES(Type, member, docstr) \
+    ::sky::FieldInfo { #member, ::sky::FieldType::EntityList, offsetof(Type, member), docstr, {}, -1e30f, 1e30f, {} }
 #define SKY_FIELD_ENUM(Type, member, docstr, ...) \
     ::sky::FieldInfo { #member, ::sky::FieldType::Enum, offsetof(Type, member), docstr, {__VA_ARGS__}, -1e30f, 1e30f, {} }
 

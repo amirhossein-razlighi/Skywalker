@@ -12,6 +12,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <memory>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -26,6 +27,24 @@ namespace sky {
 using EntityId = uint64_t;
 constexpr EntityId kNoEntity = 0;
 
+struct PrefabTemplate;  // scene/PrefabLink.h
+/// Resolves a prefab reference ("prefabs/door.prefab.json", "guid:...") to its current template. Set by the
+/// engine (asset system); scenes without one keep linked instances expanded but cannot re-expand or diff them.
+using PrefabResolver = std::function<Result<std::shared_ptr<const PrefabTemplate>>(const std::string& ref)>;
+
+/// Prefab linkage of an entity (docs/PREFABS.md). A linked instance is a tree of entities expanded from a prefab
+/// file. Every member remembers the prefab-local id (pid) of the node it came from, so overrides are addressed by
+/// pid and survive renames; the scene file stores only the instance root and its differences from the prefab.
+struct PrefabMembership {
+    EntityId instance = kNoEntity;  // root entity of the instance (the root itself); kNoEntity = not linked
+    uint32_t pid = 0;               // prefab-local id of the node this entity came from
+    std::string source;             // root only: project-relative path of the .prefab.json
+    std::string guid;               // root only: asset GUID of the source (survives renames and moves)
+    Json pending;                   // root only: the saved block, kept verbatim while the source cannot be loaded
+
+    bool linked() const { return instance != kNoEntity; }
+};
+
 struct EntityRecord {
     EntityId id = kNoEntity;
     std::string name;
@@ -34,6 +53,10 @@ struct EntityRecord {
     Json vars = Json::object();  // free-form per-entity state (Wander `var`s live here)
     bool enabled = true;
     ecs::Entity handle;
+    // --- Record-level extension points (append new ones here; keep them serialized by Scene::entityToJson) ---
+    PrefabMembership prefab;  // linked prefab instance membership (scene/PrefabLink.h)
+    bool unique = false;      // unique name in its owner (prefab instance or scene): Wander find("%Name")
+    std::string process;      // reserved for process modes (pause/when_paused/always); "" = inherit. Stored only.
 };
 
 /// Receives notifications *before* a piece of state changes (used by History).
@@ -56,6 +79,19 @@ struct ComponentKind {
     /// Raw component pointer (null if absent; reflected kinds only). Wander reads and
     /// writes fields through it without a JSON round trip.
     std::function<void*(Scene&, EntityId)> ptr;
+    /// Typed copy of the component from another scene's entity (removes it when the source has none).
+    std::function<void(Scene& dst, EntityId, const Scene& src, EntityId)> copy;
+};
+
+/// One entity link stored in a component field (FieldType::Entity / EntityList), resolved.
+struct LinkInfo {
+    EntityId from = kNoEntity;  // entity holding the link
+    std::string component;
+    std::string field;
+    int index = -1;             // element of an EntityList, -1 for single links
+    EntityLink link;            // as stored
+    EntityId target = kNoEntity;  // what it resolves to now (kNoEntity = dangling / unresolved)
+    bool byName = false;        // resolved through the name fallback (not bound to an id yet)
 };
 
 class Scene {
@@ -88,6 +124,37 @@ public:
     EntityId find(std::string_view nameOrId) const;
     std::vector<EntityId> findTagged(std::string_view tag) const;
 
+    // --- Entity links and scoped names ------------------------------------------
+    /// The entity a link points at: its id when that entity exists, else its name looked up near `from`
+    /// (findNear). kNoEntity when it is empty or dangling.
+    EntityId resolve(const EntityLink& link, EntityId from = kNoEntity) const;
+    /// Name lookup that prefers entities close to `from`: its prefab instance, its own subtree, its parent's
+    /// subtree, then the whole scene (find). "%Name" is findUnique. "#12" is an id.
+    EntityId findNear(std::string_view name, EntityId from) const;
+    /// "%Name" lookups: the entity named `name` marked `unique` in the owner scope of `from` (its prefab instance,
+    /// or the scene's top level when `from` is not part of an instance).
+    EntityId findUnique(std::string_view name, EntityId from) const;
+    /// Owner scope of an entity: its prefab instance root, or kNoEntity for the scene itself.
+    EntityId ownerOf(EntityId id) const;
+    /// Binds name-only links on `id` to entity ids when the name resolves unambiguously (scoped lookup, or a
+    /// globally unique name). Called after edits and loads, so links then follow renames.
+    void bindLinks(EntityId id);
+    /// Every link stored on `id`, resolved.
+    std::vector<LinkInfo> linksFrom(EntityId id) const;
+    /// Links anywhere in the scene that resolve to `target`.
+    std::vector<LinkInfo> linksTo(EntityId target) const;
+    /// Rewrites links on `ids` whose stored id is a key of `map` (duplicate, paste, prefab expansion).
+    void remapLinks(const std::vector<EntityId>& ids, const std::unordered_map<EntityId, EntityId>& map);
+
+    // --- Copying ------------------------------------------------------------------
+    /// Replaces `dst`'s name, flags, tags, vars, components and behaviors with those of `srcId` in `src` (which may
+    /// be this scene). Parent and prefab membership are kept. Recorded like any edit.
+    void copyEntityData(EntityId dst, const Scene& src, EntityId srcId);
+    /// Copies whole subtrees from `src` (may be this scene) under `parent`. Links and prefab instances inside the
+    /// copied set point inside the copy; `idMap` receives source id -> new id. Returns the new roots.
+    std::vector<EntityId> cloneTrees(const Scene& src, const std::vector<EntityId>& roots, EntityId parent,
+                                     std::unordered_map<EntityId, EntityId>* idMap = nullptr);
+
     // --- Edits (validated, observable) --------------------------------------
     Status rename(EntityId id, std::string name);
     Status setParent(EntityId id, EntityId parent);
@@ -97,6 +164,9 @@ public:
     /// Patch a component (adds it if missing). `null` patch removes the component.
     Status patchComponent(EntityId id, std::string_view component, const Json& patch);
     Status setBehaviors(EntityId id, const Json& behaviors);
+    Status setUnique(EntityId id, bool unique);
+    /// Prefab membership (scene/PrefabLink.h maintains it; recorded for undo).
+    Status setPrefabMembership(EntityId id, PrefabMembership membership);
     Status patchEnvironment(const Json& patch);
 
     /// Applies an entity-level JSON document: {name, tags, parent, enabled, vars,
@@ -135,8 +205,23 @@ public:
 
     // --- Serialization -------------------------------------------------------
     Json entityToJson(EntityId id) const;
+    /// Complete, self-contained scene JSON (every entity expanded): snapshots, play restore, sandboxes.
     Json toJson() const;
+    /// Scene JSON for files: linked prefab instances are written as their source plus overrides
+    /// (docs/PREFABS.md), so editing the prefab updates every scene that uses it.
+    Json toFileJson() const;
+    /// Loads either form. Problems that do not stop the load (missing prefab sources...) go to loadWarnings().
     Status loadJson(const Json& doc);
+    const std::vector<std::string>& loadWarnings() const { return loadWarnings_; }
+
+    // --- Prefab linkage (scene/PrefabLink.h) ----------------------------------------
+    void setPrefabResolver(PrefabResolver resolver) { prefabResolver_ = std::move(resolver); }
+    const PrefabResolver& prefabResolver() const { return prefabResolver_; }
+    /// The template version the instances of `source` were expanded from (kept across clear()).
+    std::shared_ptr<const PrefabTemplate> prefabTemplate(const std::string& source) const;
+    void setPrefabTemplate(const std::string& source, std::shared_ptr<const PrefabTemplate> t);
+    /// Sources with instances expanded from a known template version.
+    std::vector<std::string> prefabSources() const;
 
     /// Snapshot used by History: like entityToJson plus internal ordering.
     Json snapshotEntity(EntityId id) const;
@@ -177,6 +262,9 @@ private:
     ChangeObserver* observer_ = nullptr;
     uint64_t revision_ = 0;
     uint64_t behaviorsRevision_ = 0;
+    std::vector<std::string> loadWarnings_;
+    PrefabResolver prefabResolver_;
+    std::unordered_map<std::string, std::shared_ptr<const PrefabTemplate>> prefabTemplates_;
 };
 
 std::string formatEntityRef(EntityId id);

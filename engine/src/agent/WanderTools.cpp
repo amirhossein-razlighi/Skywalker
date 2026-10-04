@@ -321,13 +321,13 @@ void addWanderTools(Engine& engine, ToolRegistry& reg) {
                  o.configure = [&engine, project](wander::Runtime& rt, Scene& sandbox) {
                      rt.setProjectDir(project);
                      rt.spawnPrefab = [&engine, &sandbox](const std::string& ref, Vec3 pos, const std::string& n) -> Result<EntityId> {
-                         auto prefab = engine.loadPrefabAsset(ref);
-                         if (!prefab) return prefab.error();
+                         auto tmpl = engine.prefabTemplateAsset(ref);
+                         if (!tmpl) return tmpl.error();
                          PrefabPlacement p;
                          p.hasPosition = true;
                          p.position = pos;
                          p.name = n;
-                         return instantiatePrefab(sandbox, prefab.value(), p);
+                         return instantiatePrefab(sandbox, *tmpl, p, true);  // linked: find("%Name") works inside it
                      };
                  };
                  wander::TestReport rep = wander::runTests(src.value(), o);

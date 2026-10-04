@@ -69,6 +69,18 @@ void Hasher::reflected(const void* object, const TypeInfo& type, std::initialize
             case FieldType::Json: str(reinterpret_cast<const Json*>(p)->dump()); break;
             case FieldType::Vec2: bytes(p, sizeof(Vec2)); break;
             case FieldType::Vec4: bytes(p, sizeof(Vec4)); break;
+            case FieldType::Entity: {
+                const auto& l = *reinterpret_cast<const EntityLink*>(p);
+                pod(l.id);
+                str(l.name);
+                break;
+            }
+            case FieldType::EntityList:
+                for (const auto& l : *reinterpret_cast<const std::vector<EntityLink>*>(p)) {
+                    pod(l.id);
+                    str(l.name);
+                }
+                break;
         }
     }
 }

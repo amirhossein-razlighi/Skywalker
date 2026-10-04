@@ -104,10 +104,8 @@ private:
 
 /// Entity whose mesh a groom grows on (the groom's `target`, else the entity itself).
 EntityId groomMeshEntity(const Scene& scene, EntityId e);
-/// World-space colliders from a comma-separated list of entity names (spheres from sphere
-/// meshes, planes from plane/quad meshes, capsules from elongated bounds, else bounding spheres).
-std::vector<FxCollider> collidersFromNames(const Scene& scene, EntityId self, const std::string& names);
-/// Finds an entity by name, preferring the entity's own subtree, then siblings, then the scene.
-EntityId findNear(const Scene& scene, EntityId self, const std::string& name);
+/// World-space colliders from entity links (spheres from sphere meshes, planes from plane/quad meshes, capsules
+/// from elongated bounds, else bounding spheres). Name-only links resolve near `self` (Scene::findNear).
+std::vector<FxCollider> collidersFromLinks(const Scene& scene, EntityId self, const std::vector<EntityLink>& links);
 
 }  // namespace sky::fx

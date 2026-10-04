@@ -19,6 +19,8 @@ const char* toString(FieldType t) {
         case FieldType::Vec2: return "vec2";
         case FieldType::Vec4: return "vec4";
         case FieldType::Json: return "json";
+        case FieldType::Entity: return "entity";
+        case FieldType::EntityList: return "entity_list";
     }
     return "?";
 }
@@ -184,6 +186,99 @@ bool jsonToVec4(const Json& j, Vec4& out) {
 
 Json vec4ToJson(Vec4 v) { return Json::array({round4(v.x), round4(v.y), round4(v.z), round4(v.w)}); }
 
+bool jsonToEntityLink(const Json& j, EntityLink& out) {
+    EntityLink link;
+    if (j.isNull()) {
+        out = link;
+        return true;
+    }
+    if (j.isNumber()) {
+        if (j.asNumber() < 0) return false;
+        link.id = static_cast<uint64_t>(j.asInt());
+    } else if (j.isString()) {
+        std::string s = str::trim(j.asString());
+        if (s.size() > 1 && s[0] == '#') {
+            uint64_t id = 0;
+            bool digits = true;
+            for (size_t i = 1; i < s.size(); ++i) {
+                if (s[i] < '0' || s[i] > '9') {
+                    digits = false;
+                    break;
+                }
+                id = id * 10 + static_cast<uint64_t>(s[i] - '0');
+            }
+            if (digits) {
+                link.id = id;
+            } else {
+                link.name = s;
+            }
+        } else {
+            link.name = s;
+        }
+    } else if (j.isObject()) {
+        const Json* id = j.find("id");
+        if (!id) id = j.find("pid");  // prefab files: prefab-local ids
+        if (!id) id = j.find("$entity");
+        const Json* name = j.find("name");
+        if (id && !id->isNull()) {
+            if (!id->isNumber() || id->asNumber() < 0) return false;
+            link.id = static_cast<uint64_t>(id->asInt());
+        }
+        if (name && !name->isNull()) {
+            if (!name->isString()) return false;
+            link.name = name->asString();
+        }
+        for (const auto& [k, v] : j.members()) {
+            if (k != "id" && k != "pid" && k != "$entity" && k != "name") return false;
+        }
+    } else {
+        return false;
+    }
+    out = std::move(link);
+    return true;
+}
+
+Json entityLinkToJson(const EntityLink& link) {
+    if (link.empty()) return {};
+    Json j = Json::object();
+    if (link.id) j["id"] = link.id;
+    if (!link.name.empty()) j["name"] = link.name;
+    return j;
+}
+
+bool jsonToEntityLinks(const Json& j, std::vector<EntityLink>& out) {
+    std::vector<EntityLink> links;
+    if (j.isNull()) {
+        out.clear();
+        return true;
+    }
+    if (j.isString()) {  // legacy: "Shoulders, Hands"
+        for (const std::string& raw : str::split(j.asString(), ',')) {
+            std::string n = str::trim(raw);
+            if (n.empty()) continue;
+            EntityLink l;
+            if (!jsonToEntityLink(Json(n), l)) return false;
+            links.push_back(std::move(l));
+        }
+    } else if (j.isArray()) {
+        for (const auto& e : j.elements()) {
+            EntityLink l;
+            if (!jsonToEntityLink(e, l)) return false;
+            if (!l.empty()) links.push_back(std::move(l));
+        }
+    } else {
+        return false;
+    }
+    out = std::move(links);
+    return true;
+}
+
+Json entityLinksToJson(const std::vector<EntityLink>& links) {
+    Json arr = Json::array();
+    for (const auto& l : links) arr.push(entityLinkToJson(l));
+    return arr;
+}
+
 Json fieldToJson(const void* object, const FieldInfo& f) {
     switch (f.type) {
         case FieldType::Float: return round4(at<float>(object, f));
@@ -196,6 +291,8 @@ Json fieldToJson(const void* object, const FieldInfo& f) {
         case FieldType::Vec2: return vec2ToJson(at<Vec2>(object, f));
         case FieldType::Vec4: return vec4ToJson(at<Vec4>(object, f));
         case FieldType::Json: return at<Json>(object, f);
+        case FieldType::Entity: return entityLinkToJson(at<EntityLink>(object, f));
+        case FieldType::EntityList: return entityLinksToJson(at<std::vector<EntityLink>>(object, f));
     }
     return {};
 }
@@ -273,6 +370,22 @@ Status fieldFromJson(void* object, const FieldInfo& f, const Json& v, std::strin
                 }
             }
             at<Json>(object, f) = v;
+            return {};
+        }
+        case FieldType::Entity: {
+            EntityLink out;
+            if (!jsonToEntityLink(v, out)) {
+                return typeError(context, f, v, "an entity: a name (\"Door\"), \"#12\", {\"id\": 12} or null");
+            }
+            at<EntityLink>(object, f) = std::move(out);
+            return {};
+        }
+        case FieldType::EntityList: {
+            std::vector<EntityLink> out;
+            if (!jsonToEntityLinks(v, out)) {
+                return typeError(context, f, v, "a list of entities ([\"Hand\", \"#12\", {\"id\": 7}]) or null");
+            }
+            at<std::vector<EntityLink>>(object, f) = std::move(out);
             return {};
         }
     }
@@ -358,6 +471,19 @@ Json schema(const TypeInfo& type) {
             case FieldType::Json:
                 if (auto sch = Json::parse(f.jsonSchema.empty() ? "{}" : f.jsonSchema)) p = *sch;
                 p["x-sky-json"] = true;
+                break;
+            case FieldType::Entity:
+                p["type"] = Json::array({"object", "string", "integer", "null"});
+                p["description"] =
+                    "entity link: name (\"Door\"), \"#id\", {\"id\": 12} or null; read back as {\"id\", \"name\"} "
+                    "(follows renames; entity_refs lists links)";
+                p["x-sky-entity"] = true;
+                break;
+            case FieldType::EntityList:
+                p["type"] = Json::array({"array", "string", "null"});
+                p["items"] = Json::object({{"type", Json::array({"object", "string", "integer"})}});
+                p["description"] = "entity links: [\"Hand\", \"#12\", {\"id\": 7}] (a comma-separated string also works)";
+                p["x-sky-entity-list"] = true;
                 break;
         }
         if (!f.doc.empty()) {

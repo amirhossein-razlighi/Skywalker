@@ -18,7 +18,7 @@ struct Groom {
     bool visible = true;
     // --- Source -------------------------------------------------------------------------
     std::string source;              // "" = grow on the mesh; or a .hair / .groom.json / .skygroom file
-    std::string target;              // entity whose mesh grows the hair ("" = this entity)
+    EntityLink target;               // entity whose mesh grows the hair (empty = this entity)
     float importScale = 1.f;         // imported files: unit scale (0.01 for centimeters)
     bool importZUp = false;          // imported files: Z-up source
     // --- Growth -------------------------------------------------------------------------
@@ -68,7 +68,7 @@ struct Groom {
     float damping = 0.2f;
     float wind = 1.f;                // environment wind influence
     bool collide = true;             // collide with the mesh (sphere/capsule proxy) and `colliders`
-    std::string colliders;           // comma-separated entity names (proxies from their bounds)
+    std::vector<EntityLink> colliders;  // entities hair collides with (proxies from their bounds)
     // --- Rendering ----------------------------------------------------------------------
     std::string lod = "auto";        // auto | strands | cards
     float cardsBelow = 90.f;         // auto: cards when the groom is smaller than this (pixels)
