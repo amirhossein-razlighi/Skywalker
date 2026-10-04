@@ -45,7 +45,7 @@ enum class SpriteMode : int {
     Halo = 2,   // soft radial glow of a 2D light (additive, untextured)
 };
 
-/// One world-space quad (sprite, tile, world-text glyph, light halo). 32 floats; must match Sprite2D.metal.
+/// One world-space quad (sprite, tile, world-text glyph, light halo). 40 floats; must match Sprite2D.metal.
 struct SpriteInstance {
     float origin[4];    // xyz = world position of the quad corner at uv (u0, v0); w = fog factor 0..1
     float axisX[4];     // xyz = world edge from uv u0 -> u1;  w = unused
@@ -54,9 +54,11 @@ struct SpriteInstance {
     float color[4];     // linear rgba tint (straight alpha)
     float emission[4];  // Color: linear rgb * strength (adds light); Sdf: outline rgb, a = outline width (0..0.5)
     float params[4];    // x = SpriteMode, y = lit (0/1), z = normal map strength (0 = none), w = SDF dilation (bold)
-    float extra[4];     // x = casts 2D shadows, y = alpha cutoff, zw = unused
+    float extra[4];     // x = casts 2D shadows, y = alpha cutoff, z = sway pin (0 bottom, 1 top), w = additive (premultiplied out)
+    float fx[4];        // x = blur radius (texels), y = sway amplitude (fraction of the quad width), z = sway Hz, w = sway waves
+    float flash[4];     // rgb linear flash color, a = amount (mixed over the shaded color)
 };
-static_assert(sizeof(SpriteInstance) == 32 * sizeof(float));
+static_assert(sizeof(SpriteInstance) == 40 * sizeof(float));
 
 /// A run of consecutive SpriteInstances sharing textures and sampling.
 struct SpriteBatch {

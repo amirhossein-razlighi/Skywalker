@@ -31,6 +31,7 @@ struct ResolvedProcess {
     bool realClock = false;                    // ignores the game's time scale
     bool interpolate = true;                   // smoothed between ticks on screen
     int priority = 0;                          // the entity's own (not inherited)
+    float speed = 1.f;                         // product of process.timeScale along the hierarchy
     EntityId modeFrom = kNoEntity;             // entity whose `process` (or UI canvas) decided the mode; 0 = default
 };
 

@@ -199,11 +199,17 @@ public:
     void requestTimeScale(double scale);
     /// The state of the current tick.
     bool gamePaused() const { return paused_; }
-    double timeScale() const { return timeScale_; }
+    double timeScale() const { return tickScale_; }  // includes a running hit-stop
     /// The latest request (what the next tick will use).
     bool pauseRequested() const { return requestedPause_.value_or(paused_); }
     double timeScaleRequested() const { return requestedScale_.value_or(timeScale_); }
     static constexpr double kMaxTimeScale = 10.0;
+    /// Hit-stop: the game clock runs at `scale` (0 = frozen) for `seconds` of real time, then returns to the
+    /// time scale (game feel on impacts). Counted in fixed ticks, so it replays exactly; a longer or
+    /// stronger stop extends the current one.
+    void requestHitStop(double seconds, double scale = 0.0);
+    /// Real seconds of hit-stop left (0 = none).
+    double hitStopRemaining() const;
     /// Applies pending requests and refreshes the process gate. The engine calls it at the start of
     /// every tick, before any system runs; tick() calls it itself when the embedding did not.
     void prepareTick();
@@ -280,6 +286,9 @@ private:
     // game clock (prepareTick)
     bool paused_ = false;
     double timeScale_ = 1.0;
+    double tickScale_ = 1.0;   // the scale this tick runs at (time scale, lowered by a hit-stop)
+    int hitStopTicks_ = 0;
+    double hitStopScale_ = 0.0;
     std::optional<bool> requestedPause_;
     std::optional<double> requestedScale_;
     uint64_t preparedFrame_ = ~0ull;

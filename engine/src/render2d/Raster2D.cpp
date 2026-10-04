@@ -238,12 +238,35 @@ void drawWorld(Image& image, const FrameData& frame, render2d::ImageCache& cache
                                   blendLinear(p, c, a * tint.w, false);
                                   return;
                               }
+                              if (s.fx[1] != 0.f) {  // sway (Sprite2D.metal swayUv)
+                                  float free = s.extra[2] > 0.5f ? v : 1.f - v;
+                                  float weight = free * free * (3.f - 2.f * free);
+                                  float phase = s.origin[0] * 0.73f + s.origin[1] * 0.31f;
+                                  float tt = frame.time * s.fx[2] * 6.2831853f;
+                                  float wave = std::sin(tt + phase + v * s.fx[3] * 6.2831853f) * 0.75f +
+                                               std::sin(tt * 0.53f + phase * 1.7f + v * s.fx[3] * 3.1f) * 0.25f;
+                                  tu += s.fx[1] * weight * wave * (s.uv[2] - s.uv[0]);
+                              }
                               Vec4 t = tex.valid() ? tex.sample(tu, tv, batch.nearest) : Vec4{1, 1, 1, 1};
+                              if (tex.valid() && s.fx[0] > 0.25f) {  // depth-of-field blur: a small premultiplied disk
+                                  Vec4 acc{t.x * t.w, t.y * t.w, t.z * t.w, t.w};
+                                  const int kTaps = 8;
+                                  for (int k = 0; k < kTaps; ++k) {
+                                      float ang = static_cast<float>(k) * 0.7853982f, r = s.fx[0] * (k % 2 ? 1.f : 0.6f);
+                                      Vec4 q = tex.sample(tu + std::cos(ang) * r / static_cast<float>(tex.w),
+                                                          tv + std::sin(ang) * r / static_cast<float>(tex.h), false);
+                                      acc = Vec4{acc.x + q.x * q.w, acc.y + q.y * q.w, acc.z + q.z * q.w, acc.w + q.w};
+                                  }
+                                  float n = static_cast<float>(kTaps + 1);
+                                  t = acc.w > 1e-4f ? Vec4{acc.x / acc.w, acc.y / acc.w, acc.z / acc.w, acc.w / n} : Vec4{0, 0, 0, 0};
+                              }
                               float a = t.w * tint.w;
                               if (s.extra[1] > 0.f) a = t.w >= s.extra[1] ? tint.w : 0.f;
                               if (a <= 0.001f) return;
                               Vec3 c{t.x * tint.x * light.x + s.emission[0], t.y * tint.y * light.y + s.emission[1],
                                      t.z * tint.z * light.z + s.emission[2]};
+                              const float fl = sat(s.flash[3]);
+                              c = c + (Vec3{s.flash[0], s.flash[1], s.flash[2]} - c) * fl;
                               blendLinear(p, c, a, batch.additive);
                           });
         }

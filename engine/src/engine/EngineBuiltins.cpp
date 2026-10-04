@@ -14,6 +14,7 @@ namespace sky {
 
 void registerRenderLayerBuiltins(wander::BuiltinRegistry& reg);  // RenderBuiltins.cpp: layer_mask
 void registerProbeBuiltins(wander::BuiltinRegistry& reg);  // ProbeBuiltins.cpp: probe_bake
+void registerGameFeelBuiltins(wander::BuiltinRegistry& reg);  // GameFeelBuiltins.cpp: hit_stop, camera_shake, flash
 
 namespace {
 
@@ -166,6 +167,7 @@ void registerEngineBuiltins() {
         // Subsystem builtins: one line each.
         registerRenderLayerBuiltins(reg);  // render layers (RenderBuiltins.cpp)
         registerProbeBuiltins(reg);  // reflection probes (ProbeBuiltins.cpp)
+        registerGameFeelBuiltins(reg);  // hit-stop, 2D camera shake, sprite flash (GameFeelBuiltins.cpp)
     });
 }
 

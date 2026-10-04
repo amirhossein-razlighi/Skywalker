@@ -1,7 +1,7 @@
 #pragma once
 // Sprite atlases: many frames in one texture, described by a small JSON file.
 //
-//   {"format": "skywalker.atlas", "image": "hero.png", "width": 256, "height": 128,
+//   {"format": "skywalker.atlas", "image": "hero.png", "normalMap": "hero_n.png", "width": 256, "height": 128,
 //    "frames": {"run_0": {"rect": [0, 0, 32, 32], "source": [32, 32], "offset": [0, 0]}, ...}}
 //
 // rect = pixels in the atlas image; source = the untrimmed frame size; offset = where the trimmed
@@ -27,6 +27,7 @@ struct AtlasFrame {
 
 struct Atlas {
     std::string image;  // as written in the file (relative to the atlas file's folder)
+    std::string normalMap;  // optional companion normal map with the same layout (relative, like image)
     int width = 0, height = 0;
     std::vector<AtlasFrame> frames;
 

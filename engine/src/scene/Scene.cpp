@@ -100,6 +100,7 @@ void Scene::registerKinds() {
     kinds_.push_back(makeReflectedKind<Process>());  // pause modes, run order, interpolation (scene/Process.h)
     kinds_.push_back(makeReflectedKind<ReflectionProbe>());  // render/ReflectionProbes.h
     kinds_.push_back(makeReflectedKind<Particles2D>());  // pixel-art 2D particles (ecs/Particles2D.h)
+    kinds_.push_back(makeReflectedKind<SpriteTrail>());  // afterimages of dashing sprites (ecs/SpriteTrail.h)
 }
 
 const ComponentKind* Scene::componentKind(std::string_view n) const {

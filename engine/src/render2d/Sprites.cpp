@@ -271,6 +271,7 @@ Status Assets2D::frameAt(const std::string& texture, int index, int columns, int
         if (at.frames.empty()) return Error::make("invalid_atlas", texture + " has no frames");
         const AtlasFrame& f = at.frames[static_cast<size_t>(std::clamp(index, 0, static_cast<int>(at.frames.size()) - 1))];
         out.path = (fs::path(resolve(texture)).parent_path() / at.image).lexically_normal().string();
+        if (!at.normalMap.empty()) out.normalPath = (fs::path(resolve(texture)).parent_path() / at.normalMap).lexically_normal().string();
         if (!images_.size(out.path, out.texW, out.texH)) {
             out.texW = at.width;
             out.texH = at.height;
@@ -595,6 +596,9 @@ float applyCamera2D(const Scene& scene, EntityId cam, ViewCamera& view, int widt
         view.eye.x = clampAxis(view.eye.x, std::min(b.x, b.z), std::max(b.x, b.z), halfW);
         view.eye.y = clampAxis(view.eye.y, std::min(b.y, b.w), std::max(b.y, b.w), halfH);
     }
+    // camera_shake: an offset computed on fixed ticks (tickCameras), so captures replay exactly.
+    view.eye.x += c2->shakeOffset_.x;
+    view.eye.y += c2->shakeOffset_.y;
     if (c2->pixelSnap && texel > 0.f) {
         view.eye.x = std::round(view.eye.x / texel) * texel;
         view.eye.y = std::round(view.eye.y / texel) * texel;
@@ -603,8 +607,36 @@ float applyCamera2D(const Scene& scene, EntityId cam, ViewCamera& view, int widt
     return c2->pixelSnap ? texel : 0.f;
 }
 
+namespace {
+
+/// Smooth 1D value noise in [-1, 1] (deterministic).
+float shakeNoise(float t, float seed) {
+    auto hash = [&](float i) {
+        float x = std::sin(i * 127.1f + seed * 311.7f) * 43758.5453f;
+        return (x - std::floor(x)) * 2.f - 1.f;
+    };
+    float i = std::floor(t), f = t - i;
+    float u = f * f * (3.f - 2.f * f);
+    return hash(i) * (1.f - u) + hash(i + 1.f) * u;
+}
+
+}  // namespace
+
+void addCameraShake(Camera2D& camera, float trauma) { camera.trauma_ = std::clamp(camera.trauma_ + trauma, 0.f, 1.f); }
+
 void tickCameras(Scene& scene, float baseDt, const ProcessGate* gate) {
     for (EntityId e : scene.entities()) {
+        // Shake runs on the real clock (it keeps going through hit-stops and slow motion) but holds while paused.
+        if (Camera2D* shaker = scene.get<Camera2D>(e); shaker && (shaker->trauma_ > 0.f || shaker->shakeOffset_.x != 0.f ||
+                                                                 shaker->shakeOffset_.y != 0.f)) {
+            if (!gate || !gate->paused()) {
+                shaker->shakeTime_ += baseDt;
+                shaker->trauma_ = std::max(0.f, shaker->trauma_ - shaker->shakeDecay * baseDt);
+                const float amount = shaker->trauma_ * shaker->trauma_ * shaker->shakeAmplitude;
+                const float t = shaker->shakeTime_ * shaker->shakeFrequency;
+                shaker->shakeOffset_ = {shakeNoise(t, 1.3f) * amount, shakeNoise(t, 7.9f) * amount};
+            }
+        }
         const Camera2D* c2 = scene.get<Camera2D>(e);
         if (!c2 || c2->follow.empty() || !scene.isActive(e)) continue;
         if (gate && !gate->runs(e)) continue;
@@ -802,13 +834,50 @@ void selectionOutline(Ctx& c, Vec3 o, Vec3 ax, Vec3 ay) {
     c.pool.push_back(quad(o + ax, nx, ay, 0, 0, 1, 1, col));
 }
 
-void gatherSprite(Ctx& c, EntityId e, size_t sceneIndex, const Sprite& sp) {
+/// An afterimage of a sprite_trail: a recorded pose drawn tinted behind the sprite.
+struct Ghost {
+    const TrailSnapshot* snap = nullptr;
+    Vec4 color;     // linear tint and opacity
+    Vec4 emission;  // linear glow
+    bool additive = false;
+    int sub = -1;   // entry sub-order (negative: behind the sprite itself)
+};
+
+void gatherSprite(Ctx& c, EntityId e, size_t sceneIndex, const Sprite& sp, const Ghost* ghost = nullptr);
+
+/// The afterimages of a sprite_trail, oldest first (drawn behind the sprite, fading with age).
+void gatherTrail(Ctx& c, EntityId e, size_t sceneIndex, const Sprite& sp, const SpriteTrail& t) {
+    const size_t n = t.snapshots_.size();
+    if (n == 0 || t.count <= 0) return;
+    const float life = std::max(1e-3f, static_cast<float>(t.count) * std::max(1e-3f, t.interval));
+    const Vec4 tint = toLinear(t.color);
+    const Vec4 glow = toLinear(Vec4{t.color.x, t.color.y, t.color.z, 1.f});
+    const size_t first = n > static_cast<size_t>(t.count) ? n - static_cast<size_t>(t.count) : 0;
+    for (size_t i = first; i < n; ++i) {
+        const TrailSnapshot& snap = t.snapshots_[i];
+        const float k = std::clamp(1.f - snap.age / life, 0.f, 1.f);
+        if (k <= 0.01f) continue;
+        Ghost g;
+        g.snap = &snap;
+        const float a = t.opacity * k * k * sp.color.w;
+        g.color = {tint.x, tint.y, tint.z, a};
+        g.emission = {glow.x * t.emissive * k, glow.y * t.emissive * k, glow.z * t.emissive * k, 0.f};
+        g.additive = t.additive;
+        g.sub = -static_cast<int>(n - i);
+        gatherSprite(c, e, sceneIndex, sp, &g);
+    }
+}
+
+void gatherSprite(Ctx& c, EntityId e, size_t sceneIndex, const Sprite& sp, const Ghost* ghost) {
     std::string texture = sp.texture;
     int columns = sp.columns, rows = sp.rows;
     int animFrame = -1;
     FrameRef fr;
     Status st;
-    if (animatedFrame(c.scene, c.assets, e, texture, columns, rows, animFrame)) {
+    if (ghost && ghost->snap->frame >= 0) {
+        texture = ghost->snap->texture.empty() ? sp.texture : ghost->snap->texture;
+        st = c.assets.frameAt(texture, ghost->snap->frame, ghost->snap->columns, ghost->snap->rows, fr);
+    } else if (!ghost && animatedFrame(c.scene, c.assets, e, texture, columns, rows, animFrame)) {
         st = c.assets.frameAt(texture, animFrame, columns, rows, fr);
     } else {
         st = c.assets.frame(texture, sp.frame, columns, rows, sp.region, fr);
@@ -834,8 +903,9 @@ void gatherSprite(Ctx& c, EntityId e, size_t sceneIndex, const Sprite& sp) {
         u1 = (fr.x + fr.w) / static_cast<float>(fr.texW);
         v1 = (fr.y + fr.h) / static_cast<float>(fr.texH);
     }
-    const float fx = sp.flipX ? -1.f : 1.f, fy = sp.flipY ? -1.f : 1.f;
-    Mat4 world = c.scene.worldMatrix(e);
+    const bool flipX = ghost ? ghost->snap->flipX : sp.flipX;
+    const float fx = flipX ? -1.f : 1.f, fy = sp.flipY ? -1.f : 1.f;
+    Mat4 world = ghost ? ghost->snap->world : c.scene.worldMatrix(e);
     Vec3 wx, wy, wz;
     basis(c, world, sp.billboard, wx, wy, wz);
     Vec3 pos = world.translation();
@@ -846,19 +916,34 @@ void gatherSprite(Ctx& c, EntityId e, size_t sceneIndex, const Sprite& sp) {
     Vec3 ax = wx * (fx * w), ay = wy * (-fy * h);
     if (c.opts.pixelSnap > 0.f && unrotated(wx, wy)) o = snap(o, c.opts.pixelSnap);
 
-    Vec4 color = toLinear(sp.color);
-    Vec4 emission = toLinear(Vec4{sp.emissive.x, sp.emissive.y, sp.emissive.z, 1.f}) * sp.emissive.w;
+    Vec4 color = ghost ? ghost->color : toLinear(sp.color);
+    Vec4 emission = ghost ? ghost->emission : toLinear(Vec4{sp.emissive.x, sp.emissive.y, sp.emissive.z, 1.f}) * sp.emissive.w;
     SpriteInstance base = quad(o, ax, ay, u0, v0, u1, v1, color);
     set4(base.emission, emission.x, emission.y, emission.z, 0.f);
-    set4(base.params, static_cast<float>(SpriteMode::Color), sp.lit ? 1.f : 0.f, sp.normalMap.empty() ? 0.f : 1.f, 0.f);
-    set4(base.extra, sp.castShadows ? 1.f : 0.f, sp.alphaCutoff, 0.f, 0.f);
+    // A sprite's own normalMap wins; otherwise an atlas may carry one with the same layout (animated sheets).
+    const bool mapped = !sp.normalMap.empty() || (!ghost && !fr.normalPath.empty());
+    set4(base.params, static_cast<float>(SpriteMode::Color), sp.lit ? 1.f : 0.f, mapped ? 1.f : 0.f, 0.f);
+    const bool additive = ghost ? ghost->additive : sp.blend == "add";
+    set4(base.extra, sp.castShadows ? 1.f : 0.f, sp.alphaCutoff, sp.sway.w > 0.5f ? 1.f : 0.f, additive ? 1.f : 0.f);
+    set4(base.fx, sp.blur, sp.sway.x, sp.sway.y, sp.sway.z);
+    if (!ghost) {
+        Vec4 flash = sp.flash;
+        if (sp.flashTimer_ > 0.f && sp.flashDuration_ > 0.f) {
+            const float k = std::clamp(sp.flashTimer_ / sp.flashDuration_, 0.f, 1.f);
+            if (k * sp.flashColor_.w >= flash.w) flash = {sp.flashColor_.x, sp.flashColor_.y, sp.flashColor_.z, k * sp.flashColor_.w};
+        }
+        Vec4 fl = toLinear(Vec4{flash.x, flash.y, flash.z, 1.f});
+        set4(base.flash, fl.x, fl.y, fl.z, flash.w);
+    }
 
-    Entry& en = c.begin(e, layerIndex(sp.sortingLayer), sp.order, c.depthOf(pos), sceneIndex, 0);
+    Entry& en = c.begin(e, layerIndex(sp.sortingLayer), sp.order, c.depthOf(pos), sceneIndex, ghost ? ghost->sub : 0);
+    en.additive = additive;
     en.texture.path = fr.path;
     if (!sp.palette.empty() && !fr.path.empty()) {
         if (auto img = c.assets.paletted(fr.path, sp.palette)) en.texture.image = img.value();
     }
     if (!sp.normalMap.empty()) en.normalMap.path = c.assets.resolve(sp.normalMap);
+    else if (mapped) en.normalMap.path = fr.normalPath;
     en.nearest = sp.filter == "nearest";
     en.ySort = sp.ySort;
     en.sortY = pos.y;
@@ -866,7 +951,7 @@ void gatherSprite(Ctx& c, EntityId e, size_t sceneIndex, const Sprite& sp) {
     int nx0 = 0, nx1 = 0, ny0 = 0, ny1 = 0;
     Vec3 stepX = wx * (par && par->spacing > 0.f ? par->spacing : size.x);
     Vec3 stepY = wy * (par && par->spacing > 0.f ? par->spacing : size.y);
-    if (par && (par->repeatX || par->repeatY)) {
+    if (!ghost && par && (par->repeatX || par->repeatY)) {
         Vec3 corners[4];
         if (c.viewOnPlane(pos, normalize(cross(wx, wy)), corners)) {
             float minX = 1e30f, maxX = -1e30f, minY = 1e30f, maxY = -1e30f;
@@ -900,6 +985,7 @@ void gatherSprite(Ctx& c, EntityId e, size_t sceneIndex, const Sprite& sp) {
         }
     }
     c.end(en);
+    if (ghost) return;
     addBox(c, e, base, static_cast<int64_t>(c.entries.size()));
     if (std::find(c.opts.selection.begin(), c.opts.selection.end(), e) != c.opts.selection.end()) {
         Entry& sel = c.begin(e, 4, 1 << 30, 0, sceneIndex, 1);
@@ -1066,7 +1152,9 @@ void gatherParticles(Ctx& c, EntityId e, size_t sceneIndex, const Particles2D& p
     Mat4 world = c.scene.worldMatrix(e);
     const Vec3 origin = world.translation();
     Entry& en = c.begin(e, layerIndex(p.sortingLayer), p.order, c.depthOf(origin), sceneIndex, 0);
-    en.nearest = true;
+    en.nearest = p.filter != "linear";
+    en.additive = p.blend == "add";
+    const bool snapTexels = en.nearest;
     if (!p.texture.empty()) {
         if (const FrameRef* fr = frameRef(0)) en.texture.path = fr->path;
     }
@@ -1096,14 +1184,18 @@ void gatherParticles(Ctx& c, EntityId e, size_t sceneIndex, const Particles2D& p
             u1 = (fr->x + fr->w) / static_cast<float>(fr->texW);
             v1 = (fr->y + fr->h) / static_cast<float>(fr->texH);
         }
+        w *= q.scale;
+        h *= q.scale;
+        offX *= q.scale;
+        offY *= q.scale;
         Vec3 pos = particleWorldPosition(p, q, origin, c.eye);
         Vec3 o{pos.x - w * 0.5f + offX, pos.y + h * 0.5f - offY, pos.z};
-        if (c.opts.pixelSnap > 0.f) o = snap(o, c.opts.pixelSnap);
+        if (snapTexels && c.opts.pixelSnap > 0.f) o = snap(o, c.opts.pixelSnap);
         Vec4 col{base.x * q.shade, base.y * q.shade, base.z * q.shade, base.w * alpha};
         SpriteInstance s = quad(o, {w, 0, 0}, {0, -h, 0}, u0, v0, u1, v1, col);
         set4(s.emission, glow.x * alpha, glow.y * alpha, glow.z * alpha, 0.f);
         set4(s.params, static_cast<float>(SpriteMode::Color), p.lit ? 1.f : 0.f, 0.f, 0.f);
-        set4(s.extra, 0.f, 0.f, 0.f, 0.f);
+        set4(s.extra, 0.f, 0.f, 0.f, en.additive ? 1.f : 0.f);
         c.pool.push_back(s);
     }
     c.end(en);
@@ -1239,7 +1331,10 @@ void gather2D(const Scene& scene, Assets2D& assets, FrameData& frame, const Gath
         EntityId e = order[i];
         if (!scene.isActive(e)) continue;
         if (const Light2D* l = scene.get<Light2D>(e)) gatherLight(c, e, *l);
-        if (const Sprite* s = scene.get<Sprite>(e); s && s->visible) gatherSprite(c, e, i, *s);
+        if (const Sprite* s = scene.get<Sprite>(e); s && s->visible) {
+            if (const SpriteTrail* t = scene.get<SpriteTrail>(e)) gatherTrail(c, e, i, *s, *t);
+            gatherSprite(c, e, i, *s);
+        }
         if (const Tilemap* t = scene.get<Tilemap>(e)) gatherTilemap(c, e, i, *t);
         if (const Particles2D* p = scene.get<Particles2D>(e)) gatherParticles(c, e, i, *p);
         if (const Text* t = scene.get<Text>(e); t && t->visible && !t->text.empty()) gatherText(c, e, i, *t);

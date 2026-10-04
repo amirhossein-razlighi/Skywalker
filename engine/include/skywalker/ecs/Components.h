@@ -362,3 +362,4 @@ struct Environment {
 #include "skywalker/ecs/ProcessComponent.h"  // process: pause modes, run order, interpolation
 #include "skywalker/ecs/ReflectionProbeComponent.h"  // reflection_probe (render/ReflectionProbes.h)
 #include "skywalker/ecs/Particles2D.h"  // particles2d: pixel-art 2D particles (weather, leaves, fireflies)
+#include "skywalker/ecs/SpriteTrail.h"  // sprite_trail: afterimages of dashing sprites (render2d/SpriteTrail.cpp)

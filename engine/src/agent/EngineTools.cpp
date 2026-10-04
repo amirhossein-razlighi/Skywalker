@@ -1235,6 +1235,7 @@ void registerEngineTools(Engine& engine) {
     tools::addAgentLinkTools(engine, reg);  // engine/src/agent/AgentLinkTools.cpp: events_poll, tool_host_*
     tools::addAuditTools(engine, reg);   // engine/src/agent/AuditTools.cpp (scene_audit quality gate)
     tools::addParticles2DTools(engine, reg);  // engine/src/agent/Particles2DTools.cpp (pixel-art weather, fireflies)
+    tools::addPainted2DTools(engine, reg);  // engine/src/agent/Painted2DTools.cpp (sprite_sheet_import, game_feel)
 }
 
 }  // namespace sky

@@ -32,8 +32,10 @@ Json Atlas::toJson() const {
                                    {"source", Json::array({f.sourceW, f.sourceH})},
                                    {"offset", Json::array({f.offsetX, f.offsetY})}});
     }
-    return Json::object({{"format", "skywalker.atlas"}, {"version", 1}, {"image", image}, {"width", width},
-                         {"height", height}, {"frames", fr}});
+    Json doc = Json::object({{"format", "skywalker.atlas"}, {"version", 1}, {"image", image}, {"width", width},
+                             {"height", height}, {"frames", fr}});
+    if (!normalMap.empty()) doc["normalMap"] = normalMap;
+    return doc;
 }
 
 bool isAtlasPath(std::string_view path) {
@@ -105,6 +107,7 @@ Result<Atlas> parseAtlas(const Json& doc) {
     Atlas a;
     a.image = doc.get("image").asString();
     if (a.image.empty()) a.image = doc.get("meta").get("image").asString();
+    a.normalMap = doc.get("normalMap").asString();
     a.width = static_cast<int>(doc.get("width").asInt());
     a.height = static_cast<int>(doc.get("height").asInt());
     if (a.width == 0) (void)pairOf(doc.get("meta").get("size"), "w", "h", a.width, a.height);

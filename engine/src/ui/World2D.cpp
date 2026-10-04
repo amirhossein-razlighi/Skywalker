@@ -108,6 +108,7 @@ void World2D::postTick(Scene& scene, wander::Runtime& runtime, float dt) {
     render2d::tickAnimators(scene, *assets_, dt, [&](EntityId e, const std::string& ev) { runtime.emit("anim:" + ev, e); }, gate);
     render2d::tickCameras(scene, dt, gate);
     render2d::tickParticles2D(scene, *assets_, dt, gate);
+    render2d::tickSpriteFx(scene, *assets_, dt, gate);  // flashes, sprite_trail afterimages
 }
 
 void World2D::preTick(Scene& scene, wander::InputState& input, wander::Runtime& runtime, float baseDt) {

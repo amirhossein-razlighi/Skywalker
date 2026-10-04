@@ -2,6 +2,7 @@
 
 #include "skywalker/scene/Process.h"
 
+#include <algorithm>
 #include <vector>
 
 namespace sky {
@@ -27,6 +28,9 @@ const TypeInfo& Process::type() {
                            "inherit | on (motion is smoothed between ticks on screen) | off (shown exactly at tick "
                            "positions: snapping things, pixel-art)",
                            "inherit", "on", "off"),
+            SKY_FIELD_RANGE(Process, timeScale, Float,
+                            "This entity's own clock speed (multiplied with its parents' and the game time_scale): 0.2 "
+                            "slows one enemy or a boss arm, 0 freezes it (a per-entity hit-stop)", 0.f, 10.f),
         }};
     return info;
 }
@@ -70,6 +74,7 @@ struct Local {
     std::optional<bool> realClock;
     std::optional<bool> interpolate;
     int priority = 0;
+    float speed = 1.f;
 };
 
 Local localSettings(const Scene& scene, EntityId e) {
@@ -81,6 +86,7 @@ Local localSettings(const Scene& scene, EntityId e) {
         if (p->interpolation == "on") l.interpolate = true;
         else if (p->interpolation == "off") l.interpolate = false;
         l.priority = p->priority;
+        l.speed = std::max(0.f, p->timeScale);
     }
     // A UI canvas runs always on the real clock unless its own process component says otherwise.
     if (scene.get<UICanvas>(e)) {
@@ -116,8 +122,8 @@ ResolvedProcess resolveProcess(const Scene& scene, EntityId e) {
     for (EntityId cur = e; cur && scene.exists(cur) && guard < 4096; ++guard) {
         Local l = localSettings(scene, cur);
         if (cur == e) out.priority = l.priority;
+        out.speed *= l.speed;
         inherit(out, haveMode, haveClock, haveInterp, l, cur);
-        if (haveMode && haveClock && haveInterp) break;
         cur = scene.record(cur)->parent;
     }
     return out;
@@ -174,6 +180,7 @@ const ResolvedProcess& ProcessGate::resolved(EntityId e) const {
         Local l = localSettings(*scene_, *it2);
         ResolvedProcess r = parent;  // inherited (modeFrom too)
         r.priority = l.priority;     // not inherited
+        r.speed = parent.speed * l.speed;
         if (l.mode) {
             r.mode = *l.mode;
             r.modeFrom = *it2;
@@ -195,7 +202,7 @@ float ProcessGate::scale(EntityId e) const {
     if (uniform_) return paused_ ? 0.f : timeScale_;
     const ResolvedProcess& r = resolved(e);
     if (!processRuns(r.mode, paused_)) return 0.f;
-    return r.realClock ? 1.f : timeScale_;
+    return (r.realClock ? 1.f : timeScale_) * r.speed;
 }
 
 bool ProcessGate::interpolates(EntityId e) const { return uniform_ ? true : resolved(e).interpolate; }

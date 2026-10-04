@@ -1313,6 +1313,9 @@ void Runtime::reset(bool keepQueuedEvents) {
     realTime_ = 0;
     paused_ = false;
     timeScale_ = 1.0;
+    tickScale_ = 1.0;
+    hitStopTicks_ = 0;
+    hitStopScale_ = 0.0;
     requestedPause_.reset();
     requestedScale_.reset();
     preparedFrame_ = ~0ull;
@@ -1891,6 +1894,16 @@ void Runtime::requestTimeScale(double scale) {
     requestedScale_ = std::clamp(scale, 0.0, kMaxTimeScale);
 }
 
+void Runtime::requestHitStop(double seconds, double scale) {
+    if (!std::isfinite(seconds) || seconds <= 0.0) return;
+    if (!std::isfinite(scale)) scale = 0.0;
+    const int ticks = static_cast<int>(std::lround(std::min(seconds, 5.0) * 60.0));
+    hitStopScale_ = hitStopTicks_ > 0 ? std::min(hitStopScale_, std::clamp(scale, 0.0, 1.0)) : std::clamp(scale, 0.0, 1.0);
+    hitStopTicks_ = std::max(hitStopTicks_, std::max(1, ticks));
+}
+
+double Runtime::hitStopRemaining() const { return static_cast<double>(hitStopTicks_) / 60.0; }
+
 void Runtime::prepareTick() {
     preparedFrame_ = frame_;
     if (requestedScale_) {
@@ -1905,7 +1918,12 @@ void Runtime::prepareTick() {
             emit(p ? "pause" : "resume");  // delivered this tick (also to the entities the pause stops)
         }
     }
-    gate_.update(scene_, paused_, static_cast<float>(timeScale_));
+    tickScale_ = timeScale_;
+    if (hitStopTicks_ > 0 && !paused_) {
+        tickScale_ = std::min(timeScale_, hitStopScale_);
+        --hitStopTicks_;
+    }
+    gate_.update(scene_, paused_, static_cast<float>(tickScale_));
 }
 
 void Runtime::tick(float dt, const InputState& input) {
@@ -2004,7 +2022,7 @@ void Runtime::tick(float dt, const InputState& input) {
     impl.revisionValid = true;
     impl.input = nullptr;
     ticking_ = false;
-    time_ += static_cast<double>(dt) * (paused_ ? 0.0 : timeScale_);  // game time
+    time_ += static_cast<double>(dt) * (paused_ ? 0.0 : tickScale_);  // game time
     realTime_ += dt;
     ++frame_;
 }
