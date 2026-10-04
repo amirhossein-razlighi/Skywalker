@@ -171,7 +171,8 @@ void addWorldBuildTools(Engine& engine, ToolRegistry& reg) {
              "erosion; material layers (sand, grass, soil, rock, snow...) are auto-painted by height and slope, with "
              "procedural textures unless you pass your own layer textures (e.g. downloaded photoscans). `water: true` adds "
              "an FFT sea at sea level and wet sand along the shore. Then add foliage_add (grass, pebbles, shells, rocks). "
-             "Example: {\"preset\":\"island_beach\",\"size\":600,\"water\":true}.",
+             "Your own relief: pass `heightmap` (a grayscale PNG). Examples: {\"preset\":\"island_beach\",\"size\":600,\"water\":true}, "
+             "{\"heightmap\":\"maps/continent.png\",\"size\":4000,\"generator\":{\"minHeight\":-40,\"maxHeight\":160}}.",
              "world",
              object({{"name", string("Entity name (default \"Terrain\")")},
                      {"preset", enumeration(world::terrainPresets(), "Starting shape and layers")},
@@ -181,16 +182,31 @@ void addWorldBuildTools(Engine& engine, ToolRegistry& reg) {
                      {"seed", integer("Random seed (each seed is a different landscape)")},
                      {"generator", Json::object({{"type", "object"},
                                                  {"description", "Overrides: shape, minHeight, maxHeight, featureSize (m), ridges, "
-                                                                 "warp, erosion, thermal, terraces, beachWidth, seaLevel"}})},
+                                                                 "warp, erosion, thermal, terraces, beachWidth, seaLevel, heightmap, detailNoise"}})},
                      {"layers", Json::object({{"type", "array"}, {"description", "Material layers (see the terrain component)"}})},
-                     {"water", boolean("Add an ocean at sea level with a wet shoreline (island/coast presets)")}},
-                    {"preset"}),
+                     {"heightmap", string("Grayscale image (16-bit PNG, 8-bit PNG or square .r16) whose values 0..1 map to "
+                                          "generator minHeight..maxHeight: hand-made or scripted continents, real-world-style "
+                                          "relief. Row 0 is the -Z edge. Erosion/thermal from the generator still apply.")},
+                     {"water", boolean("Add an ocean at sea level with a wet shoreline (island/coast presets)")}}),
              true, false, [&engine](const Json& a, ToolContext& ctx) {
-                 std::string preset = a.get("preset").asString();
+                 const bool fromImage = a.contains("heightmap");
+                 if (!fromImage && !a.contains("preset")) {
+                     return ToolResult::error(Error::make("invalid_arguments", "terrain_create needs a preset or a heightmap",
+                                                          "e.g. {\"preset\": \"island_beach\"} or {\"heightmap\": \"maps/height.png\"}"));
+                 }
+                 std::string preset = a.get("preset").asString(fromImage ? "rolling_hills" : "");
                  auto gp = world::terrainPreset(preset);
                  if (!gp) return ToolResult::error(gp.error());
+                 if (fromImage) {
+                     gp->shape = "heightmap";
+                     gp->heightmap = a.get("heightmap").asString();
+                     if (!a.contains("preset")) gp->minHeight = 0, gp->maxHeight = 100, gp->erosion = 0.2f, gp->thermal = 0.1f;
+                 }
                  world::TerrainGenParams params = world::genParamsFromJson(a.get("generator"), *gp);
                  if (a.contains("seed")) params.seed = static_cast<uint32_t>(a.get("seed").asInt());
+                 if (Status hs = world::resolveHeightmap(params, [&engine](const std::string& p) { return engine.resolvePath(p); }); !hs) {
+                     return fail(hs);
+                 }
                  Json layers = a.contains("layers") ? a.get("layers") : world::defaultTerrainLayers(preset);
                  layers = materializeLayerTextures(engine, layers);
                  int res = static_cast<int>(std::clamp<int64_t>(a.get("resolution").asInt(513), 65, 4097));
@@ -247,6 +263,9 @@ void addWorldBuildTools(Engine& engine, ToolRegistry& reg) {
                  const Terrain* comp = engine.scene().get<Terrain>(t->id);
                  world::TerrainGenParams p = world::genParamsFromJson(a.get("generator"), world::genParamsFromJson(comp->generator));
                  if (a.contains("seed")) p.seed = static_cast<uint32_t>(a.get("seed").asInt());
+                 if (Status hs = world::resolveHeightmap(p, [&engine](const std::string& path) { return engine.resolvePath(path); }); !hs) {
+                     return fail(hs);
+                 }
                  pushUndo(engine, t->id, *t->data);
                  auto data = std::make_shared<world::TerrainData>(t->data->resolution(), t->data->size());
                  world::generate(*data, p);

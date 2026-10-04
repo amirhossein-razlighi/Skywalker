@@ -13,6 +13,7 @@ struct TerrainUniforms {
     float4 water;            // x = water level (world y), y = wet band (m), z = selected, w = unused
     float4 layerParams[8];   // x = tiling (repeats per m), y = normal strength, z = roughness, w = flags
     float4 layerColor[8];    // rgb = tint (linear), a = metallic
+    float4 overlay;          // x = opacity (0 = no overlay), y = blend (0 mix, 1 multiply, 2 glow)
 };
 
 struct TerrainNode {
@@ -86,6 +87,7 @@ struct LayerSample {
 };
 
 constexpr sampler terrainSampler(coord::normalized, filter::linear, mip_filter::linear, address::repeat, max_anisotropy(16));
+constexpr sampler overlaySampler(coord::normalized, filter::linear, mip_filter::linear, address::clamp_to_edge, max_anisotropy(16));
 
 static LayerSample sampleLayer(int i, float3 wp, float3 N, float dist, constant TerrainUniforms& tu,
                                texture2d<float> albedoTex, texture2d<float> normalTex, texture2d<float> ormTex) {
@@ -148,7 +150,8 @@ fragment MainOut terrainFragment(TerrainOut in [[stage_in]],
                                  texture2d<float> l4a [[texture(19)]], texture2d<float> l4n [[texture(20)]], texture2d<float> l4o [[texture(21)]],
                                  texture2d<float> l5a [[texture(22)]], texture2d<float> l5n [[texture(23)]], texture2d<float> l5o [[texture(24)]],
                                  texture2d<float> l6a [[texture(25)]], texture2d<float> l6n [[texture(26)]], texture2d<float> l6o [[texture(27)]],
-                                 texture2d<float> l7a [[texture(28)]], texture2d<float> l7n [[texture(29)]], texture2d<float> l7o [[texture(30)]]) {
+                                 texture2d<float> l7a [[texture(28)]], texture2d<float> l7n [[texture(29)]], texture2d<float> l7o [[texture(30)]],
+                                 texture2d<float> overlayTex [[texture(31)]]) {
     float3 wp = in.worldPos;
     float3 V = normalize(f.cameraPos.xyz - wp);
     if (f.cameraForward.w > 0.5) V = -f.cameraForward.xyz;
@@ -222,10 +225,30 @@ fragment MainOut terrainFragment(TerrainOut in [[stage_in]],
         s.roughness = mix(s.roughness, 0.07, wet * 0.92);
         N = normalize(mix(N, Ngeo, wet * 0.8));
     }
+    // Map overlay draped over the whole terrain (political maps, borders, paper maps).
+    float3 overlayGlow = 0.0;
+    if (tu.overlay.x > 0.0) {
+        float4 ov = overlayTex.sample(overlaySampler, in.uv);
+        float a = saturate(ov.a * tu.overlay.x);
+        int blend = int(tu.overlay.y + 0.5);
+        if (blend == 1) {
+            s.albedo *= mix(float3(1.0), ov.rgb, a);
+        } else if (blend == 2) {
+            overlayGlow = ov.rgb * a * 2.0;
+        } else {
+            // Painted on: matte, and the ground's fine detail fades so only the relief shades it.
+            s.albedo = mix(s.albedo, ov.rgb, a);
+            s.roughness = mix(s.roughness, 0.8, a);
+            s.metallic *= 1.0 - a;
+            s.ao = mix(s.ao, 1.0, a * 0.7);
+            N = normalize(mix(N, Ngeo, a * 0.75));
+        }
+    }
     s.clearcoat = 0.0;
     s.subsurface = 0.0;
+    s.N = N;
     float3 color = shadeSurface(s, Ngeo, wp, in.position.xy, V, false, 0.0, f, lights, clusterCells, clusterIndices, shadowAtlas,
-                                envTex, brdfLut, cloudShape);
+                                envTex, brdfLut, cloudShape) + overlayGlow;
     if (tu.water.z > 0.5) color = mix(color, float3(1.0, 0.5, 0.1), 0.15);  // selection tint
     color = applyFog(color, wp, V, f);
     return mainOut(float4(color, 1.0), s.albedo, s.ao, N, s.roughness, s.metallic);

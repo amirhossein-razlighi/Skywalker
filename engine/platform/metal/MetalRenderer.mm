@@ -170,6 +170,7 @@ struct TerrainUniformsGpu {
     simd_float4 origin, grid, water;
     simd_float4 layerParams[8];
     simd_float4 layerColor[8];
+    simd_float4 overlay;  // x = opacity (0 = none), y = blend (0 mix, 1 multiply, 2 glow)
 };
 
 struct TerrainNodeGpu {
@@ -1631,6 +1632,9 @@ private:
             u.layerParams[i] = simd_make_float4(l.tiling, s.normalStrength, s.roughness, static_cast<float>(flags));
             u.layerColor[i] = lin(s.color.xyz(), s.metallic);
         }
+        if (!item.overlay.empty() && texture(item.overlay, true)) {
+            u.overlay = simd_make_float4(item.overlayOpacity, static_cast<float>(item.overlayBlend), 0, 0);
+        }
         return u;
     }
 
@@ -1663,6 +1667,8 @@ private:
                 [enc setFragmentTexture:(n ?: white_) atIndex:8 + i * 3];
                 [enc setFragmentTexture:(o ?: white_) atIndex:9 + i * 3];
             }
+            id<MTLTexture> ov = item.overlay.empty() ? nil : texture(item.overlay, true);
+            [enc setFragmentTexture:(ov ?: white_) atIndex:31];
             [enc drawIndexedPrimitives:MTLPrimitiveTypeTriangle
                             indexCount:patchIndexCount_
                              indexType:MTLIndexTypeUInt16

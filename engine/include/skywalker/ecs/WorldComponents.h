@@ -24,6 +24,11 @@ struct Terrain {
     float wetBand = 1.2f;             // meters above the water line that stay damp (shorelines, wave run-up)
     float detail = 1.f;               // LOD quality multiplier (0.5 faster .. 2 sharper)
     bool castShadows = true;
+    // Map overlay: one image draped over the whole terrain (row 0 = -Z edge, column 0 = -X edge),
+    // e.g. a political map, region tints, borders, a paper/parchment map. Its alpha masks it.
+    std::string overlay;              // project-relative image (png/jpg); empty = none
+    float overlayOpacity = 1.f;       // 0..1, multiplied by the image alpha
+    std::string overlayBlend = "mix";  // mix (paint over the ground, matte) | multiply (tint) | glow (adds unlit color)
 
     static const TypeInfo& type();
 };
