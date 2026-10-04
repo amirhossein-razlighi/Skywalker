@@ -180,8 +180,16 @@ Result<StateDef> parseState(const std::string& name, const Json& j, const std::s
     } else {
         bool twoD = j.contains("blend2d");
         const Json& b = j.get(twoD ? "blend2d" : "blend");
-        if (Status st = checkKeys(b, {"parameter", "x", "y", "motions"}, where + " blend"); !st) return st.error();
+        if (Status st = checkKeys(b, {"parameter", "x", "y", "motions", "mode"}, where + " blend"); !st) return st.error();
         s.kind = twoD ? StateKind::Blend2D : StateKind::Blend1D;
+        if (b.contains("mode")) {
+            std::string mode = b.get("mode").asString();
+            if (!twoD || (mode != "cartesian" && mode != "directional")) {
+                return invalid(where, "blend2d \"mode\" is \"cartesian\" (default) or \"directional\" (2D blends only)",
+                               "directional: motions are velocities ([x, y] = strafe, forward in m/s); direction and speed blend separately");
+            }
+            s.mode2d = mode == "directional" ? Blend2DMode::Directional : Blend2DMode::Cartesian;
+        }
         s.paramX = twoD ? b.get("x").asString() : b.get("parameter").asString();
         s.paramY = b.get("y").asString();
         if (s.paramX.empty() || (twoD && s.paramY.empty())) {
@@ -421,6 +429,7 @@ Json ControllerDef::toJson() const {
                     sj["blend"] = Json::object({{"parameter", s.paramX}, {"motions", motions}});
                 } else {
                     sj["blend2d"] = Json::object({{"x", s.paramX}, {"y", s.paramY}, {"motions", motions}});
+                    if (s.mode2d == Blend2DMode::Directional) sj["blend2d"]["mode"] = "directional";
                 }
             }
             if (s.speed != 1.f) sj["speed"] = s.speed;
@@ -611,13 +620,18 @@ Status AnimatorRuntime::init(std::shared_ptr<const Library> library, std::shared
         layer.current.state = L.states.empty() ? -1 : std::max(0, L.stateIndex(L.defaultState));  // a library without clips plays nothing
         layers_.push_back(std::move(layer));
     }
-    setRootMotion(rootMotion_, up_);
+    setRootMotion(rootMotion_, up_, rootYaw_);
     return {};
 }
 
-void AnimatorRuntime::setRootMotion(bool enabled, Vec3 up) {
+void AnimatorRuntime::setRootMotion(bool enabled, Vec3 up, bool yaw) {
     rootMotion_ = enabled;
+    rootYaw_ = enabled && yaw;
     up_ = length(up) > 1e-6f ? normalize(up) : Vec3{0, 1, 0};
+    // Characters face +Z in their model (glTF) space; keep the forward perpendicular to up.
+    forward_ = Vec3{0, 0, 1} - up_ * up_.z;
+    if (length(forward_) < 1e-3f) forward_ = Vec3{1, 0, 0} - up_ * up_.x;
+    forward_ = normalize(forward_);
     rootParent_ = Mat4{};
     if (library_ && library_->rootBone >= 0) {
         const Skeleton& sk = library_->skeleton;
@@ -756,6 +770,89 @@ Status AnimatorRuntime::seek(const std::string& name, float normalizedTime, int 
     return {};
 }
 
+namespace {
+
+/// Weights sum to 1; outside every band the nearest motion plays alone.
+void normalizeBlendWeights(const std::vector<Vec2>& pos, Vec2 pt, std::vector<float>& w) {
+    float total = 0.f;
+    for (float x : w) total += x;
+    if (total > 1e-6f) {
+        for (float& x : w) x /= total;
+        return;
+    }
+    size_t best = 0;
+    float bestD = 1e30f;
+    for (size_t i = 0; i < pos.size(); ++i) {
+        Vec2 d = pos[i] - pt;
+        if (d.x * d.x + d.y * d.y < bestD) {
+            bestD = d.x * d.x + d.y * d.y;
+            best = i;
+        }
+    }
+    std::fill(w.begin(), w.end(), 0.f);
+    if (!w.empty()) w[best] = 1.f;
+}
+
+}  // namespace
+
+std::vector<float> blendWeights2D(const std::vector<Vec2>& pos, Vec2 pt) {
+    const size_t n = pos.size();
+    std::vector<float> w(n, 0.f);
+    for (size_t i = 0; i < n; ++i) {
+        float h = 1.f;
+        for (size_t j = 0; j < n; ++j) {
+            if (i == j) continue;
+            Vec2 pij = pos[j] - pos[i];
+            float len2 = pij.x * pij.x + pij.y * pij.y;
+            if (len2 < 1e-9f) continue;
+            Vec2 pip = pt - pos[i];
+            h = std::min(h, std::clamp(1.f - (pip.x * pij.x + pip.y * pij.y) / len2, 0.f, 1.f));
+        }
+        w[i] = h;
+    }
+    normalizeBlendWeights(pos, pt, w);
+    return w;
+}
+
+std::vector<float> blendWeightsDirectional(const std::vector<Vec2>& pos, Vec2 pt) {
+    // Polar gradient bands (Johansen 2009): the band coordinates are the magnitude difference
+    // (relative to the pair's mean speed) and the angle between directions (times kAngle). A pair
+    // with a motion at the origin (idle) has no direction: it blends by speed only (against the motions
+    // ahead of the query), so idle fades out with speed in every direction and never steals weight at
+    // full speed between two clips.
+    constexpr float kAngle = 2.f;
+    const size_t n = pos.size();
+    std::vector<float> w(n, 0.f);
+    auto len = [](Vec2 v) { return std::sqrt(v.x * v.x + v.y * v.y); };
+    auto angleBetween = [](Vec2 a, Vec2 b) { return std::atan2(a.x * b.y - a.y * b.x, a.x * b.x + a.y * b.y); };
+    const float lp = len(pt);
+    for (size_t i = 0; i < n; ++i) {
+        const float li = len(pos[i]);
+        float h = 1.f;
+        for (size_t j = 0; j < n; ++j) {
+            if (i == j) continue;
+            const float lj = len(pos[j]);
+            const float mean = (li + lj) * 0.5f;
+            if (mean < 1e-6f) continue;
+            // Idle fades by the speed of the motions ahead of the query, not of those behind it.
+            if (li < 1e-6f && lp >= 1e-6f && pt.x * pos[j].x + pt.y * pos[j].y <= 0.f) continue;
+            float aij = 0.f, aip = 0.f;
+            if (li >= 1e-6f && lj >= 1e-6f) {
+                aij = angleBetween(pos[i], pos[j]);
+                aip = lp < 1e-6f ? 0.f : angleBetween(pos[i], pt);
+            }
+            Vec2 bij{(lj - li) / mean, aij * kAngle};
+            Vec2 bip{(lp - li) / mean, aip * kAngle};
+            float len2 = bij.x * bij.x + bij.y * bij.y;
+            if (len2 < 1e-9f) continue;
+            h = std::min(h, std::clamp(1.f - (bip.x * bij.x + bip.y * bij.y) / len2, 0.f, 1.f));
+        }
+        w[i] = h;
+    }
+    normalizeBlendWeights(pos, pt, w);
+    return w;
+}
+
 std::vector<float> AnimatorRuntime::weights(const Layer& layer, const Playing& p) const {
     const State& st = layer.states[static_cast<size_t>(p.state)];
     const StateDef& def = st.def ? *st.def : st.owned;
@@ -791,37 +888,9 @@ std::vector<float> AnimatorRuntime::weights(const Layer& layer, const Playing& p
     }
     // 2D freeform (gradient band interpolation, Johansen 2009).
     Vec2 pt{value(def.paramX), value(def.paramY)};
-    float total = 0.f;
-    for (size_t i = 0; i < n; ++i) {
-        Vec2 pi = st.motions[i].def.position;
-        float h = 1.f;
-        for (size_t j = 0; j < n; ++j) {
-            if (i == j) continue;
-            Vec2 pij = st.motions[j].def.position - pi;
-            float len2 = pij.x * pij.x + pij.y * pij.y;
-            if (len2 < 1e-9f) continue;
-            Vec2 pip = pt - pi;
-            h = std::min(h, std::clamp(1.f - (pip.x * pij.x + pip.y * pij.y) / len2, 0.f, 1.f));
-        }
-        w[i] = h;
-        total += h;
-    }
-    if (total <= 1e-6f) {  // outside every band: nearest motion
-        size_t best = 0;
-        float bestD = 1e30f;
-        for (size_t i = 0; i < n; ++i) {
-            Vec2 d = st.motions[i].def.position - pt;
-            if (d.x * d.x + d.y * d.y < bestD) {
-                bestD = d.x * d.x + d.y * d.y;
-                best = i;
-            }
-        }
-        std::fill(w.begin(), w.end(), 0.f);
-        w[best] = 1.f;
-        return w;
-    }
-    for (float& x : w) x /= total;
-    return w;
+    std::vector<Vec2> pos(n);
+    for (size_t i = 0; i < n; ++i) pos[i] = st.motions[i].def.position;
+    return def.mode2d == Blend2DMode::Directional ? blendWeightsDirectional(pos, pt) : blendWeights2D(pos, pt);
 }
 
 bool AnimatorRuntime::looping(const Layer& layer, const Playing& p) const {
@@ -885,6 +954,13 @@ void AnimatorRuntime::samplePlaying(const Layer& layer, const Playing& p, Pose& 
             Vec3 start = sampleTranslation(clip, root, 0.f, sk.bones[static_cast<size_t>(root)].rest.t);
             Vec3 posModel = rootParent_.transformPoint(now) - horizontal(now) + horizontal(start);
             tmp[static_cast<size_t>(root)].t = rootParentInv_.transformPoint(posModel);
+            if (rootYaw_) {
+                // The turn so far becomes the entity's: the body keeps facing the entity's forward.
+                const Quat parent = rotationOf(rootParent_);
+                const Quat undo = Quat::axisAngle(up_, -rootTurn(clip, 0.f, phase));
+                Quat& r = tmp[static_cast<size_t>(root)].r;
+                r = (parent.conjugate() * undo * parent * r).normalized();
+            }
         }
         if (first) {
             for (size_t b = 0; b < out.size(); ++b) {
@@ -995,37 +1071,93 @@ Vec3 AnimatorRuntime::horizontal(Vec3 rootLocal) const {
     return p - up_ * dot(p, up_);
 }
 
-Vec3 AnimatorRuntime::rootMotion(const Layer& layer, const Playing& p, float a, float b) const {
+float AnimatorRuntime::rootHeading(const Clip& clip, float seconds) const {
+    const int root = library_->rootBone;
+    const Trs& rest = library_->skeleton.bones[static_cast<size_t>(root)].rest;
+    Quat local = rest.r;
+    for (const auto& ch : clip.channels) {
+        if (ch.bone == root && ch.path == Path::Rotation) {
+            Trs base;
+            base.r = rest.r;
+            local = sampleChannel(ch, seconds, base).r;
+            break;
+        }
+    }
+    // The rest-relative turn of the root in model space, applied to the model's forward.
+    const Quat parent = rotationOf(rootParent_);
+    const Quat now = parent * local, restQ = parent * rest.r;
+    Vec3 f = (now * restQ.conjugate()).rotate(forward_);
+    f = f - up_ * dot(f, up_);
+    if (length(f) < 1e-5f) return 0.f;
+    f = normalize(f);
+    return std::atan2(dot(cross(forward_, f), up_), dot(forward_, f));
+}
+
+float AnimatorRuntime::rootTurn(const Clip& clip, float a, float b) const {
+    // Integrate wrapped differences so a 360 degree turn clip counts fully.
+    const int steps = std::clamp(static_cast<int>(std::ceil(std::fabs(b - a) * 24.f)), 1, 48);
+    float total = 0.f, prev = rootHeading(clip, a * clip.duration);
+    for (int i = 1; i <= steps; ++i) {
+        float h = rootHeading(clip, (a + (b - a) * static_cast<float>(i) / static_cast<float>(steps)) * clip.duration);
+        float d = h - prev;
+        while (d > kPi) d -= 2.f * kPi;
+        while (d < -kPi) d += 2.f * kPi;
+        total += d;
+        prev = h;
+    }
+    return total;
+}
+
+AnimatorRuntime::RootStep AnimatorRuntime::rootMotion(const Layer& layer, const Playing& p, float a, float b) const {
     const int root = library_->rootBone;
     if (p.state < 0 || root < 0) return {};
     const State& st = layer.states[static_cast<size_t>(p.state)];
     std::vector<float> w = weights(layer, p);
     const bool loop = looping(layer, p);
     const Vec3 rest = library_->skeleton.bones[static_cast<size_t>(root)].rest.t;
-    Vec3 total{0, 0, 0};
+    RootStep total;
     for (size_t i = 0; i < st.motions.size(); ++i) {
         if (w[i] <= 1e-5f || !st.motions[i].clip) continue;
         const Clip& clip = *st.motions[i].clip;
         auto h = [&](float phase) { return horizontal(sampleTranslation(clip, root, phase * clip.duration, rest)); };
-        Vec3 d;
+        // Displacements are measured in the clip's frame at its cycle start; with root yaw, each
+        // later cycle starts turned by the cycle's total turn, and the result is expressed in the
+        // frame the entity faces at phase a (it has already turned by the clip's heading so far).
+        auto turnAbout = [&](float angle, Vec3 v) { return rootYaw_ ? Quat::axisAngle(up_, angle).rotate(v) : v; };
+        Vec3 d{0, 0, 0};
+        float yaw = 0.f;
         if (!loop) {
-            d = h(std::clamp(b, 0.f, 1.f)) - h(std::clamp(a, 0.f, 1.f));
+            float pa = std::clamp(a, 0.f, 1.f), pb = std::clamp(b, 0.f, 1.f);
+            d = turnAbout(rootYaw_ ? -rootTurn(clip, 0.f, pa) : 0.f, h(pb) - h(pa));
+            if (rootYaw_) yaw = rootTurn(clip, pa, pb);
         } else {
             float ka = std::floor(a), kb = std::floor(b);
+            float fa = a - ka, fb = b - kb;
+            const float cycleTurn = rootYaw_ ? rootTurn(clip, 0.f, 1.f) : 0.f;
+            Vec3 inCycle;  // in the frame of the cycle containing `a`
             if (ka == kb) {
-                d = h(b - ka) - h(a - ka);
+                inCycle = h(fb) - h(fa);
+                if (rootYaw_) yaw = rootTurn(clip, fa, fb);
             } else {
-                Vec3 cycle = h(1.f) - h(0.f);
-                d = (h(1.f) - h(a - ka)) + cycle * std::max(0.f, kb - ka - 1.f) + (h(b - kb) - h(0.f));
+                const Vec3 cycle = h(1.f) - h(0.f);
+                inCycle = h(1.f) - h(fa);
+                float heading = cycleTurn;  // each following cycle starts turned by one more cycle
+                int full = static_cast<int>(std::min(kb - ka - 1.f, 4.f));
+                for (int c = 0; c < full; ++c, heading += cycleTurn) inCycle += turnAbout(heading, cycle);
+                inCycle += turnAbout(heading, h(fb) - h(0.f));
+                if (rootYaw_) yaw = rootTurn(clip, fa, 1.f) + cycleTurn * static_cast<float>(full) + rootTurn(clip, 0.f, fb);
             }
+            d = turnAbout(rootYaw_ ? -rootTurn(clip, 0.f, fa) : 0.f, inCycle);
         }
-        total += d * w[i];
+        total.delta += d * w[i];
+        total.yaw += yaw * w[i];
     }
     return total;
 }
 
-void AnimatorRuntime::update(float dt, std::vector<Event>* events, Vec3* rootDelta) {
+void AnimatorRuntime::update(float dt, std::vector<Event>* events, Vec3* rootDelta, float* yawDelta) {
     if (rootDelta) *rootDelta = {0, 0, 0};
+    if (yawDelta) *yawDelta = 0.f;
     if (!library_) return;
     for (size_t li = 0; li < layers_.size(); ++li) {
         Layer& layer = layers_[li];
@@ -1041,14 +1173,17 @@ void AnimatorRuntime::update(float dt, std::vector<Event>* events, Vec3* rootDel
         }
         // Root motion (base layer): blended like the poses.
         if (li == 0 && rootMotion_ && rootDelta) {
-            Vec3 d = rootMotion(layer, layer.current, before, layer.current.nt);
+            RootStep d = rootMotion(layer, layer.current, before, layer.current.nt);
             if (layer.fading && !layer.frozenSource) {
-                Vec3 ds = rootMotion(layer, layer.previous, beforePrev, layer.previous.nt);
-                d = ds * (1.f - fadeW) + d * fadeW;
+                RootStep ds = rootMotion(layer, layer.previous, beforePrev, layer.previous.nt);
+                d.delta = ds.delta * (1.f - fadeW) + d.delta * fadeW;
+                d.yaw = ds.yaw * (1.f - fadeW) + d.yaw * fadeW;
             } else if (layer.fading) {
-                d = d * fadeW;
+                d.delta = d.delta * fadeW;
+                d.yaw *= fadeW;
             }
-            *rootDelta += d;
+            *rootDelta += d.delta;
+            if (yawDelta && rootYaw_) *yawDelta += d.yaw;
         }
         // Events of the state being played.
         const State& st = layer.states[static_cast<size_t>(layer.current.state)];

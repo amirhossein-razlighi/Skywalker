@@ -98,10 +98,16 @@ void computeGlobals(const Skeleton& skeleton, const Pose& pose, std::vector<Mat4
 /// `globals` must match `pose` and is updated. Returns false if the chain is degenerate.
 bool solveTwoBoneIk(const Skeleton& skeleton, Pose& pose, std::vector<Mat4>& globals, int end, Vec3 target, Vec3 pole,
                     float weight);
+/// The same for an explicit chain (root -> mid -> end may have twist / helper bones in between).
+bool solveTwoBoneChain(const Skeleton& skeleton, Pose& pose, std::vector<Mat4>& globals, int root, int mid, int end, Vec3 target,
+                       Vec3 pole, float weight);
 
 /// Average horizontal speed of the root bone over a clip (model units per second, `up` is
 /// the model's up axis). Locomotion clips report how fast they move: blend thresholds.
 float rootSpeed(const Library& library, const Clip& clip, Vec3 up = {0, 1, 0});
+/// How far the root turns about `up` over the whole clip (radians, unwrapped; + = counter-clockwise
+/// seen from above). Turn clips and curved walks report it; straight locomotion is ~0.
+float rootTurn(const Library& library, const Clip& clip, Vec3 up = {0, 1, 0});
 
 /// Re-addresses a clip from another skeleton onto `target` by bone name. Channels whose
 /// bone has no match are dropped. Returns the number of channels kept.

@@ -147,6 +147,50 @@ Status dropToSurface(Engine& engine, EntityId id, float offset) {
     return translateWorld(s, id, {0, hit->point.y + offset - base.y, 0});
 }
 
+namespace {
+/// [characters] The same benchmark with every groom hidden (its average GPU ms): the difference is what
+/// hair and fur cost to draw. Grooms are restored afterwards; nothing is recorded in the history.
+double benchmarkWithoutGrooms(Engine& engine, const Json& a, int frames) {
+    Scene& s = engine.scene();
+    std::vector<EntityId> hidden;
+    for (EntityId e : s.entities()) {
+        Groom* g = s.get<Groom>(e);
+        if (g && g->visible) {
+            g->visible = false;
+            hidden.push_back(e);
+        }
+    }
+    CaptureOptions o;
+    o.width = static_cast<int>(std::clamp<int64_t>(a.get("width").asInt(1920), 64, 4096));
+    o.height = static_cast<int>(std::clamp<int64_t>(a.get("height").asInt(1080), 64, 4096));
+    o.samples = 1;
+    o.editorOverlays = false;
+    Vec3 eye, target;
+    const Json& view = a.get("view");
+    if (view.isObject() && reflect::jsonToVec3(view.get("eye"), eye)) {
+        o.hasCustomView = true;
+        o.customView = engine.camera().toView();
+        o.customView.eye = eye;
+        if (reflect::jsonToVec3(view.get("target"), target)) o.customView.target = target;
+        if (view.contains("fov")) o.customView.fovDeg = std::clamp(view.get("fov").asFloat(), 5.f, 150.f);
+    } else {
+        o.useSceneCamera = view.asString() == "scene";
+    }
+    double sum = 0;
+    int counted = 0;
+    for (int i = 0; i < frames + 3; ++i) {
+        if (!engine.capture(o)) break;
+        if (i < 3) continue;
+        sum += engine.renderer().stats().get("gpuMs").asFloat(0.f);
+        ++counted;
+    }
+    for (EntityId e : hidden) {
+        if (Groom* g = s.get<Groom>(e)) g->visible = true;
+    }
+    return counted ? sum / counted : 0.0;
+}
+}  // namespace
+
 void addWorldTools(Engine& engine, ToolRegistry& reg) {
     reg.add({"raycast", "Ray cast",
              "Cast a ray into the scene and get the first mesh hit (triangle-accurate): entity, point, surface "
@@ -613,7 +657,9 @@ void addWorldTools(Engine& engine, ToolRegistry& reg) {
                                   "[x,y,z], fov: degrees}")},
                      {"quality", enumeration({"full", "balanced", "fast"},
                                              "Viewport quality tier to benchmark (default full, as in play mode and captures)")},
-                     {"passes", boolean("Add the per-pass GPU timeline and CPU scopes (profile: passes, groups, cpu)")}}),
+                     {"passes", boolean("Add the per-pass GPU timeline and CPU scopes (profile: passes, groups, cpu)")},
+                     {"characters", boolean("With frames: also benchmark with hair and fur hidden to measure what grooms cost "
+                                            "to draw (characters.groomRenderGpuMs)")}}),
              false, false, [&engine](const Json& a, ToolContext&) {
                  Json bench = Json::object();
                  int frames = static_cast<int>(std::clamp<int64_t>(a.get("frames").asInt(0), 0, 600));
@@ -688,6 +734,17 @@ void addWorldTools(Engine& engine, ToolRegistry& reg) {
                      return Json::object({{"vehicles", vs.vehicles}, {"wheels", vs.wheels}, {"simulated", pw != nullptr},
                                           {"stepMs", std::round(vs.lastStepMs * 1000.0) / 1000.0}});
                  }();
+                 {  // [characters] skinning, groom simulation and groom rendering cost
+                     // Read the live stats first: the comparison benchmark below renders frames without grooms.
+                     Json chars = characterPerfStats(engine);
+                     if (frames > 0 && a.get("characters").asBool(false) && bench.contains("gpuMsAvg") &&
+                         chars.get("grooms").asInt(0) > 0) {
+                         const double ms = bench.get("gpuMsAvg").asFloat() - benchmarkWithoutGrooms(engine, a, frames);
+                         chars["groomRenderGpuMs"] = std::round(std::max(ms, 0.0) * 100.0) / 100.0;  // strands + their shadows
+                         chars.erase("note");
+                     }
+                     j["characters"] = chars;
+                 }
                  j["frameFlow"] = Json::object({{"interpolation", engine.interpolation()},
                                                 {"alpha", std::round(engine.interpolationAlpha() * 1000.f) / 1000.f},
                                                 {"interpolatedLastFrame", engine.frameFlowStats().interpolated},

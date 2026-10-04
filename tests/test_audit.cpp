@@ -118,6 +118,41 @@ TEST_CASE("audit: occlusion - hidden primitives do not count") {
     CHECK(rw.get("stats").get("waterCoverage").asFloat() > 20.f);
 }
 
+TEST_CASE("audit: instanced foliage occludes props behind it and its materials are audited") {
+    AuditFixture fx;
+    fx.add("Hidden Crate", "cube", {0, 1, 0}, {0.6f, 0.6f, 0.6f});
+    FrameData f = buildFrame(fx.scene, fx.cam, 1920, 1080, BuildOptions{});
+    // A hedge of instanced boxes between the camera and the crate; an untextured flat green.
+    EntityId hedge = fx.scene.create("Hedge");
+    auto parts = std::make_shared<std::vector<InstancePart>>();
+    InstancePart part;
+    part.mesh = "cube";
+    part.surface.color = {0.2f, 0.5f, 0.2f, 1.f};
+    parts->push_back(part);
+    auto instances = std::make_shared<std::vector<world::FoliageInstance>>();
+    for (int i = -3; i <= 3; ++i) {
+        world::FoliageInstance in{};
+        // Rows of a 1 x 2.5 x 0.6 m box at (i, 1.25, 2).
+        in.row0[0] = 1.f, in.row0[3] = static_cast<float>(i);
+        in.row1[1] = 2.5f, in.row1[3] = 1.25f;
+        in.row2[2] = 0.6f, in.row2[3] = 2.f;
+        instances->push_back(in);
+    }
+    InstanceBatch batch;
+    batch.entity = hedge;
+    batch.parts = parts;
+    batch.instances = instances;
+    batch.cullDistance = 100.f;
+    f.instances.push_back(batch);
+    Json r = audit::auditFrame(fx.scene, f, fx.src, {}, "foliage");
+    CHECK(coverageOf(r, "Hidden Crate") == 0.f);
+    CHECK(r.get("stats").get("foliageCoverage").asFloat() > 10.f);
+    CHECK(r.get("stats").get("foliageInstancesRasterized").asInt() == 7);
+    REQUIRE(r.get("foliage").size() == 1);
+    CHECK(r.get("foliage")[0].get("parts")[0].get("issue").asString() == "untextured");
+    CHECK(hasWarning(r, "untextured_foliage"));
+}
+
 TEST_CASE("audit: primitive characters - body arrangement and animated primitives; props are not characters") {
     AuditFixture fx;
     EntityId visitor = fx.scene.create("Visitor 1");
@@ -311,7 +346,8 @@ TEST_CASE("mounts: game.json mounts resolve kit/ paths, scan, import and package
         REQUIRE(settings);
         auto files = game::collectGameFiles(project.string(), *settings);
         REQUIRE(files);
-        CHECK(files->files.count("kit/props/lamp.prefab.json") == 1);  // the placed instance stays linked to its prefab
+        CHECK(files->files.count("kit/props/lamp.prefab.json") == 1);  // a linked prefab instance references its prefab
+        CHECK(files->mounted.count("kit/props/lamp.prefab.json") == 1);
         CHECK(files->files.count("kit/materials/brass.mat.json") == 1);
         CHECK(files->mounted.count("kit/materials/brass.mat.json") == 1);
         CHECK(files->missing.empty());

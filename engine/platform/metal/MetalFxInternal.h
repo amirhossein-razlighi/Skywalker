@@ -8,6 +8,7 @@
 #include <array>
 #include <atomic>
 #include <memory>
+#include <string>
 #include <unordered_map>
 #include <vector>
 
@@ -31,8 +32,9 @@ struct FxDrawUniforms {
     simd_float4 material4;  // alpha cutoff
     simd_float4x4 prevModel;  // velocity buffer (appended)
     simd_float4 motion;
+    simd_float4 character[3];  // character material models (appended)
 };
-static_assert(sizeof(FxDrawUniforms) == 336);
+static_assert(sizeof(FxDrawUniforms) == 384);
 
 /// Mirror of GpuStep in GpuParticles.metal.
 struct GpuStepUniforms {
@@ -55,7 +57,13 @@ struct HairParamsUniforms {
     simd_float4x4 domViewProj;
     simd_float4 dims, width, sigma, dye, rootColor, tipColor, shade, dom, view, sim, sim2, wind, cards;
     simd_float4 colliders[16];
+    // --- appended (skinned grooms) ---
+    simd_float4 colliders2[16];
+    simd_float4 skin;       // x skinned, y vertex count, z follow, w max speed
+    simd_float4 skinScale;  // xyz target scale
+    simd_float4 skinStep;   // x root interpolation at the substep start, y at its end
 };
+static_assert(sizeof(HairParamsUniforms) == 896, "must match HairParams in Hair.metal");
 
 /// Mirror of HairChild in Hair.metal.
 struct HairChildGpu {
@@ -150,6 +158,7 @@ public:
     void encodeShadowCaster(id<MTLRenderCommandEncoder> enc, const FrameData& frame, simd_float4x4 lightViewProj);
     void encodeOpaque(id<MTLRenderCommandEncoder> enc);
     Json stats() const;
+    bool budgetLimited() const { return budgetLimited_; }
     FxGpuTimer timer, domTimer;
 
 private:
@@ -157,6 +166,11 @@ private:
         uint64_t hash = 0;
         uint32_t P = 0, G = 0, N = 0;
         id<MTLBuffer> rest, pos, prev, children, offsets, render;
+        // Skinned grooms: root binds, rest frames and the roots of this and the last frame (world).
+        id<MTLBuffer> guideBind, childBind, guideFrames, rootsLast, rootsCur, cpuVerts;
+        bool skinned = false, rootsValid = false;
+        uint32_t colliders = 0;
+        std::string vertexSource;  // where the skinned roots came from: gpu-skinning | cpu-skinning | rest
         id<MTLBuffer> renderPrev;  // last frame's interpolated strands (velocity buffer)
         bool motion = false;       // renderPrev holds last frame's strands and they moved
         id<MTLTexture> domDepth, domOpaque, domDensity;
@@ -171,6 +185,11 @@ private:
         float radius = 1;
     };
     void upload(GroomGpu& g, const GroomItem& item);
+    /// The posed vertices a skinned groom's roots follow this frame (GPU skinning output, the CPU-skinned
+    /// fallback, else the rest mesh) and their count.
+    id<MTLBuffer> skinVertices(GroomGpu& g, const GroomItem& item, uint32_t& count);
+    /// Real-time strand counts for every groom: by size on screen and distance, within one shared budget.
+    std::vector<uint32_t> strandBudget(const FrameData& frame);
     void renderDom(id<MTLCommandBuffer> cmd, GroomGpu& g, const GroomItem& item, const FrameData& frame);
 
     id<MTLDevice> device_;
@@ -183,7 +202,9 @@ private:
     id<MTLDepthStencilState> depthWrite_;
     std::unordered_map<EntityId, GroomGpu> grooms_;
     std::vector<EntityId> order_;
+    bool budgetLimited_ = false;  // the shared real-time strand budget scaled grooms down this frame
     static constexpr NSUInteger kDomSize = 512;
+    static constexpr uint32_t kRealtimeStrandBudget = 600000;  // strands drawn per frame over all grooms (real time)
 };
 
 }  // namespace sky

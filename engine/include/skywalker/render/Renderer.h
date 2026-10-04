@@ -69,7 +69,7 @@ struct OrbitCamera {
     Json toJson() const;
 };
 
-enum class Shading : uint8_t { Pbr = 0, Toon = 1, Unlit = 2, Water = 3 };
+enum class Shading : uint8_t { Pbr = 0, Toon = 1, Unlit = 2, Water = 3, Skin = 4, Eye = 5, Cloth = 6, HairCard = 7 };
 Shading shadingFromString(std::string_view s);
 
 /// How a surface looks: the inline MeshRenderer fields or a material asset, resolved.
@@ -96,6 +96,9 @@ struct Surface {
     float occlusionStrength = 1.f;
     float alphaCutoff = 0.f;  // > 0: alpha-tested cutout
     bool textureAlphaOnly = false;  // use the base-color texture for its alpha (cut-out) only (clay renders)
+    /// Character material models (skin, eye, cloth, hair_card), packed as the shaders read them
+    /// (DrawUniforms.character[3]; colors already linear). See toSurface() in assets/Material.cpp.
+    Vec4 model[3] = {{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}};
 };
 
 struct DrawItem {

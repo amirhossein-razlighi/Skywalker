@@ -66,12 +66,17 @@ struct EventDef {
 };
 
 enum class StateKind { Clip, Blend1D, Blend2D };
+/// 2D blend spaces: `cartesian` gradient bands over (x, y) positions (aim offsets, lean), or
+/// `directional` (polar gradient bands: direction and speed are blended separately, so strafes,
+/// diagonals and backpedals keep their speed and never cancel out between opposite clips).
+enum class Blend2DMode { Cartesian, Directional };
 
 struct StateDef {
     std::string name;
     StateKind kind = StateKind::Clip;
     std::vector<MotionDef> motions;  // Clip: exactly one
     std::string paramX, paramY;      // blend parameters
+    Blend2DMode mode2d = Blend2DMode::Cartesian;
     float speed = 1.f;
     std::string speedParam;          // optional multiplier parameter
     bool loop = true;
@@ -123,6 +128,12 @@ struct ControllerDef {
                     const Skeleton* skeleton) const;
 };
 
+/// Weights (summing to 1) of 2D blend motions at `pt`: cartesian gradient bands over positions, or
+/// directional polar gradient bands over velocities ([x, y] = strafe, forward). Outside every band
+/// the nearest motion gets 1. Used by blend2d states; exposed for tools and tests.
+std::vector<float> blendWeights2D(const std::vector<Vec2>& positions, Vec2 pt);
+std::vector<float> blendWeightsDirectional(const std::vector<Vec2>& velocities, Vec2 pt);
+
 Result<ControllerDef> loadController(const std::string& absolutePath);
 Status saveController(const std::string& absolutePath, const ControllerDef& def);
 
@@ -162,11 +173,15 @@ public:
 
     /// Root motion: the root bone's horizontal movement is taken out of the pose and
     /// reported by update() as a delta in model (glTF) space. `up` is the model's up axis.
-    void setRootMotion(bool enabled, Vec3 up = {0, 1, 0});
+    /// With `yaw`, the root's turning about `up` is taken out too and reported as a yaw delta
+    /// (turn clips, curved walks): the body keeps facing the entity's forward and the entity turns.
+    void setRootMotion(bool enabled, Vec3 up = {0, 1, 0}, bool yaw = false);
+    bool rootYaw() const { return rootYaw_; }
 
     /// Advances by dt seconds (already scaled by the animator's speed). Collects events
-    /// crossed this step and the root motion delta.
-    void update(float dt, std::vector<Event>* events = nullptr, Vec3* rootDelta = nullptr);
+    /// crossed this step, the root motion delta (model space, in the frame the entity faces at the
+    /// start of the step) and, with root yaw, the turn in radians about the up axis.
+    void update(float dt, std::vector<Event>* events = nullptr, Vec3* rootDelta = nullptr, float* yawDelta = nullptr);
     /// The current pose (local transforms).
     void evaluate(Pose& out) const;
 
@@ -218,8 +233,16 @@ private:
     void layerPose(const Layer& layer, Pose& out) const;
     bool conditionsHold(const TransitionDef& t) const;
     void consumeTriggers(const TransitionDef& t);
-    Vec3 rootMotion(const Layer& layer, const Playing& p, float ntFrom, float ntTo) const;
+    struct RootStep {
+        Vec3 delta{0, 0, 0};  // model space, in the frame faced at the start of the step
+        float yaw = 0.f;      // radians about up_
+    };
+    RootStep rootMotion(const Layer& layer, const Playing& p, float ntFrom, float ntTo) const;
     Vec3 horizontal(Vec3 rootLocal) const;
+    /// The root's heading about up_ in a clip at `seconds` (radians, relative to the rest pose).
+    float rootHeading(const Clip& clip, float seconds) const;
+    /// Heading change between two phases of one cycle, unwrapped (turns beyond 180 degrees count).
+    float rootTurn(const Clip& clip, float phase0, float phase1) const;
 
     std::shared_ptr<const Library> library_;
     std::shared_ptr<const ControllerDef> controller_;
@@ -228,7 +251,9 @@ private:
     std::vector<float> triggerAge_;  // seconds a trigger has been armed (-1 = not armed)
     std::vector<Layer> layers_;
     bool rootMotion_ = false;
+    bool rootYaw_ = false;
     Vec3 up_{0, 1, 0};
+    Vec3 forward_{0, 0, 1};  // the model's forward, perpendicular to up_ (headings are measured from it)
     Mat4 rootParent_;  // rest global of the root bone's parent (model space)
     Mat4 rootParentInv_;
 };

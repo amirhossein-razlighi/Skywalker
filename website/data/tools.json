@@ -1645,7 +1645,11 @@
        "motion",
        "shadow_atlas",
        "reflection_probes",
-       "vehicles"
+       "vehicles",
+       "skeleton",
+       "ik_targets",
+       "groom_roots",
+       "sss_mask"
       ],
       "description": "Diagnostic view instead of the final image. Buffers: albedo, normals, material (roughness red / metallic green), gi, reflections, ao, depth, lighting. Shading: unshaded, lighting_only (white material), emission, specular. Geometry: wireframe, overdraw (heat map), lod (green 0 .. red 3), uv_checker, texel_density (green = 512 texels/m). Lights: shadow_cascades (red/green/blue/yellow), light_complexity (lights per pixel heat map), shadow_atlas (point/spot shadow maps, outlined per light: green re-rendered, blue cached, orange waiting; see shadow_atlas_info), reflection_probes (which probe lights each pixel, their volumes; see probe_info). Motion: the velocity buffer (hue = direction, strength = speed). Also sketch, impostors. Full legend: viewport_debug_view {\"list\": true}"
      },
@@ -1859,7 +1863,11 @@
        "motion",
        "shadow_atlas",
        "reflection_probes",
-       "vehicles"
+       "vehicles",
+       "skeleton",
+       "ik_targets",
+       "groom_roots",
+       "sss_mask"
       ],
       "description": "Debug view to show (final = normal image); omit to read the current one"
      },
@@ -2510,7 +2518,7 @@
   {
    "name": "material_create",
    "title": "Create material",
-   "description": "Create a reusable material asset (*.mat.json): color, metallic, roughness, emissive (glows with bloom), albedo texture with tiling, unlit. Assign it with material_assign.",
+   "description": "Create a reusable material asset (*.mat.json): color, metallic, roughness, emissive (glows with bloom), albedo texture with tiling, unlit. Character models: preset skin (scatterColor, scatterRadius mm, lobeMix, microNormal), eye (irisCenter, irisRadius, irisDepth, corneaRoughness, eyeShadow), cloth (sheenColor, sheenRoughness, fuzz), hair_card (hairShift, hairSpecular, hairDirection, alphaMode dither|coverage). Assign it with material_assign. Example: {\"path\": \"materials/face.mat.json\", \"preset\": \"skin\", \"texture\": \"textures/face.png\"}.",
    "inputSchema": {
     "type": "object",
     "properties": {
@@ -2558,9 +2566,13 @@
        "pbr",
        "toon",
        "unlit",
-       "water"
+       "water",
+       "skin",
+       "eye",
+       "cloth",
+       "hair_card"
       ],
-      "description": "pbr = physically based, toon = cel bands + crisp highlights, unlit = flat, water = animated waves"
+      "description": "pbr = physically based, toon = cel bands + crisp highlights, unlit = flat, water = animated waves; character models: skin (subsurface scattering, dual-lobe specular, pores, transmission), eye (refracted iris, wet cornea, shadowed corners), cloth (sheen and fuzz), hair_card (anisotropic strand highlights, dithered or coverage alpha)"
      },
      "normalMap": {
       "type": "string",
@@ -2627,6 +2639,141 @@
       "maximum": 1,
       "description": "Alpha-tested cutout threshold (foliage, sails, fences); 0 = off"
      },
+     "scatterColor": {
+      "description": "skin: relative distance each color scatters under the surface (red farthest: the warm glow in shadow edges and backlit ears) — hex string \"#rrggbb[aa]\" or [r,g,b(,a)] in 0..1"
+     },
+     "scatterRadius": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 50,
+      "description": "skin: scattering distance of the reddest light in millimeters (1-4)"
+     },
+     "lobeMix": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "skin: weight of the second, broader specular lobe (0.1-0.2)"
+     },
+     "lobeRoughness": {
+      "type": "array",
+      "items": {
+       "type": "number"
+      },
+      "minItems": 2,
+      "maxItems": 2,
+      "description": "skin: roughness multipliers of the two specular lobes [sharp, broad]"
+     },
+     "microNormal": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 2,
+      "description": "skin: procedural pore detail strength (fades with distance)"
+     },
+     "microNormalTiling": {
+      "type": "number",
+      "minimum": 1,
+      "maximum": 4000,
+      "description": "skin: pore detail repeats per UV unit"
+     },
+     "transmission": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 4,
+      "description": "skin: light through thin parts (ears, nostrils, fingers), from the sun's shadow-map thickness"
+     },
+     "irisCenter": {
+      "type": "array",
+      "items": {
+       "type": "number"
+      },
+      "minItems": 2,
+      "maxItems": 2,
+      "description": "eye: UV of the iris center in the eye texture"
+     },
+     "irisCenter2": {
+      "type": "array",
+      "items": {
+       "type": "number"
+      },
+      "minItems": 2,
+      "maxItems": 2,
+      "description": "eye: UV of a second iris when both eyes share one texture (each pixel uses the nearer); [-1, -1] = none"
+     },
+     "irisRadius": {
+      "type": "number",
+      "minimum": 0.001,
+      "maximum": 0.5,
+      "description": "eye: UV radius of the iris"
+     },
+     "irisDepth": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 0.3,
+      "description": "eye: parallax depth of the iris under the cornea (UV units)"
+     },
+     "corneaRoughness": {
+      "type": "number",
+      "minimum": 0.01,
+      "maximum": 0.5,
+      "description": "eye: roughness of the wet cornea highlight"
+     },
+     "eyeShadow": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "eye: darkening toward the eye corners (lids and lashes)"
+     },
+     "limbusDarkening": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "eye: dark ring around the iris"
+     },
+     "sheenColor": {
+      "description": "cloth: color of the soft sheen at grazing angles (velvet, wool, cotton) — hex string \"#rrggbb[aa]\" or [r,g,b(,a)] in 0..1"
+     },
+     "sheenRoughness": {
+      "type": "number",
+      "minimum": 0.07,
+      "maximum": 1,
+      "description": "cloth: 0.3 satin .. 1 felt"
+     },
+     "fuzz": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 2,
+      "description": "cloth: extra rim of loose fibers"
+     },
+     "hairShift": {
+      "type": "number",
+      "minimum": -1,
+      "maximum": 1,
+      "description": "hair_card: primary highlight shift along the strand"
+     },
+     "hairSpecular": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 4,
+      "description": "hair_card: highlight strength"
+     },
+     "hairDirection": {
+      "type": "string",
+      "enum": [
+       "v",
+       "-v",
+       "u",
+       "-u"
+      ],
+      "description": "hair_card: strand direction in the card's UVs (root to tip)"
+     },
+     "alphaMode": {
+      "type": "string",
+      "enum": [
+       "dither",
+       "coverage"
+      ],
+      "description": "hair_card: dither = stochastic transparency that resolves to soft strands under TAA and stills; coverage = alpha to coverage (MSAA)"
+     },
      "path": {
       "type": "string",
       "description": "Project-relative path ending in .mat.json, e.g. materials/stone.mat.json"
@@ -2655,7 +2802,10 @@
        "neon",
        "toon",
        "toon_metal",
-       "clay"
+       "clay",
+       "eye",
+       "cloth",
+       "hair_card"
       ],
       "description": "Start from a built-in material (other fields override it)"
      }
@@ -2726,9 +2876,13 @@
        "pbr",
        "toon",
        "unlit",
-       "water"
+       "water",
+       "skin",
+       "eye",
+       "cloth",
+       "hair_card"
       ],
-      "description": "pbr = physically based, toon = cel bands + crisp highlights, unlit = flat, water = animated waves"
+      "description": "pbr = physically based, toon = cel bands + crisp highlights, unlit = flat, water = animated waves; character models: skin (subsurface scattering, dual-lobe specular, pores, transmission), eye (refracted iris, wet cornea, shadowed corners), cloth (sheen and fuzz), hair_card (anisotropic strand highlights, dithered or coverage alpha)"
      },
      "normalMap": {
       "type": "string",
@@ -2795,6 +2949,141 @@
       "maximum": 1,
       "description": "Alpha-tested cutout threshold (foliage, sails, fences); 0 = off"
      },
+     "scatterColor": {
+      "description": "skin: relative distance each color scatters under the surface (red farthest: the warm glow in shadow edges and backlit ears) — hex string \"#rrggbb[aa]\" or [r,g,b(,a)] in 0..1"
+     },
+     "scatterRadius": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 50,
+      "description": "skin: scattering distance of the reddest light in millimeters (1-4)"
+     },
+     "lobeMix": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "skin: weight of the second, broader specular lobe (0.1-0.2)"
+     },
+     "lobeRoughness": {
+      "type": "array",
+      "items": {
+       "type": "number"
+      },
+      "minItems": 2,
+      "maxItems": 2,
+      "description": "skin: roughness multipliers of the two specular lobes [sharp, broad]"
+     },
+     "microNormal": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 2,
+      "description": "skin: procedural pore detail strength (fades with distance)"
+     },
+     "microNormalTiling": {
+      "type": "number",
+      "minimum": 1,
+      "maximum": 4000,
+      "description": "skin: pore detail repeats per UV unit"
+     },
+     "transmission": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 4,
+      "description": "skin: light through thin parts (ears, nostrils, fingers), from the sun's shadow-map thickness"
+     },
+     "irisCenter": {
+      "type": "array",
+      "items": {
+       "type": "number"
+      },
+      "minItems": 2,
+      "maxItems": 2,
+      "description": "eye: UV of the iris center in the eye texture"
+     },
+     "irisCenter2": {
+      "type": "array",
+      "items": {
+       "type": "number"
+      },
+      "minItems": 2,
+      "maxItems": 2,
+      "description": "eye: UV of a second iris when both eyes share one texture (each pixel uses the nearer); [-1, -1] = none"
+     },
+     "irisRadius": {
+      "type": "number",
+      "minimum": 0.001,
+      "maximum": 0.5,
+      "description": "eye: UV radius of the iris"
+     },
+     "irisDepth": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 0.3,
+      "description": "eye: parallax depth of the iris under the cornea (UV units)"
+     },
+     "corneaRoughness": {
+      "type": "number",
+      "minimum": 0.01,
+      "maximum": 0.5,
+      "description": "eye: roughness of the wet cornea highlight"
+     },
+     "eyeShadow": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "eye: darkening toward the eye corners (lids and lashes)"
+     },
+     "limbusDarkening": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "eye: dark ring around the iris"
+     },
+     "sheenColor": {
+      "description": "cloth: color of the soft sheen at grazing angles (velvet, wool, cotton) — hex string \"#rrggbb[aa]\" or [r,g,b(,a)] in 0..1"
+     },
+     "sheenRoughness": {
+      "type": "number",
+      "minimum": 0.07,
+      "maximum": 1,
+      "description": "cloth: 0.3 satin .. 1 felt"
+     },
+     "fuzz": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 2,
+      "description": "cloth: extra rim of loose fibers"
+     },
+     "hairShift": {
+      "type": "number",
+      "minimum": -1,
+      "maximum": 1,
+      "description": "hair_card: primary highlight shift along the strand"
+     },
+     "hairSpecular": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 4,
+      "description": "hair_card: highlight strength"
+     },
+     "hairDirection": {
+      "type": "string",
+      "enum": [
+       "v",
+       "-v",
+       "u",
+       "-u"
+      ],
+      "description": "hair_card: strand direction in the card's UVs (root to tip)"
+     },
+     "alphaMode": {
+      "type": "string",
+      "enum": [
+       "dither",
+       "coverage"
+      ],
+      "description": "hair_card: dither = stochastic transparency that resolves to soft strands under TAA and stills; coverage = alpha to coverage (MSAA)"
+     },
      "path": {
       "type": "string",
       "description": "Project-relative path ending in .mat.json, e.g. materials/stone.mat.json"
@@ -2823,7 +3112,10 @@
        "neon",
        "toon",
        "toon_metal",
-       "clay"
+       "clay",
+       "eye",
+       "cloth",
+       "hair_card"
       ],
       "description": "Start from a built-in material (other fields override it)"
      }
@@ -3438,6 +3730,10 @@
      "passes": {
       "type": "boolean",
       "description": "Add the per-pass GPU timeline and CPU scopes (profile: passes, groups, cpu)"
+     },
+     "characters": {
+      "type": "boolean",
+      "description": "With frames: also benchmark with hair and fur hidden to measure what grooms cost to draw (characters.groomRenderGpuMs)"
      }
     },
     "additionalProperties": false
@@ -7779,7 +8075,7 @@
   {
    "name": "animator_setup",
    "title": "Set up animator",
-   "description": "Create a state machine controller (*.animctl.json) for a character and assign it. preset=locomotion (default) finds idle/walk/run/jump clips by name and builds: parameter `speed` (m/s) driving a 1D blend Idle -> Walk -> Run whose thresholds are the clips' real root speeds (feet don't slide when you set speed to the actual velocity), and if there is a jump clip a `jump` trigger with Jump -> back to locomotion. preset=clips: one state per clip, no transitions (drive with play_animation). Override clip choices with `clips` ({\"idle\": \"Breathe\", \"run\": \"Sprint\"}), or pass a full `controller` document (parameters, layers with states/blend/blend2d, transitions with \"when\" conditions like \"speed > 0.1 and grounded\", exit times, events, masks) — it is validated with did-you-mean errors. Then drive it from Wander: set_param(self, \"speed\", v), trigger(self, \"jump\"), play_animation(self, \"Wave\").",
+   "description": "Create a state machine controller (*.animctl.json) for a character and assign it. preset=locomotion (default) finds idle/walk/run/jump clips by name and builds: parameter `speed` (m/s) driving a 1D blend Idle -> Walk -> Run whose thresholds are the clips' real root speeds (feet don't slide when you set speed to the actual velocity), and if there is a jump clip a `jump` trigger with Jump -> back to locomotion. preset=clips: one state per clip, no transitions (drive with play_animation). preset=directional: a polar 2D blend space for strafing characters: parameters `moveX` (right) and `moveY` (forward) in m/s drive idle, forward, back, left, right and diagonal clips placed at their measured root velocities (direction and speed blend separately: no slowdown or foot sliding between directions). Override clip choices with `clips` ({\"idle\": \"Breathe\", \"run\": \"Sprint\"}), or pass a full `controller` document (parameters, layers with states/blend/blend2d, transitions with \"when\" conditions like \"speed > 0.1 and grounded\", exit times, events, masks) — it is validated with did-you-mean errors. Then drive it from Wander: set_param(self, \"speed\", v), trigger(self, \"jump\"), play_animation(self, \"Wave\").",
    "inputSchema": {
     "type": "object",
     "properties": {
@@ -7794,13 +8090,14 @@
       "type": "string",
       "enum": [
        "locomotion",
-       "clips"
+       "clips",
+       "directional"
       ],
       "description": "Generated controller (default locomotion)"
      },
      "clips": {
       "type": "object",
-      "description": "Clip choice overrides: idle, walk, run, jump"
+      "description": "Clip choice overrides: idle, walk, run, jump; directional: idle, forward, back, left, right, forward_left, forward_right, back_left, back_right"
      },
      "controller": {
       "type": "object",
@@ -8545,7 +8842,7 @@
   {
    "name": "groom_create",
    "title": "Create hair or fur",
-   "description": "Grow strand hair or fur on an entity's mesh (a head, a bust, an animal body) from a preset, ready to tweak. Presets: hair_straight, hair_wavy, hair_curly, hair_ponytail, hair_short (heads: they grow on the upper back of the mesh; set maskDirection/maskAngle or a vertex-color mask for your model), fur_short, fur_long (cover the whole mesh). `overrides` patches groom fields, e.g. {\"melanin\": 0.2, \"length\": 0.5, \"strands\": 100000}. Color is physically based: melanin 0 white .. 0.3 blond .. 0.8 brown .. 1 black, redness for auburn/ginger, dye for unnatural tints. Hair is simulated (gravity, wind, collisions with the mesh) and rendered as real strands with Marschner shading and self-shadowing. Example: {\"entity\": \"Head\", \"preset\": \"hair_wavy\", \"overrides\": {\"melanin\": 0.25}}.",
+   "description": "Grow strand hair or fur on an entity's mesh (a head, a bust, an animal body) from a preset, ready to tweak. Presets: hair_straight, hair_wavy, hair_curly, hair_ponytail, hair_short (heads: they grow on the upper back of the mesh; set maskDirection/maskAngle or a vertex-color mask for your model), fur_short, fur_long (cover the whole mesh); for rigged characters: hair_scalp (dense scalp hair on the Head bone's vertices), beard, eyebrows (regions in the head's bounds, mirrored brows), fur_dense (a creature's coat). On a rigged mesh the roots ride the animated skin (attach auto: rooted on triangles, follow, maxSpeed, capsules fitted to the skeleton as colliders); maskBone / maskCenter / maskRadius / maskSpace limit growth to a region. `overrides` patches groom fields, e.g. {\"melanin\": 0.2, \"length\": 0.5, \"strands\": 100000}. Color is physically based: melanin 0 white .. 0.3 blond .. 0.8 brown .. 1 black, redness for auburn/ginger, dye for unnatural tints. Hair is simulated (gravity, wind, collisions with the mesh) and rendered as real strands with Marschner shading and self-shadowing. Example: {\"entity\": \"Head\", \"preset\": \"hair_wavy\", \"overrides\": {\"melanin\": 0.25}}.",
    "inputSchema": {
     "type": "object",
     "properties": {
@@ -8565,7 +8862,11 @@
        "hair_ponytail",
        "hair_short",
        "fur_short",
-       "fur_long"
+       "fur_long",
+       "beard",
+       "eyebrows",
+       "hair_scalp",
+       "fur_dense"
       ],
       "description": "Starting style"
      },
@@ -8612,7 +8913,11 @@
        "hair_ponytail",
        "hair_short",
        "fur_short",
-       "fur_long"
+       "fur_long",
+       "beard",
+       "eyebrows",
+       "hair_scalp",
+       "fur_dense"
       ],
       "description": "Reset to this preset first"
      },
@@ -9117,7 +9422,11 @@
        "motion",
        "shadow_atlas",
        "reflection_probes",
-       "vehicles"
+       "vehicles",
+       "skeleton",
+       "ik_targets",
+       "groom_roots",
+       "sss_mask"
       ],
       "description": "Buffer visualization, shading debug view (wireframe, lod, unshaded, ...) or the pencil sketch look; see viewport_capture"
      },
@@ -11120,6 +11429,212 @@
    },
    "_meta": {
     "skywalker/category": "render"
+   }
+  },
+  {
+   "name": "character_inspect",
+   "title": "Inspect character",
+   "description": "Everything about a character's animation and look in one call: the humanoid bone map of its skeleton (slots like hips, leftHand, rightFoot with the bone names found, convention mixamo / suffixed / generic, missing slots), key bone positions in the world, clips with their root speed (m/s) and root turn (degrees per cycle), root motion / in-place / root yaw settings, retargeting (retargetFrom and how its clips map), foot and hand IK status of the last solve (contact, locked, ground offset, slope, pelvis drop, hand reach error), hair and fur attachment (follows the skin?, bound roots, colliders), and the material model of every mesh part (skin, eye, cloth, hair_card, pbr). Start here before retargeting, adding IK or grooming a character. Example: {\"entity\": \"Hero\"}.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "entity": {
+      "type": [
+       "integer",
+       "string"
+      ],
+      "description": "The character (or any of its parts)"
+     },
+     "clips": {
+      "type": "boolean",
+      "description": "Include the clip list (default true)"
+     }
+    },
+    "additionalProperties": false,
+    "required": [
+     "entity"
+    ]
+   },
+   "annotations": {
+    "title": "Inspect character",
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "openWorldHint": false
+   },
+   "_meta": {
+    "skywalker/category": "animation"
+   }
+  },
+  {
+   "name": "character_ik",
+   "title": "Character foot and hand IK",
+   "description": "Set up automatic foot IK, hand targets and turning for a humanoid character (adds or updates its characterIk component; undoable). Feet plant on stairs, slopes and rocks under them (ground probes every tick), the pelvis drops so the lower foot reaches, feet pitch / roll onto the slope (max_slope) and lock in place while in contact (contact: auto = low and slow, velocity, events = foot_l_down / foot_l_up / foot_r_down / foot_r_up animation events, always, never), re-planting with a short step once the animation pulls a foot lock_distance away. Hands reach entities: a grip point on a staff held in the other hand (no lag), a ledge, a rail; animate the weights for grabs. turn_to turns a standing character in place (yaw degrees, or an entity / point to face). Returns the solve status. Example: {\"entity\": \"Monk\", \"feet\": true, \"left_hand\": \"Staff Grip\"}.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "entity": {
+      "type": [
+       "integer",
+       "string"
+      ],
+      "description": "The character"
+     },
+     "feet": {
+      "type": "boolean",
+      "description": "Automatic foot planting (default true when the component is created)"
+     },
+     "feet_weight": {
+      "type": "number",
+      "description": "0..1 blend of the foot IK"
+     },
+     "step_height": {
+      "type": "number",
+      "description": "Meters a foot may reach up or down (stairs: 0.3-0.5)"
+     },
+     "foot_height": {
+      "type": "number",
+      "description": "Ankle height above the sole in meters (-1 = from the rest pose)"
+     },
+     "pelvis": {
+      "type": "boolean",
+      "description": "Lower the hips for the lower foot"
+     },
+     "align_feet": {
+      "type": "boolean",
+      "description": "Tilt the feet onto the slope"
+     },
+     "max_slope": {
+      "type": "number",
+      "description": "Steepest slope the feet align to (degrees)"
+     },
+     "contact": {
+      "type": "string",
+      "enum": [
+       "auto",
+       "velocity",
+       "events",
+       "always",
+       "never"
+      ],
+      "description": "When a foot locks in place"
+     },
+     "lock_speed": {
+      "type": "number",
+      "description": "m/s below which a foot counts as planted"
+     },
+     "lock_distance": {
+      "type": "number",
+      "description": "m a locked foot may lag before re-planting"
+     },
+     "smoothing": {
+      "type": "number",
+      "description": "1/s: how fast pelvis and feet follow the ground"
+     },
+     "left_hand": {
+      "description": "Entity the left hand reaches (\"\" clears)"
+     },
+     "left_hand_weight": {
+      "type": "number",
+      "description": "0..1"
+     },
+     "right_hand": {
+      "description": "Entity the right hand reaches (\"\" clears)"
+     },
+     "right_hand_weight": {
+      "type": "number",
+      "description": "0..1"
+     },
+     "hand_rotation": {
+      "type": "boolean",
+      "description": "Also orient the hands like their targets"
+     },
+     "turn_speed": {
+      "type": "number",
+      "description": "Turn-in-place rate (degrees per second)"
+     },
+     "turn_to": {
+      "description": "Turn in place: world yaw in degrees (0 = -Z), or an entity / [x, y, z] point to face"
+     },
+     "remove": {
+      "type": "boolean",
+      "description": "Remove the characterIk component"
+     }
+    },
+    "additionalProperties": false,
+    "required": [
+     "entity"
+    ]
+   },
+   "annotations": {
+    "title": "Character foot and hand IK",
+    "readOnlyHint": false,
+    "destructiveHint": false,
+    "openWorldHint": false
+   },
+   "_meta": {
+    "skywalker/category": "animation"
+   }
+  },
+  {
+   "name": "animation_retarget",
+   "title": "Retarget animations",
+   "description": "Retarget clips from one humanoid rig to another in pose space and save them as a new library (.anim) on the target's skeleton: different bone names (mixamo / suffixed like thigh_l / generic, detected by name and topology), rest poses (T-pose vs A-pose), bone axes and proportions (the hips move by the source motion scaled by the leg-length ratio; bones keep their own lengths, so nothing stretches). `source` / `target` are a library (.anim or a rigged .glb) or a character entity. preview=true only reports the bone maps and alignment. Use the result with \"<output>#<Clip>\" clip references in controllers, play_animation, or animator.retargetFrom (which retargets on the fly). Example: {\"source\": \"anims/pack.anim\", \"target\": \"Knight\", \"clips\": [\"Walk\", \"Run\"]}.",
+   "inputSchema": {
+    "type": "object",
+    "properties": {
+     "source": {
+      "description": "Library path (.anim / .glb) or character entity with the clips"
+     },
+     "target": {
+      "description": "Library path or character entity to retarget onto"
+     },
+     "clips": {
+      "type": "array",
+      "items": {
+       "type": "string",
+       "description": "Clip name"
+      },
+      "description": "Clips to retarget (default: all)"
+     },
+     "output": {
+      "type": "string",
+      "description": "Output .anim path (default: next to the target library, <target>_<source>.anim)"
+     },
+     "fps": {
+      "type": "number",
+      "description": "Resampling rate of the output clips (default 30)"
+     },
+     "translation": {
+      "type": "boolean",
+      "description": "Move the hips / root with the source (default true; false keeps them at rest)"
+     },
+     "source_map": {
+      "type": "object",
+      "description": "Slot overrides for the source, e.g. {\"leftHand\": \"L_Wrist\"}"
+     },
+     "target_map": {
+      "type": "object",
+      "description": "Slot overrides for the target"
+     },
+     "preview": {
+      "type": "boolean",
+      "description": "Only report the bone maps and alignment (no file)"
+     }
+    },
+    "additionalProperties": false,
+    "required": [
+     "source",
+     "target"
+    ]
+   },
+   "annotations": {
+    "title": "Retarget animations",
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "openWorldHint": false
+   },
+   "_meta": {
+    "skywalker/category": "animation"
    }
   }
  ]

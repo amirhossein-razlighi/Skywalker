@@ -496,7 +496,7 @@ Takes no arguments.
 
 **Create material** <span class="sky-badge sky-badge--mut" title="Changes the project; undoable and attributed">mutating</span>
 
-Create a reusable material asset (*.mat.json): color, metallic, roughness, emissive (glows with bloom), albedo texture with tiling, unlit. Assign it with material_assign.
+Create a reusable material asset (*.mat.json): color, metallic, roughness, emissive (glows with bloom), albedo texture with tiling, unlit. Character models: preset skin (scatterColor, scatterRadius mm, lobeMix, microNormal), eye (irisCenter, irisRadius, irisDepth, corneaRoughness, eyeShadow), cloth (sheenColor, sheenRoughness, fuzz), hair_card (hairShift, hairSpecular, hairDirection, alphaMode dither|coverage). Assign it with material_assign. Example: {"path": "materials/face.mat.json", "preset": "skin", "texture": "textures/face.png"}.
 
 | Argument | Type | Required | Description | Values |
 |---|---|---|---|---|
@@ -508,7 +508,7 @@ Create a reusable material asset (*.mat.json): color, metallic, roughness, emiss
 | `tilingU` | number |  | Texture repeats along U | 0.01 .. 1000 |
 | `tilingV` | number |  | Texture repeats along V | 0.01 .. 1000 |
 | `unlit` | boolean |  | Ignore lighting (flat look for 2D / UI / stylized) |  |
-| `shading` | string |  | pbr = physically based, toon = cel bands + crisp highlights, unlit = flat, water = animated waves | `pbr` `toon` `unlit` `water` |
+| `shading` | string |  | pbr = physically based, toon = cel bands + crisp highlights, unlit = flat, water = animated waves; character models: skin (subsurface scattering, dual-lobe specular, pores, transmission), eye (refracted iris, wet cornea, shadowed corners), cloth (sheen and fuzz), hair_card (anisotropic strand highlights, dithered or coverage alpha) | `pbr` `toon` `unlit` `water` `skin` `eye` `cloth` `hair_card` |
 | `normalMap` | string |  | Normal map (png), project-relative |  |
 | `ormMap` | string |  | Occlusion/roughness/metallic map (R/G/B), project-relative |  |
 | `emissiveMap` | string |  | Emission map, multiplied with emissive |  |
@@ -522,19 +522,40 @@ Create a reusable material asset (*.mat.json): color, metallic, roughness, emiss
 | `doubleSided` | boolean |  | Render both faces |  |
 | `occlusionStrength` | number |  | Ambient occlusion from the ORM map's red channel | 0 .. 1 |
 | `alphaCutoff` | number |  | Alpha-tested cutout threshold (foliage, sails, fences); 0 = off | 0 .. 1 |
+| `scatterColor` | color |  | skin: relative distance each color scatters under the surface (red farthest: the warm glow in shadow edges and backlit ears) — hex string "#rrggbb[aa]" or [r,g,b(,a)] in 0..1 |  |
+| `scatterRadius` | number |  | skin: scattering distance of the reddest light in millimeters (1-4) | 0 .. 50 |
+| `lobeMix` | number |  | skin: weight of the second, broader specular lobe (0.1-0.2) | 0 .. 1 |
+| `lobeRoughness` | number[2] |  | skin: roughness multipliers of the two specular lobes [sharp, broad] |  |
+| `microNormal` | number |  | skin: procedural pore detail strength (fades with distance) | 0 .. 2 |
+| `microNormalTiling` | number |  | skin: pore detail repeats per UV unit | 1 .. 4000 |
+| `transmission` | number |  | skin: light through thin parts (ears, nostrils, fingers), from the sun's shadow-map thickness | 0 .. 4 |
+| `irisCenter` | number[2] |  | eye: UV of the iris center in the eye texture |  |
+| `irisCenter2` | number[2] |  | eye: UV of a second iris when both eyes share one texture (each pixel uses the nearer); [-1, -1] = none |  |
+| `irisRadius` | number |  | eye: UV radius of the iris | 0.001 .. 0.5 |
+| `irisDepth` | number |  | eye: parallax depth of the iris under the cornea (UV units) | 0 .. 0.3 |
+| `corneaRoughness` | number |  | eye: roughness of the wet cornea highlight | 0.01 .. 0.5 |
+| `eyeShadow` | number |  | eye: darkening toward the eye corners (lids and lashes) | 0 .. 1 |
+| `limbusDarkening` | number |  | eye: dark ring around the iris | 0 .. 1 |
+| `sheenColor` | color |  | cloth: color of the soft sheen at grazing angles (velvet, wool, cotton) — hex string "#rrggbb[aa]" or [r,g,b(,a)] in 0..1 |  |
+| `sheenRoughness` | number |  | cloth: 0.3 satin .. 1 felt | 0.07 .. 1 |
+| `fuzz` | number |  | cloth: extra rim of loose fibers | 0 .. 2 |
+| `hairShift` | number |  | hair_card: primary highlight shift along the strand | -1 .. 1 |
+| `hairSpecular` | number |  | hair_card: highlight strength | 0 .. 4 |
+| `hairDirection` | string |  | hair_card: strand direction in the card's UVs (root to tip) | `v` `-v` `u` `-u` |
+| `alphaMode` | string |  | hair_card: dither = stochastic transparency that resolves to soft strands under TAA and stills; coverage = alpha to coverage (MSAA) | `dither` `coverage` |
 | `path` | string | yes | Project-relative path ending in .mat.json, e.g. materials/stone.mat.json |  |
-| `preset` | string |  | Start from a built-in material (other fields override it) | `gold` `silver` `copper` `chrome` `brushed_steel` `iron` `plastic` `rubber` `ceramic` `car_paint` `glass` `water` `ice` `skin` `wax` `leaves` `snow` `velvet` `neon` `toon` `toon_metal` `clay` |
+| `preset` | string |  | Start from a built-in material (other fields override it) | `gold` `silver` `copper` `chrome` `brushed_steel` `iron` `plastic` `rubber` `ceramic` `car_paint` `glass` `water` `ice` `skin` `wax` `leaves` `snow` `velvet` `neon` `toon` `toon_metal` `clay` `eye` `cloth` `hair_card` |
 
 === "Tool call"
 
     ```tool
-    material_create {"path": "materials/brass.mat.json", "preset": "gold", "roughness": 0.35, "color": "#c9a24a"}
+    material_create {"path": "materials/face.mat.json", "preset": "skin", "texture": "textures/face.png"}
     ```
 
 === "CLI"
 
     ```bash
-    skywalker call material_create '{"path": "materials/brass.mat.json", "preset": "gold", "roughness": 0.35, "color": "#c9a24a"}' --project my_game
+    skywalker call material_create '{"path": "materials/face.mat.json", "preset": "skin", "texture": "textures/face.png"}' --project my_game
     ```
 
 === "MCP request"
@@ -547,10 +568,9 @@ Create a reusable material asset (*.mat.json): color, metallic, roughness, emiss
       "params": {
         "name": "material_create",
         "arguments": {
-          "path": "materials/brass.mat.json",
-          "preset": "gold",
-          "roughness": 0.35,
-          "color": "#c9a24a"
+          "path": "materials/face.mat.json",
+          "preset": "skin",
+          "texture": "textures/face.png"
         }
       }
     }
@@ -572,7 +592,7 @@ Change fields of an existing material; every entity using it updates instantly.
 | `tilingU` | number |  | Texture repeats along U | 0.01 .. 1000 |
 | `tilingV` | number |  | Texture repeats along V | 0.01 .. 1000 |
 | `unlit` | boolean |  | Ignore lighting (flat look for 2D / UI / stylized) |  |
-| `shading` | string |  | pbr = physically based, toon = cel bands + crisp highlights, unlit = flat, water = animated waves | `pbr` `toon` `unlit` `water` |
+| `shading` | string |  | pbr = physically based, toon = cel bands + crisp highlights, unlit = flat, water = animated waves; character models: skin (subsurface scattering, dual-lobe specular, pores, transmission), eye (refracted iris, wet cornea, shadowed corners), cloth (sheen and fuzz), hair_card (anisotropic strand highlights, dithered or coverage alpha) | `pbr` `toon` `unlit` `water` `skin` `eye` `cloth` `hair_card` |
 | `normalMap` | string |  | Normal map (png), project-relative |  |
 | `ormMap` | string |  | Occlusion/roughness/metallic map (R/G/B), project-relative |  |
 | `emissiveMap` | string |  | Emission map, multiplied with emissive |  |
@@ -586,8 +606,29 @@ Change fields of an existing material; every entity using it updates instantly.
 | `doubleSided` | boolean |  | Render both faces |  |
 | `occlusionStrength` | number |  | Ambient occlusion from the ORM map's red channel | 0 .. 1 |
 | `alphaCutoff` | number |  | Alpha-tested cutout threshold (foliage, sails, fences); 0 = off | 0 .. 1 |
+| `scatterColor` | color |  | skin: relative distance each color scatters under the surface (red farthest: the warm glow in shadow edges and backlit ears) — hex string "#rrggbb[aa]" or [r,g,b(,a)] in 0..1 |  |
+| `scatterRadius` | number |  | skin: scattering distance of the reddest light in millimeters (1-4) | 0 .. 50 |
+| `lobeMix` | number |  | skin: weight of the second, broader specular lobe (0.1-0.2) | 0 .. 1 |
+| `lobeRoughness` | number[2] |  | skin: roughness multipliers of the two specular lobes [sharp, broad] |  |
+| `microNormal` | number |  | skin: procedural pore detail strength (fades with distance) | 0 .. 2 |
+| `microNormalTiling` | number |  | skin: pore detail repeats per UV unit | 1 .. 4000 |
+| `transmission` | number |  | skin: light through thin parts (ears, nostrils, fingers), from the sun's shadow-map thickness | 0 .. 4 |
+| `irisCenter` | number[2] |  | eye: UV of the iris center in the eye texture |  |
+| `irisCenter2` | number[2] |  | eye: UV of a second iris when both eyes share one texture (each pixel uses the nearer); [-1, -1] = none |  |
+| `irisRadius` | number |  | eye: UV radius of the iris | 0.001 .. 0.5 |
+| `irisDepth` | number |  | eye: parallax depth of the iris under the cornea (UV units) | 0 .. 0.3 |
+| `corneaRoughness` | number |  | eye: roughness of the wet cornea highlight | 0.01 .. 0.5 |
+| `eyeShadow` | number |  | eye: darkening toward the eye corners (lids and lashes) | 0 .. 1 |
+| `limbusDarkening` | number |  | eye: dark ring around the iris | 0 .. 1 |
+| `sheenColor` | color |  | cloth: color of the soft sheen at grazing angles (velvet, wool, cotton) — hex string "#rrggbb[aa]" or [r,g,b(,a)] in 0..1 |  |
+| `sheenRoughness` | number |  | cloth: 0.3 satin .. 1 felt | 0.07 .. 1 |
+| `fuzz` | number |  | cloth: extra rim of loose fibers | 0 .. 2 |
+| `hairShift` | number |  | hair_card: primary highlight shift along the strand | -1 .. 1 |
+| `hairSpecular` | number |  | hair_card: highlight strength | 0 .. 4 |
+| `hairDirection` | string |  | hair_card: strand direction in the card's UVs (root to tip) | `v` `-v` `u` `-u` |
+| `alphaMode` | string |  | hair_card: dither = stochastic transparency that resolves to soft strands under TAA and stills; coverage = alpha to coverage (MSAA) | `dither` `coverage` |
 | `path` | string | yes | Project-relative path ending in .mat.json, e.g. materials/stone.mat.json |  |
-| `preset` | string |  | Start from a built-in material (other fields override it) | `gold` `silver` `copper` `chrome` `brushed_steel` `iron` `plastic` `rubber` `ceramic` `car_paint` `glass` `water` `ice` `skin` `wax` `leaves` `snow` `velvet` `neon` `toon` `toon_metal` `clay` |
+| `preset` | string |  | Start from a built-in material (other fields override it) | `gold` `silver` `copper` `chrome` `brushed_steel` `iron` `plastic` `rubber` `ceramic` `car_paint` `glass` `water` `ice` `skin` `wax` `leaves` `snow` `velvet` `neon` `toon` `toon_metal` `clay` `eye` `cloth` `hair_card` |
 
 === "Tool call"
 

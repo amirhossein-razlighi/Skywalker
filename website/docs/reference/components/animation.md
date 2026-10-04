@@ -5,7 +5,7 @@ title: "Animation"
 
 # Animation
 
-Animators, bone attachments, IK effectors and sequence players.
+Animators, character IK (foot planting, hand targets, turn in place), bone attachments, IK effectors and sequence players.
 
 ## `animator` { #animator }
 
@@ -24,6 +24,10 @@ Skeletal animation for this entity's rigged meshes (and its children's): a state
 | `lookAt` | object \| string \| integer \| null | Entity the head and spine turn towards (look-at IK); empty = off — entity link: name ("Door"), "#id", {"id": 12} or null; read back as {"id", "name"} (follows renames; entity_refs lists links) |  |
 | `lookAtWeight` | number | How strongly the head follows lookAt | 0 .. 1 |
 | `lookAtLimit` | number | Maximum head/spine turn (degrees) | 0 .. 180 |
+| `rootYaw` | boolean | With rootMotion: also turn the entity by the clip's root rotation (turn-in-place and curved-walk clips); the body keeps facing the entity's forward |  |
+| `inPlace` | boolean | Play locomotion in place: the root's horizontal motion (and turn, with rootYaw) is removed and the entity does not move (gameplay code moves it) |  |
+| `retargetFrom` | string | Clip library (*.anim or a rigged .glb) whose clips play on this character when they are not in its own library, e.g. a shared animation pack for a different rig (retargeted per `retarget`) |  |
+| `retarget` | string | How clips from another rig map onto this skeleton: auto = pose-space when both rigs are humanoids (different names, rest poses, proportions), else by bone name; pose = always pose-space; name = by bone name | `auto` `pose` `name` |
 
 === "Tool call"
 
@@ -35,6 +39,42 @@ Skeletal animation for this entity's rigged meshes (and its children's): a state
 
     ```text
     self.animator.library          -- read or write any field
+    ```
+
+## `characterIk` { #characterIk }
+
+Automatic foot planting (stairs, slopes, rocks), pelvis adjustment, feet aligned to the slope and locked while in contact, hand targets (two-handed grips, ledges, rails) and turn in place for a humanoid character. Put it on the entity with the animator; bones come from the skeleton's humanoid map (character_inspect shows it).
+
+| Field | Type | Description | Values |
+|---|---|---|---|
+| `feet` | boolean | Plant the feet on the ground under them every tick |  |
+| `feetWeight` | number | 0 = animation only .. 1 = fully planted | 0 .. 1 |
+| `stepHeight` | number | Meters a foot may reach up or down to find ground (stairs: 0.3-0.5) | 0.01 .. 2 |
+| `footHeight` | number | Ankle height above the sole in meters; -1 = measured from the rest pose | -1 .. 0.5 |
+| `pelvis` | boolean | Lower the hips so the lower foot reaches its ground (uneven ground, stairs) |  |
+| `alignFeet` | boolean | Pitch and roll the feet onto the ground's slope |  |
+| `maxSlope` | number | Steeper ground aligns the feet only this far (degrees) | 0 .. 80 |
+| `contact` | string | When a foot is in contact and locks to its spot (no sliding): auto = low and slow, velocity = slow, events = animation events foot_l_down / foot_l_up / foot_r_down / foot_r_up, always, never | `auto` `velocity` `events` `always` `never` |
+| `lockSpeed` | number | A foot slower than this (m/s) counts as planted | 0 .. 5 |
+| `lockDistance` | number | A locked foot re-plants with a quick step once the animation pulls it this far (m) | 0.02 .. 2 |
+| `smoothing` | number | How fast the pelvis and feet follow the ground (1/s; higher = snappier) | 0.5 .. 60 |
+| `leftHand` | object \| string \| integer \| null | The left hand reaches this entity: a grip point on a staff held in the right hand, a ledge, a rail — entity link: name ("Door"), "#id", {"id": 12} or null; read back as {"id", "name"} (follows renames; entity_refs lists links) |  |
+| `leftHandWeight` | number | Blend of the left-hand target (animate it for grabs) | 0 .. 1 |
+| `rightHand` | object \| string \| integer \| null | The right hand reaches this entity — entity link: name ("Door"), "#id", {"id": 12} or null; read back as {"id", "name"} (follows renames; entity_refs lists links) |  |
+| `rightHandWeight` | number | Blend of the right-hand target | 0 .. 1 |
+| `handRotation` | boolean | Also orient the hands like their target entities |  |
+| `turnSpeed` | number | Turn-in-place rate in degrees per second (turn_in_place) | 1 .. 2000 |
+
+=== "Tool call"
+
+    ```tool
+    entity_update {"entity": "Crate", "components": {"characterIk": {}}}
+    ```
+
+=== "Wander"
+
+    ```text
+    self.characterIk.feet          -- read or write any field
     ```
 
 ## `attach` { #attach }

@@ -3,6 +3,9 @@
 #include <algorithm>
 #include <cmath>
 
+#include "AnimationSystemInternal.h"
+#include "skywalker/anim/Retarget.h"
+
 #include "skywalker/core/Log.h"
 #include "skywalker/core/Strings.h"
 #include "skywalker/render/Gltf.h"
@@ -88,61 +91,6 @@ std::vector<int> lookChain(const Skeleton& sk) {
 
 }  // namespace
 
-struct AnimationSystem::Instance {
-    std::string signature;
-    std::shared_ptr<const Library> lib;
-    std::shared_ptr<const ControllerDef> ctl;
-    AnimatorRuntime rt;
-    std::string error;
-    bool rootMotion = false;
-
-    // The first rigged mesh under the animator: where the skeleton sits in the world.
-    uint64_t bindRevision = ~0ull, bindGeneration = 0;
-    EntityId meshEntity = kNoEntity;
-    std::string meshKey, libraryFromMesh;
-    Mat4 transform;  // the mesh's glTF -> mesh space transform
-
-    Pose pose;
-    std::vector<Mat4> globals;
-    std::vector<Mat4> prevGlobals;  // the pose of the tick before (render interpolation)
-    uint64_t version = 0;
-    bool posed = false;
-    std::string editKey;
-    uint64_t paramsVersion = 0;
-    float editClock = 0.f;
-
-    struct SkinEntry {
-        const MeshData* mesh = nullptr;
-        std::vector<int> map;
-        uint64_t version = ~0ull;
-        SkinPose pose;
-        std::shared_ptr<MeshData> posed;
-        uint64_t posedVersion = ~0ull;
-        SkinPose blended;  // between the previous tick's pose and the last one (render interpolation)
-        uint64_t blendedVersion = ~0ull;
-        float blendedAlpha = -1.f;
-    };
-    std::unordered_map<std::string, SkinEntry> skins;
-
-    std::vector<int> lookChain;
-    std::vector<Mat4> restGlobals;     // skeleton rest pose (look-at reference)
-    float lookBlend = 0.f;
-    std::optional<Vec3> lookTarget;    // last aim point (world): lets the turn fade out when lookAt clears
-    Vec3 lastRootMotion{0, 0, 0};
-    std::vector<std::string> recentEvents;
-    std::optional<std::pair<std::string, float>> preview;     // tool preview: (state or clip, seconds)
-    std::optional<std::pair<std::string, float>> seqPreview;  // sequencer animation track, this frame only
-};
-
-struct AnimationSystem::SeqInstance {
-    std::string signature;
-    std::shared_ptr<const SequenceDef> def;
-    std::string error;
-    bool started = false;
-    bool playing = false;
-    float time = 0.f;
-};
-
 AnimationSystem::AnimationSystem(Scene& scene) : scene_(scene) {}
 AnimationSystem::~AnimationSystem() = default;
 
@@ -171,6 +119,7 @@ void AnimationSystem::invalidate(const std::string& path) {
         }
     }
     retargeted_.clear();
+    retargetSetups_.clear();
     ++assetGeneration_;
 }
 
@@ -235,21 +184,65 @@ Result<std::shared_ptr<const SequenceDef>> AnimationSystem::sequence(const std::
     return it->second.first;
 }
 
-std::shared_ptr<const Clip> AnimationSystem::resolveClip(const std::shared_ptr<const Library>& lib, const std::string& ref) {
+std::string AnimationSystem::retargetMethod(const Library& src, const Library& dst, const std::string& mode) {
+    if (src.skeleton.names() == dst.skeleton.names()) return "same";
+    if (mode == "name") return "name";
+    if (mode == "pose") return "pose";
+    // auto: rigs of one family (every humanoid slot of the target found by name in the source) keep
+    // the name mapping; different rigs go through pose space when both are humanoids.
+    HumanoidMap tm = detectHumanoid(dst.skeleton);
+    if (!tm.retargetable()) return "name";
+    bool allByName = true;
+    for (size_t i = 0; i < kHumanBones && allByName; ++i) {
+        int b = tm.bones[i];
+        if (b >= 0 && src.skeleton.find(dst.skeleton.bones[static_cast<size_t>(b)].name) < 0) allByName = false;
+    }
+    if (allByName) return "name";
+    return detectHumanoid(src.skeleton).retargetable() ? "pose" : "name";
+}
+
+Result<std::shared_ptr<const RetargetSetup>> AnimationSystem::retargetSetup(const std::shared_ptr<const Library>& src,
+                                                                            const std::shared_ptr<const Library>& dst) {
+    std::string key = std::to_string(reinterpret_cast<uintptr_t>(src.get())) + ">" + std::to_string(reinterpret_cast<uintptr_t>(dst.get()));
+    auto it = retargetSetups_.find(key);
+    if (it == retargetSetups_.end()) {
+        auto r = prepareRetarget(src->skeleton, src->rootBone, dst->skeleton, dst->rootBone);
+        std::shared_ptr<const RetargetSetup> setup = r ? std::make_shared<const RetargetSetup>(std::move(*r)) : nullptr;
+        it = retargetSetups_.emplace(key, std::make_pair(setup, r ? std::string() : r.error().message)).first;
+    }
+    if (!it->second.first) return Error::make("not_humanoid", it->second.second, "animation_retarget {preview: true} shows the bone maps");
+    return it->second.first;
+}
+
+std::shared_ptr<const Clip> AnimationSystem::resolveClip(const std::shared_ptr<const Library>& lib, const std::string& refIn,
+                                                         const std::string& mode, const std::string& fallbackLibrary) {
     if (!lib) return nullptr;
+    std::string ref = refIn;
     size_t hash = ref.rfind('#');
+    if ((hash == std::string::npos || hash == 0) && !lib->clip(ref) && !fallbackLibrary.empty()) {
+        ref = fallbackLibrary + "#" + ref;  // Animator::retargetFrom: a shared clip pack
+        hash = ref.rfind('#');
+    }
     if (hash != std::string::npos && hash > 0) {
         std::string file = ref.substr(0, hash), name = ref.substr(hash + 1);
-        std::string key = std::to_string(reinterpret_cast<uintptr_t>(lib.get())) + "|" + ref;
+        std::string key = std::to_string(reinterpret_cast<uintptr_t>(lib.get())) + "|" + mode + "|" + ref;
         if (auto it = retargeted_.find(key); it != retargeted_.end()) return it->second;
         auto other = library(file);
         std::shared_ptr<const Clip> out;
         if (other) {
             const Library& src = **other;
             if (const Clip* c = src.clip(name)) {
-                if (src.skeleton.names() == lib->skeleton.names()) {
+                std::string method = retargetMethod(src, *lib, mode);
+                if (method == "same") {
                     out = std::shared_ptr<const Clip>(*other, c);  // same rig: no retargeting needed
-                } else {
+                } else if (method == "pose") {
+                    if (auto setup = retargetSetup(*other, lib)) {
+                        out = std::make_shared<Clip>(retargetClipPose(**setup, src.skeleton, *c, lib->skeleton));
+                    } else {
+                        warnOnce("retarget:" + file, "pose-space retargeting " + file + ": " + setup.error().message + " (falling back to bone names)");
+                    }
+                }
+                if (!out && method != "same") {
                     auto rc = std::make_shared<Clip>();
                     if (retarget(*c, src.skeleton, lib->skeleton, *rc) > 0) out = rc;
                 }
@@ -336,15 +329,17 @@ AnimationSystem::Instance* AnimationSystem::instance(EntityId e) {
     Instance& inst = *slot;
     if (inst.bindRevision != scene_.revision() || inst.bindGeneration != assetGeneration_) bindMesh(inst, e);
     std::string signature = a->library + "|" + a->controller + "|" + a->clip + "|" + (a->loop ? "1" : "0") + "|" +
-                            inst.libraryFromMesh + "|" + std::to_string(assetGeneration_);
+                            inst.libraryFromMesh + "|" + a->retargetFrom + "|" + a->retarget + "|" + std::to_string(assetGeneration_);
     if (signature != inst.signature) {
         inst.signature = signature;
         initRuntime(inst, *a);
     }
-    if (inst.lib && inst.rootMotion != a->rootMotion) {
-        inst.rootMotion = a->rootMotion;
+    const bool pin = a->rootMotion || a->inPlace;
+    const int rootMode = (pin ? 2 : 0) + (pin && a->rootYaw ? 1 : 0);
+    if (inst.lib && inst.rootMode != rootMode) {
+        inst.rootMode = rootMode;
         Vec3 up = normalize(inst.transform.inverse().transformDir({0, 1, 0}));
-        inst.rt.setRootMotion(a->rootMotion, up);
+        inst.rt.setRootMotion(pin, up, a->rootYaw);
     }
     return &inst;
 }
@@ -360,7 +355,11 @@ void AnimationSystem::initRuntime(Instance& inst, const Animator& a) {
     inst.lookChain.clear();
     inst.restGlobals.clear();
     inst.lookTarget.reset();
-    inst.rootMotion = false;
+    inst.rootMode = -1;
+    inst.humanoid.reset();
+    inst.capsules.clear();
+    inst.feet = FootIkState{};
+    inst.ikStatus = Json();
     ++inst.version;
 
     std::shared_ptr<const ControllerDef> ctl;
@@ -385,19 +384,36 @@ void AnimationSystem::initRuntime(Instance& inst, const Animator& a) {
         return;
     }
     inst.lib = *lib;
+    std::shared_ptr<const Library> fallback;
+    if (!a.retargetFrom.empty()) {
+        if (auto f = library(a.retargetFrom)) {
+            fallback = *f;
+        } else {
+            warnOnce("retargetFrom:" + a.retargetFrom, "animator retargetFrom " + a.retargetFrom + ": " + f.error().message);
+        }
+    }
     if (!ctl) {
         std::string clip = a.clip;
-        if (!clip.empty() && !inst.lib->clip(clip) && clip.find('#') == std::string::npos) {
+        const bool inFallback = fallback && fallback->clip(clip);
+        if (!clip.empty() && !inst.lib->clip(clip) && clip.find('#') == std::string::npos && !inFallback) {
             warnOnce("clip:" + libRef + clip, "animator clip \"" + clip + "\" is not in " + libRef);
             clip.clear();
         }
         std::vector<std::string> names = inst.lib->clipNames();
+        if (fallback) {  // a shared clip pack: its clips play too (retargeted)
+            for (const auto& n : fallback->clipNames()) {
+                if (!inst.lib->clip(n)) names.push_back(n);
+            }
+            if (clip.empty() && inst.lib->clips.empty() && !fallback->clips.empty()) clip = fallback->clips.front().name;
+        }
         if (!clip.empty() && std::find(names.begin(), names.end(), clip) == names.end()) names.push_back(clip);
         ctl = std::make_shared<ControllerDef>(simpleController(names, clip, a.loop));
     }
     inst.ctl = ctl;
     std::shared_ptr<const Library> libPtr = inst.lib;
-    if (Status s = inst.rt.init(libPtr, ctl, [this, libPtr](const std::string& ref) { return resolveClip(libPtr, ref); }); !s) {
+    const std::string mode = a.retarget, from = fallback ? a.retargetFrom : std::string();
+    if (Status s = inst.rt.init(libPtr, ctl, [this, libPtr, mode, from](const std::string& ref) { return resolveClip(libPtr, ref, mode, from); });
+        !s) {
         inst.error = s.error().message;
         inst.lib.reset();
         return;
@@ -409,6 +425,22 @@ void AnimationSystem::initRuntime(Instance& inst, const Animator& a) {
 Mat4 AnimationSystem::modelToWorld(const Instance& inst, EntityId e) const {
     if (inst.meshEntity && scene_.exists(inst.meshEntity)) return scene_.worldMatrix(inst.meshEntity) * inst.transform;
     return scene_.worldMatrix(e);
+}
+
+void AnimationSystem::applyRootYaw(const Instance& inst, EntityId e, float yaw) {
+    Transform* t = scene_.get<Transform>(e);
+    if (!t) return;
+    // Turn about the character's up axis as seen in the world (the mesh's +Y: world up when upright).
+    EntityId upright = inst.meshEntity && scene_.exists(inst.meshEntity) ? inst.meshEntity : e;
+    Vec3 upWorld = scene_.worldMatrix(upright).transformDir({0, 1, 0});
+    upWorld = length(upWorld) > 1e-6f ? normalize(upWorld) : Vec3{0, 1, 0};
+    const EntityRecord* rec = scene_.record(e);
+    Mat4 parentInv = rec && rec->parent ? scene_.worldMatrix(rec->parent).inverse() : Mat4{};
+    Vec3 axis = normalize(parentInv.transformDir(upWorld));
+    Quat local = Quat::fromEulerDeg(t->rotation);
+    Quat turned = (Quat::axisAngle(axis, yaw) * local).normalized();
+    t->rotation = eulerDegFromQuat(turned);
+    scene_.markDirty();
 }
 
 void AnimationSystem::applyLookAt(Instance& inst, EntityId e, const Animator& a) {
@@ -527,6 +559,7 @@ void AnimationSystem::applyIk(Instance& inst, EntityId e) {
 void AnimationSystem::finishPose(Instance& inst, EntityId e, const Animator& a) {
     inst.rt.evaluate(inst.pose);
     applyLookAt(inst, e, a);
+    applyCharacterIk(inst, e);  // feet, pelvis and hand targets (characterIk component)
     applyIk(inst, e);
     computeGlobals(inst.lib->skeleton, inst.pose, inst.globals);
     inst.posed = true;
@@ -546,6 +579,16 @@ void AnimationSystem::poseEditing(Instance& inst, EntityId e, const Animator& a)
             key += "|" + std::to_string(p.x) + "," + std::to_string(p.y) + "," + std::to_string(p.z);
         }
         Vec3 me = scene_.worldMatrix(e).translation();
+        key += "|" + std::to_string(me.x) + "," + std::to_string(me.y) + "," + std::to_string(me.z);
+    }
+    if (const CharacterIk* cik = scene_.get<CharacterIk>(e)) {  // foot / hand IK settings and targets re-pose
+        key += "|cik" + reflect::toJson(cik, CharacterIk::type()).dump();
+        for (const EntityLink* l : {&cik->leftHand, &cik->rightHand}) {
+            if (EntityId t = l->empty() ? kNoEntity : scene_.resolve(*l, e)) {
+                for (float v : scene_.worldMatrix(t).m) key += "," + std::to_string(v);
+            }
+        }
+        Vec3 me = scene_.worldMatrix(e).translation();  // the ground under the feet changes as it moves
         key += "|" + std::to_string(me.x) + "," + std::to_string(me.y) + "," + std::to_string(me.z);
     }
     if (const std::vector<EntityId>* effectors = ikEffectors(e)) {  // moving an IK target re-poses
@@ -649,15 +692,21 @@ void AnimationSystem::tick(float baseDt) {
             }
             const float dt = baseDt * (process ? process->scale(e) : 1.f);
             if (inst->posed) inst->prevGlobals = inst->globals;
+            updateTurn(*inst, e, dt);  // turn_in_place: rotate toward the target, feed `turn` / `turning`
             std::vector<AnimatorRuntime::Event> events;
             Vec3 delta{0, 0, 0};
-            inst->rt.update(dt * a->speed, &events, a->rootMotion ? &delta : nullptr);
+            float yaw = 0.f;
+            inst->rt.update(dt * a->speed, &events, a->rootMotion ? &delta : nullptr, a->rootMotion && a->rootYaw ? &yaw : nullptr);
             for (const auto& ev : events) {
+                // Foot contact markers (characterIk.contact = events).
+                if (ev.name == "foot_l_down" || ev.name == "foot_l_up") inst->feet.feet[0].eventContact = ev.name == "foot_l_down";
+                if (ev.name == "foot_r_down" || ev.name == "foot_r_up") inst->feet.feet[1].eventContact = ev.name == "foot_r_down";
                 if (hooks.emit) hooks.emit("anim:" + ev.name, e);
                 inst->recentEvents.push_back(ev.name);
                 if (inst->recentEvents.size() > kRecentEvents) inst->recentEvents.erase(inst->recentEvents.begin());
             }
             inst->lastRootMotion = {0, 0, 0};
+            inst->lastRootYaw = yaw;
             if (a->rootMotion && length(delta) > 0.f) {
                 Vec3 world = modelToWorld(*inst, e).transformDir(delta);
                 inst->lastRootMotion = world;
@@ -670,10 +719,13 @@ void AnimationSystem::tick(float baseDt) {
                     }
                 }
             }
+            if (std::fabs(yaw) > 1e-7f) applyRootYaw(*inst, e, yaw);
             const bool looking = !a->lookAt.empty() && scene_.resolve(a->lookAt, e) != kNoEntity;
             float goal = looking ? std::clamp(a->lookAtWeight, 0.f, 1.f) : 0.f;  // turns fade in and out
             inst->lookBlend += (goal - inst->lookBlend) * std::min(1.f, dt * kLookRate);
+            inst->tickDt = dt;  // foot IK smoothing and contact locking advance with the simulation
             finishPose(*inst, e, *a);
+            inst->tickDt = 0.f;
         }
     }
     // 3. Bone attachments
@@ -930,6 +982,7 @@ Result<Json> AnimationSystem::describe(EntityId e) {
         j["recentEvents"] = ev;
     }
     if (length(inst->lastRootMotion) > 0.f) j["rootMotion"] = reflect::vec3ToJson(inst->lastRootMotion);
+    if (std::fabs(inst->lastRootYaw) > 1e-7f) j["rootYawDeg"] = std::round(degrees(inst->lastRootYaw) * 1000.f) / 1000.f;
     if (!inst->error.empty()) j["warning"] = inst->error;
     return j;
 }

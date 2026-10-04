@@ -162,6 +162,7 @@ nav:
           - Water: manual/world/water.md
           - Foliage: manual/world/foliage.md
       - Characters and effects:
+          - Characters: manual/characters.md
           - Hair and fur: manual/hair.md
           - Visual effects: manual/vfx.md
           - Animation: manual/animation.md

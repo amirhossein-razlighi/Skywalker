@@ -90,7 +90,9 @@ TEST_CASE("hair: groom generation is deterministic, counted and masked") {
         CHECK(c.guide[0] < 60u);
         CHECK(c.lengthScale <= 1.f);
     }
-    CHECK(maxAngle < 70.f + g.maskSoftness);
+    // The mask reads the interpolated surface normal; on a coarse sphere it differs from the root's position
+    // direction by up to a degree.
+    CHECK(maxAngle < 70.f + g.maskSoftness + 1.f);
 
     // A different seed gives a different head of the same style.
     Groom g2 = g;
@@ -340,6 +342,7 @@ TEST_CASE("vfx & hair: presets are valid components") {
         REQUIRE(scene.patchComponent(e, "groom", fx::groomPreset(name)));
         Groom g = *scene.get<Groom>(e);
         g.strands = 500;  // keep the test fast
+        g.maskRadius = {0, 0, 0};  // face presets (beard, eyebrows) target a character's head region
         auto d = fx::generateGroom(g, &sphere);
         CHECK(d);
     }

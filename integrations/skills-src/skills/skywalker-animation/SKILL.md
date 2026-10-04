@@ -1,6 +1,6 @@
 ---
 name: skywalker-animation
-description: Animate characters and direct cinematics in Skywalker - import rigged glTF, animator state machines and blend trees, driving them from Wander, bone attachments (weapons, hats), look-at and two-bone IK, and sequences with keyed properties, camera shots and cuts, storyboard scrubs, and final movie renders to MP4/ProRes/PNG with motion blur (movie_render). Use for walking/idle/jump characters, held props, hand-on-handle reaches, cutscenes, trailers and films.
+description: Animate characters and direct cinematics in Skywalker - import rigged glTF, animator state machines and blend trees, driving them from Wander, bone attachments (weapons, hats), look-at and two-bone IK, humanoid characters (bone maps, pose-space retargeting between rigs, root yaw, automatic foot planting on stairs and slopes, hand grips on props and ledges, directional strafing blends, turn in place), and sequences with keyed properties, camera shots and cuts, storyboard scrubs, and final movie renders to MP4/ProRes/PNG with motion blur (movie_render). Use for walking/idle/jump characters, held props, hand-on-handle reaches, cutscenes, trailers and films.
 ---
 
 # Animation and sequences
@@ -19,7 +19,8 @@ stopping the simulation resets them.
 | `ik` component | Two-bone effector: a hand or foot reaches this entity |
 | `*.sequence.json` + `sequencer` component | A cinematic timeline played in the simulation, previewable while editing |
 
-Clips are shared between rigs **by bone name**; only the hips keep translation when retargeting. No morph targets (blend shapes) yet.
+Clips from another rig are retargeted (by name for identical rigs, in pose space otherwise: see Workflow D). No morph targets (blend shapes) yet.
+Humanoid characters (retargeting, foot and hand IK, turning, hair on skin): engine doc `skywalker://docs/CHARACTERS`.
 
 ## Workflow A: import a character and make it walk
 
@@ -51,14 +52,14 @@ sim_control {action:"stop"}
 - `animator_set` while **editing** only previews (nothing is saved, parameters set then are preview-only); while **playing** it acts live like `set_param` / `trigger` / `play_animation`.
   `play` crossfades to a state, or to any clip as a one-shot that returns to the default state; replaying the current state is a no-op, so calling it every tick is safe.
 - Animation events (controller `events`, clip events) reach Wander as `on anim "footstep"` on the next tick.
-- Root motion is the hips' horizontal movement only (no yaw). With a physics `character` it becomes that controller's desired velocity (collides, climbs steps); otherwise it moves the Transform.
+- Root motion is the hips' horizontal movement; `rootYaw:true` also turns the entity by the clip's root rotation, `inPlace:true` plays locomotion on the spot. With a physics `character` it becomes that controller's desired velocity (collides, climbs steps); otherwise it moves the Transform.
 
 ### Characters and clip libraries from different files
 
 When the character and its animations come from different glTF files (a base mesh plus a shared clip library), set the
 animator's `library` to the **character's own** `.anim` (written at import, next to the mesh) and name every clip with its
-library: `"anims/ual1.anim#Walk_Loop"`. Clips are then retargeted onto the character's skeleton by bone name (rotations, plus
-the hips translation scaled to its proportions), so each body keeps its own bone lengths. Using the clip library's skeleton
+library: `"anims/ual1.anim#Walk_Loop"` (or set `animator.retargetFrom` to the clip library and use bare clip names). Clips are then
+retargeted onto the character's skeleton (by name when the rigs share bone names, else in pose space), so each body keeps its own bone lengths. Using the clip library's skeleton
 as the animator library instead poses the mesh with the *other* rig's proportions (stretched necks, sunk hips). A rig
 re-exported by a DCC must keep the source's root and hips frames (exporters sometimes fold a root rotation into the hips).
 
@@ -74,7 +75,25 @@ bone_ik {character:"Knight", bone:"RightFoot", position:[0.2,0.3,-0.4], pole:[0,
 - `animation_list {entity, bones:true}` lists the bones first; a bad name returns did-you-mean.
 - `bone_attach` parents the prop under the character (disable with `parent:false`); it follows the bone every tick and in the editor preview, and the attachment is never baked into the file.
 - IK: `pole` is the bend direction in the character's space (knees `[0,0,-1]`, elbows usually `[0,0,1]`); out-of-reach targets straighten the limb. Animate a reach by keying the effector's `transform.position` with `sequence_key`.
-  No automatic foot planting: raycast from Wander and move the foot effectors yourself.
+  For feet on stairs and slopes and hands on held props use `character_ik` (Workflow D) instead of hand-placed effectors.
+
+## Workflow D: humanoid characters (retarget, foot and hand IK, strafing, turning)
+
+```text
+character_inspect {entity:"Knight"}                                              # humanoid map (mixamo / suffixed / generic), clips with rootSpeed and rootTurn, IK status, parts, grooms
+animation_retarget {source:"anims/pack.anim", target:"Knight", preview:true}     # both bone maps + alignment; fix slots with target_map {leftHand:"L_Wrist"}
+animation_retarget {source:"anims/pack.anim", target:"Knight", clips:["Walk_Loop","Idle_Loop"]}   # bakes <target>_<source>.anim; per-clip stretch ~0 = correct
+character_ik {entity:"Knight", feet:true, step_height:0.4}                       # feet plant on stairs / slopes, pelvis drops, feet align, contacts lock
+character_ik {entity:"Monk", left_hand:"Staff Grip"}                             # two-handed staff: a child entity on the staff held by the right hand
+character_ik {entity:"Knight", turn_to:"Door"}                                   # turn in place (yaw degrees, entity or point)
+animator_setup {entity:"Knight", preset:"directional"}                           # moveX / moveY (m/s) polar blend of idle, forward, back, left, right, diagonals
+viewport_capture {eye:[2,1.2,3], target:[0,0.6,0], debug_view:"ik_targets", samples:1}
+```
+
+- Retargeting works in pose space: different bone names, axes and rest poses (T vs A pose) line up; the hips move by the source motion scaled by leg length. `retargetable:false` in `character_inspect` names the missing slots.
+- Foot contact: `contact:"auto"` (low and slow feet lock), `"events"` (clip events `foot_l_down`, `foot_l_up`, `foot_r_down`, `foot_r_up`), `"velocity"`, `"always"`, `"never"`. `character_inspect` shows each foot's offset, lock and the pelvis drop; hands report `error` (m) when out of reach.
+- Wander: `foot_ik(self, on, weight?)`, `hand_ik(self, "left", find("Staff Grip"), 1)` (`none` releases), `turn_in_place(self, yaw_or_point)`, `look_at(self, target, weight?)`.
+- Debug views: `skeleton`, `ik_targets`, `groom_roots`, `sss_mask`. Costs: `perf_stats {frames:30, characters:true}`.
 
 ## Workflow B: a cutscene
 
@@ -127,7 +146,7 @@ movie_render {action:"status"}
 
 ## Wander builtins
 
-`set_param(e, name, value)`, `trigger(e, name)`, `play_animation(e, name, fade?, loop?)`, `anim_state(e)`, `play_sequence(e, from?)`; fields are also properties: `self.animator.speed = 0.5`, `self.animator.lookAt = "Player"`.
+`set_param(e, name, value)`, `trigger(e, name)`, `play_animation(e, name, fade?, loop?)`, `anim_state(e)`, `play_sequence(e, from?)`, `foot_ik(e, on, weight?)`, `hand_ik(e, side, target, weight?)`, `turn_in_place(e, yaw_or_point)`, `look_at(e, target, weight?)`; fields are also properties: `self.animator.speed = 0.5`, `self.animator.lookAt = "Player"`.
 
 ## Verification loop
 
@@ -142,6 +161,7 @@ movie_render {action:"status"}
 - Wander `set_param` every tick overrides your manual `animator_set` value on the same tick.
 - `no animation library` error: the character has no rigged mesh below it; import the model first or pass `library` to `animator_setup`.
 - Animator lives on the root; skinned parts must be descendants of that entity.
-- Sliding feet: set `speed` to the real velocity (`rootSpeed` from `animation_list`), or use `root_motion`.
+- Sliding feet: set `speed` to the real velocity (`rootSpeed` from `animation_list`), or use `root_motion`. Feet through stairs or floating on slopes: `character_ik {feet:true}`.
+- Stretched necks or sunk hips on a borrowed clip: the clip was played with the wrong skeleton; retarget it (`animation_retarget` or `animator.retargetFrom`).
 - A sequence shot with `cut:false` does not become the live camera; add a `camera_cuts` key or leave `cut` at its default.
 - Mixamo-style names (`mixamorig:Hips`) are fine; clip names are cleaned (`Armature|Walk` becomes `Walk`).

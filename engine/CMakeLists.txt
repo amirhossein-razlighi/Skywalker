@@ -187,6 +187,16 @@ set(SKY_ENGINE_SOURCES
     src/render/ReflectionProbes.cpp
     src/agent/ProbeTools.cpp
     src/engine/ProbeBuiltins.cpp
+    # Character tech: humanoid maps, pose-space retargeting, foot / hand IK, skinned grooms (docs/CHARACTERS.md)
+    src/anim/HumanoidMap.cpp
+    src/anim/Retarget.cpp
+    src/anim/CharacterIk.cpp
+    src/ecs/CharacterComponents.cpp
+    src/engine/CharacterHooks.cpp
+    src/fx/GroomBinding.cpp
+    src/anim/BodyColliders.cpp
+    src/engine/CharacterBuiltins.cpp
+    src/agent/CharacterTools.cpp
 )
 
 # DCC bridge: the Python helper library and the Blender add-on are embedded so the engine can
@@ -317,7 +327,7 @@ if(SKY_HAS_METAL)
     # by agents and does not require the offline Metal toolchain).
     # The standard shader library is several modules concatenated in dependency order.
     set(_shader_dir ${CMAKE_CURRENT_SOURCE_DIR}/platform/metal/shaders)
-    set(_shader_modules Common.metal Debug.metal Shadows.metal Clouds.metal Sky.metal Probes.metal Surface.metal Terrain.metal Lighting.metal Effects.metal Post.metal GpuParticles.metal Hair.metal)
+    set(_shader_modules Common.metal Debug.metal Shadows.metal Clouds.metal Sky.metal Probes.metal Characters.metal Surface.metal Terrain.metal Lighting.metal Effects.metal Post.metal GpuParticles.metal Hair.metal)
     list(TRANSFORM _shader_modules PREPEND ${_shader_dir}/ OUTPUT_VARIABLE _shader_src)
     string(REPLACE ";" "," _shader_list "${_shader_modules}")
     set(_shader_inc ${CMAKE_CURRENT_BINARY_DIR}/generated/ShaderSource.inc)

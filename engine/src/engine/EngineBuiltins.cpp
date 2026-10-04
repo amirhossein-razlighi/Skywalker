@@ -15,6 +15,7 @@ namespace sky {
 void registerRenderLayerBuiltins(wander::BuiltinRegistry& reg);  // RenderBuiltins.cpp: layer_mask
 void registerProbeBuiltins(wander::BuiltinRegistry& reg);  // ProbeBuiltins.cpp: probe_bake
 void registerVehicleBuiltins(wander::BuiltinRegistry& reg);      // VehicleBuiltins.cpp: vehicle_*
+void registerCharacterBuiltins(wander::BuiltinRegistry& reg);  // CharacterBuiltins.cpp: hand_ik, foot_ik, turn_in_place, look_at
 
 namespace {
 
@@ -168,6 +169,7 @@ void registerEngineBuiltins() {
         registerRenderLayerBuiltins(reg);  // render layers (RenderBuiltins.cpp)
         registerProbeBuiltins(reg);  // reflection probes (ProbeBuiltins.cpp)
         registerVehicleBuiltins(reg);      // vehicles (VehicleBuiltins.cpp)
+        registerCharacterBuiltins(reg);  // character IK and turning (CharacterBuiltins.cpp)
     });
 }
 

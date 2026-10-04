@@ -7,7 +7,7 @@ title: "Animation tools"
 
 Skeletal animation, controllers, IK, bone attachments and cinematic sequences.
 
-12 tools in the `animation` category. Badges: **read-only** tools never change the project; **mutating** tools are undoable and attributed; **open-world** tools reach outside the engine and MCP clients ask before running them.
+15 tools in the `animation` category. Badges: **read-only** tools never change the project; **mutating** tools are undoable and attributed; **open-world** tools reach outside the engine and MCP clients ask before running them.
 
 | Tool | Summary |
 |---|---|
@@ -23,6 +23,9 @@ Skeletal animation, controllers, IK, bone attachments and cinematic sequences.
 | [`sequence_get`](#sequence_get) | A sequence's tracks (type, entity, property, key count and time span) and length; with `time`, the evaluated property values and live camera at that moment. |
 | [`sequence_play`](#sequence_play) | Play or stop a sequence. |
 | [`sequence_scrub`](#sequence_scrub) | Look at a sequence at any time without playing: renders through the sequence's live camera (cuts and shots) with every keyed property and animation applied, then restores the scene. |
+| [`character_inspect`](#character_inspect) | Everything about a character's animation and look in one call: the humanoid bone map of its skeleton (slots like hips, leftHand, rightFoot with the bone names found, convention mixamo / suffixed / generic, missing slots), key bone positions in the world, clips with their root speed (m/s) and root turn (degrees per cycle), root motion / in-place / root yaw settings, retargeting (retargetFrom and how its clips map), foot and hand IK status of the last solve (contact, locked, ground offset, slope, pelvis drop, hand reach error), hair and fur attachment (follows the skin?, bound roots, colliders), and the material model of every mesh part (skin, eye, cloth, hair_card, pbr). |
+| [`character_ik`](#character_ik) | Set up automatic foot IK, hand targets and turning for a humanoid character (adds or updates its characterIk component; undoable). |
+| [`animation_retarget`](#animation_retarget) | Retarget clips from one humanoid rig to another in pose space and save them as a new library (.anim) on the target's skeleton: different bone names (mixamo / suffixed like thigh_l / generic, detected by name and topology), rest poses (T-pose vs A-pose), bone axes and proportions (the hips move by the source motion scaled by the leg-length ratio; bones keep their own lengths, so nothing stretches). |
 
 ### `animation_list` { #animation_list }
 
@@ -68,13 +71,13 @@ Skeleton and clips of a rigged model or animated character. With `entity`: its a
 
 **Set up animator** <span class="sky-badge sky-badge--mut" title="Changes the project; undoable and attributed">mutating</span>
 
-Create a state machine controller (*.animctl.json) for a character and assign it. preset=locomotion (default) finds idle/walk/run/jump clips by name and builds: parameter `speed` (m/s) driving a 1D blend Idle -> Walk -> Run whose thresholds are the clips' real root speeds (feet don't slide when you set speed to the actual velocity), and if there is a jump clip a `jump` trigger with Jump -> back to locomotion. preset=clips: one state per clip, no transitions (drive with play_animation). Override clip choices with `clips` ({"idle": "Breathe", "run": "Sprint"}), or pass a full `controller` document (parameters, layers with states/blend/blend2d, transitions with "when" conditions like "speed > 0.1 and grounded", exit times, events, masks) — it is validated with did-you-mean errors. Then drive it from Wander: set_param(self, "speed", v), trigger(self, "jump"), play_animation(self, "Wave").
+Create a state machine controller (*.animctl.json) for a character and assign it. preset=locomotion (default) finds idle/walk/run/jump clips by name and builds: parameter `speed` (m/s) driving a 1D blend Idle -> Walk -> Run whose thresholds are the clips' real root speeds (feet don't slide when you set speed to the actual velocity), and if there is a jump clip a `jump` trigger with Jump -> back to locomotion. preset=clips: one state per clip, no transitions (drive with play_animation). preset=directional: a polar 2D blend space for strafing characters: parameters `moveX` (right) and `moveY` (forward) in m/s drive idle, forward, back, left, right and diagonal clips placed at their measured root velocities (direction and speed blend separately: no slowdown or foot sliding between directions). Override clip choices with `clips` ({"idle": "Breathe", "run": "Sprint"}), or pass a full `controller` document (parameters, layers with states/blend/blend2d, transitions with "when" conditions like "speed > 0.1 and grounded", exit times, events, masks) — it is validated with did-you-mean errors. Then drive it from Wander: set_param(self, "speed", v), trigger(self, "jump"), play_animation(self, "Wave").
 
 | Argument | Type | Required | Description | Values |
 |---|---|---|---|---|
 | `entity` | integer \| string | yes | The character |  |
-| `preset` | string |  | Generated controller (default locomotion) | `locomotion` `clips` |
-| `clips` | object |  | Clip choice overrides: idle, walk, run, jump |  |
+| `preset` | string |  | Generated controller (default locomotion) | `locomotion` `clips` `directional` |
+| `clips` | object |  | Clip choice overrides: idle, walk, run, jump; directional: idle, forward, back, left, right, forward_left, forward_right, back_left, back_right |  |
 | `controller` | object |  | A full controller document instead of a preset |  |
 | `path` | string |  | Where to save the controller (default: next to the library, &lt;name&gt;.animctl.json) |  |
 | `library` | string |  | Animation library (.anim) if the character has none yet |  |
@@ -83,13 +86,13 @@ Create a state machine controller (*.animctl.json) for a character and assign it
 === "Tool call"
 
     ```tool
-    animator_setup {"entity": "Knight", "root_motion": false}
+    animator_setup {"entity": "Hero", "preset": "directional"}
     ```
 
 === "CLI"
 
     ```bash
-    skywalker call animator_setup '{"entity": "Knight", "root_motion": false}' --project my_game
+    skywalker call animator_setup '{"entity": "Hero", "preset": "directional"}' --project my_game
     ```
 
 === "MCP request"
@@ -102,8 +105,8 @@ Create a state machine controller (*.animctl.json) for a character and assign it
       "params": {
         "name": "animator_setup",
         "arguments": {
-          "entity": "Knight",
-          "root_motion": false
+          "entity": "Hero",
+          "preset": "directional"
         }
       }
     }
@@ -618,6 +621,155 @@ Look at a sequence at any time without playing: renders through the sequence's l
             0,
             2.5,
             5
+          ]
+        }
+      }
+    }
+    ```
+
+### `character_inspect` { #character_inspect }
+
+**Inspect character** <span class="sky-badge sky-badge--ro" title="Never changes the scene">read-only</span>
+
+Everything about a character's animation and look in one call: the humanoid bone map of its skeleton (slots like hips, leftHand, rightFoot with the bone names found, convention mixamo / suffixed / generic, missing slots), key bone positions in the world, clips with their root speed (m/s) and root turn (degrees per cycle), root motion / in-place / root yaw settings, retargeting (retargetFrom and how its clips map), foot and hand IK status of the last solve (contact, locked, ground offset, slope, pelvis drop, hand reach error), hair and fur attachment (follows the skin?, bound roots, colliders), and the material model of every mesh part (skin, eye, cloth, hair_card, pbr). Start here before retargeting, adding IK or grooming a character. Example: {"entity": "Hero"}.
+
+| Argument | Type | Required | Description | Values |
+|---|---|---|---|---|
+| `entity` | integer \| string | yes | The character (or any of its parts) |  |
+| `clips` | boolean |  | Include the clip list (default true) |  |
+
+=== "Tool call"
+
+    ```tool
+    character_inspect {"entity": "Hero"}
+    ```
+
+=== "CLI"
+
+    ```bash
+    skywalker call character_inspect '{"entity": "Hero"}' --project my_game
+    ```
+
+=== "MCP request"
+
+    ```json
+    {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "method": "tools/call",
+      "params": {
+        "name": "character_inspect",
+        "arguments": {
+          "entity": "Hero"
+        }
+      }
+    }
+    ```
+
+### `character_ik` { #character_ik }
+
+**Character foot and hand IK** <span class="sky-badge sky-badge--mut" title="Changes the project; undoable and attributed">mutating</span>
+
+Set up automatic foot IK, hand targets and turning for a humanoid character (adds or updates its characterIk component; undoable). Feet plant on stairs, slopes and rocks under them (ground probes every tick), the pelvis drops so the lower foot reaches, feet pitch / roll onto the slope (max_slope) and lock in place while in contact (contact: auto = low and slow, velocity, events = foot_l_down / foot_l_up / foot_r_down / foot_r_up animation events, always, never), re-planting with a short step once the animation pulls a foot lock_distance away. Hands reach entities: a grip point on a staff held in the other hand (no lag), a ledge, a rail; animate the weights for grabs. turn_to turns a standing character in place (yaw degrees, or an entity / point to face). Returns the solve status. Example: {"entity": "Monk", "feet": true, "left_hand": "Staff Grip"}.
+
+| Argument | Type | Required | Description | Values |
+|---|---|---|---|---|
+| `entity` | integer \| string | yes | The character |  |
+| `feet` | boolean |  | Automatic foot planting (default true when the component is created) |  |
+| `feet_weight` | number |  | 0..1 blend of the foot IK |  |
+| `step_height` | number |  | Meters a foot may reach up or down (stairs: 0.3-0.5) |  |
+| `foot_height` | number |  | Ankle height above the sole in meters (-1 = from the rest pose) |  |
+| `pelvis` | boolean |  | Lower the hips for the lower foot |  |
+| `align_feet` | boolean |  | Tilt the feet onto the slope |  |
+| `max_slope` | number |  | Steepest slope the feet align to (degrees) |  |
+| `contact` | string |  | When a foot locks in place | `auto` `velocity` `events` `always` `never` |
+| `lock_speed` | number |  | m/s below which a foot counts as planted |  |
+| `lock_distance` | number |  | m a locked foot may lag before re-planting |  |
+| `smoothing` | number |  | 1/s: how fast pelvis and feet follow the ground |  |
+| `left_hand` | any |  | Entity the left hand reaches ("" clears) |  |
+| `left_hand_weight` | number |  | 0..1 |  |
+| `right_hand` | any |  | Entity the right hand reaches ("" clears) |  |
+| `right_hand_weight` | number |  | 0..1 |  |
+| `hand_rotation` | boolean |  | Also orient the hands like their targets |  |
+| `turn_speed` | number |  | Turn-in-place rate (degrees per second) |  |
+| `turn_to` | any |  | Turn in place: world yaw in degrees (0 = -Z), or an entity / [x, y, z] point to face |  |
+| `remove` | boolean |  | Remove the characterIk component |  |
+
+=== "Tool call"
+
+    ```tool
+    character_ik {"entity": "Monk", "feet": true, "left_hand": "Staff Grip"}
+    ```
+
+=== "CLI"
+
+    ```bash
+    skywalker call character_ik '{"entity": "Monk", "feet": true, "left_hand": "Staff Grip"}' --project my_game
+    ```
+
+=== "MCP request"
+
+    ```json
+    {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "method": "tools/call",
+      "params": {
+        "name": "character_ik",
+        "arguments": {
+          "entity": "Monk",
+          "feet": true,
+          "left_hand": "Staff Grip"
+        }
+      }
+    }
+    ```
+
+### `animation_retarget` { #animation_retarget }
+
+**Retarget animations** <span class="sky-badge sky-badge--ro" title="Never changes the scene">read-only</span>
+
+Retarget clips from one humanoid rig to another in pose space and save them as a new library (.anim) on the target's skeleton: different bone names (mixamo / suffixed like thigh_l / generic, detected by name and topology), rest poses (T-pose vs A-pose), bone axes and proportions (the hips move by the source motion scaled by the leg-length ratio; bones keep their own lengths, so nothing stretches). `source` / `target` are a library (.anim or a rigged .glb) or a character entity. preview=true only reports the bone maps and alignment. Use the result with "<output>#<Clip>" clip references in controllers, play_animation, or animator.retargetFrom (which retargets on the fly). Example: {"source": "anims/pack.anim", "target": "Knight", "clips": ["Walk", "Run"]}.
+
+| Argument | Type | Required | Description | Values |
+|---|---|---|---|---|
+| `source` | any | yes | Library path (.anim / .glb) or character entity with the clips |  |
+| `target` | any | yes | Library path or character entity to retarget onto |  |
+| `clips` | string[] |  | Clips to retarget (default: all) |  |
+| `output` | string |  | Output .anim path (default: next to the target library, &lt;target&gt;_&lt;source&gt;.anim) |  |
+| `fps` | number |  | Resampling rate of the output clips (default 30) |  |
+| `translation` | boolean |  | Move the hips / root with the source (default true; false keeps them at rest) |  |
+| `source_map` | object |  | Slot overrides for the source, e.g. {"leftHand": "L_Wrist"} |  |
+| `target_map` | object |  | Slot overrides for the target |  |
+| `preview` | boolean |  | Only report the bone maps and alignment (no file) |  |
+
+=== "Tool call"
+
+    ```tool
+    animation_retarget {"source": "anims/pack.anim", "target": "Knight", "clips": ["Walk", "Run"]}
+    ```
+
+=== "CLI"
+
+    ```bash
+    skywalker call animation_retarget '{"source": "anims/pack.anim", "target": "Knight", "clips": ["Walk", "Run"]}' --project my_game
+    ```
+
+=== "MCP request"
+
+    ```json
+    {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "method": "tools/call",
+      "params": {
+        "name": "animation_retarget",
+        "arguments": {
+          "source": "anims/pack.anim",
+          "target": "Knight",
+          "clips": [
+            "Walk",
+            "Run"
           ]
         }
       }

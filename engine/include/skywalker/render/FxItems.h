@@ -15,6 +15,7 @@
 namespace sky {
 
 using EntityId = uint64_t;
+struct MeshData;  // render/MeshData.h
 
 /// Simple collision proxy (world space).
 struct FxCollider {
@@ -80,6 +81,12 @@ struct GroomData {
         float random = 0;        // 0..1: color / width variation
         float width = 1;         // width multiplier
     };
+    /// A root on a triangle of the mesh it grew on: vertex indices and barycentrics (b0 = 1 - b1 - b2).
+    /// Skinned grooms re-evaluate it every frame on the posed vertices, so strands follow the skin.
+    struct RootBind {
+        uint32_t v[3] = {0, 0, 0};
+        float b1 = 0.f, b2 = 0.f;
+    };
     uint32_t points = 0;                // points per strand (P)
     std::vector<Vec3> guideRest;        // guides * P, mesh local space
     std::vector<Child> children;
@@ -89,8 +96,15 @@ struct GroomData {
     FxCollider proxy;                   // collision proxy of the scalp mesh (local space)
     bool hasProxy = false;
     uint64_t hash = 0;                  // generation parameters hash (changes => re-upload)
+    // --- Binding to the mesh (skinned characters) -----------------------------------------------
+    std::vector<RootBind> guideBind;    // one per guide (empty = not bound)
+    std::vector<RootBind> childBind;    // one per child
+    std::vector<Vec4> guideFrames;      // rest frame per guide root (quaternion x,y,z,w: tangent, normal, bitangent)
+    uint32_t meshVertices = 0;          // vertex count of the mesh the binds index
+    float bindError = 0.f;              // largest root distance from its bound surface point (m; imported grooms)
 
     size_t guideCount() const { return points ? guideRest.size() / points : 0; }
+    bool bound() const { return !childBind.empty() && childBind.size() == children.size() && guideBind.size() == guideCount(); }
     size_t strandCount() const { return children.size(); }
     size_t memoryBytes() const;
 };
@@ -101,8 +115,15 @@ struct GroomItem {
     Mat4 model;                                  // the hair's mesh-local -> world transform
     std::shared_ptr<const GroomData> data;
     Groom params;
-    std::vector<FxCollider> colliders;           // world space (proxy + named colliders)
+    std::vector<FxCollider> colliders;           // world space (proxy + named colliders + body capsules)
     Vec3 wind{0, 0, 0};                          // environment wind (m/s, world)
+    // --- Skinned grooms: roots follow the posed surface of the target mesh ------------------------
+    bool skinned = false;
+    std::string skinKey;                         // GPU-skinned vertices of the target's draw ("<mesh>@skin<entity>")
+    std::string meshKey;                         // the target's mesh (rest pose)
+    std::shared_ptr<const MeshData> posed;       // CPU-skinned target when it is not drawn this frame (fallback)
+    Vec3 meshScale{1, 1, 1};                     // the target's scale (grooms are generated on the scaled mesh)
+    Aabb rootBounds;                             // world bounds of the current guide roots (min > max = unknown)
 };
 
 }  // namespace sky
