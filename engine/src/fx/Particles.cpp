@@ -255,15 +255,17 @@ void ParticleSystem::step(State& s, const ParticleEmitter& em, const Mat4& world
     }
 }
 
-void ParticleSystem::update(const Scene& scene, float dt) {
+void ParticleSystem::update(const Scene& scene, float dt, const ProcessGate* gate) {
     if (dt <= 0.f) return;
-    time_ += dt;
+    time_ += gate ? dt * (gate->paused() ? 0.f : gate->timeScale()) : dt;
     std::vector<EntityId> alive;
     for (EntityId e : scene.entities()) {
         const ParticleEmitter* em = scene.get<ParticleEmitter>(e);
         if (!em || em->simulation == "gpu") continue;  // GPU emitters are simulated by the renderer
         alive.push_back(e);
         if (!scene.isActive(e)) continue;
+        const float edt = gate ? dt * gate->scale(e) : dt;
+        if (edt <= 0.f) continue;  // paused (process mode) or time scale 0: the particles hold
         auto [it, inserted] = states_.try_emplace(e);
         State& s = it->second;
         Mat4 world = scene.worldMatrix(e);
@@ -275,7 +277,7 @@ void ParticleSystem::update(const Scene& scene, float dt) {
                 for (float t = 0; t < warm; t += 1.f / 20.f) step(s, *em, world, scene.environment(), 1.f / 20.f);
             }
         }
-        step(s, *em, world, scene.environment(), dt);
+        step(s, *em, world, scene.environment(), edt);
     }
     std::sort(alive.begin(), alive.end());
     for (auto it = states_.begin(); it != states_.end();) {

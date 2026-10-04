@@ -8,6 +8,7 @@ set(SKY_ENGINE_SOURCES
     src/ecs/Components.cpp
     src/scene/Scene.cpp
     src/scene/History.cpp
+    src/scene/Process.cpp
     src/wander/Value.cpp
     src/wander/Parser.cpp
     src/wander/Format.cpp
@@ -65,9 +66,12 @@ set(SKY_ENGINE_SOURCES
     src/agent/HairTools.cpp
     src/agent/ImpostorTools.cpp
     src/agent/McpServer.cpp
+    src/agent/ProcessTools.cpp
     src/agent/SocketServer.cpp
     src/engine/Engine.cpp
     src/engine/Gizmo.cpp
+    src/engine/EngineFlow.cpp
+    src/engine/Interpolation.cpp
     # 2D, text, UI and dialogue
     src/third_party/StbImpl.cpp
     src/ecs/Components2D.cpp

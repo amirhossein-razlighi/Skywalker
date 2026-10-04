@@ -88,6 +88,7 @@ void Scene::registerKinds() {
     kinds_.push_back(makeReflectedKind<SequencePlayer>());
     kinds_.push_back(makeReflectedKind<IkTarget>());
     kinds_.push_back(makeReflectedKind<Groom>());
+    kinds_.push_back(makeReflectedKind<Process>());  // pause modes, run order, interpolation (scene/Process.h)
 }
 
 const ComponentKind* Scene::componentKind(std::string_view n) const {

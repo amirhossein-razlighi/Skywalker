@@ -419,7 +419,7 @@ NSString* keyNameForEvent(NSEvent* event) {
 
     if (_options.automated()) {
         // Automated runs use a fixed 60 Hz step: deterministic, and independent of a display.
-        _timer = [NSTimer scheduledTimerWithTimeInterval:1.0 / 60.0 target:self selector:@selector(timerFrame:) userInfo:nil repeats:YES];
+        _timer = [NSTimer scheduledTimerWithTimeInterval:1.0 / _options.displayHz target:self selector:@selector(timerFrame:) userInfo:nil repeats:YES];
         [[NSRunLoop currentRunLoop] addTimer:_timer forMode:NSRunLoopCommonModes];
         if (_options.quitAfter > 0) {
             dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(_options.quitAfter * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{ [self quit]; });
@@ -443,7 +443,7 @@ NSString* keyNameForEvent(NSEvent* event) {
     [self frame:dt];
 }
 
-- (void)timerFrame:(NSTimer*)timer { [self frame:1.0 / 60.0]; }
+- (void)timerFrame:(NSTimer*)timer { [self frame:1.0 / _options.displayHz]; }  // simulated display rate (--display-hz)
 
 - (void)pollGamepads {
     Engine& engine = *_session->engine;

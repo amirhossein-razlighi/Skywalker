@@ -302,10 +302,13 @@ bool animatedFrame(const Scene& scene, Assets2D& assets, EntityId e, std::string
     return true;
 }
 
-void tickAnimators(Scene& scene, Assets2D& assets, float dt, const std::function<void(EntityId, const std::string&)>& emit) {
+void tickAnimators(Scene& scene, Assets2D& assets, float baseDt, const std::function<void(EntityId, const std::string&)>& emit,
+                   const ProcessGate* gate) {
     for (EntityId e : scene.entities()) {
         SpriteAnimator* a = scene.get<SpriteAnimator>(e);
         if (!a || !scene.isActive(e)) continue;
+        if (gate && !gate->runs(e)) continue;  // paused (process mode): the sprite holds its frame
+        const float dt = baseDt * (gate ? gate->scale(e) : 1.f);
         const Sprite* s = scene.get<Sprite>(e);
         std::string name = effectiveClip(*a);
         if (name.empty()) continue;
@@ -404,10 +407,12 @@ float applyCamera2D(const Scene& scene, EntityId cam, ViewCamera& view, int widt
     return c2->pixelSnap ? texel : 0.f;
 }
 
-void tickCameras(Scene& scene, float dt) {
+void tickCameras(Scene& scene, float baseDt, const ProcessGate* gate) {
     for (EntityId e : scene.entities()) {
         const Camera2D* c2 = scene.get<Camera2D>(e);
         if (!c2 || c2->follow.empty() || !scene.isActive(e)) continue;
+        if (gate && !gate->runs(e)) continue;
+        const float dt = baseDt * (gate ? gate->scale(e) : 1.f);
         EntityId target = scene.find(c2->follow);
         if (!target || target == e) continue;
         Transform* t = scene.get<Transform>(e);

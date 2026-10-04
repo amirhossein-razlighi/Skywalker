@@ -553,6 +553,7 @@ private:
         TypeSet returns = kTAny;
         bool returnAnnotated = false;
         bool isEvent = false;
+        bool cosmetic = false;  // an `on frame` handler: display rate, its writes are undone after the frame
         int labelPc = -1;
         bool regOverflow = false;
     };
@@ -561,7 +562,39 @@ private:
     Proto& P() { return prog_.protos[fn_->proto]; }
     size_t pc() const { return prog_.protos[fn_->proto].code.size(); }
 
+    void notCosmetic(SourceLoc loc, const std::string& what) {
+        error(loc, "frame_not_cosmetic", "on frame cannot " + what,
+              "on frame runs at display rate and its writes are undone after the frame, so it may only style what "
+              "on tick computed: set position/rotation/scale/color or fields of transform, mesh, light, camera, sprite, "
+              "text, ui (camera shake, bobbing, UI tweens); keep game state changes in on tick");
+    }
+
+    /// `on frame` handlers: nothing that changes the simulation.
+    void checkCosmetic(Op op, int b, SourceLoc loc) {
+        switch (op) {
+            case Op::SetVar: notCosmetic(loc, "change vars"); break;
+            case Op::Wait: notCosmetic(loc, "wait"); break;
+            case Op::Every:
+            case Op::After: notCosmetic(loc, "use every/after timers"); break;
+            case Op::GoTo: notCosmetic(loc, "change state (go to)"); break;
+            case Op::Call: {
+                const BuiltinDef& def = *prog_.builtins[static_cast<size_t>(b)];
+                if (cosmeticBuiltin(def)) break;
+                static const std::map<std::string, std::string> statements{
+                    {"__move_by", "move (assign self.position instead)"}, {"__move_toward", "move toward (assign self.position instead)"},
+                    {"__rotate", "rotate (assign self.rotation instead)"}, {"__look", "look at (assign self.rotation instead)"},
+                    {"__emit", "emit events"}, {"__emit_to", "emit events"}, {"__destroy", "destroy entities"},
+                    {"__press", "press keys"}, {"__hold", "hold keys"}, {"__release", "release keys"}, {"__click", "click"}};
+                auto it = statements.find(def.name);
+                notCosmetic(loc, it != statements.end() ? it->second : "call " + def.name + "() (it changes the game; only pure functions and read-only queries)");
+                break;
+            }
+            default: break;
+        }
+    }
+
     size_t emit(Op op, int a, int b, int c, SourceLoc loc, uint8_t x = 0) {
+        if (fn_ && fn_->cosmetic) [[unlikely]] checkCosmetic(op, b, loc);
         Ins in;
         in.op = op;
         in.x = x;
@@ -858,7 +891,7 @@ private:
         }
         if (h.custom) {
             if (!reg_.trigger(h.argument)) {
-                std::vector<std::string> names{"start", "tick", "event", "key", "click", "enter", "exit"};
+                std::vector<std::string> names{"start", "tick", "frame", "event", "key", "click", "enter", "exit"};
                 for (const auto& t : reg_.triggers()) names.push_back(t.name);
                 std::string guess = str::closest(h.argument, names);
                 error(h.loc, "unknown_trigger", "unknown trigger " + quote(h.argument),
@@ -896,6 +929,8 @@ private:
         st.decl = &mainDecl_;
         st.bs = &bs;
         st.isEvent = h.trigger == Trigger::Event;
+        st.cosmetic = h.trigger == Trigger::Frame;
+        if (st.cosmetic) prog_.hasFrameHandlers = true;
         FnScopeGuard g(*this, &st);
         beginBody(st);
         if (st.isEvent) {
@@ -1510,6 +1545,18 @@ private:
         while (true) {
             Step& st = ch.steps[i];
             int obj = ch.regs[i];
+            if (fn_->cosmetic) {
+                TypeSet owner = i == 0 ? ch.baseType : ch.steps[i - 1].type;
+                if (st.kind == Step::Kind::Field && !cosmeticComponent(prog_.fields[st.member].component)) {
+                    notCosmetic(st.loc, "set " + prog_.fields[st.member].component + "." + prog_.fields[st.member].field);
+                } else if (st.kind == Step::Kind::Member && owner == kTEntity) {
+                    using MK = MemberRef::Kind;
+                    MK k = prog_.members[st.member].kind;
+                    if (k != MK::Position && k != MK::Rotation && k != MK::Scale && k != MK::Color) {
+                        notCosmetic(st.loc, "set ." + prog_.members[st.member].name + " on an entity");
+                    }
+                }
+            }
             switch (st.kind) {
                 case Step::Kind::Member: emit(Op::SetMember, obj, st.member, valueRk, st.loc); break;
                 case Step::Kind::Field: emit(Op::SetField, obj, st.member, valueRk, st.loc); break;

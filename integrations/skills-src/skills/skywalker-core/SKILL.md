@@ -77,6 +77,13 @@ actions, axes, mouse, gamepad, click an entity), then step. `sim_trace` samples 
 `transform.position`, `vars.score`) so you can verify numerically instead of eyeballing. `logs` shows Wander output
 and runtime errors. Behaviors are Wander code: see skywalker-wander.
 
+Two pauses: `sim_control {action:"pause"}` is the editor's (nothing ticks); `{action:"pause_game"}` is the game's own
+pause menu pause (`pause_game()` in Wander): `pausable` entities freeze, UI canvases and `process` mode
+`always`/`when_paused` entities keep running. `{action:"time_scale", scale:0.25}` is slow motion. Both apply from the
+next tick. `process_info {entity}` explains what runs while paused and why (and warns when nothing could resume).
+Real-time frames are interpolated between the 60 Hz ticks (smooth on 120 Hz displays); `sim_trace {display_hz:120}`
+measures it (`smoothness.stepJitter` near 0 = smooth) and `sim_teleport` moves something without a smear.
+
 ## Attribution and the studio
 
 Every call is attributed (`mcp:<client>` in history and the editor activity feed). To work as a roster member

@@ -145,6 +145,8 @@ void registerPlatformBuiltins(BuiltinRegistry& reg) {
 
 }  // namespace
 
+void registerFlowBuiltins(wander::BuiltinRegistry& reg);  // EngineFlow.cpp
+
 void registerEngineBuiltins() {
     static std::once_flag once;
     std::call_once(once, [] {
@@ -153,6 +155,7 @@ void registerEngineBuiltins() {
         registerAnimationBuiltins(reg);
         registerUiBuiltins(reg);  // 2D, UI, dialogue (World2D)
         registerPlatformBuiltins(reg);
+        registerFlowBuiltins(reg);  // pause_game, time_scale, teleport (EngineFlow.cpp)
         // Subsystem builtins: one line each.
     });
 }

@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <sstream>
@@ -497,9 +498,35 @@ Value getEntityMember(ExecState& st, EntityId id, const MemberRef& m, SourceLoc 
     return v;
 }
 
+std::string cosmeticComponentList() {
+    std::string out;
+    for (const auto& c : cosmeticComponents()) out += (out.empty() ? "" : ", ") + c;
+    return out;
+}
+
+[[noreturn]] void cosmeticError(SourceLoc loc, const std::string& what) {
+    raise(loc, "on frame is cosmetic: it cannot " + what +
+                   " (it runs at display rate and its writes are undone after the frame; change simulation state in on "
+                   "tick, then style it in on frame)");
+}
+
 void setEntityMember(ExecState& st, EntityId id, const MemberRef& m, const Value& v, SourceLoc loc) {
     using K = MemberRef::Kind;
     Scene& scene = st.scene;
+    if (st.cosmetic) [[unlikely]] {
+        if (m.kind == K::Position || m.kind == K::Rotation || m.kind == K::Scale) {
+            if (!scene.get<Transform>(id)) cosmeticError(loc, "add a transform");
+            recordCosmeticWrite(st, id, nullptr, nullptr);
+        } else if (m.kind == K::Color) {
+            const char* comp = scene.get<MeshRenderer>(id) ? "mesh" : scene.get<Light>(id) ? "light" : nullptr;
+            if (!comp) cosmeticError(loc, "add a mesh (.color needs a mesh or a light)");
+            const ComponentKind* kind = scene.componentKind(comp);
+            recordCosmeticWrite(st, id, kind, kind->info->field("color"));
+        } else {
+            cosmeticError(loc, "set ." + m.name + " (only position, rotation, scale, color and fields of " +
+                                   cosmeticComponentList() + ")");
+        }
+    }
     scene.markDirty();
     switch (m.kind) {
         case K::Position:
@@ -667,6 +694,14 @@ Value getField(ExecState& st, const Value& obj, const FieldRef& f, SourceLoc loc
 void setField(ExecState& st, const Value& obj, const FieldRef& f, const Value& v, SourceLoc loc) {
     EntityId id = requireEntity(st.scene, obj, loc, "the component owner");
     const auto& r = resolveField(st, f, loc);
+    if (st.cosmetic) [[unlikely]] {
+        if (!cosmeticComponent(f.component)) {
+            cosmeticError(loc, "set " + f.component + "." + f.field + " (frame handlers may set fields of " +
+                                   cosmeticComponentList() + ")");
+        }
+        if (!r.kind->has(st.scene, id)) cosmeticError(loc, "add a " + f.component + " component");
+        recordCosmeticWrite(st, id, r.kind, r.field);
+    }
     st.scene.markDirty();
     void* c = r.kind->ptr ? r.kind->ptr(st.scene, id) : nullptr;
     const FieldInfo& fi = *r.field;
@@ -800,7 +835,7 @@ bool interpret(ExecState& st, int protoIndex, Value* R, size_t& pc, Outcome& out
             case Op::LoadEnv:
                 switch (static_cast<Env>(in.b)) {
                     case Env::Dt: R[in.a] = Value::number(st.dt); break;
-                    case Env::Time: R[in.a] = Value::number(st.rt.time()); break;
+                    case Env::Time: R[in.a] = Value::number(st.cosmetic ? st.displayTime : st.rt.time()); break;
                     case Env::Frame: R[in.a] = Value::number(static_cast<double>(st.rt.frame())); break;
                     case Env::Other: R[in.a] = st.other ? Value::entity(st.other) : Value(); break;
                     case Env::State: {
@@ -833,6 +868,7 @@ bool interpret(ExecState& st, int protoIndex, Value* R, size_t& pc, Outcome& out
                 }
                 break;
             case Op::SetVar:
+                if (st.cosmetic) [[unlikely]] cosmeticError(LOC, "change vars");
                 if (st.inst && st.inst->program.get() == st.prog) [[likely]] {
                     VarTable& t = *st.inst->vars;
                     VarSlot& slot = t.slots[st.inst->behaviors[st.behavior].varSlots[in.a]];
@@ -993,6 +1029,10 @@ bool interpret(ExecState& st, int protoIndex, Value* R, size_t& pc, Outcome& out
             }
             case Op::Call: {
                 const BuiltinDef& def = *prog.builtins[in.b];
+                if (st.cosmetic && !cosmeticBuiltin(def)) [[unlikely]] {
+                    cosmeticError(LOC, "call " + (def.hidden ? std::string("this statement") : def.name + "()") +
+                                           " (only pure functions and read-only queries)");
+                }
                 CallContext ctx(st, def, &R[in.a], in.c, LOC);
                 Value r = def.fn(ctx);
                 R[in.a] = std::move(r);
@@ -1054,6 +1094,7 @@ bool interpret(ExecState& st, int protoIndex, Value* R, size_t& pc, Outcome& out
                 return false;
             case Op::Every:
             case Op::After: {
+                if (st.cosmetic) [[unlikely]] cosmeticError(LOC, "use every/after timers");
                 if (!st.inst || st.behavior < 0) raise(LOC, "timers need a running behavior");
                 double interval = asNumber(RK(in.b), LOC, in.op == Op::Every ? "the every interval" : "the after delay");
                 BehaviorRun& br = st.inst->behaviors[st.behavior];
@@ -1139,6 +1180,7 @@ bool interpret(ExecState& st, int protoIndex, Value* R, size_t& pc, Outcome& out
                 break;
             }
             case Op::Wait: {
+                if (st.cosmetic) [[unlikely]] cosmeticError(LOC, "wait");
                 double amount = asNumber(RK(in.b), LOC, in.x ? "the frame count" : "the wait time");
                 if (!std::isfinite(amount)) raise(LOC, "the wait time must be a finite number");
                 out.kind = Outcome::Kind::Wait;
@@ -1148,6 +1190,7 @@ bool interpret(ExecState& st, int protoIndex, Value* R, size_t& pc, Outcome& out
                 return false;
             }
             case Op::GoTo:
+                if (st.cosmetic) [[unlikely]] cosmeticError(LOC, "change state (go to)");
                 out.kind = Outcome::Kind::GoTo;
                 out.state = in.b;
                 return false;
@@ -1214,6 +1257,14 @@ void Runtime::reset(bool keepQueuedEvents) {
     rng_.reseed(scene_.seed);
     time_ = 0;
     frame_ = 0;
+    realTime_ = 0;
+    paused_ = false;
+    timeScale_ = 1.0;
+    requestedPause_.reset();
+    requestedScale_.reset();
+    preparedFrame_ = ~0ull;
+    gate_.reset();
+    impl_->cosmeticUndo.clear();
     impl_->pending.clear();
     if (!keepQueuedEvents) impl_->nextPending.clear();
     impl_->contacts.clear();
@@ -1404,6 +1455,12 @@ struct Scheduler {
 
     void report(Instance& inst, const RuntimeError& err, const std::string& file) {
         impl.messages.push_back({RuntimeMessage::Kind::Error, inst.entity, inst.scriptName, err.loc.line, err.message, file});
+        if (cosmetic) {  // a failing `on frame` handler: frame handlers of this instance stop until the next play
+            inst.frameFailed = true;
+            impl.messages.push_back({RuntimeMessage::Kind::Error, inst.entity, inst.scriptName, err.loc.line,
+                                     "on frame handlers of this script are off until the game restarts", file});
+            return;
+        }
         Script* s = script(inst);
         if (s && ++s->runtimeErrors >= kMaxErrorsBeforeDisable && s->enabled) {
             s->enabled = false;
@@ -1425,10 +1482,17 @@ struct Scheduler {
         st.dt = dt;
         st.input = &input;
         st.contact = contact;
+        if (cosmetic) {
+            st.cosmetic = true;
+            st.displayTime = displayTime;
+            st.native = nullptr;  // the interpreter enforces the cosmetic rules
+        }
         return st;
     }
 
     const Runtime::Contact* contact = nullptr;  // the contact being delivered (collide/trigger handlers)
+    bool cosmetic = false;                      // running `on frame` handlers
+    double displayTime = 0;
 
     // Runs a proto as the top frame; handles errors, waits and state changes.
     void run(Instance& inst, int behavior, int handler, int proto, std::vector<Value>* resumeRegs, size_t pc,
@@ -1640,6 +1704,24 @@ struct Scheduler {
         } else {
             resumeCoroutines(inst);
         }
+        if (!inst.deferred.empty()) {  // events that arrived while the entity was paused
+            std::vector<PendingEvent> deferred = std::move(inst.deferred);
+            inst.deferred.clear();
+            for (const auto& ev : deferred) {
+                fire(inst, [&](const HandlerInfo& h) { return h.trigger == Trigger::Event && h.sym == ev.sym; }, ev.payload,
+                     ev.other);
+            }
+        }
+        if (!inst.deferredContacts.empty()) {
+            std::vector<Runtime::Contact> held = std::move(inst.deferredContacts);
+            inst.deferredContacts.clear();
+            for (const auto& c : held) {
+                contact = &c;
+                fire(inst, [&](const HandlerInfo& h) { return h.trigger == c.trigger && contactMatches(c.other, h.argument); },
+                     Value(), c.other);
+                contact = nullptr;
+            }
+        }
         for (const auto& ev : impl.pending) {
             if (ev.target != kNoEntity && ev.target != inst.entity) continue;
             fire(inst, [&](const HandlerInfo& h) { return h.trigger == Trigger::Event && h.sym == ev.sym; }, ev.payload,
@@ -1684,12 +1766,98 @@ struct Scheduler {
             if (b < inst.behaviors.size() && inst.behaviors[b].state >= 0) inst.behaviors[b].stateTime += dt;
         }
     }
+
+    bool handlesEvent(const Instance& inst, uint32_t sym) const {
+        for (const auto& b : inst.program->behaviors) {
+            for (const auto& h : b.handlers) {
+                if (h.trigger == Trigger::Event && h.sym == sym) return true;
+            }
+        }
+        return false;
+    }
+
+    /// An instance whose entity does not run this tick (process mode while the game is paused, or
+    /// `disabled`): time stands still for it. It still hears `pause` / `resume`. While the GAME is paused,
+    /// events it has handlers for (and the contacts of the step before the pause) wait until it runs
+    /// again, so a pause is invisible to the simulation; an entity stopped by its own mode (`disabled`,
+    /// `when_paused` during play) is off and drops them. Input and clicks are never for it.
+    void park(Instance& inst) {
+        checkAlive(inst);
+        if (!alive(inst) || !inst.started) return;
+        const bool hold = rt.gamePaused();
+        static const uint32_t kPause = intern("pause");
+        static const uint32_t kResume = intern("resume");
+        constexpr size_t kMaxDeferred = 256;
+        for (const auto& ev : impl.pending) {
+            if (ev.target != kNoEntity && ev.target != inst.entity) continue;
+            if (ev.sym == kPause || ev.sym == kResume) {
+                fire(inst, [&](const HandlerInfo& h) { return h.trigger == Trigger::Event && h.sym == ev.sym; }, ev.payload,
+                     ev.other);
+                if (!alive(inst)) return;
+                continue;
+            }
+            if (!hold || !handlesEvent(inst, ev.sym)) continue;
+            if (inst.deferred.size() >= kMaxDeferred) inst.deferred.erase(inst.deferred.begin());  // keep the newest
+            inst.deferred.push_back(ev);
+        }
+        // Contacts from the physics step before the pause (physics holds while paused, so no new ones).
+        if (!hold) return;
+        Runtime::Contact probe;
+        probe.self = inst.entity;
+        auto [cBegin, cEnd] = std::equal_range(impl.contacts.begin(), impl.contacts.end(), probe,
+                                               [](const Runtime::Contact& x, const Runtime::Contact& y) { return x.self < y.self; });
+        for (auto c = cBegin; c != cEnd && inst.deferredContacts.size() < kMaxDeferred; ++c) inst.deferredContacts.push_back(*c);
+    }
+
+    /// Runs the instance's `on frame` handlers (behavior-level, then the current state's). Returns how many ran.
+    size_t frame(Instance& inst) {
+        size_t runs = 0;
+        const Program& prog = *inst.program;
+        for (size_t b = 0; b < prog.behaviors.size(); ++b) {
+            const auto& hs = prog.behaviors[b].handlers;
+            for (int pass = 0; pass < 2; ++pass) {
+                for (size_t h = 0; h < hs.size(); ++h) {
+                    if (!alive(inst) || inst.frameFailed) return runs;
+                    const HandlerInfo& hi = hs[h];
+                    if (hi.trigger != Trigger::Frame) continue;
+                    if (pass == 0 ? hi.state >= 0 : hi.state < 0) continue;
+                    if (hi.state >= 0 && (b >= inst.behaviors.size() || hi.state != inst.behaviors[b].state)) continue;
+                    invoke(inst, static_cast<int>(b), static_cast<int>(h));
+                    ++runs;
+                }
+            }
+        }
+        return runs;
+    }
 };
 
 }  // namespace
 
+void Runtime::requestTimeScale(double scale) {
+    if (!std::isfinite(scale)) scale = 1.0;
+    requestedScale_ = std::clamp(scale, 0.0, kMaxTimeScale);
+}
+
+void Runtime::prepareTick() {
+    preparedFrame_ = frame_;
+    if (requestedScale_) {
+        timeScale_ = *requestedScale_;
+        requestedScale_.reset();
+    }
+    if (requestedPause_) {
+        const bool p = *requestedPause_;
+        requestedPause_.reset();
+        if (p != paused_) {
+            paused_ = p;
+            emit(p ? "pause" : "resume");  // delivered this tick (also to the entities the pause stops)
+        }
+    }
+    gate_.update(scene_, paused_, static_cast<float>(timeScale_));
+}
+
 void Runtime::tick(float dt, const InputState& input) {
     Impl& impl = *impl_;
+    if (preparedFrame_ != frame_) prepareTick();  // the embedding did not (bare runtimes, tests)
     if (impl.stack.empty()) impl.stack.resize(kStackSize);
     compileScripts();
     ticking_ = true;
@@ -1726,10 +1894,17 @@ void Runtime::tick(float dt, const InputState& input) {
     }
 
     Scheduler sched{*this, impl, scene_, dt, input};
-    // Snapshot the order: entities spawned this tick start running next tick.
-    const std::vector<EntityId> order = scene_.entities();
+    // Snapshot the order: entities spawned this tick start running next tick. `process.priority`
+    // reorders it (lower first; ties keep scene order, so it stays deterministic).
+    std::vector<EntityId> order = scene_.entities();
+    if (gate_.ordered()) {
+        std::stable_sort(order.begin(), order.end(), [&](EntityId a, EntityId b) { return gate_.priority(a) < gate_.priority(b); });
+    }
     for (EntityId id : order) {
         if (!scene_.exists(id) || !scene_.isActive(id)) continue;
+        if (!scene_.get<Behavior>(id)) continue;
+        const bool runs = gate_.runs(id);
+        sched.dt = runs ? dt * gate_.scale(id) : 0.f;
         // Never hold Behavior pointers across handler runs: `spawn` may reallocate storage.
         for (size_t si = 0;; ++si) {
             Behavior* b = scene_.get<Behavior>(id);
@@ -1752,7 +1927,11 @@ void Runtime::tick(float dt, const InputState& input) {
                 auto nit = native_.find(inst.program->hash);
                 inst.native = nit == native_.end() ? nullptr : nit->second.get();
             }
-            sched.tickInstance(inst);
+            if (runs) {
+                sched.tickInstance(inst);
+            } else {
+                sched.park(inst);
+            }
         }
     }
     for (EntityId id : impl.toDestroy) {
@@ -1792,8 +1971,108 @@ void Runtime::tick(float dt, const InputState& input) {
     impl.revisionValid = true;
     impl.input = nullptr;
     ticking_ = false;
-    time_ += dt;
+    time_ += static_cast<double>(dt) * (paused_ ? 0.0 : timeScale_);  // game time
+    realTime_ += dt;
     ++frame_;
+}
+
+// ---------------------------------------------------------------------------
+// Cosmetic `on frame` handlers
+// ---------------------------------------------------------------------------
+
+namespace {
+size_t fieldBytes(FieldType t) {
+    switch (t) {
+        case FieldType::Float:
+        case FieldType::Int: return 4;
+        case FieldType::Bool: return sizeof(bool);
+        case FieldType::Vec3: return sizeof(Vec3);
+        case FieldType::Color: return sizeof(Vec4);
+        default: return 0;  // strings, enums, JSON, vec2/vec4: through reflection
+    }
+}
+}  // namespace
+
+void recordCosmeticWrite(ExecState& st, EntityId e, const ComponentKind* kind, const FieldInfo* field) {
+    auto& log = st.impl.cosmeticUndo;
+    for (const auto& u : log) {
+        if (u.entity == e && u.kind == kind && u.field == field) return;  // the first value is the one to restore
+    }
+    if (log.size() >= 100000) raise(SourceLoc{}, "on frame wrote too many fields in one frame (more than 100000)");
+    Runtime::Impl::CosmeticUndo u;
+    u.entity = e;
+    u.kind = kind;
+    u.field = field;
+    if (!kind) {
+        const Transform* t = st.scene.get<Transform>(e);
+        if (!t) return;
+        u.transform = *t;
+    } else {
+        void* c = kind->ptr ? kind->ptr(st.scene, e) : nullptr;
+        const size_t n = field ? fieldBytes(field->type) : 0;
+        if (c && n > 0) {
+            std::memcpy(u.raw, static_cast<const char*>(c) + field->offset, n);
+        } else {
+            u.viaJson = true;
+            u.json = kind->toJson(st.scene, e).get(field ? field->name : std::string());
+        }
+    }
+    log.push_back(std::move(u));
+}
+
+bool Runtime::hasFrameHandlers() const {
+    for (const auto& [key, inst] : impl_->instances) {
+        if (inst.program && inst.program->hasFrameHandlers) return true;
+    }
+    return false;
+}
+
+size_t Runtime::runFrameHandlers(const FrameInfo& info) {
+    Impl& impl = *impl_;
+    if (ticking_ || !hasFrameHandlers()) return 0;
+    if (impl.stack.empty()) impl.stack.resize(kStackSize);
+    static const InputState kNoInput;
+    Scheduler sched{*this, impl, scene_, info.dt, info.input ? *info.input : kNoInput};
+    sched.cosmetic = true;
+    sched.displayTime = info.time;
+    const bool gated = preparedFrame_ != ~0ull;  // the gate is valid once a tick ran
+    size_t runs = 0;
+    for (EntityId id : scene_.entities()) {
+        const Behavior* b = scene_.get<Behavior>(id);
+        if (!b || !scene_.isActive(id)) continue;
+        if (gated && !gate_.runs(id)) continue;
+        sched.dt = info.dt * (gated ? gate_.scale(id) : 1.f);
+        for (size_t si = 0; si < b->scripts.size(); ++si) {
+            auto found = impl.instances.find({id, si});
+            if (found == impl.instances.end()) continue;
+            Instance& inst = found->second;
+            if (!inst.started || inst.dead || inst.frameFailed || !inst.program || !inst.program->hasFrameHandlers) continue;
+            if (b->scripts[si].program != inst.program || !b->scripts[si].enabled) continue;
+            runs += sched.frame(inst);
+            b = scene_.get<Behavior>(id);  // never hold component pointers across handler runs
+            if (!b) break;
+        }
+    }
+    return runs;
+}
+
+void Runtime::revertFrame() {
+    auto& log = impl_->cosmeticUndo;
+    for (auto it = log.rbegin(); it != log.rend(); ++it) {
+        if (!scene_.exists(it->entity)) continue;
+        if (!it->kind) {
+            if (Transform* t = scene_.get<Transform>(it->entity)) *t = it->transform;
+            continue;
+        }
+        if (it->viaJson) {
+            (void)it->kind->apply(scene_, it->entity, Json::object({{it->field->name, it->json}}));
+            continue;
+        }
+        if (void* c = it->kind->ptr ? it->kind->ptr(scene_, it->entity) : nullptr) {
+            std::memcpy(static_cast<char*>(c) + it->field->offset, it->raw, fieldBytes(it->field->type));
+        }
+    }
+    log.clear();
 }
 
 Json Runtime::inspect(EntityId e) const {

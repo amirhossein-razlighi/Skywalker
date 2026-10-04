@@ -327,3 +327,4 @@ struct Environment {
 #include "skywalker/ecs/AnimationComponents.h"
 // Workstream components (kept in their own headers).
 #include "skywalker/ecs/GroomComponent.h"
+#include "skywalker/ecs/ProcessComponent.h"  // process: pause modes, run order, interpolation

@@ -84,7 +84,8 @@ end
 ```
 
 - **Triggers**: `on start`, `on tick`, `on event "name" (with x)`, `on key "space"`, `on action "jump"` (input actions, see skywalker-audio), `on click`, `on collide/trigger_enter/trigger_exit ("name or tag")`, `on anim "name"`, `on ui "Button"`,
-  `on dialogue "cmd"`; inside a `state`: `on enter`, `on exit`, `on tick`. `wander_reference` lists subsystem triggers.
+  `on dialogue "cmd"`, `on pause` / `on resume` (the game was paused / resumed), `on frame` (every displayed frame, cosmetic only: see below);
+  inside a `state`: `on enter`, `on exit`, `on tick`. `wander_reference` lists subsystem triggers.
 - **Declarations**: `var`, `param x = 1 in 0..5 "doc"`, `const MAX = 10`, `fn name(a, b: number) -> number ... end` (recursion ok), `use "scripts/combat"` then `combat.damage(...)` (modules are `.wander` files of `fn`/`const`).
 - **Statements**: `let`, `x = v`, `x += v`, `if/elif/else/end`, `for x in list`, `for i in 0..10` (end excluded; `0..=10` includes), `while` and `repeat n times` (bounded by the budget), `break`, `continue`, `return`, `stop`,
   `every 2 seconds ... end`, `after 1 seconds ... end`, `wait 1.5` / `wait frames 3` / `wait until cond` (coroutines; handlers and tests only, not inside `fn`), `go to State`, `move e by v` / `move e toward p at speed`,
@@ -95,6 +96,24 @@ end
 - Reserved words cannot be names: `fn return for in while do break continue wait until state go goto const test expect use with param other step`.
 - **Idioms**: always multiply per-tick change by `dt`; smooth follow `self.position = lerp(self.position, goal, 1 - exp(-8 * dt))`; prefer `state` over boolean flags; cooldown `var cd = 0` / `cd -= dt`;
   find things with `nearest("enemy", 10)`, `find_all("coin")`, `find("Door")` and test `if x then` before using a maybe-none; share code with `use`.
+
+**Pause, slow motion, smoothing.** `pause_game()` / `resume_game()` / `is_paused()`, `time_scale(0.3)` (slow motion; `dt`, timers and
+waits scale), `unscaled_dt()` / `unscaled_time()` (real time), `teleport(self, find("Spawn"))` (jump without a render smear). All apply from
+the next tick. While paused, `pausable` entities (the default) stop: no `on tick`, waits and timers hold, events wait until resume; put pause
+menu logic on a UI canvas (runs `always`) or an entity with `process: {mode: "always"}` (or `"when_paused"`). `time` is game time (stops
+while paused). `process.priority` orders behaviors (lower first). `on frame` handlers are cosmetic (camera shake, bobbing, UI tweens): they
+may set position/rotation/scale/color and fields of transform, mesh, light, camera, sprite, text, ui, read anything and call pure
+functions; their writes are undone after each frame; vars, `wait`, `emit`, `spawn`, `random`, `move` there are compile errors
+(`frame_not_cosmetic`).
+
+```wander
+on action "pause"                -- on the pause menu canvas
+  if is_paused() then resume_game() else pause_game() end
+end
+on frame                         -- camera shake that never touches the simulation
+  self.position = self.position + (noise(time * 40) - 0.5, noise(time * 40 + 9) - 0.5, 0) * self.trauma * 0.3
+end
+```
 
 Runtime facts: events arrive next tick in emission order; a handler error aborts that run (logged), **five errors disable the script**; each handler run has a 1,000,000-step budget; 256 `spawn`s per tick, 20,000 entities;
 vars are mirrored into `entity_get` after every tick; replacing a behavior while playing restarts its instance; changes made during play are restored on stop.

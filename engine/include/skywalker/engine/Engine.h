@@ -27,6 +27,7 @@
 #include "skywalker/audio/AudioSystem.h"
 #include "skywalker/core/Json.h"
 #include "skywalker/engine/Gizmo.h"
+#include "skywalker/engine/Interpolation.h"
 #include "skywalker/fx/Groom.h"
 #include "skywalker/fx/Ocean.h"
 #include "skywalker/fx/Particles.h"
@@ -101,6 +102,12 @@ struct CaptureOptions {
     FrameData::Offline offline;
     bool resetHistory = false;
     bool listVisible = true;  // compute Capture::visible (skipped by movie frames)
+    // Render interpolation (engine/Interpolation.h): show the world this far between the last two ticks.
+    // 1 = the tick state (captures and tools by default); real-time frames pass Engine::interpolationAlpha().
+    float interpolationAlpha = 1.f;
+    // Run the cosmetic `on frame` Wander handlers for this frame (real-time frames), frameDt seconds after the last.
+    bool frameHandlers = false;
+    float frameDt = 0.f;
 };
 
 /// How the live editor viewport trades quality for responsiveness while editing. Play mode
@@ -162,6 +169,41 @@ public:
     void step(int ticks);
     /// Advance real time: pumps posted jobs and runs fixed simulation steps when playing.
     void update(double seconds);
+    /// The simulation half of update(): accumulates real time and runs the whole ticks it covers
+    /// (nothing else: no jobs, no editor work). Returns the ticks run. Tools use it to simulate a display.
+    int advance(double seconds);
+
+    // --- Game pause, time scale, render interpolation (docs/ARCHITECTURE.md "Game pause..." / "Render interpolation")
+    /// The game's own pause (a pause menu: pause_game() in Wander): `pausable` entities stop while
+    /// `always` / `when_paused` ones and UI canvases keep running. Unlike pause() (the editor's pause)
+    /// the simulation keeps ticking. Applies from the next tick (deterministic).
+    void setGamePaused(bool paused);
+    /// The requested state (true from the call on, even before the next tick applies it).
+    bool gamePaused() const;
+    /// Slow motion / fast forward for the `game` clock (0..10; ticks stay 1/60 s, dt scales). Next tick.
+    void setTimeScale(double scale);
+    double timeScale() const;
+    /// Real-time frames show the world between the last two ticks (smooth motion at 120 Hz). On by default.
+    void setInterpolation(bool on) { interpolate_ = on; }
+    bool interpolation() const { return interpolate_; }
+    /// How far real time is into the next tick (0..1): what a real-time frame shows now.
+    float interpolationAlpha() const;
+    /// The next frames show `e` exactly at its tick position (no smear after a jump / respawn).
+    void teleport(EntityId e) { transformHistory_.teleport(e); }
+    const TransformHistory& transformHistory() const { return transformHistory_; }
+    /// Model matrices drawn on the previous real-time frame, per entity (velocity buffers, motion blur).
+    const DisplayHistory& displayHistory() const { return displayHistory_; }
+    /// Off by default (it costs a map write per draw per frame); a renderer feature that needs it turns it on.
+    void setTrackDisplayHistory(bool on) { trackDisplayHistory_ = on; }
+    /// Frame pacing of real-time frames: alpha, jitter with and without interpolation.
+    const PacingStats& pacing() const { return pacing_.stats(); }
+    /// Records a presented real-time frame in the pacing stats (renderToSurface does; tools simulating a display too).
+    void notePresentedFrame(float alpha);
+    struct FrameFlowStats {
+        size_t interpolated = 0;  // entities shown between ticks last frame
+        size_t frameHandlerRuns = 0;  // `on frame` handler runs last frame
+    };
+    const FrameFlowStats& frameFlowStats() const { return flowStats_; }
     wander::InputState& input() { return input_; }
     std::vector<Json> recentMessages(size_t max = 50) const;
 
@@ -319,6 +361,10 @@ private:
     void drainStreamedMeshes();
     std::optional<audio::ListenerPose> listenerPose();
     void resolveTexturePaths(FrameData& f) const;
+    FrameData buildFrameData(const CaptureOptions& opts);  // frame() without the display-time setup (EngineFlow.cpp)
+    void stepPhysics();                                    // one tick of physics under the process gate (EngineFlow.cpp)
+    void resetFrameFlow();                                 // play/stop: interpolation history and pacing (EngineFlow.cpp)
+    void presented(const FrameData& f, float alpha);       // after a real-time frame (EngineFlow.cpp)
 
     EngineConfig config_;
     std::unique_ptr<Scene> scene_;
@@ -412,6 +458,15 @@ private:
     Json lastMovie_;
     std::atomic<bool> movieCancel_{false};
     std::optional<double> effectsTimeOverride_;
+    // Game pause, time scale and render interpolation (EngineFlow.cpp, Interpolation.h)
+    TransformHistory transformHistory_;
+    DisplayHistory displayHistory_;
+    PacingMeter pacing_;
+    bool interpolate_ = true;
+    bool trackDisplayHistory_ = false;
+    double realSinceFrame_ = 0;  // real seconds accumulated since the last presented frame
+    int ticksSinceFrame_ = 0;
+    FrameFlowStats flowStats_;
 };
 
 void registerEngineTools(Engine& engine);

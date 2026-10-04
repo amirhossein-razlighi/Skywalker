@@ -967,6 +967,7 @@ Result<std::string> fromGraph(const Json& g) {
         else if (t == "collide") h.trigger = Trigger::Collide;
         else if (t == "trigger_enter") h.trigger = Trigger::TriggerEnter;
         else if (t == "trigger_exit") h.trigger = Trigger::TriggerExit;
+        else if (t == "frame") h.trigger = Trigger::Frame;
         else {
             h.trigger = Trigger::Event;
             h.custom = true;

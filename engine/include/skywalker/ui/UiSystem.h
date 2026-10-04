@@ -99,6 +99,9 @@ public:
 
     /// Processes one fixed tick of input: hover, press, drag, focus, keyboard and wheel.
     void tick(Scene& scene, const UiInput& input, float dt, const ViewCamera* camera, const UiEvents& events);
+    /// Process modes (scene/Process.h): a canvas whose entity does not run this tick (a `pausable` HUD
+    /// while the game is paused, a `when_paused` menu while it plays) takes no input. Null = all run.
+    void setProcessGate(const ProcessGate* gate) { gate_ = gate; }
     /// Activates a widget as if clicked (buttons, toggles, inputs submit). Used by tools and keys.
     void activate(Scene& scene, EntityId element, const UiEvents& events);
 
@@ -123,6 +126,7 @@ public:
     render2d::Assets2D& assets() const { return assets_; }
 
 private:
+    const ProcessGate* gate_ = nullptr;
     EntityId hitIn(const Layout& layout, float x, float y, const ViewCamera* camera, bool interactiveOnly) const;
     StyleState stateFor(EntityId e, const UIElement& el) const;
 

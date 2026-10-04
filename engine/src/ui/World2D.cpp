@@ -103,11 +103,13 @@ void World2D::onPlay(Scene& scene, wander::Runtime& runtime) {
 }
 
 void World2D::postTick(Scene& scene, wander::Runtime& runtime, float dt) {
-    render2d::tickAnimators(scene, *assets_, dt, [&](EntityId e, const std::string& ev) { runtime.emit("anim:" + ev, e); });
-    render2d::tickCameras(scene, dt);
+    const ProcessGate* gate = &runtime.processGate();
+    render2d::tickAnimators(scene, *assets_, dt, [&](EntityId e, const std::string& ev) { runtime.emit("anim:" + ev, e); }, gate);
+    render2d::tickCameras(scene, dt, gate);
 }
 
-void World2D::preTick(Scene& scene, wander::InputState& input, wander::Runtime& runtime, float dt) {
+void World2D::preTick(Scene& scene, wander::InputState& input, wander::Runtime& runtime, float baseDt) {
+    const float dt = baseDt;  // UI runs on the real clock; conversations scale per runner below
     ui::UiInput in;
     in.width = viewW_;
     in.height = viewH_;
@@ -133,12 +135,15 @@ void World2D::preTick(Scene& scene, wander::InputState& input, wander::Runtime& 
         const EntityRecord* rec = scene.record(e);
         if (!rec || !rec->vars.contains("_dialogueChoice")) return false;
         auto runner = static_cast<EntityId>(rec->vars.get("_dialogueRunner").asInt());
+        if (!runtime.processGate().runs(runner)) return true;  // the conversation is paused: the click does nothing
         int index = static_cast<int>(rec->vars.get("_dialogueChoice").asInt());
         if (Status s = chooseDialogue(scene, runner, index, &runtime); !s) log::warn("dialogue", s.error().message);
         choiceMade = true;
         return true;
     };
+    ui_->setProcessGate(&runtime.processGate());
     ui_->tick(scene, in, dt, camPtr, ev);
+    ui_->setProcessGate(nullptr);
     input.text.clear();
 
     // Conversations: waits, typewriter, advancing with a click / space / enter, number keys for choices.
@@ -157,12 +162,14 @@ void World2D::preTick(Scene& scene, wander::InputState& input, wander::Runtime& 
             conversations_.erase(it);
             continue;
         }
+        if (!runtime.processGate().runs(e)) continue;  // paused (process mode): the conversation holds
+        const float cdt = baseDt * runtime.processGate().scale(e);
         auto store = vars(scene, e);
         auto evs = events(scene, e, &runtime);
-        if (c.runner->state() == dialogue::Runner::State::Waiting) (void)c.runner->update(dt, store, evs);
+        if (c.runner->state() == dialogue::Runner::State::Waiting) (void)c.runner->update(cdt, store, evs);
         const int total = text::visibleLength(c.runner->line().text);
         if (c.runner->state() == dialogue::Runner::State::Line || c.runner->state() == dialogue::Runner::State::Choices) {
-            c.shown = comp->typewriter <= 0.f ? static_cast<float>(total) : std::min(static_cast<float>(total), c.shown + dt * comp->typewriter);
+            c.shown = comp->typewriter <= 0.f ? static_cast<float>(total) : std::min(static_cast<float>(total), c.shown + cdt * comp->typewriter);
         }
         const bool overUi = ui_->hovered() != kNoEntity;
         const bool advance = !choiceMade && ((released && !overUi) || advanceKey);
