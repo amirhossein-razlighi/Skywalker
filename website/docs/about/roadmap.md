@@ -6,7 +6,7 @@ The ground-up expansion of the engine into a complete, agent-first toolset.
 
 === "Agents"
 
-    - 186 tools over MCP, the editor socket and the C API, with schema validation and did-you-mean errors.
+    - 195 tools over MCP, the editor socket and the C API, with schema validation and did-you-mean errors.
     - Thirteen skills, eight studio-role subagents and five workflow commands for Claude Code, Codex, Gemini CLI and
       Cursor, installed with `skywalker setup`.
     - MCP resources (docs, skills, live catalogue, live studio and scene state) and prompts (roles and workflows).
@@ -14,6 +14,8 @@ The ground-up expansion of the engine into a complete, agent-first toolset.
       measured effects, playtest bots that play, user-defined loops, a headless runner.
     - A Python agent layer (`python/`, `sky-agents`): a typed engine client, agents, shared memory, workflows,
       approvals, evals and tracing, an event log and hosted tools, and `skywalker serve` for a shared headless engine.
+    - Custom tools agents define themselves (Wander, composite and hosted), with capabilities, limits, approval and
+      an audit log.
 
 === "Wander 2"
 

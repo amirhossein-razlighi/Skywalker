@@ -187,6 +187,7 @@ nav:
       - The MCP server: agents/mcp.md
       - Skills and integrations: agents/skills.md
       - Python agents: agents/python.md
+      - Custom tools: agents/custom-tools.md
       - Permissions and approvals: agents/permissions.md
       - Best practices and prompts: agents/best-practices.md
   - Reference:

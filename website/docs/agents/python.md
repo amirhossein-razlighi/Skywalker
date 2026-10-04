@@ -107,7 +107,7 @@ MCP client, and they are *quiet*: they do not appear in the Activity feed or in 
 | Tool or command | What it does |
 |---|---|
 | [`events_poll`](../reference/tools/agent.md#events_poll) | Reads the engine's event log (everything the Activity feed sees, numbered, the last 4096 kept) after a cursor, with optional long polling. |
-| [`tool_host_register`](../reference/tools/agent.md#tool_host_register) | A process offers tools to every client of the engine as `py_<name>`. |
+| [`tool_host_register`](../reference/tools/agent.md#tool_host_register) | A process offers tools to every client of the engine as `py_<name>`, each with its capabilities and limits; the result says which are `active` and which wait for approval. |
 | [`tool_host_poll`](../reference/tools/agent.md#tool_host_poll), [`tool_host_reply`](../reference/tools/agent.md#tool_host_reply) | The host fetches queued calls and answers them. Hosts that stop polling are dropped with their tools. |
 | [`tool_host_unregister`](../reference/tools/agent.md#tool_host_unregister), [`tool_host_list`](../reference/tools/agent.md#tool_host_list) | Stop serving; list who serves what. |
 | [`studio_presence`](../reference/tools/studio.md#studio_presence) | Live status (working, idle, waiting, blocked) in the Studio panel for agents run outside the editor. |
@@ -127,6 +127,10 @@ tool_host_list {}
   runner) fails fast with a hint instead of waiting for the host.
 - **Regenerate the typed wrappers** with `uv run sky-agents gen-tools` after engine tools change; an integration test
   fails when they drift.
+- **Hosted tools follow the custom tool rules.** Each declares the engine tools it calls back into
+  (`@tool(capabilities={"calls": ["scene_query"]})`); callbacks made through `ctx.session` while serving a call carry
+  its id and are checked against that list. Tools that mutate wait for a person's approval under the default policy
+  (`host.status`, `host.pending()`). See [Custom tools](custom-tools.md).
 - **The event log is bounded.** A reader more than 4096 events behind gets `truncated: true` and continues.
 
 !!! agent "For agents"

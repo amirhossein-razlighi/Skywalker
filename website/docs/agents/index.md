@@ -12,7 +12,7 @@ permissions shape what an agent does, and the patterns that make agents effectiv
 ## Design principles
 
 **Everything is a tool.** Every capability is a named tool with an LLM-oriented description, a JSON Schema and a
-handler. The editor's buttons, the in-editor crew, the CLI and external MCP clients all call the same 186 tools, so a
+handler. The editor's buttons, the in-editor crew, the CLI and external MCP clients all call the same 195 tools, so a
 person and an agent never have different powers, and every UI action is scriptable. Arguments are validated before a
 tool runs (types, enums, required and unknown keys) and errors carry a stable code, a message and a hint, often
 *did you mean …?*.
@@ -81,6 +81,7 @@ scene_save {"path": "scenes/main.sky.json"}
 - **[The MCP server](mcp.md)** — modes, transports, tools, resources and prompts, identity and attribution.
 - **[Skills and integrations](skills.md)** — the thirteen skills, subagents and workflow commands per client.
 - **[Python agents](python.md)** — the Python agent layer: engine client, agents, memory, workflows, tracing.
+- **[Custom tools](custom-tools.md)** — tools agents define themselves: Wander, composite and hosted, with capabilities and approval.
 - **[Permissions and approvals](permissions.md)** — tool annotations, categories, autonomy levels, open-world tools.
 - **[Best practices and prompts](best-practices.md)** — patterns, prompt templates and anti-patterns.
 
