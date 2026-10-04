@@ -357,3 +357,4 @@ struct Environment {
 // Workstream components (kept in their own headers).
 #include "skywalker/ecs/GroomComponent.h"
 #include "skywalker/ecs/ProcessComponent.h"  // process: pause modes, run order, interpolation
+#include "skywalker/ecs/PersistComponent.h"  // persist: what save games keep (docs/SAVE_GAMES.md)

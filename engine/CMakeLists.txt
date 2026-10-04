@@ -171,6 +171,13 @@ set(SKY_ENGINE_SOURCES
     # Agent link: followable events and tools served by external processes (docs/PYTHON_AGENTS.md)
     src/agent/AgentLink.cpp
     src/agent/AgentLinkTools.cpp
+    # Save games: persist component, slots, migrations, exact Wander state (docs/SAVE_GAMES.md)
+    src/ecs/PersistComponent.cpp
+    src/wander/RuntimeState.cpp
+    src/game/SaveGame.cpp
+    src/game/SaveSystem.cpp
+    src/game/SaveBuiltins.cpp
+    src/agent/SaveTools.cpp
 )
 
 # DCC bridge: the Python helper library and the Blender add-on are embedded so the engine can

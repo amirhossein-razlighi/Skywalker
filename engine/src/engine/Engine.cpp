@@ -1,5 +1,6 @@
 #include "skywalker/engine/Engine.h"
 #include "skywalker/game/GameSettings.h"
+#include "skywalker/game/SaveGame.h"
 
 #include <algorithm>
 #include <atomic>
@@ -201,6 +202,7 @@ Engine::Engine(EngineConfig config)
     nav_ = std::make_unique<nav::NavSystem>(*scene_, *physics_, [this](const std::string& path) { return resolvePath(path); });
     physics_->setNavigation(nav_.get());
     runtime_->physics = physics_.get();
+    saves_ = std::make_unique<game::SaveSystem>(*this);
     registerEngineTools(*this);
     mainThread_ = std::this_thread::get_id();
     customTools_ = std::make_unique<CustomTools>(*this);  // after the built-in tools: custom ones never shadow them
@@ -338,6 +340,7 @@ void Engine::play() {
         physics_->beginPlay();  // the world is built from the scene on the first tick
         nav_->beginPlay();
         resetFrameFlow();  // render interpolation history, pacing stats
+        saves_->beginPlay();  // game variables, play time, the persisted entities tombstones refer to
     }
     playState_ = PlayState::Playing;
     emitEvent(Json::object({{"type", "play_state"}, {"state", "playing"}}));
@@ -364,6 +367,7 @@ void Engine::stop() {
     physics_->endPlay();
     nav_->endPlay();
     resetFrameFlow();
+    saves_->endPlay();
     input_ = {};
     cursorLocked_ = false;
     audio_->stopAll();
@@ -390,6 +394,7 @@ void Engine::step(int ticks) {
         if (!gate.paused()) native_->tick(kFixedDt * gate.timeScale());  // per-tick systems of native modules
         stepPhysics();  // nav steering, bodies, characters, contacts (holds while the game is paused)
         particles_.update(*scene_, static_cast<float>(kFixedDt), &gate);
+        saves_->endTick();  // saves and loads scripts asked for during the tick
         input_.endTick();
     }
     if (ticks > 0) {

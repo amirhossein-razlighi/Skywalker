@@ -51,6 +51,8 @@ struct GameSettings {
     std::vector<std::pair<std::string, std::string>> mounts;
     // Rendering: "render": {"layers": {"1": "world", "2": "player"}} names the 20 render layers
     render::LayerNames renderLayers;
+    // Save games: "saves": {"version": 2, "maxSlots": 20, "compress": false, "migrate": "..."} (game/SaveGame.h)
+    Json saves;
 
     bool fromFile = false;  // a game.json was found
 
