@@ -20,6 +20,12 @@
 //   hairDom*         deep opacity map: front depth of the hair + 4 cumulative density layers
 //                    (and the depth of opaque meshes around the groom) from the sun
 //   hairCard*        distant LOD: guide strands as wide cards with procedural strand alpha
+// Skinned grooms (characters, creatures)
+//   hairRoots        one thread per guide: its bound triangle on this frame's skinned vertices -> root
+//                    position and the rotation of its surface frame since the rest pose (world)
+//   the simulate / reset / interpolate kernels then pin guides and children to the posed skin; each
+//   substep interpolates the roots between frames, and `follow` carries part of the skin's motion
+//   rigidly so fast characters do not whip their hair (velocities are clamped to `maxSpeed`)
 // ---------------------------------------------------------------------------
 
 struct HairParams {
@@ -39,13 +45,105 @@ struct HairParams {
     float4 wind;           // xyz wind (m/s), w gust
     float4 cards;          // x card width (m), y strands per card, z strand stride (shadow passes), w 0
     float4 colliders[16];  // [a.xyz, kind], [b.xyz, radius]
+    // --- appended (skinned grooms) ---
+    float4 colliders2[16]; // colliders 8..15
+    float4 skin;           // x 1 = roots follow the skinned vertices, y vertex count, z follow (0..1), w max speed (m/s)
+    float4 skinScale;      // xyz the target's scale (grooms grow on the scaled mesh), w 0
+    float4 skinStep;       // x root interpolation at the substep start, y at its end (0 = last frame, 1 = this frame)
 };
+static_assert(sizeof(HairParams) == 896, "HairParams must match HairParamsUniforms in MetalFxInternal.h");
 
 struct HairChild {
     float4 root;     // xyz mesh-local root, w length scale
     float4 weights;  // xyz guide weights, w random
     uint4 guides;    // xyz guide indices, w width multiplier (float bits)
 };
+
+// --- skinned roots -------------------------------------------------------------------------------
+
+static float4 hairQuatMul(float4 a, float4 b) {
+    return float4(a.w * b.xyz + b.w * a.xyz + cross(a.xyz, b.xyz), a.w * b.w - dot(a.xyz, b.xyz));
+}
+
+static float3 hairQuatRotate(float4 q, float3 v) {
+    float3 t = 2.0 * cross(q.xyz, v);
+    return v + q.w * t + cross(q.xyz, t);
+}
+
+static float4 hairQuatFromBasis(float3 x, float3 y, float3 z) {
+    // Same as anim::Quat::fromMatrix (columns x, y, z).
+    float tr = x.x + y.y + z.z;
+    float4 q;
+    if (tr > 0.0) {
+        float s = sqrt(tr + 1.0) * 2.0;
+        q = float4((y.z - z.y) / s, (z.x - x.z) / s, (x.y - y.x) / s, 0.25 * s);
+    } else if (x.x > y.y && x.x > z.z) {
+        float s = sqrt(1.0 + x.x - y.y - z.z) * 2.0;
+        q = float4(0.25 * s, (y.x + x.y) / s, (z.x + x.z) / s, (y.z - z.y) / s);
+    } else if (y.y > z.z) {
+        float s = sqrt(1.0 + y.y - x.x - z.z) * 2.0;
+        q = float4((y.x + x.y) / s, 0.25 * s, (z.y + y.z) / s, (z.x - x.z) / s);
+    } else {
+        float s = sqrt(1.0 + z.z - x.x - y.y) * 2.0;
+        q = float4((z.x + x.z) / s, (z.y + y.z) / s, 0.25 * s, (x.y - y.x) / s);
+    }
+    return normalize(q);
+}
+
+static float4 hairQuatSlerp(float4 a, float4 b, float t) {
+    if (dot(a, b) < 0.0) b = -b;
+    return normalize(mix(a, b, t));  // the roots move little between frames: nlerp is enough
+}
+
+// A root bound to a triangle (fx::evalRoot on the CPU): position (scaled mesh space) and surface frame.
+static void hairSkinRoot(device const float* v, uint count, uint4 bind, float3 scale, thread float3& pos, thread float4& frame) {
+    uint n = max(count, 1u) - 1u;
+    uint i0 = min(bind.x, n), i1 = min(bind.y, n), i2 = min(bind.z, n);
+    float b1 = float(bind.w & 0xFFFFu) / 65535.0, b2 = float(bind.w >> 16) / 65535.0, b0 = 1.0 - b1 - b2;
+    float3 p0 = float3(v[i0 * 12], v[i0 * 12 + 1], v[i0 * 12 + 2]) * scale;
+    float3 p1 = float3(v[i1 * 12], v[i1 * 12 + 1], v[i1 * 12 + 2]) * scale;
+    float3 p2 = float3(v[i2 * 12], v[i2 * 12 + 1], v[i2 * 12 + 2]) * scale;
+    float3 nr = float3(v[i0 * 12 + 3], v[i0 * 12 + 4], v[i0 * 12 + 5]) * b0 + float3(v[i1 * 12 + 3], v[i1 * 12 + 4], v[i1 * 12 + 5]) * b1 +
+                float3(v[i2 * 12 + 3], v[i2 * 12 + 4], v[i2 * 12 + 5]) * b2;
+    pos = p0 * b0 + p1 * b1 + p2 * b2;
+    if (length(nr) < 1e-8) nr = cross(p1 - p0, p2 - p0);
+    nr = length(nr) > 1e-12 ? normalize(nr) : float3(0, 1, 0);
+    float3 t = p1 - p0;
+    t -= nr * dot(t, nr);
+    if (length(t) < 1e-9) {
+        t = p2 - p0;
+        t -= nr * dot(t, nr);
+    }
+    if (length(t) < 1e-9) t = abs(nr.x) < 0.9 ? cross(nr, float3(1, 0, 0)) : cross(nr, float3(0, 0, 1));
+    t = normalize(t);
+    frame = hairQuatFromBasis(t, nr, cross(t, nr));
+}
+
+// One thread per guide: world root (xyz) and world rotation since the rest pose (model rotation x frame delta).
+kernel void hairRoots(uint g [[thread_position_in_grid]], constant HairParams& H [[buffer(0)]],
+                      device const float* verts [[buffer(1)]], device const uint4* binds [[buffer(2)]],
+                      device const float4* restFrames [[buffer(3)]], device float4* roots [[buffer(4)]]) {
+    uint G = uint(H.dims.z);
+    if (g >= G) return;
+    float3 p;
+    float4 cur;
+    hairSkinRoot(verts, uint(H.skin.y), binds[g], H.skinScale.xyz, p, cur);
+    float4 rest = restFrames[g];
+    float4 delta = hairQuatMul(cur, float4(-rest.xyz, rest.w));
+    float3 m0 = normalize(H.model[0].xyz), m1 = normalize(H.model[1].xyz), m2 = normalize(H.model[2].xyz);
+    float4 model = hairQuatFromBasis(m0, m1, m2);
+    roots[g] = float4((H.model * float4(p, 1.0)).xyz, 0.0);
+    roots[G + g] = normalize(hairQuatMul(model, delta));
+}
+
+// The guide's root frame at `a` (0 = last frame, 1 = this frame).
+static void hairRootAt(device const float4* last, device const float4* cur, uint g, uint G, float a, thread float3& pos,
+                       thread float4& rot) {
+    pos = mix(last[g].xyz, cur[g].xyz, a);
+    rot = hairQuatSlerp(last[G + g], cur[G + g], a);
+}
+
+static float4 hairCollider(constant HairParams& H, int i) { return i < 16 ? H.colliders[i] : H.colliders2[i - 16]; }
 
 // Large so that even one hair sample in a pixel keeps the MSAA-resolved flag above 1.5: screen-space
 // GI / reflections then leave hair pixels alone (hair has its own ambient and scattering).
@@ -88,25 +186,51 @@ static bool hairPushOut(float4 a, float4 b, thread float3& p, float margin) {
 
 kernel void hairReset(uint id [[thread_position_in_grid]], constant HairParams& H [[buffer(0)]],
                       device const float4* rest [[buffer(1)]], device float4* pos [[buffer(2)]],
-                      device float4* prev [[buffer(3)]]) {
-    uint n = uint(H.dims.z) * uint(H.dims.x);
+                      device float4* prev [[buffer(3)]], device const float4* roots [[buffer(4)]]) {
+    uint G = uint(H.dims.z), P = uint(H.dims.x);
+    uint n = G * P;
     if (id >= n) return;
-    float4 w = float4((H.model * float4(rest[id].xyz, 1.0)).xyz, 0.0);
+    float4 w;
+    if (H.skin.x > 0.5) {
+        uint g = id / P;
+        w = float4(roots[g].xyz + hairQuatRotate(roots[G + g], rest[id].xyz - rest[g * P].xyz), 0.0);
+    } else {
+        w = float4((H.model * float4(rest[id].xyz, 1.0)).xyz, 0.0);
+    }
     pos[id] = w;
     prev[id] = w;
 }
 
 kernel void hairSimulate(uint g [[thread_position_in_grid]], constant HairParams& H [[buffer(0)]],
                          device const float4* rest [[buffer(1)]], device float4* pos [[buffer(2)]],
-                         device float4* prev [[buffer(3)]]) {
-    uint G = uint(H.dims.z), P = uint(H.dims.x);
+                         device float4* prev [[buffer(3)]], device const float4* rootsLast [[buffer(4)]],
+                         device const float4* rootsCur [[buffer(5)]]) {
+    uint G = uint(H.dims.z), P = min(uint(H.dims.x), 32u);
     if (g >= G) return;
-    device const float4* r = rest + g * P;
-    device float4* x = pos + g * P;
-    device float4* xp = prev + g * P;
+    device const float4* r = rest + g * uint(H.dims.x);
+    device float4* x = pos + g * uint(H.dims.x);
+    device float4* xp = prev + g * uint(H.dims.x);
     float dt = max(H.sim.x, 1e-4);
     float3 target[32], cur[32];
-    for (uint k = 0; k < P; ++k) target[k] = (H.model * float4(r[k].xyz, 1.0)).xyz;
+    if (H.skin.x > 0.5) {
+        // Roots on the skin: interpolated across the substep. `follow` moves the strand rigidly with the
+        // root frame (positions and their history alike: inertia is kept for the rest of the motion).
+        float3 p0, p1;
+        float4 q0, q1;
+        hairRootAt(rootsLast, rootsCur, g, G, H.skinStep.x, p0, q0);
+        hairRootAt(rootsLast, rootsCur, g, G, H.skinStep.y, p1, q1);
+        float4 dq = hairQuatMul(q1, float4(-q0.xyz, q0.w));
+        float follow = clamp(H.skin.z, 0.0, 1.0);
+        for (uint k = 1; k < P; ++k) {
+            float3 a = x[k].xyz, b = xp[k].xyz;
+            x[k] = float4(mix(a, p1 + hairQuatRotate(dq, a - p0), follow), 0.0);
+            xp[k] = float4(mix(b, p1 + hairQuatRotate(dq, b - p0), follow), 0.0);
+        }
+        for (uint k = 0; k < P; ++k) target[k] = p1 + hairQuatRotate(q1, r[k].xyz - r[0].xyz);
+    } else {
+        for (uint k = 0; k < P; ++k) target[k] = (H.model * float4(r[k].xyz, 1.0)).xyz;
+    }
+    const float maxStep = H.skin.x > 0.5 ? max(H.skin.w, 0.1) * dt : 1e9;
     cur[0] = target[0];
     x[0] = float4(target[0], 0.0);
     xp[0] = float4(target[0], 0.0);
@@ -117,6 +241,8 @@ kernel void hairSimulate(uint g [[thread_position_in_grid]], constant HairParams
         float tk = float(k) / float(P - 1);
         float3 pk = x[k].xyz, pp = xp[k].xyz;
         float3 v = (pk - pp) * (1.0 - damping);
+        float vl = length(v);
+        if (vl > maxStep) v *= maxStep / vl;  // stability under fast character motion
         float3 windV = H.wind.xyz * gust;
         float3 acc = float3(0.0, -H.sim2.y, 0.0) + (windV - v / dt) * H.sim2.w * tk;
         float3 nx = pk + v + acc * dt * dt;
@@ -126,7 +252,7 @@ kernel void hairSimulate(uint g [[thread_position_in_grid]], constant HairParams
         cur[k] = nx;
         xp[k] = float4(pk, 0.0);
     }
-    int nc = int(H.sim2.z + 0.5);
+    int nc = clamp(int(H.sim2.z + 0.5), 0, 16);
     for (uint k = 1; k < P; ++k) {
         float tk = float(k) / float(P - 1);
         float3 restSeg = target[k] - target[k - 1];
@@ -137,9 +263,9 @@ kernel void hairSimulate(uint g [[thread_position_in_grid]], constant HairParams
         float3 d = mix(cur[k] - cur[k - 1], desired, ls);
         float3 np = cur[k - 1] + normalize(d + 1e-9) * restLen;
         float margin = 0.002;
-        for (int c = 0; c < nc; ++c) hairPushOut(H.colliders[c * 2], H.colliders[c * 2 + 1], np, margin);
+        for (int c = 0; c < nc; ++c) hairPushOut(hairCollider(H, c * 2), hairCollider(H, c * 2 + 1), np, margin);
         np = cur[k - 1] + normalize(np - cur[k - 1] + 1e-9) * restLen;  // inextensible
-        for (int c = 0; c < nc; ++c) hairPushOut(H.colliders[c * 2], H.colliders[c * 2 + 1], np, margin * 0.5);
+        for (int c = 0; c < nc; ++c) hairPushOut(hairCollider(H, c * 2), hairCollider(H, c * 2 + 1), np, margin * 0.5);
         cur[k] = np;
         x[k] = float4(np, 0.0);
     }
@@ -164,12 +290,26 @@ static float3 hairBase(HairChild c, float3 root, device const float4* guides, ui
 // (a rolling window, no per-thread arrays) exactly like fx::transportFrames on the CPU.
 kernel void hairInterpolate(uint i [[thread_position_in_grid]], constant HairParams& H [[buffer(0)]],
                             device const HairChild* children [[buffer(1)]], device const half4* offsets [[buffer(2)]],
-                            device const float4* guides [[buffer(3)]], device float4* out [[buffer(4)]]) {
+                            device const float4* guides [[buffer(3)]], device float4* out [[buffer(4)]],
+                            device const uint4* childBinds [[buffer(5)]], device const float* verts [[buffer(6)]],
+                            device const float4* roots [[buffer(7)]]) {
     uint N = uint(H.dims.y), P = uint(H.dims.x);
     if (i >= N) return;
     HairChild c = children[i];
     float3 root = (H.model * float4(c.root.xyz, 1.0)).xyz;
     float3 ref = normalize((H.model * float4(1.0, 0.0, 0.0, 0.0)).xyz);
+    float3 altAxis = normalize((H.model * float4(0.0, 0.0, 1.0, 0.0)).xyz);
+    if (H.skin.x > 0.5) {
+        // The child's own root on the posed skin; its frame turns with its first guide's root.
+        float3 p;
+        float4 frame;
+        hairSkinRoot(verts, uint(H.skin.y), childBinds[i], H.skinScale.xyz, p, frame);
+        root = (H.model * float4(p, 1.0)).xyz;
+        uint G = uint(H.dims.z);
+        float4 q = roots[G + min(c.guides.x, max(G, 1u) - 1u)];
+        ref = normalize(hairQuatRotate(q, float3(1.0, 0.0, 0.0)));
+        altAxis = normalize(hairQuatRotate(q, float3(0.0, 0.0, 1.0)));
+    }
     float scale = H.dims.w;
     // w packs the strand's width multiplier (integer part, 1/256 steps) and random value (fraction),
     // so drawing reads one float4 per point and nothing else.
@@ -183,10 +323,7 @@ kernel void hairInterpolate(uint i [[thread_position_in_grid]], constant HairPar
         prevT = T;
         if (k == 0) {
             float3 n0 = ref - T * dot(ref, T);
-            if (length(n0) < 0.1) {
-                float3 alt = normalize((H.model * float4(0.0, 0.0, 1.0, 0.0)).xyz);
-                n0 = alt - T * dot(alt, T);
-            }
+            if (length(n0) < 0.1) n0 = altAxis - T * dot(altAxis, T);
             float l0 = length(n0);
             Nk = l0 > 1e-12 ? n0 / l0 : float3(1, 0, 0);
         } else {

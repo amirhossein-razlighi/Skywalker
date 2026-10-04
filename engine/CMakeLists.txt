@@ -171,6 +171,8 @@ set(SKY_ENGINE_SOURCES
     src/anim/CharacterIk.cpp
     src/ecs/CharacterComponents.cpp
     src/engine/CharacterHooks.cpp
+    src/fx/GroomBinding.cpp
+    src/anim/BodyColliders.cpp
 )
 
 # DCC bridge: the Python helper library and the Blender add-on are embedded so the engine can

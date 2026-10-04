@@ -666,7 +666,13 @@ public:
             lightsBuf_ = transient(allLights.data(), allLights.size() * sizeof(GPULight));
             clusterCellsBuf_ = transient(grid.cells.data(), grid.cells.size() * sizeof(uint32_t));
             clusterIndexBuf_ = transient(grid.indices.data(), grid.indices.size() * sizeof(uint32_t));
-            encodeSkinning(cmd, frame);  // animation: posed vertices for every pass below
+            {  // animation: posed vertices for every pass below, in a command buffer committed before the
+               // effects' own (skinned hair and fur read this frame's pose)
+                id<MTLCommandBuffer> skinCmd = [queue_ commandBuffer];
+                skinCmd.label = @"Skinning";
+                encodeSkinning(skinCmd, frame);
+                [skinCmd commit];
+            }
             ensureCloudNoise(cmd);
             encodeEnvironment(cmd, frame, base);
             lodFrame_ = &frame;

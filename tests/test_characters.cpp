@@ -9,6 +9,9 @@
 #include "skywalker/anim/Controller.h"
 #include "skywalker/anim/HumanoidMap.h"
 #include "skywalker/anim/Retarget.h"
+#include "skywalker/fx/Groom.h"
+#include "skywalker/fx/GroomBinding.h"
+#include "skywalker/scene/Scene.h"
 
 using namespace sky;
 using namespace sky::anim;
@@ -494,4 +497,150 @@ TEST_CASE("foot and hand IK on a skeleton: pelvis, ankles on target, hands reach
     REQUIRE(applyHand(sk, map, true, grip, Mat4{}, 1.f, false, pose, g));
     CHECK(distance(pos(g, map[HumanBone::LeftHand]), grip.translation()) < 1e-3f);
     CHECK_FALSE(applyHand(sk, HumanoidMap{}, true, grip, Mat4{}, 1.f, false, pose, g));
+}
+
+// ---------------------------------------------------------------------------------------------
+// Skinned grooms: barycentric root binding, rebinding, roots on the posed skin, masks
+// ---------------------------------------------------------------------------------------------
+
+namespace {
+
+/// A vertical 0.4 x 2 m grid strip skinned to two bones (Root below y = 1, Upper above), facing +Z.
+MeshData skinnedStrip() {
+    MeshData m;
+    const int rows = 20, cols = 4;
+    for (int r = 0; r <= rows; ++r) {
+        for (int c = 0; c <= cols; ++c) {
+            float x = -0.2f + 0.4f * static_cast<float>(c) / cols, y = 2.f * static_cast<float>(r) / rows;
+            m.addVertex({x, y, 0}, {0, 0, 1}, {static_cast<float>(c) / cols, static_cast<float>(r) / rows});
+        }
+    }
+    for (int r = 0; r < rows; ++r) {
+        for (int c = 0; c < cols; ++c) {
+            uint32_t a = static_cast<uint32_t>(r * (cols + 1) + c), b = a + 1, d = a + cols + 1, e = d + 1;
+            m.indices.insert(m.indices.end(), {a, b, e, a, e, d});
+        }
+    }
+    m.bounds = {{-0.2f, 0, 0}, {0.2f, 2, 0}};
+    SkinStream& s = m.skin;
+    s.jointNames = {"Root", "Upper"};
+    s.inverseBind = {Mat4{}, Mat4::translate({0, -1, 0})};
+    s.restGlobal = {Mat4{}, Mat4::translate({0, 1, 0})};
+    s.slotBounds = {m.bounds, m.bounds};
+    for (size_t v = 0; v < m.vertexCount(); ++v) {
+        const float* p = &m.vertices[v * MeshData::kFloatsPerVertex];
+        s.bind.insert(s.bind.end(), {p[0], p[1], p[2], p[3], p[4], p[5]});
+        bool upper = p[1] > 1.f + 1e-4f;
+        s.joints.insert(s.joints.end(), {static_cast<uint16_t>(upper ? 1 : 0), 0, 0, 0});
+        s.weights.insert(s.weights.end(), {1.f, 0.f, 0.f, 0.f});
+    }
+    return m;
+}
+
+Skeleton stripSkeleton() {
+    Skeleton sk;
+    sk.bones.push_back({"Root", -1, {}});
+    sk.bones.push_back({"Upper", 0, {{0, 1, 0}, {}, {1, 1, 1}}});
+    return sk;
+}
+
+}  // namespace
+
+TEST_CASE("groom binding: barycentric roots, rebinding imported strands, roots on the posed skin") {
+    MeshData mesh = skinnedStrip();
+    Groom g;
+    g.strands = 600;
+    g.guides = 40;
+    g.segments = 4;
+    g.length = 0.05f;
+    g.maskAngle = 180.f;
+    auto d = fx::generateGroom(g, &mesh);
+    REQUIRE(d);
+    REQUIRE(d->bound());
+    CHECK(d->meshVertices == mesh.vertexCount());
+    // Every root is its triangle's barycentric point.
+    for (size_t i = 0; i < d->children.size(); i += 37) {
+        fx::RootFrame f = fx::evalRoot(mesh.vertices.data(), mesh.vertexCount(), d->childBind[i], {1, 1, 1});
+        CHECK(distance(f.position, d->children[i].root) < 1e-5f);
+    }
+    // Rest frames: the normal (frame y axis) is the surface normal.
+    Vec3 n = fx::quatRotate(d->guideFrames[0], {0, 1, 0});
+    CHECK(n.z == doctest::Approx(1.f).epsilon(1e-4));
+
+    // Rebinding points slightly off the surface finds the same spot.
+    std::vector<Vec3> pts;
+    for (size_t i = 0; i < d->children.size(); i += 50) pts.push_back(d->children[i].root + Vec3{0, 0, 0.003f});
+    float err = 0.f;
+    auto binds = fx::bindToMesh(mesh, pts, &err);
+    CHECK(err == doctest::Approx(0.003f).epsilon(0.01));
+    for (size_t i = 0; i < pts.size(); ++i) {
+        fx::RootFrame f = fx::evalRoot(mesh.vertices.data(), mesh.vertexCount(), binds[i], {1, 1, 1});
+        CHECK(distance(f.position, pts[i] - Vec3{0, 0, 0.003f}) < 1e-4f);
+    }
+
+    // Pose the upper bone (bend 90 degrees about Z): the CPU-skinned guide roots lie on the posed surface
+    // and their frames turned with it.
+    Skeleton sk = stripSkeleton();
+    Pose pose = restPose(sk);
+    pose[1].r = Quat::axisAngle({0, 0, 1}, radians(90.f));
+    std::vector<Mat4> globals, palette;
+    computeGlobals(sk, pose, globals);
+    skinPalette(mesh.skin, mapSkin(mesh.skin, sk), globals, palette);
+    MeshData posed;
+    skinMesh(mesh, palette, posed);
+    auto roots = fx::skinnedGuideRoots(*d, mesh, palette, {1, 1, 1});
+    REQUIRE(roots.size() == d->guideCount());
+    int upper = 0;
+    for (size_t gi = 0; gi < roots.size(); ++gi) {
+        fx::RootFrame ref = fx::evalRoot(posed.vertices.data(), posed.vertexCount(), d->guideBind[gi], {1, 1, 1});
+        CHECK(distance(roots[gi].position, ref.position) < 1e-4f);
+        Vec4 r = fx::rootRotation(roots[gi].rotation, d->guideFrames[gi]);
+        if (d->guideRest[gi * d->points].y > 1.05f) {
+            ++upper;
+            CHECK(degrees(2.f * std::acos(std::clamp(std::fabs(r.w), 0.f, 1.f))) == doctest::Approx(90.f).epsilon(0.01));
+            CHECK(roots[gi].position.x < 0.f);  // bent over to -X
+        }
+    }
+    CHECK(upper > 5);
+}
+
+TEST_CASE("groom masks: bone and mirrored region masks only grow where asked") {
+    MeshData mesh = skinnedStrip();
+    fx::GroomSystem sys;
+    Scene scene;
+    EntityId e = scene.create("Strip");
+    scene.add<MeshRenderer>(e).mesh = "asset:strip.glb";
+    Groom g;
+    g.strands = 800;
+    g.segments = 3;
+    g.length = 0.02f;
+    g.maskAngle = 180.f;
+    g.maskBone = "Upper";
+    scene.add<Groom>(e) = g;
+    auto meshes = [&](const std::string&) -> const MeshData* { return &mesh; };
+    auto paths = [](const std::string& p) { return p; };
+    auto d = sys.groomFor(scene, e, meshes, paths);
+    REQUIRE(d);
+    for (const auto& c : d->children) CHECK(c.root.y > 0.9f);  // only the Upper bone's half
+    // Region (mirrored): two small discs at x = +-0.15, y = 1.5.
+    g.maskBone = "";
+    g.maskCenter = {0.15f, 1.5f, 0};
+    g.maskRadius = {0.04f, 0.08f, 0.2f};  // smaller than the 0.1 m vertex spacing: evaluated per root
+    g.maskMirror = true;
+    *scene.get<Groom>(e) = g;
+    d = sys.groomFor(scene, e, meshes, paths);
+    REQUIRE(d);
+    int left = 0, right = 0;
+    for (const auto& c : d->children) {
+        CHECK(std::fabs(c.root.y - 1.5f) < 0.08f);
+        CHECK(std::fabs(std::fabs(c.root.x) - 0.15f) < 0.04f);
+        (c.root.x > 0 ? right : left)++;
+    }
+    CHECK(left > 100);
+    CHECK(right > 100);
+    // A bone that does not exist fails with a hint.
+    scene.get<Groom>(e)->maskBone = "Uper";
+    std::string error;
+    CHECK(sys.groomFor(scene, e, meshes, paths, &error) == nullptr);
+    CHECK(error.find("Upper") != std::string::npos);
 }

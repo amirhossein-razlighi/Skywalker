@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "skywalker/anim/AnimationSystem.h"
+#include "skywalker/anim/BodyColliders.h"
 #include "skywalker/anim/CharacterIk.h"
 #include "skywalker/anim/HumanoidMap.h"
 
@@ -66,6 +67,7 @@ struct AnimationSystem::Instance {
     float restAnkleHeight = -1.f, restToeHeight = 0.f;  // model units (rest pose)
     std::optional<float> turnTarget;      // turn_in_place: world yaw (degrees) to reach
     Json ikStatus;                        // last solve, for character_inspect and the debug views
+    std::unordered_map<std::string, std::vector<BodyCapsule>> capsules;  // per skinned mesh (fitted once)
 };
 
 struct AnimationSystem::SeqInstance {

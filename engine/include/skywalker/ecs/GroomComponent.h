@@ -74,6 +74,16 @@ struct Groom {
     float cardsBelow = 90.f;         // auto: cards when the groom is smaller than this (pixels)
     bool castShadows = true;
     int seed = 0;
+    // --- Skinned characters (docs/CHARACTERS.md) ------------------------------------------
+    std::string attach = "auto";     // auto | rigid | skinned: roots follow the animated skin (auto = when the mesh is rigged)
+    float follow = 0.6f;             // skinned: share of the skin's motion strands take rigidly before simulating (0 = all inertia)
+    float maxSpeed = 8.f;            // m/s: strand points never move faster than this relative to their roots
+    bool bodyColliders = true;       // skinned: collide with capsules fitted to the character's skeleton (head, neck, torso, limbs)
+    std::string maskBone;            // grow only on vertices skinned to this bone and its children ("Head")
+    Vec3 maskCenter{0.f};            // region center: offset from maskBone's rest position (or the mesh origin), mesh axes, m
+    Vec3 maskRadius{0.f};            // region ellipsoid radii (m); 0 = no region
+    bool maskMirror = false;         // also grow in the region mirrored across the mesh's X = 0 plane (eyebrows, sideburns)
+    float lodBias = 1.f;             // real time: > 1 keeps more strands at a distance, < 1 fewer
 
     static const TypeInfo& type();
     /// Named starting points (hair_straight, hair_wavy, hair_curly, hair_ponytail, fur_short, fur_long...).

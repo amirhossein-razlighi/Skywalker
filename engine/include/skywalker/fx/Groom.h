@@ -49,9 +49,12 @@ std::vector<uint8_t> writeSkyGroom(const StrandSet& strands);
 /// Loads any supported groom file by extension (scale and Z-up conversion applied).
 Result<StrandSet> loadStrands(const std::string& path, float scale = 1.f, bool zUp = false);
 
-/// Grows a groom on a mesh (mesh local space). `mesh` may be null for imported grooms.
-/// Deterministic: the same inputs give bit-identical output.
-Result<GroomData> generateGroom(const Groom& params, const MeshData* mesh);
+/// Grows a groom on a mesh (mesh local space). `mesh` may be null for imported grooms. `vertexMask`
+/// (optional, one 0..1 value per vertex) scales the density (bone masks); the maskCenter / maskRadius
+/// region is evaluated exactly per root, around `regionCenter` (default: params.maskCenter).
+/// Deterministic: the same inputs give bit-identical output. Roots are bound to their triangles.
+Result<GroomData> generateGroom(const Groom& params, const MeshData* mesh, const std::vector<float>* vertexMask = nullptr,
+                                const Vec3* regionCenter = nullptr);
 /// Builds a groom from explicit strands (every strand rendered; a subset becomes guides).
 Result<GroomData> groomFromStrands(const Groom& params, const StrandSet& strands, const MeshData* mesh);
 
@@ -81,6 +84,28 @@ public:
     using MeshProvider = std::function<const MeshData*(const std::string& key)>;
     using PathResolver = std::function<std::string(const std::string& path)>;
 
+    /// Character tech (set by the engine): what skinned grooms need from the animation system.
+    struct Hooks {
+        /// Joint palette (mesh space) of a rigged mesh drawn by `entity` this frame; null = not animated.
+        std::function<std::shared_ptr<const std::vector<Mat4>>(EntityId entity, const std::string& meshKey)> palette;
+        /// CPU-skinned copy of that mesh (the fallback when it is not drawn).
+        std::function<std::shared_ptr<const MeshData>(EntityId entity, const std::string& meshKey)> posed;
+        /// World capsules fitted to the skeleton that animates `entity` (head, neck, torso, limbs).
+        std::function<std::vector<FxCollider>(EntityId entity)> bodyColliders;
+        /// A bone and its descendants, by name, in the skeleton of a rigged mesh (maskBone).
+        std::function<std::vector<std::string>(const std::string& meshKey, const std::string& bone)> boneFamily;
+    };
+    Hooks hooks;
+
+    /// The current guide roots of a groom in world space (CPU skinned when it follows a skin).
+    struct RootsView {
+        std::vector<Vec3> roots, normals;
+        bool skinned = false;
+        size_t children = 0, bound = 0;
+        float bindError = 0.f;
+    };
+    Result<RootsView> roots(const Scene& scene, EntityId e, const MeshProvider& meshes, const PathResolver& resolve);
+
     /// Builds GroomItems for every visible groom (generating as needed).
     void gather(const Scene& scene, const MeshProvider& meshes, const PathResolver& resolve,
                 std::vector<GroomItem>& out);
@@ -93,6 +118,10 @@ public:
     double lastGenerateMs() const { return lastGenerateMs_; }
 
 private:
+    /// Per-vertex density from maskBone (skin weights of the bone family); `regionCenter` = maskCenter offset
+    /// from the bone's rest position (scaled mesh space).
+    std::vector<float> vertexMask(const Groom& g, const MeshData& mesh, const std::string& meshKey, Vec3 scale, Vec3& regionCenter,
+                                  std::string& error) const;
     struct Entry {
         uint64_t hash = 0;
         std::shared_ptr<const GroomData> data;

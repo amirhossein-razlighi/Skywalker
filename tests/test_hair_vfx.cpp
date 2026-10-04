@@ -340,6 +340,7 @@ TEST_CASE("vfx & hair: presets are valid components") {
         REQUIRE(scene.patchComponent(e, "groom", fx::groomPreset(name)));
         Groom g = *scene.get<Groom>(e);
         g.strands = 500;  // keep the test fast
+        g.maskRadius = {0, 0, 0};  // face presets (beard, eyebrows) target a character's head region
         auto d = fx::generateGroom(g, &sphere);
         CHECK(d);
     }

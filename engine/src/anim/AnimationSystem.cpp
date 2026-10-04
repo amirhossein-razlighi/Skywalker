@@ -357,6 +357,7 @@ void AnimationSystem::initRuntime(Instance& inst, const Animator& a) {
     inst.lookTarget.reset();
     inst.rootMode = -1;
     inst.humanoid.reset();
+    inst.capsules.clear();
     inst.feet = FootIkState{};
     inst.ikStatus = Json();
     ++inst.version;

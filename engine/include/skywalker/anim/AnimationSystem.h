@@ -124,6 +124,8 @@ public:
     Result<Json> characterStatus(EntityId e);
     /// Bone segments (parent joint -> joint) of the current pose in world space (debug views).
     std::vector<std::pair<Vec3, Vec3>> skeletonLines(EntityId e);
+    /// World capsules fitted to a skinned draw's mesh around its bones, in the current pose (BodyColliders.cpp).
+    std::vector<FxCollider> bodyColliders(EntityId drawEntity, const std::string& meshKey);
 
     Status playSequence(EntityId e, float from = 0.f);
     Status stopSequence(EntityId e);

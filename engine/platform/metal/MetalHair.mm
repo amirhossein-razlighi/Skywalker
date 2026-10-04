@@ -39,7 +39,7 @@ bool MetalHair::build(id<MTLLibrary> lib, const FxFormats& fmt) {
     kernels_.clear();
     shadowTile_ = fmt.shadowTileTexels;
     NSError* err = nil;
-    for (const char* k : {"hairReset", "hairSimulate", "hairInterpolate"}) {
+    for (const char* k : {"hairReset", "hairSimulate", "hairInterpolate", "hairRoots"}) {
         id<MTLFunction> f = [lib newFunctionWithName:[NSString stringWithUTF8String:k]];
         id<MTLComputePipelineState> ps = f ? newComputePipeline(device_, f, &err) : nil;
         if (!ps) {
@@ -152,8 +152,106 @@ void MetalHair::upload(GroomGpu& g, const GroomItem& item) {
         t.storageMode = MTLStorageModePrivate;
         g.domDensity = [device_ newTextureWithDescriptor:t];
     }
+    // Skinned grooms: root binds (vertex indices + 16-bit barycentrics) and rest frames.
+    g.guideBind = g.childBind = g.guideFrames = g.rootsLast = g.rootsCur = nil;
+    if (d.bound()) {
+        auto pack = [](const GroomData::RootBind& b) {
+            uint32_t b1 = static_cast<uint32_t>(std::lround(std::clamp(b.b1, 0.f, 1.f) * 65535.f));
+            uint32_t b2 = static_cast<uint32_t>(std::lround(std::clamp(b.b2, 0.f, 1.f) * 65535.f));
+            return simd_make_uint4(b.v[0], b.v[1], b.v[2], b1 | (b2 << 16));
+        };
+        std::vector<simd_uint4> gb(d.guideBind.size()), cb(d.childBind.size());
+        for (size_t i = 0; i < gb.size(); ++i) gb[i] = pack(d.guideBind[i]);
+        for (size_t i = 0; i < cb.size(); ++i) cb[i] = pack(d.childBind[i]);
+        std::vector<simd_float4> frames(d.guideBind.size(), simd_make_float4(0, 0, 0, 1));
+        for (size_t i = 0; i < frames.size() && i < d.guideFrames.size(); ++i) {
+            frames[i] = simd_make_float4(d.guideFrames[i].x, d.guideFrames[i].y, d.guideFrames[i].z, d.guideFrames[i].w);
+        }
+        g.guideBind = [device_ newBufferWithBytes:gb.data() length:gb.size() * sizeof(simd_uint4) options:MTLResourceStorageModeShared];
+        g.childBind = [device_ newBufferWithBytes:cb.data() length:cb.size() * sizeof(simd_uint4) options:MTLResourceStorageModeShared];
+        g.guideFrames = [device_ newBufferWithBytes:frames.data() length:frames.size() * sizeof(simd_float4)
+                                            options:MTLResourceStorageModeShared];
+        g.rootsLast = [device_ newBufferWithLength:static_cast<NSUInteger>(g.G) * 2 * 16 options:MTLResourceStorageModePrivate];
+        g.rootsCur = [device_ newBufferWithLength:static_cast<NSUInteger>(g.G) * 2 * 16 options:MTLResourceStorageModePrivate];
+    }
+    g.rootsValid = false;
     g.posValid = false;
     g.interpolated = false;
+}
+
+id<MTLBuffer> MetalHair::skinVertices(GroomGpu& g, const GroomItem& item, uint32_t& count) {
+    count = 0;
+    const NSUInteger stride = MeshData::kFloatsPerVertex * sizeof(float);
+    FxMesh m = meshes_ ? meshes_(item.skinKey) : FxMesh{};
+    if (m.vertices && m.vertices.length >= stride) {
+        g.vertexSource = "gpu-skinning";
+        count = static_cast<uint32_t>(m.vertices.length / stride);
+        return m.vertices;
+    }
+    if (item.posed && !item.posed->vertices.empty()) {  // the target is not drawn: CPU-skinned copy
+        // A fresh buffer every frame: the previous one may still be read by a frame in flight.
+        g.cpuVerts = [device_ newBufferWithBytes:item.posed->vertices.data() length:item.posed->vertices.size() * sizeof(float)
+                                        options:MTLResourceStorageModeShared];
+        g.vertexSource = "cpu-skinning";
+        count = static_cast<uint32_t>(item.posed->vertexCount());
+        return g.cpuVerts;
+    }
+    FxMesh rest = meshes_ ? meshes_(item.meshKey) : FxMesh{};
+    if (rest.vertices && rest.vertices.length >= stride) {
+        g.vertexSource = "rest";
+        count = static_cast<uint32_t>(rest.vertices.length / stride);
+        return rest.vertices;
+    }
+    g.vertexSource = "none";
+    return nil;
+}
+
+std::vector<uint32_t> MetalHair::strandBudget(const FrameData& frame) {
+    // Real time only: stills (accumulated sub-samples) and movie frames draw every strand.
+    std::vector<uint32_t> drawn(frame.grooms.size(), 0);
+    const ViewCamera& cam = frame.camera;
+    const float H = static_cast<float>(std::max(frame.height, 1));
+    const bool ortho = cam.orthographic;
+    const float pixelAt1m = ortho ? cam.orthoSize * 2.f / H : 2.f * std::tan(radians(cam.fovDeg) * 0.5f) / H;
+    const bool realtime = frame.samples <= 1 && !frame.offline.enabled;
+    double total = 0;
+    for (size_t i = 0; i < frame.grooms.size(); ++i) {
+        const GroomItem& item = frame.grooms[i];
+        if (!item.data) continue;
+        const GroomData& d = *item.data;
+        const uint32_t N = static_cast<uint32_t>(d.strandCount());
+        const Groom& p = item.params;
+        const float scale = modelScale(item.model);
+        Vec3 center = item.model.transformPoint(d.bounds.center());
+        float radius = length(d.bounds.extents()) * scale + p.length * 0.25f * scale + 0.02f;
+        if (item.skinned && item.rootBounds.max.x >= item.rootBounds.min.x) {
+            center = item.rootBounds.center();
+            radius = length(item.rootBounds.extents());
+        }
+        float dist = std::max(distance(cam.eye, center), 0.01f);
+        float screenPx = 2.f * radius / (pixelAt1m * (ortho ? 1.f : dist));
+        float fraction = 1.f;
+        if (realtime && N > 20000) {
+            // Thin strands far away merge into the coverage of fewer, more opaque ones, and the count
+            // follows the groom's size on screen (geometry is the cost on tile-based GPUs).
+            float widthM = p.widthRoot * 0.001f * scale;
+            float ratio = widthM / (pixelAt1m * (ortho ? 1.f : dist));
+            fraction = std::clamp(12.f * ratio * p.lodBias, 0.3f, 1.f);
+            float budget = std::clamp(screenPx * 36.f * p.lodBias, 6000.f, static_cast<float>(N));
+            fraction = std::min(fraction, budget / static_cast<float>(N));
+        }
+        drawn[i] = std::max<uint32_t>(1, static_cast<uint32_t>(static_cast<float>(N) * fraction));
+        total += drawn[i];
+    }
+    // One budget for all grooms on screen (a herd of furred creatures): scale everyone down evenly.
+    if (realtime && total > static_cast<double>(kRealtimeStrandBudget)) {
+        const double k = static_cast<double>(kRealtimeStrandBudget) / total;
+        for (auto& n : drawn) n = std::max<uint32_t>(std::min<uint32_t>(n, 2000), static_cast<uint32_t>(n * k));
+        budgetLimited_ = true;
+    } else {
+        budgetLimited_ = false;
+    }
+    return drawn;
 }
 
 void MetalHair::simulate(id<MTLCommandBuffer> cmd, const FrameData& frame) {
@@ -166,34 +264,35 @@ void MetalHair::simulate(id<MTLCommandBuffer> cmd, const FrameData& frame) {
     const float H = static_cast<float>(std::max(frame.height, 1));
     const bool ortho = cam.orthographic;
     const float pixelAt1m = ortho ? cam.orthoSize * 2.f / H : 2.f * std::tan(radians(cam.fovDeg) * 0.5f) / H;
+    const std::vector<uint32_t> budget = strandBudget(frame);
     id<MTLComputeCommandEncoder> enc = profiledCompute(cmd, "Hair simulation", "hair");
-    for (const GroomItem& item : frame.grooms) {
+    for (size_t gi = 0; gi < frame.grooms.size(); ++gi) {
+        const GroomItem& item = frame.grooms[gi];
         if (!item.data || item.data->children.empty() || item.data->points < 3) continue;
         GroomGpu& g = grooms_[item.entity];
         if (g.hash != item.data->hash || !g.rest) upload(g, item);
         const Groom& p = item.params;
         const GroomData& d = *item.data;
         const float scale = modelScale(item.model);
+        // Skinned roots: this frame's posed vertices (bounded reads: indices are clamped to `count`).
+        uint32_t vertexCount = 0;
+        id<MTLBuffer> verts = item.skinned && g.guideBind ? skinVertices(g, item, vertexCount) : nil;
+        const bool skinned = verts != nil && vertexCount > 0;
+        if (skinned != g.skinned) g.rootsValid = false;
+        g.skinned = skinned;
         // Bounds (world) with room for motion.
         g.center = item.model.transformPoint(d.bounds.center());
         g.radius = length(d.bounds.extents()) * scale + p.length * 0.25f * scale + 0.02f;
+        if (item.skinned && item.rootBounds.max.x >= item.rootBounds.min.x) {
+            g.center = item.rootBounds.center();
+            g.radius = length(item.rootBounds.extents()) + 0.02f;
+        }
         // Level of detail.
         float dist = std::max(distance(cam.eye, g.center), 0.01f);
         float screenPx = 2.f * g.radius / (pixelAt1m * (ortho ? 1.f : dist));
         g.cards = p.lod == "cards" || (p.lod == "auto" && screenPx < p.cardsBelow);
-        float widthM = p.widthRoot * 0.001f * scale;
-        float ratio = widthM / (pixelAt1m * (ortho ? 1.f : dist));
-        float fraction = 1.f;
-        if (frame.samples <= 1 && !frame.offline.enabled && g.N > 20000) {
-            // Real time: thin strands far away merge into the coverage of fewer, more opaque
-            // ones, and the strand count follows the groom's size on screen (geometry is the cost
-            // on tile-based GPUs). Stills (accumulated sub-samples) always draw every strand.
-            fraction = std::clamp(12.f * ratio, 0.3f, 1.f);
-            float budget = std::clamp(screenPx * 36.f, 6000.f, static_cast<float>(g.N));
-            fraction = std::min(fraction, budget / static_cast<float>(g.N));
-        }
-        if (g.cards) fraction = std::min(fraction, 0.3f);
-        g.drawn = std::max<uint32_t>(1, static_cast<uint32_t>(static_cast<float>(g.N) * fraction));
+        g.drawn = std::max<uint32_t>(1, std::min<uint32_t>(budget[gi], g.N));
+        if (g.cards) g.drawn = std::max<uint32_t>(1, std::min<uint32_t>(g.drawn, static_cast<uint32_t>(static_cast<float>(g.N) * 0.3f)));
         g.castShadows = p.castShadows;
         HairParamsUniforms& u = g.params;
         u.model = simdMat(item.model);
@@ -211,35 +310,65 @@ void MetalHair::simulate(id<MTLCommandBuffer> cmd, const FrameData& frame) {
         u.cards = simd_make_float4(d.spacing * scale * 2.4f, 28.f, 0.f, 0.f);
         int nc = 0;
         for (const FxCollider& c : item.colliders) {
-            if (nc >= 8) break;
-            u.colliders[nc * 2] = simd_make_float4(c.a.x, c.a.y, c.a.z, static_cast<float>(c.kind));
-            u.colliders[nc * 2 + 1] = simd_make_float4(c.b.x, c.b.y, c.b.z, c.radius);
+            if (nc >= 16) break;
+            simd_float4* slot = nc < 8 ? &u.colliders[nc * 2] : &u.colliders2[(nc - 8) * 2];
+            slot[0] = simd_make_float4(c.a.x, c.a.y, c.a.z, static_cast<float>(c.kind));
+            slot[1] = simd_make_float4(c.b.x, c.b.y, c.b.z, c.radius);
             ++nc;
         }
+        g.colliders = static_cast<uint32_t>(nc);
         u.sim2 = simd_make_float4(p.rootStiffness, 9.81f, static_cast<float>(nc), 2.2f * p.wind);
+        u.skin = simd_make_float4(skinned ? 1.f : 0.f, static_cast<float>(vertexCount), std::clamp(p.follow, 0.f, 1.f),
+                                  std::max(p.maxSpeed, 0.1f));
+        u.skinScale = simd_make_float4(item.meshScale.x, item.meshScale.y, item.meshScale.z, 0.f);
+        u.skinStep = simd_make_float4(1.f, 1.f, 0.f, 0.f);
+        id<MTLBuffer> rootsCur = skinned ? g.rootsCur : g.rest;    // bound placeholders keep validation happy
+        id<MTLBuffer> rootsLast = skinned ? g.rootsLast : g.rest;
+        if (skinned) {
+            // This frame's roots on the posed skin.
+            [enc setComputePipelineState:kernels_["hairRoots"]];
+            [enc setBytes:&u length:sizeof(u) atIndex:0];
+            [enc setBuffer:verts offset:0 atIndex:1];
+            [enc setBuffer:g.guideBind offset:0 atIndex:2];
+            [enc setBuffer:g.guideFrames offset:0 atIndex:3];
+            [enc setBuffer:g.rootsCur offset:0 atIndex:4];
+            [enc dispatchThreads:MTLSizeMake(g.G, 1, 1) threadsPerThreadgroup:MTLSizeMake(64, 1, 1)];
+            if (!g.rootsValid) {  // no history yet: last frame = this frame
+                [enc setBuffer:g.rootsLast offset:0 atIndex:4];
+                [enc dispatchThreads:MTLSizeMake(g.G, 1, 1) threadsPerThreadgroup:MTLSizeMake(64, 1, 1)];
+                g.rootsValid = true;
+            }
+        }
 
         // Simulation.
         const double now = frame.time;
         const bool moved = !sameMatrix(g.lastModel, item.model);
-        bool changed = false;
-        [enc setBytes:&u length:sizeof(u) atIndex:0];
-        [enc setBuffer:g.rest offset:0 atIndex:1];
-        [enc setBuffer:g.pos offset:0 atIndex:2];
-        [enc setBuffer:g.prev offset:0 atIndex:3];
+        bool changed = skinned;  // a posed skin moves the roots every frame
+        auto bindSim = [&] {
+            [enc setBuffer:g.rest offset:0 atIndex:1];
+            [enc setBuffer:g.pos offset:0 atIndex:2];
+            [enc setBuffer:g.prev offset:0 atIndex:3];
+            [enc setBuffer:rootsLast offset:0 atIndex:4];
+            [enc setBuffer:rootsCur offset:0 atIndex:5];
+        };
         const NSUInteger guidePoints = static_cast<NSUInteger>(g.G) * g.P;
         bool reset = !g.posValid || g.lastTime < 0 || now < g.lastTime - 1e-4 || now - g.lastTime > 2.0;
-        if (reset || (!p.simulate && moved)) {
+        if (reset || (!p.simulate && (moved || skinned))) {
             u.sim = simd_make_float4(0.f, static_cast<float>(now), p.damping, p.stiffness);
             [enc setBytes:&u length:sizeof(u) atIndex:0];
             [enc setComputePipelineState:kernels_["hairReset"]];
+            bindSim();
+            [enc setBuffer:rootsCur offset:0 atIndex:4];
             [enc dispatchThreads:MTLSizeMake(guidePoints, 1, 1) threadsPerThreadgroup:MTLSizeMake(256, 1, 1)];
             g.posValid = true;
             changed = true;
             if (reset && p.simulate) {
                 // Settle: let gravity and collisions relax the rest pose before the first frame.
                 [enc setComputePipelineState:kernels_["hairSimulate"]];
+                bindSim();
                 for (int i = 0; i < 45; ++i) {
                     u.sim = simd_make_float4(1.f / 60.f, static_cast<float>(now) - (45 - i) / 60.f, std::max(p.damping, 0.35f), p.stiffness);
+                    u.skinStep = simd_make_float4(1.f, 1.f, 0.f, 0.f);
                     [enc setBytes:&u length:sizeof(u) atIndex:0];
                     [enc dispatchThreads:MTLSizeMake(g.G, 1, 1) threadsPerThreadgroup:MTLSizeMake(64, 1, 1)];
                 }
@@ -249,13 +378,17 @@ void MetalHair::simulate(id<MTLCommandBuffer> cmd, const FrameData& frame) {
             int sub = std::clamp(static_cast<int>(std::ceil(dt * 120.0)), 1, 6);
             float h = static_cast<float>(std::min(dt, 0.1) / sub);
             [enc setComputePipelineState:kernels_["hairSimulate"]];
+            bindSim();
             for (int i = 0; i < sub; ++i) {
                 u.sim = simd_make_float4(h, static_cast<float>(now - dt + h * (i + 1)), p.damping, p.stiffness);
+                // Roots move from last frame's skin to this frame's across the substeps.
+                u.skinStep = simd_make_float4(static_cast<float>(i) / static_cast<float>(sub), static_cast<float>(i + 1) / static_cast<float>(sub), 0.f, 0.f);
                 [enc setBytes:&u length:sizeof(u) atIndex:0];
                 [enc dispatchThreads:MTLSizeMake(g.G, 1, 1) threadsPerThreadgroup:MTLSizeMake(64, 1, 1)];
             }
             changed = true;
         }
+        u.skinStep = simd_make_float4(1.f, 1.f, 0.f, 0.f);
         g.lastTime = now;
         g.lastModel = item.model;
         // Rebuild the rendered strands from the guides.
@@ -271,10 +404,14 @@ void MetalHair::simulate(id<MTLCommandBuffer> cmd, const FrameData& frame) {
             [enc setBuffer:g.offsets offset:0 atIndex:2];
             [enc setBuffer:g.pos offset:0 atIndex:3];
             [enc setBuffer:g.render offset:0 atIndex:4];
+            [enc setBuffer:(skinned ? g.childBind : g.children) offset:0 atIndex:5];
+            [enc setBuffer:(skinned ? verts : g.rest) offset:0 atIndex:6];
+            [enc setBuffer:rootsCur offset:0 atIndex:7];
             [enc dispatchThreads:MTLSizeMake(g.drawn, 1, 1) threadsPerThreadgroup:MTLSizeMake(64, 1, 1)];
             g.interpolated = true;
             g.lastDrawn = g.drawn;
         }
+        if (skinned) std::swap(g.rootsLast, g.rootsCur);  // this frame's roots become next frame's history
         order_.push_back(item.entity);
     }
     [enc endEncoding];
@@ -454,13 +591,16 @@ Json MetalHair::stats() const {
     for (const auto& [id, g] : grooms_) {
         double gpuMB = (static_cast<double>(g.G) * g.P * 16 * 3 + static_cast<double>(g.N) * (48 + g.P * 8.0 + g.P * 32.0) +
                         kDomSize * kDomSize * 16.0) / (1024.0 * 1024.0);
-        arr.push(Json::object({{"entity", id},
+        Json j = Json::object({{"entity", id},
                                {"strands", g.N},
                                {"drawn", g.drawn},
                                {"guides", g.G},
                                {"pointsPerStrand", g.P},
                                {"cards", g.cards},
-                               {"gpuMemoryMB", gpuMB}}));
+                               {"colliders", g.colliders},
+                               {"gpuMemoryMB", gpuMB}});
+        if (g.skinned) j["skinned"] = Json::object({{"roots", g.vertexSource}, {"follow", g.params.skin.z}});
+        arr.push(std::move(j));
     }
     return arr;
 }

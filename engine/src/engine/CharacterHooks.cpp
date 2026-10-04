@@ -5,6 +5,7 @@
 
 #include "skywalker/anim/AnimationSystem.h"
 #include "skywalker/engine/Engine.h"
+#include "skywalker/fx/Groom.h"
 #include "skywalker/physics/PhysicsSystem.h"
 #include "skywalker/physics/PhysicsWorld.h"
 #include "skywalker/world/WorldRuntime.h"
@@ -91,6 +92,31 @@ anim::GroundProbe groundProbe(Engine& engine, Vec3 origin, Vec3 dir, float maxDi
 void installCharacterHooks(Engine& engine) {
     engine.animation().hooks.ground = [&engine](Vec3 origin, Vec3 dir, float maxDist, EntityId character) {
         return groundProbe(engine, origin, dir, maxDist, character);
+    };
+    // Skinned grooms: palettes, CPU-skinned fallbacks, body capsules and bone families.
+    fx::GroomSystem::Hooks& g = engine.grooms().hooks;
+    g.palette = [&engine](EntityId e, const std::string& key) -> std::shared_ptr<const std::vector<Mat4>> {
+        const SkinPose* sp = engine.animation().skin(e, key);
+        return sp ? sp->palette : nullptr;
+    };
+    g.posed = [&engine](EntityId e, const std::string& key) { return engine.animation().posedMesh(e, key); };
+    g.bodyColliders = [&engine](EntityId e) {
+        const MeshRenderer* m = engine.scene().get<MeshRenderer>(e);
+        return m ? engine.animation().bodyColliders(e, m->mesh) : std::vector<FxCollider>{};
+    };
+    g.boneFamily = [&engine](const std::string& meshKey, const std::string& bone) {
+        std::vector<std::string> out;
+        std::string file = meshKey.rfind("asset:", 0) == 0 ? meshKey.substr(6) : meshKey;
+        if (size_t hash = file.rfind('#'); hash != std::string::npos) file = file.substr(0, hash);
+        auto lib = engine.animation().library(file);
+        if (!lib) return out;
+        const anim::Skeleton& sk = (*lib)->skeleton;
+        int b = sk.find(bone);
+        if (b < 0) return out;
+        for (size_t i = 0; i < sk.bones.size(); ++i) {
+            if (sk.isDescendant(static_cast<int>(i), b)) out.push_back(sk.bones[i].name);
+        }
+        return out;
     };
 }
 
