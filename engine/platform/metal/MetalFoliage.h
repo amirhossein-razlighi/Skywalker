@@ -83,6 +83,8 @@ public:
     Json stats() const;
     /// Triangles drawn by foliage (camera + shadows) in the last completed frame.
     uint64_t triangles() const;
+    /// Safe mode (after a GPU fault): a quarter of the triangle budget.
+    void setSafeMode(bool safe) { safeMode_ = safe; }
 
 private:
     struct Impostor;
@@ -137,6 +139,7 @@ private:
     /// safety net against GPU watchdog stalls; impostors normally keep frames far below it).
     static constexpr uint64_t kTriangleBudget = 120'000'000;
     int budgetBias_ = 0;
+    bool safeMode_ = false;
     uint64_t lastEstimate_ = 0;
     size_t bakes_ = 0, cacheLoads_ = 0;
     double bakeMs_ = 0.0;

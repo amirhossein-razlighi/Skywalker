@@ -459,7 +459,8 @@ void MetalFoliage::prepare(id<MTLCommandBuffer> cmd, const FrameData& frame, con
             }
         }
         lastEstimate_ = static_cast<uint64_t>(total);
-        if (total <= static_cast<double>(kTriangleBudget) || budgetBias_ == 4) break;
+        const uint64_t budget = safeMode_ ? kTriangleBudget / 4 : kTriangleBudget;
+        if (total <= static_cast<double>(budget) || budgetBias_ == 4) break;
     }
 
     // Lists and arguments live in shared memory (unified on Apple silicon): the CPU fallback

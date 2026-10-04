@@ -428,6 +428,7 @@ public:
                              {"culledDraws", static_cast<int64_t>(culled_)},
                              {"terrainNodes", static_cast<int64_t>(terrainNodesDrawn_)},
                              {"trianglesDrawn", static_cast<int64_t>(lastTriangles_ + (foliage_ ? foliage_->triangles() : 0))},
+                             {"gpuFaults", static_cast<int64_t>(gpuFaults_->load())},
                              {"meshesCached", static_cast<int64_t>(meshes_.size())},
                              {"texturesCached", static_cast<int64_t>(textures_.size())}});
         if (foliage_) {  // [foliage] instances, impostors, bakes
@@ -532,6 +533,7 @@ public:
             lodFrame_ = &frame;
             trianglesDrawn_ = 0;
             fx_->simulate(frame, depthPrev_, gbufB_, prevViewProj_, historyValid_);  // [hair+vfx]
+            chooseFoliageBudgetBias(frame);
             {  // [foliage] impostors (bake/load within budget) and the GPU cull pass
                 FoliageView fv;
                 fv.viewProj = vp;
@@ -592,9 +594,13 @@ public:
             {
                 dispatch_semaphore_t sem = inFlight_;
                 auto gpuMs = gpuMs_;
+                auto faults = gpuFaults_;
                 [cmd addCompletedHandler:^(id<MTLCommandBuffer> done) {
                     double ms = (done.GPUEndTime - firstCmd.GPUStartTime) * 1000.0;  // whole frame, all sub-samples
                     if (ms > 0.0) gpuMs->store(ms);
+                    if (done.status == MTLCommandBufferStatusError || firstCmd.status == MTLCommandBufferStatusError) {
+                        faults->fetch_add(1);  // timeouts, page faults: the next frames run in safe mode
+                    }
                     dispatch_semaphore_signal(sem);
                 }];
             }
@@ -634,6 +640,12 @@ public:
             [cmd waitUntilCompleted];
             if (cmd.status == MTLCommandBufferStatusError) {
                 return Error::make("gpu_error", cmd.error ? cmd.error.localizedDescription.UTF8String : "readback failed");
+            }
+            if (lastCommand_ && lastCommand_.status == MTLCommandBufferStatusError) {
+                return Error::make("gpu_error",
+                                   std::string("the frame failed on the GPU: ") +
+                                       (lastCommand_.error ? lastCommand_.error.localizedDescription.UTF8String : "unknown error"),
+                                   "the scene is too heavy or a shader faulted; lower samples/resolution or check perf_stats");
             }
             Image img(static_cast<int>(w), static_cast<int>(h));
             const auto* src = static_cast<const uint8_t*>(buffer.contents);
@@ -1665,6 +1677,19 @@ private:
         }
     }
 
+    /// After a GPU fault (watchdog timeout, page fault) the renderer stays in safe mode: the
+    /// foliage triangle budget drops to a quarter so frames stay far from the watchdog.
+    void chooseFoliageBudgetBias(const FrameData& frame) {
+        (void)frame;
+        const int faults = gpuFaults_->load();
+        if (faults != reportedFaults_) {
+            reportedFaults_ = faults;
+            log::error("render", "GPU command buffer failed (" + std::to_string(faults) +
+                                     " so far): rendering in safe mode with a reduced geometry budget");
+        }
+        foliage_->setSafeMode(faults > 0);  // [foliage] per-instance LODs fit MetalFoliage's budget
+    }
+
     void evictWorldCaches() {
         foliage_->evict(frameIndex_);  // [foliage]
         std::erase_if(terrainsGpu_, [&](const auto& kv) { return frameIndex_ - kv.second.lastUse > 180; });
@@ -2625,6 +2650,8 @@ private:
         terrainPipeline_, terrainShadowPipeline_, cloudsPipeline_, cloudTemporalPipeline_, lumaPipeline_, exposurePipeline_, motionBlurPipeline_, dofCocPipeline_,
         dofBlurPipeline_, dofCombinePipeline_;
     id<MTLTexture> lum_, exposure_[2], postA_, postB_, dofCoc_, dofBlur_, lut_, upscaled_, motion_, postSource_;
+    std::shared_ptr<std::atomic<int>> gpuFaults_ = std::make_shared<std::atomic<int>>(0);
+    int reportedFaults_ = 0;
     id<MTLFXTemporalScaler> scaler_;
     id<MTLFXSpatialScaler> spatialScaler_;
     struct RetiredScaler {
