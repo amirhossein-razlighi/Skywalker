@@ -14,6 +14,7 @@
 #include "skywalker/engine/Engine.h"
 #include "skywalker/game/GameSettings.h"
 #include "skywalker/game/SaveGame.h"
+#include "skywalker/game/SceneFlow.h"
 
 using namespace sky;
 namespace fs = std::filesystem;
@@ -355,7 +356,7 @@ TEST_CASE("saves: loading during play never breaks the editor's stop snapshot") 
     Json r = call(*e, "load_game", R"({"slot": "elsewhere"})");
     CHECK(r.get("sceneChanged").asString() == "scenes/other.sky.json");
     CHECK(e->scene().find("Other Hero") != kNoEntity);
-    CHECK(e->saves().currentScene() == "scenes/other.sky.json");
+    CHECK(e->sceneFlow().current() == "scenes/other.sky.json");
     e->step(3);
     e->stop();
     CHECK(e->scene().toJson() == edited);
@@ -565,4 +566,117 @@ TEST_CASE("saves: settings, slot names and the platform save folder") {
 #if defined(__APPLE__)
     CHECK(dir.find("Application Support") != std::string::npos);
 #endif
+}
+
+namespace {
+
+/// worldState without the carried game manager: it is not in the save, so it keeps the running game's state.
+Json persistedState(Engine& e) {
+    Json all = worldState(e);
+    Json out = Json::array();
+    for (const auto& j : all.elements()) {
+        if (j.get("name").asString() != "GameManager") out.push(j);
+    }
+    return out;
+}
+
+/// menu (a carried game manager) and level (its own copy of the manager, persisted entities placed in the scene,
+/// a spawner of persisted coins, scenery), with game.json aliases.
+void buildFlowGame(const Project& p) {
+    p.write("prefabs/coin.prefab.json", kCoinPrefab);
+    p.write("game.json", R"({"id": "flow-saves", "scenes": {"menu": "scenes/menu.sky.json", "level": "scenes/level.sky.json"}})");
+    const std::string gm = R"({"id": 1, "name": "GameManager", "components": {"persistent": {"id": "gm"}},
+        "behaviors": [{"name": "Count", "source": "var ticks = 0\non tick\n  ticks += 1\nend"}]})";
+    p.write("scenes/menu.sky.json", R"({"format": "skywalker.scene", "version": 1, "name": "Menu", "seed": 5, "entities": [)" + gm +
+                                        R"(, {"id": 2, "name": "Title"}]})");
+    p.write("scenes/level.sky.json",
+            R"({"format": "skywalker.scene", "version": 1, "name": "Level", "seed": 9, "entities": [)" + gm + R"(,
+        {"id": 2, "name": "Spawner", "components": {"persist": {"id": "spawner"}}, "behaviors": [{"name": "S", "source": )" +
+                Json(kSpawner).dump() + R"(}]},
+        {"id": 3, "name": "Walker", "components": {"persist": {"id": "walker"}}, "behaviors": [{"name": "W", "source": )" +
+                Json(kWalker).dump() + R"(}]},
+        {"id": 4, "name": "Chest", "components": {"persist": {}},
+         "behaviors": [{"name": "C", "source": "var opened = 0\non tick\n  rotate self by (0, 30 * dt, 0)\n  if random(0, 1) > 0.9 then opened += 1 end\nend"}]},
+        {"id": 5, "name": "Wall", "components": {"transform": {"position": [3, 0, 0]}}}]})");
+}
+
+std::unique_ptr<Engine> menuEngine(const Project& p) {
+    auto e = makeEngine(p);
+    REQUIRE(e->loadScene("scenes/menu.sky.json"));
+    e->play();
+    return e;
+}
+
+}  // namespace
+
+TEST_CASE("saves: a save from another scene loads through the scene flow; carried entities survive; replay is exact") {
+    Project p("flow");
+    buildFlowGame(p);
+    constexpr int N = 40, M = 53;
+
+    // The direct run: menu, then the level (fresh entity ids), save at N, play M more ticks.
+    auto direct = menuEngine(p);
+    direct->step(3);
+    call(*direct, "scene_change", R"({"scene": "level", "immediate": true})");
+    CHECK_FALSE(direct->sceneFlow().sceneIds().empty());  // the level's entities did not keep their file ids
+    const EntityId chest = direct->scene().find("Chest");
+    CHECK(chest != 4);
+    direct->step(N);
+    Json saved = call(*direct, "save_game", R"({"slot": "lvl"})");
+    CHECK(saved.get("warnings").size() == 0);
+    CHECK(Json::parse(p.read(".skywalker/saves/lvl.save.json")).value().get("scene").asString() == "level");
+    direct->step(M);
+    const Json expected = persistedState(*direct);
+    const uint64_t frame = direct->runtime().frame();
+
+    // Same session: back to the menu, then load. The load changes scene through the scene flow at once (no
+    // transition) and the carried game manager comes along with its behavior still running.
+    call(*direct, "scene_change", R"({"scene": "menu", "transition": "fade", "duration": 0.2})");
+    direct->step(40);
+    CHECK(direct->sceneFlow().current() == "menu");
+    call(*direct, "scene_change", R"({"scene": "level", "transition": "fade", "duration": 0.5})");
+    direct->step(5);  // a change under way when the load comes: it is dropped
+    REQUIRE(direct->sceneFlow().busy());
+    const EntityId gm = direct->scene().find("GameManager");
+    const int64_t ticksBefore = var(*direct, gm, "ticks").asInt();
+    Json r = call(*direct, "load_game", R"({"slot": "lvl"})");
+    CHECK(r.get("sceneChanged").asString() == "level");
+    CHECK(r.get("warnings").size() == 0);
+    CHECK(direct->sceneFlow().current() == "level");
+    CHECK_FALSE(direct->sceneFlow().busy());
+    CHECK(direct->sceneFlow().fade().alpha == 0.f);
+    CHECK(direct->scene().find("GameManager") == gm);  // carried, not replaced by the level's copy
+    CHECK(direct->scene().find("Title") == kNoEntity);
+    CHECK(direct->scene().find("Chest") == chest);     // the saved ids are back
+    direct->step(M);
+    CHECK(var(*direct, gm, "ticks").asInt() == ticksBefore + M);  // never reset by the load
+    CHECK(direct->runtime().frame() == frame);
+    CHECK(persistedState(*direct) == expected);
+
+    // A fresh session that never entered the level: the load enters it with the saved ids.
+    auto fresh = menuEngine(p);
+    fresh->step(2);
+    r = call(*fresh, "load_game", R"({"slot": "lvl"})");
+    CHECK(r.get("sceneChanged").asString() == "level");
+    CHECK(fresh->scene().find("GameManager") == 1);
+    fresh->step(M);
+    CHECK(persistedState(*fresh) == expected);
+
+    // Already in the level, but entered with other ids (an extra entity shifted them): the load rebuilds the ids.
+    auto shifted = menuEngine(p);
+    REQUIRE(shifted->scene().create("Extra") != kNoEntity);
+    call(*shifted, "scene_change", R"({"scene": "level", "immediate": true})");
+    CHECK(shifted->scene().find("Chest") != chest);
+    Json same = call(*shifted, "save_inspect", R"({"slot": "lvl"})");
+    CHECK_FALSE(same.get("scene").get("same").asBool());
+    r = call(*shifted, "load_game", R"({"slot": "lvl"})");
+    CHECK(r.get("sceneChanged").asString() == "level");
+    CHECK(shifted->scene().find("Chest") == chest);
+    CHECK(call(*shifted, "save_inspect", R"({"slot": "lvl"})").get("scene").get("same").asBool());
+    shifted->step(M);
+    CHECK(persistedState(*shifted) == expected);
+
+    // In the same scene with the same ids, a load does not change scene.
+    r = call(*shifted, "load_game", R"({"slot": "lvl"})");
+    CHECK_FALSE(r.contains("sceneChanged"));
 }

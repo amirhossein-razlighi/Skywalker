@@ -216,4 +216,8 @@ sim_control {"action": "stop"}       -- back to the edited scene
 - Runtime ids differ from the ids in the scene file (scene files keep theirs; the running copy gets fresh ones).
 - Particles, animation and audio of entities that leave stop with them; persistent entities' physics bodies are
   rebuilt (from their transform and `body.velocity`) at the swap.
-- Saving and loading games (docs/SAVE_GAMES.md, when present) records the current scene; a load switches to it.
+- Save games ([SAVE_GAMES](SAVE_GAMES.md)) record the current scene and its runtime ids. Loading a save made in
+  another scene is an immediate change through the scene flow (no transition, no loading scene): persistent
+  entities come along and keep running, the scene's entities get their saved ids back, and a change under way is
+  dropped. `persist` (what a save restores) and `persistent` (what survives a change) are separate; a player
+  usually has both.

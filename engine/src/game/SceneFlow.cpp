@@ -21,6 +21,7 @@
 #include "skywalker/core/FileTime.h"
 #include "skywalker/core/Strings.h"
 #include "skywalker/engine/Engine.h"
+#include "skywalker/game/SaveGame.h"
 #include "skywalker/ecs/Reflection.h"
 
 namespace sky::game {
@@ -208,6 +209,7 @@ struct SceneFlow::Impl {
     };
 
     std::string current, currentPath;
+    std::vector<std::pair<uint64_t, uint64_t>> sceneIds;  // (file id, live id) where they differ, sorted
     std::optional<Change> pending;
     Phase phase = Phase::Idle;
     double phaseTime = 0;
@@ -403,7 +405,17 @@ struct SceneFlow::Impl {
         }
         for (EntityId e : dupes) temp.destroy(e);
         std::unordered_map<EntityId, EntityId> map;
-        s.cloneTrees(temp, rootsOf(temp), kNoEntity, &map);
+        std::unordered_map<EntityId, EntityId> wanted;
+        if (options.exactIds) {
+            for (EntityId e : temp.entities()) wanted[e] = e;
+            for (const auto& [from, to] : options.ids) wanted[from] = to;
+        }
+        s.cloneTrees(temp, rootsOf(temp), kNoEntity, &map, options.exactIds ? &wanted : nullptr);
+        sceneIds.clear();
+        for (const auto& [from, to] : map) {
+            if (from != to) sceneIds.emplace_back(from, to);
+        }
+        std::sort(sceneIds.begin(), sceneIds.end());
         (void)s.patchEnvironment(reflect::toJson(&temp.environment(), Environment::type()));
         s.name = temp.name;
         for (const auto& src : temp.prefabSources()) {
@@ -446,6 +458,7 @@ struct SceneFlow::Impl {
         engine.navigation().beginPlay();
         currentPath = path;
         current = idOf(path);
+        engine.saves().sceneChanged();  // the persisted entities of the new scene are the base of its saves
         emit("scene_loaded", Json::object({{"id", current}, {"path", path}, {"additive", false}}));
         engine.emitEvent(Json::object({{"type", "scene_flow"}, {"action", "changed"}, {"scene", current}}));
         return {};
@@ -569,6 +582,7 @@ struct SceneFlow::Impl {
     void reset() {
         current.clear();
         currentPath.clear();
+        sceneIds.clear();
         pending.reset();
         phase = Phase::Idle;
         phaseTime = 0;
@@ -690,6 +704,16 @@ Result<SceneFlow::UnloadResult> SceneFlow::unload(const std::string& handle, boo
 }
 
 const std::string& SceneFlow::current() const { return impl_->current; }
+const std::string& SceneFlow::currentPath() const { return impl_->currentPath; }
+const std::vector<std::pair<uint64_t, uint64_t>>& SceneFlow::sceneIds() const { return impl_->sceneIds; }
+
+void SceneFlow::cancel() {
+    Impl& m = *impl_;
+    m.pending.reset();
+    m.phase = Impl::Phase::Idle;
+    m.phaseTime = 0;
+    m.additiveRequests.clear();
+}
 
 double SceneFlow::progress() const {
     const Impl& m = *impl_;

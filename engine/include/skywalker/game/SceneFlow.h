@@ -56,6 +56,10 @@ struct ChangeOptions {
     bool hasLoading = false;
     std::string loading;            // loading scene for this change ("" = none)
     bool immediate = false;         // tools: skip transition and preloading, change now (between ticks)
+    /// Save games: the new scene's entities get the ids they had when the save was made (file id -> id;
+    /// a file id not listed keeps its own id; an id in use gets a fresh one). Off: fresh ids for all.
+    bool exactIds = false;
+    std::vector<std::pair<uint64_t, uint64_t>> ids;
 
     static Result<ChangeOptions> fromJson(const Json& j);
 };
@@ -103,6 +107,13 @@ public:
     // State.
     /// The current scene's id (alias or path); "" while editing.
     const std::string& current() const;
+    /// The current scene's project-relative file ("" while editing or for an unsaved scene).
+    const std::string& currentPath() const;
+    /// The ids the current scene's entities got, as (id in the scene file, id now) pairs where they differ,
+    /// sorted. Empty for the scene play started in. Save games keep it so a load can rebuild the same ids.
+    const std::vector<std::pair<uint64_t, uint64_t>>& sceneIds() const;
+    /// Drops a scene change under way, its transition and requested sub-scenes (a save game was loaded).
+    void cancel();
     /// 0..1 while a change preloads; 1 when nothing is loading.
     double progress() const;
     bool busy() const;

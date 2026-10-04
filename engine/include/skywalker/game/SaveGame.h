@@ -132,8 +132,8 @@ public:
     Status setGlobal(const std::string& name, const Json& taggedValue);
     /// Seconds of play in this save line: the loaded save's play time plus real time since.
     double playTime() const;
-    /// The scene the game is in (project-relative): the scene play started in, or the one a load switched to.
-    const std::string& currentScene() const;
+    /// The scene flow swapped scenes: the new scene's persisted entities become the base tombstones refer to.
+    void sceneChanged();
 
     struct Outcome {
         SaveInfo info;

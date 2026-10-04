@@ -155,8 +155,11 @@ public:
     void copyEntityData(EntityId dst, const Scene& src, EntityId srcId);
     /// Copies whole subtrees from `src` (may be this scene) under `parent`. Links and prefab instances inside the
     /// copied set point inside the copy; `idMap` receives source id -> new id. Returns the new roots.
+    /// `wantedIds` (source id -> id) gives copies the ids they should get (save games restore a scene with the
+    /// ids it was saved with); an id that is taken, or a source missing from the map, gets a fresh id.
     std::vector<EntityId> cloneTrees(const Scene& src, const std::vector<EntityId>& roots, EntityId parent,
-                                     std::unordered_map<EntityId, EntityId>* idMap = nullptr);
+                                     std::unordered_map<EntityId, EntityId>* idMap = nullptr,
+                                     const std::unordered_map<EntityId, EntityId>* wantedIds = nullptr);
 
     // --- Edits (validated, observable) --------------------------------------
     Status rename(EntityId id, std::string name);

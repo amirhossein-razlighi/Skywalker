@@ -44,7 +44,8 @@ void addSaveTools(Engine& engine, ToolRegistry& reg) {
 
     reg.add({"load_game", "Load a save",
              "Restores a slot into the running game: persisted entities return to their saved state (spawned ones are "
-             "recreated with their ids, ones destroyed before the save are removed again), game vars, the scene and the "
+             "recreated with their ids, ones destroyed before the save are removed again), game vars, the scene (a save "
+             "from another scene is an immediate scene flow change: persistent entities come along) and the "
              "exact behavior state (state machines, timers, waiting handlers, random generator), then `on loaded` runs. "
              "Older saves are migrated (game.json saves.version / saves.migrate). Stopping play still returns to the "
              "edited scene. After loading, save_inspect on the same slot lists anything that did not restore. Example: "

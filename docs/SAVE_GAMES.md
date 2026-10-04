@@ -24,7 +24,7 @@ captures the running game between two ticks and a load puts it back, exactly, in
 | Tombstones | Persisted scene entities destroyed before the save (a collected key stays collected) |
 | Game variables | `game_var(name, value)`: state that belongs to the game, not to one entity (chapter, flags, settings) |
 | Wander state | Clocks, the random generator, queued events, and per persisted entity its state machines, timers and waiting handlers |
-| The scene | The scene the game was in; a load switches back to it |
+| The scene | The scene the game was in (its scene flow id: a game.json `scenes` alias or the path) and the ids its entities had; a load switches back to it ([SCENE_FLOW](SCENE_FLOW.md)) |
 | Play time | Seconds played in this save line (the loaded save's time plus real time since) |
 | Metadata | A free object for menus: `{title, chapter, thumbnail, ...}` |
 
@@ -106,7 +106,7 @@ The file is stable, readable JSON:
 {
   "format": "skywalker.save", "formatVersion": 1, "version": 2, "game": "sky-dash", "slot": "autosave",
   "savedAt": "2026-10-04T12:00:00Z", "engine": "0.1.0", "tick": 1834, "playTime": 30.57,
-  "scene": "scenes/forest.sky.json", "meta": {"title": "Forest gate", "chapter": 2},
+  "scene": "forest", "sceneIds": [[1, 212], [2, 213]], "meta": {"title": "Forest gate", "chapter": 2},
   "globals": {"chapter": 2, "flags": ["met_owl"], "spawn": {"$vec": [3, 0, -4]}},
   "entities": [{"key": "id:player", "id": 4, "name": "Player", "mode": "all", "entity": {...}}],
   "destroyed": ["#17"], "order": [...], "nextId": 212,
@@ -116,6 +116,9 @@ The file is stable, readable JSON:
 ```
 
 - `formatVersion` is the engine's file layout; `version` is the game's own data version.
+- `scene` is the scene flow's id of the scene (`scene_flow_info` `current`). `sceneIds` lists `[id in the scene
+  file, id in the game]` where they differ: scenes entered with `change_scene` give their entities fresh ids, and a
+  load gives them the same ids again so the save's entity ids, behavior state and spawn ids line up.
 - `hash` is FNV-1a 64 over the document without `hash`. It detects truncated, damaged and hand-edited files
   (`save_corrupted`); it is an integrity check, not a protection against cheating.
 - Values that plain JSON would blur keep a tag: `{"$vec": [...]}`, `{"$color": [...]}`, `{"$entity": id}`.
@@ -160,7 +163,11 @@ A save written by a newer version of the game is refused with `save_too_new`.
 
 Between two ticks, while playing:
 
-1. If the save was made in another scene, that scene is loaded (the editor's play snapshot is untouched).
+1. If the save was made in another scene (or in the same scene entered with other entity ids), the scene flow
+   changes to it at once, without a transition or loading scene, and its entities get the ids they had in the save.
+   Entities with a `persistent` component come along and keep running, as on any scene change; persisted ones
+   among them are then restored like the others; sub-scenes loaded with `load_additive` go with the scene they were
+   loaded into. A scene change or transition under way is dropped. The editor's play snapshot is untouched.
 2. Tombstoned entities are destroyed, and so are persisted entities spawned after the save.
 3. Each saved entity is restored in place (keeping its current scripts), or recreated with its saved id and children
    when it was spawned.
@@ -170,7 +177,12 @@ Between two ticks, while playing:
 
 The result is deterministic: saving at tick N, loading, and running M ticks gives the same world as running N + M
 ticks directly (tests/test_save_games.cpp checks it, with random numbers, timers, waiting handlers, state machines
-and spawns). Stopping play still returns to the scene as it was edited.
+and spawns, and for a save loaded from another scene). Stopping play still returns to the scene as it was edited.
+
+`persist` and the scene flow's `persistent` answer different questions: `persist` says what a save restores,
+`persistent` says what survives a scene change. A player usually has both. Entities carried across scene changes keep
+the ids they had, so carry entities from the scene play starts in (or spawn them in a fixed order) and give persisted
+ones a `persist.id`: a save then finds them in every play session.
 
 ## Recipe: checkpoints and autosave
 

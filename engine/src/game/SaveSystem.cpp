@@ -3,7 +3,9 @@
 //
 // Entities are matched by key: "id:<persist.id>" when the persist component names one, else "#<entity
 // id>" (stable for entities placed in a scene). A load, between two ticks:
-//   1. switches scene when the save was made in another one,
+//   1. switches scene through the scene flow when the save was made in another one (or in the same scene
+//      loaded with other entity ids): an immediate change without a transition that gives the scene's
+//      entities their saved ids; `carry` entities come along as on any scene change,
 //   2. destroys tombstoned entities and persisted ones spawned after the save,
 //   3. restores every saved entity (recreating spawned subtrees with their saved ids),
 //   4. restores entity order, the next entity id and the Wander state, rebuilds the physics world,
@@ -25,6 +27,7 @@
 #include "skywalker/engine/Engine.h"
 #include "skywalker/game/GameSettings.h"
 #include "skywalker/game/SaveGame.h"
+#include "skywalker/game/SceneFlow.h"
 #include "skywalker/ui/World2D.h"
 #include "skywalker/wander/Compiler.h"
 
@@ -135,7 +138,6 @@ struct SaveSystem::Impl {
     double unscaledMark = 0;              // runtime unscaled time when it was loaded / play started
     std::set<std::string> baseKeys;       // persisted entities of the scene as play started (tombstones)
     std::set<std::string> tombstones;     // destroyed before a loaded save: stay destroyed
-    std::string currentScene;
     struct Request {
         bool load = false;
         std::string slot;
@@ -171,23 +173,41 @@ struct SaveSystem::Impl {
         else log::warn("saves", s.error().message);
     }
 
-    std::string relativeScene(const std::string& path) const {
-        if (path.empty()) return {};
-        std::string rel = engine.assets().relative(engine.resolvePath(path));
-        return rel.empty() ? path : rel;
-    }
-
     void resetSession() {
         globals = Json::object();
         playTimeBase = 0;
         unscaledMark = 0;
-        tombstones.clear();
         requests.clear();
+        resetBase();
+    }
+
+    /// The scene changed (play started, the scene flow swapped scenes): its persisted entities are the base
+    /// that tombstones refer to; tombstones of the scene left behind no longer apply.
+    void resetBase() {
+        tombstones.clear();
         baseKeys.clear();
         const Scene& s = engine.scene();
         for (EntityId e : s.entities()) {
             if (s.get<Persist>(e)) baseKeys.insert(keyOf(s, e));
         }
+    }
+
+    /// The scene a save records: the scene flow's id (alias or path) when the scene has a file.
+    std::string sceneId() const {
+        const SceneFlow& flow = engine.sceneFlow();
+        return flow.currentPath().empty() ? std::string() : flow.current();
+    }
+
+    static Json idsJson(const std::vector<std::pair<uint64_t, uint64_t>>& ids) {
+        Json a = Json::array();
+        for (const auto& [from, to] : ids) a.push(Json::array({from, to}));
+        return a;
+    }
+    static std::vector<std::pair<uint64_t, uint64_t>> idsOf(const Json& a) {
+        std::vector<std::pair<uint64_t, uint64_t>> ids;
+        for (const auto& p : a.elements()) ids.emplace_back(static_cast<uint64_t>(p[0].asInt()), static_cast<uint64_t>(p[1].asInt()));
+        std::sort(ids.begin(), ids.end());
+        return ids;
     }
 
     double playTime() const { return playTimeBase + (engine.runtime().unscaledTime() - unscaledMark); }
@@ -282,7 +302,8 @@ struct SaveSystem::Impl {
                                  {"engine", SKY_VERSION_STRING},
                                  {"tick", engine.runtime().frame()},
                                  {"playTime", playTime()},
-                                 {"scene", currentScene},
+                                 {"scene", sceneId()},
+                                 {"sceneIds", idsJson(engine.sceneFlow().sceneIds())},
                                  {"meta", meta.isObject() ? meta : Json::object()},
                                  {"globals", globals},
                                  {"entities", std::move(entities)},
@@ -367,24 +388,32 @@ struct SaveSystem::Impl {
 
     // --- restore ----------------------------------------------------------------------------
 
-    Status switchScene(const std::string& scene) {
-        auto text = readText(engine.resolvePath(scene));
-        if (!text) return Error::make("scene_not_found", "the save was made in " + scene + ", which no longer exists");
-        auto doc = Json::parse(*text);
-        if (!doc) return Error::make("invalid_scene", scene + ": " + doc.error().message);
-        Scene& s = engine.scene();
-        ChangeObserver* obs = s.observer();
-        if (Status st = s.loadJson(*doc); !st) return st;
-        s.setObserver(obs);
-        engine.runtime().reset();
-        engine.particles().reset();
-        engine.world2d().reset();
-        engine.animation().reset();
-        currentScene = scene;
-        baseKeys.clear();
-        for (EntityId e : s.entities()) {
-            if (s.get<Persist>(e)) baseKeys.insert(keyOf(s, e));
+    /// Puts the game in the save's scene with the save's entity ids. Through the scene flow, like any scene
+    /// change at run time: an immediate one (no transition, no loading scene), carried entities come along
+    /// and keep running. A change under way in the running game is dropped either way.
+    Status switchScene(const Json& doc, Outcome& out) {
+        SceneFlow& flow = engine.sceneFlow();
+        const std::string scene = doc.get("scene").asString();
+        if (scene.empty()) {  // saved from an unsaved scene: restore into whatever runs
+            flow.cancel();
+            return {};
         }
+        auto path = flow.resolve(scene);
+        if (!path) {
+            return Error::make("scene_not_found", "the save was made in " + scene + ", which no longer exists", path.error().hint);
+        }
+        const auto ids = idsOf(doc.get("sceneIds"));
+        if (*path == flow.currentPath() && ids == flow.sceneIds()) {
+            flow.cancel();
+            return {};
+        }
+        ChangeOptions options;
+        options.immediate = true;
+        options.hasTransition = true;  // kind "none": a load cuts
+        options.exactIds = true;
+        options.ids = ids;
+        if (Status st = flow.requestChange(*path, options); !st) return st;
+        out.sceneChanged = scene;
         return {};
     }
 
@@ -416,11 +445,7 @@ struct SaveSystem::Impl {
 
     Status apply(const Json& doc, Outcome& out) {
         Scene& s = engine.scene();
-        const std::string scene = doc.get("scene").asString();
-        if (!scene.empty() && scene != currentScene) {
-            out.sceneChanged = scene;
-            if (Status st = switchScene(scene); !st) return st;
-        }
+        if (Status st = switchScene(doc, out); !st) return st;
         std::map<std::string, EntityId> current;  // entities inside a spawned subtree come back with their root
         for (EntityId e : s.entities()) {
             if (s.get<Persist>(e) && spawnedRootAbove(s, e) == kNoEntity) current.emplace(keyOf(s, e), e);
@@ -499,16 +524,14 @@ SaveSettings SaveSystem::settings() const {
 
 void SaveSystem::addMigrator(int fromVersion, SaveMigrator migrator) { impl_->migrators[fromVersion] = std::move(migrator); }
 
-void SaveSystem::beginPlay() {
-    impl_->resetSession();
-    impl_->currentScene = impl_->relativeScene(impl_->engine.scenePath());
-}
+void SaveSystem::beginPlay() { impl_->resetSession(); }
 
 void SaveSystem::endPlay() {
     impl_->resetSession();
     impl_->baseKeys.clear();
-    impl_->currentScene.clear();
 }
+
+void SaveSystem::sceneChanged() { impl_->resetBase(); }
 
 void SaveSystem::endTick() {
     if (impl_->requests.empty()) return;
@@ -540,7 +563,6 @@ Status SaveSystem::setGlobal(const std::string& name, const Json& taggedValue) {
 }
 
 double SaveSystem::playTime() const { return impl_->playTime(); }
-const std::string& SaveSystem::currentScene() const { return impl_->currentScene; }
 
 Json SaveSystem::Outcome::toJson() const {
     Json warn = Json::array();
@@ -691,11 +713,13 @@ Result<Json> SaveSystem::inspect(const std::string& slot, size_t maxDiffs) {
     for (const auto& w : warnings) warn.push(w);
     if (budget == 0) warn.push("more than " + std::to_string(maxDiffs) + " differences: the list is cut (raise max_diffs)");
     const std::string& savedScene = d.get("scene").asString();
+    const SceneFlow& flow = impl_->engine.sceneFlow();
+    auto savedPath = flow.resolve(savedScene);
+    const bool sameScene = savedScene.empty() || (savedPath && *savedPath == flow.currentPath() &&
+                                                  Impl::idsOf(d.get("sceneIds")) == flow.sceneIds());
     Json result = Json::object({{"slot", slot},
                                 {"version", d.get("version")},
-                                {"scene", Json::object({{"saved", savedScene},
-                                                        {"current", impl_->currentScene},
-                                                        {"same", savedScene.empty() || savedScene == impl_->currentScene}})},
+                                {"scene", Json::object({{"saved", savedScene}, {"current", impl_->sceneId()}, {"same", sameScene}})},
                                 {"tick", Json::object({{"saved", d.get("tick")}, {"current", impl_->engine.runtime().frame()}})},
                                 {"summary", Json::object({{"same", same},
                                                           {"differs", differ},

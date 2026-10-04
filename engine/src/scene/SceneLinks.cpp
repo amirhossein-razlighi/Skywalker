@@ -214,7 +214,8 @@ void Scene::copyEntityData(EntityId dst, const Scene& src, EntityId srcId) {
 }
 
 std::vector<EntityId> Scene::cloneTrees(const Scene& src, const std::vector<EntityId>& roots, EntityId parent,
-                                        std::unordered_map<EntityId, EntityId>* idMap) {
+                                        std::unordered_map<EntityId, EntityId>* idMap,
+                                        const std::unordered_map<EntityId, EntityId>* wantedIds) {
     // Gather sources first (depth first): copies may land inside the source scene.
     std::vector<std::pair<EntityId, bool>> list;  // (source id, is a root)
     std::unordered_set<EntityId> seen;
@@ -225,6 +226,10 @@ std::vector<EntityId> Scene::cloneTrees(const Scene& src, const std::vector<Enti
     };
     for (EntityId r : roots) gather(r, true);
 
+    // Fresh ids (wanted ones taken, sources without one) come after every wanted id, so they never take one.
+    if (wantedIds) {
+        for (const auto& [from, to] : *wantedIds) nextId_ = std::max(nextId_, to + 1);
+    }
     std::unordered_map<EntityId, EntityId> map;
     std::vector<EntityId> created, newRoots;
     for (const auto& [s, isRoot] : list) {
@@ -233,7 +238,11 @@ std::vector<EntityId> Scene::cloneTrees(const Scene& src, const std::vector<Enti
             auto it = map.find(src.record(s)->parent);
             p = it == map.end() ? parent : it->second;
         }
-        EntityId c = create(src.record(s)->name, p);
+        EntityId want = kNoEntity;
+        if (wantedIds) {
+            if (auto w = wantedIds->find(s); w != wantedIds->end()) want = w->second;
+        }
+        EntityId c = create(src.record(s)->name, p, want);
         copyEntityData(c, src, s);
         map[s] = c;
         created.push_back(c);
