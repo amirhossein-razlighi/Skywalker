@@ -509,12 +509,12 @@ void Engine::requestMeshAsync(const std::string& key) {
         lo.zUp = rec->importSettings.get("zUp").asBool(false);
         lo.turnAround = rec->importSettings.get("turnAround").asBool(false);
     }
-    struct Job {
+    struct LoadJob {
         std::shared_ptr<MeshStream> stream;
         std::string key, path;
         mesh::LoadOptions lo;
     };
-    auto run = [](std::unique_ptr<Job> j) {
+    auto run = [](std::unique_ptr<LoadJob> j) {
         MeshStream::Done d{j->key, nullptr, {}};
         auto data = mesh::loadMeshFile(j->path, j->lo);
         if (data) {
@@ -526,10 +526,10 @@ void Engine::requestMeshAsync(const std::string& key) {
         std::lock_guard lock(j->stream->mutex);
         j->stream->done.push_back(std::move(d));
     };
-    auto job = std::make_unique<Job>(Job{meshStream_, key, resolvePath(file), lo});
+    auto job = std::make_unique<LoadJob>(LoadJob{meshStream_, key, resolvePath(file), lo});
 #if defined(__APPLE__)
     struct Ctx {
-        std::unique_ptr<Job> job;
+        std::unique_ptr<LoadJob> job;
         decltype(run) fn;
     };
     dispatch_async_f(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), new Ctx{std::move(job), run}, [](void* p) {
