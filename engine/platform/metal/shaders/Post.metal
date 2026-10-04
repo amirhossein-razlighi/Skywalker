@@ -598,3 +598,22 @@ fragment float4 debugViewFragment(FullscreenOut in [[stage_in]], constant PostUn
     else c = tonemapACES(hdr.sample(linearClamp, uv).rgb);
     return float4(c, 1.0);
 }
+
+// ---------------------------------------------------------------------------
+// Scene transitions (game/SceneFlow.h, FrameData::fade): drawn over the final image, UI included, with
+// alpha blending into the sRGB target (so the blend happens in linear light).
+// ---------------------------------------------------------------------------
+
+struct ScreenFadeUniforms {
+    float4 color;  // linear rgb; a = opacity
+};
+
+fragment float4 screenFadeFragment(FullscreenOut in [[stage_in]], constant ScreenFadeUniforms& u [[buffer(0)]]) {
+    return u.color;
+}
+
+/// The previous scene's last frame over the new one (crossfade), at opacity u.color.a.
+fragment float4 crossfadeFragment(FullscreenOut in [[stage_in]], texture2d<float> previous [[texture(0)]],
+                                  constant ScreenFadeUniforms& u [[buffer(0)]]) {
+    return float4(previous.sample(presentSampler, uvOf(in)).rgb, u.color.a);
+}

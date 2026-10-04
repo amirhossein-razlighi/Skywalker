@@ -110,9 +110,11 @@ end
 
 Transitions are state, not effects baked into scenes: `scene_flow_info` reports `phase` (`idle`, `out`,
 `loading`, `in`) and `alpha`, and every frame carries `FrameData::fade` (`color`, `alpha`, `crossfade`).
-The CPU renderer applies fades over the whole picture (UI included), so headless captures show them; GPU
-backends draw the same overlay, and a crossfade blends the last frame of the old scene, which the backend
-keeps. They advance on the fixed tick (real seconds, not affected by `time_scale`).
+Both renderers apply fades over the whole picture, UI included, so captures show them (`viewport_capture`
+mid-fade is darker). The Metal renderer blends in linear light after the UI and before editor gizmos; for a
+crossfade it keeps the last frame it showed when `crossfade` first goes above 0 (the old scene) and draws it
+over the new one, then frees it when the crossfade ends. The CPU renderer cuts instead of crossfading.
+Transitions advance on the fixed tick (real seconds, not affected by `time_scale`).
 
 ## game.json
 

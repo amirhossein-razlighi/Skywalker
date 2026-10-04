@@ -606,6 +606,7 @@ public:
             // Offline (movie) sub-frames are accumulated by the caller: always the still path.
             const bool accumulateFrame = std::clamp(frame.samples, 1, 256) > 1 || frame.offline.enabled;
             const float renderScale = accumulateFrame ? 1.f : std::clamp(frame.environment.renderScale, 0.33f, 1.f);
+            captureCrossfade(frame);  // [scene transitions] the previous scene's last frame, before this one replaces it
             ensureTargets(frame.width, frame.height, renderScale);
             ensureMsaaStorage(frame);  // [characters] dense hair needs MSAA targets that can spill
             // Upscaling: interactive editor tiers use the GPU-only MetalFX spatial scaler after our
@@ -680,6 +681,7 @@ public:
             id<MTLCommandBuffer> cmd = [queue_ commandBuffer];
             cmd.label = @"Skywalker Frame";
             id<MTLCommandBuffer> firstCmd = cmd;
+            encodeCrossfadeCapture(cmd);  // [scene transitions]
             lightsBuf_ = transient(allLights.data(), allLights.size() * sizeof(GPULight));
             clusterCellsBuf_ = transient(grid.cells.data(), grid.cells.size() * sizeof(uint32_t));
             clusterIndexBuf_ = transient(grid.indices.data(), grid.indices.size() * sizeof(uint32_t));
@@ -792,7 +794,8 @@ public:
                            @"Debug view");
             }
             if (r2d_) r2d_->encodeUI(cmd, frame, resolve_, depthResolved_);  // UI at output resolution
-            encodeOverlays(cmd, frame, base);
+            encodeScreenTransition(cmd, frame);  // [scene transitions] over the whole picture, UI included
+            encodeOverlays(cmd, frame, base);  // editor gizmos stay visible
             fx_->trackFrame(cmd);  // [hair+vfx] GPU frame time
             foliage_->trackFrame(cmd);  // [foliage] GPU-counted instances and triangles
             {
@@ -928,7 +931,8 @@ private:
             "dofCombineFragment", "motionVectorFragment", "wireframeFragment", "overdrawFragment",
             "motionTileMaxFragment", "motionNeighborMaxFragment", "fxExposureFragment",
             "shadowClearVertex", "shadowAtlasDebugFragment", "probeSkyFragment", "probeFilterKernel", "probeDebugFragment",
-            "meshFragmentProbes", "ssgiProbesFragment", "lightingResolveProbesFragment"};
+            "meshFragmentProbes", "ssgiProbesFragment", "lightingResolveProbesFragment", "screenFadeFragment",
+            "crossfadeFragment"};
         return kRequired;
     }
 
@@ -1076,7 +1080,10 @@ private:
         id<MTLRenderPipelineState> meshProbes = terrainOverdraw ? make("meshVertex", "meshFragmentProbes", kHDRFormat, kSamples, Blend::None, true, &e, true) : nil;
         id<MTLRenderPipelineState> ssgiProbes = meshProbes ? make("fullscreenVertex", "ssgiProbesFragment", kHDRFormat, 1, Blend::None, false, &e) : nil;
         id<MTLRenderPipelineState> resolveProbes = ssgiProbes ? make("fullscreenVertex", "lightingResolveProbesFragment", kHDRFormat, 1, Blend::None, false, &e) : nil;
-        if (!resolveProbes) volume = nil;
+        // Scene transitions over the final image, UI included (game/SceneFlow.h): fade toward a color, crossfade.
+        id<MTLRenderPipelineState> screenFade = resolveProbes ? make("fullscreenVertex", "screenFadeFragment", kColorFormat, 1, Blend::Alpha, false, &e) : nil;
+        id<MTLRenderPipelineState> crossfade = screenFade ? make("fullscreenVertex", "crossfadeFragment", kColorFormat, 1, Blend::Alpha, false, &e) : nil;
+        if (!crossfade) volume = nil;
         if (volume) {
             for (const char* k : {"fluidAdvect", "fluidCorrect", "fluidCombust", "fluidCurl", "fluidForces", "fluidDivergence",
                                   "fluidJacobi", "fluidProject"}) {
@@ -1108,6 +1115,8 @@ private:
         presentPipeline_ = present;
         outlinePipeline_ = outline;
         overlayPipeline_ = overlay;
+        screenFadePipeline_ = screenFade;
+        crossfadePipeline_ = crossfade;
         bloomPrefilterPipeline_ = prefilter;
         bloomDownPipeline_ = down;
         bloomUpPipeline_ = up;
@@ -3189,6 +3198,48 @@ private:
         [enc endEncoding];
     }
 
+    // [scene transitions] FrameData::fade from the scene flow. A crossfade starts from the last frame shown
+    // (resolve_ is what present() and readback() hand out): it is copied once when crossfade first goes
+    // above 0 and released when it is back to 0. A fade blends toward the color. Both are one fullscreen
+    // triangle each, only while a transition runs.
+    /// Before ensureTargets: holds on to the last frame shown when a crossfade starts (a resize reallocates
+    /// resolve_; the reference keeps the old picture alive until it is copied).
+    void captureCrossfade(const FrameData& frame) {
+        if (frame.fade.crossfade <= 0.f) {
+            crossfading_ = false;
+            crossfadeFrom_ = nil;
+            crossfadeSource_ = nil;
+            return;
+        }
+        if (crossfading_) return;
+        crossfading_ = true;
+        crossfadeSource_ = resolve_;  // nil before the first frame: the new scene cuts in
+    }
+
+    /// At the start of the frame's command buffer, before anything writes resolve_.
+    void encodeCrossfadeCapture(id<MTLCommandBuffer> cmd) {
+        if (!crossfadeSource_) return;
+        crossfadeFrom_ = target2D(kColorFormat, crossfadeSource_.width, crossfadeSource_.height, MTLTextureUsageShaderRead);
+        id<MTLBlitCommandEncoder> blit = profiledBlit(cmd, "Crossfade capture", "post");
+        [blit copyFromTexture:crossfadeSource_ toTexture:crossfadeFrom_];
+        [blit endEncoding];
+        crossfadeSource_ = nil;
+    }
+
+    void encodeScreenTransition(id<MTLCommandBuffer> cmd, const FrameData& frame) {
+        const float cross = std::clamp(frame.fade.crossfade, 0.f, 1.f);
+        if (cross > 0.f && crossfadeFrom_ && crossfadeFrom_.width == resolve_.width && crossfadeFrom_.height == resolve_.height) {
+            const simd_float4 u = simd_make_float4(0.f, 0.f, 0.f, cross);
+            fullscreen(cmd, crossfadePipeline_, resolve_, {crossfadeFrom_}, &u, sizeof(u), true, @"Crossfade");
+        }
+        const float alpha = std::clamp(frame.fade.alpha, 0.f, 1.f);
+        if (alpha > 0.f) {
+            simd_float4 u = lin(frame.fade.color);
+            u.w = alpha;
+            fullscreen(cmd, screenFadePipeline_, resolve_, {}, &u, sizeof(u), true, @"Screen fade");
+        }
+    }
+
     void fullscreen(id<MTLCommandBuffer> cmd, id<MTLRenderPipelineState> pso, id<MTLTexture> target,
                     std::initializer_list<id<MTLTexture>> inputs, const void* uniforms, size_t size, bool load, NSString* label) {
         MTLRenderPassDescriptor* rp = [MTLRenderPassDescriptor renderPassDescriptor];
@@ -3431,6 +3482,10 @@ private:
     std::string envKey_;
     id<MTLDepthStencilState> depthWrite_, depthRead_, depthNone_;
     id<MTLTexture> resolve_, msaaColor_, msaaDepth_, shadowMap_, white_;
+    // [scene transitions] fade and crossfade over the final image; the frame a crossfade starts from
+    id<MTLRenderPipelineState> screenFadePipeline_, crossfadePipeline_;
+    id<MTLTexture> crossfadeFrom_, crossfadeSource_;
+    bool crossfading_ = false;
     bool msaaMemoryless_ = true;  // [characters] false once dense hair needed spillable MSAA targets
     id<MTLCommandBuffer> lastCommand_;
     std::unordered_map<std::string, GpuMesh> meshes_;
