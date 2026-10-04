@@ -1,0 +1,13 @@
+{
+  "guid": "1607d9f380eec2ae15eb3489179e011f",
+  "type": "mesh",
+  "tags": [],
+  "description": "",
+  "source": {},
+  "import": {
+    "normalize": false,
+    "zUp": false,
+    "vertexColors": false,
+    "material": "generated/minis/arrow_s1_0.mat.json"
+  }
+}

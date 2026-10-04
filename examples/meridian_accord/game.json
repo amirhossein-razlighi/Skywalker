@@ -1,0 +1,16 @@
+{
+  "id": "meridian_accord",
+  "title": "Meridian Accord",
+  "genre": "Grand Strategy \u00b7 Map Wargame",
+  "mood": "tense, stately, cartographic",
+  "pitch": "Ten nations, one inland sea, and an accord that will not survive the spring of '37.",
+  "assets": "Poly Haven (CC0) aerial photoscans; procedural maps, flags and art; Blender-generated miniatures",
+  "startScene": "scenes/main.sky.json",
+  "include": [
+    "maps/*.png",
+    "maps/*.jpg",
+    "maps/flags/*.png",
+    "ui/*",
+    "art/*.png"
+  ]
+}

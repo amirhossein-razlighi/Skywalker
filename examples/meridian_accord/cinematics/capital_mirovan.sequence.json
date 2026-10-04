@@ -1,0 +1,76 @@
+{
+  "format": "skywalker.sequence",
+  "version": 1,
+  "name": "capital_mirovan",
+  "duration": 7,
+  "tracks": [
+    {
+      "type": "shot",
+      "camera": "Cam capital_mirovan",
+      "keys": [
+        {
+          "t": 0,
+          "shot": "path",
+          "duration": 7,
+          "target": [
+            -120,
+            38,
+            -31
+          ],
+          "points": [
+            [
+              -30,
+              112,
+              56
+            ],
+            [
+              -68,
+              106,
+              84
+            ],
+            [
+              -108,
+              102,
+              96
+            ]
+          ],
+          "fov": 30
+        }
+      ]
+    },
+    {
+      "type": "camera",
+      "keys": [
+        {
+          "t": 0,
+          "camera": "Cam capital_mirovan"
+        }
+      ]
+    },
+    {
+      "type": "event",
+      "keys": [
+        {
+          "t": 0,
+          "event": "hud_hide",
+          "target": "Campaign"
+        },
+        {
+          "t": 0.005,
+          "event": "freeze",
+          "target": "Campaign"
+        },
+        {
+          "t": 0.01,
+          "event": "labels_near",
+          "target": "Campaign"
+        },
+        {
+          "t": 0.015,
+          "event": "city_labels_off",
+          "target": "Campaign"
+        }
+      ]
+    }
+  ]
+}

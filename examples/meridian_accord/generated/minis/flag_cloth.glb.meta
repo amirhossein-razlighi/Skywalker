@@ -1,0 +1,13 @@
+{
+  "guid": "4b476eae5d4a247e8fdd88b9cbd05f57",
+  "type": "mesh",
+  "tags": [],
+  "description": "",
+  "source": {},
+  "import": {
+    "normalize": false,
+    "zUp": false,
+    "vertexColors": false,
+    "material": "generated/minis/flag_cloth.mat.json"
+  }
+}

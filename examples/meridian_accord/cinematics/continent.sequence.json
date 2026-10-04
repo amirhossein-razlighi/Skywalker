@@ -1,0 +1,66 @@
+{
+  "format": "skywalker.sequence",
+  "version": 1,
+  "name": "continent",
+  "duration": 7,
+  "tracks": [
+    {
+      "type": "shot",
+      "camera": "Cam continent",
+      "keys": [
+        {
+          "t": 0,
+          "shot": "path",
+          "duration": 7,
+          "target": [
+            -150,
+            0,
+            -60
+          ],
+          "points": [
+            [
+              -150,
+              2150,
+              1640
+            ],
+            [
+              -150,
+              2000,
+              1500
+            ],
+            [
+              -150,
+              1860,
+              1380
+            ]
+          ],
+          "fov": 40
+        }
+      ]
+    },
+    {
+      "type": "camera",
+      "keys": [
+        {
+          "t": 0,
+          "camera": "Cam continent"
+        }
+      ]
+    },
+    {
+      "type": "event",
+      "keys": [
+        {
+          "t": 0,
+          "event": "hud_show",
+          "target": "Campaign"
+        },
+        {
+          "t": 0.005,
+          "event": "hold_front",
+          "target": "Campaign"
+        }
+      ]
+    }
+  ]
+}

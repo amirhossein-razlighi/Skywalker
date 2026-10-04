@@ -683,6 +683,9 @@ def generate(project):
     a = np.zeros((n, n), np.float32)
     lowland = land & (h_hi > 1.5) & (h_hi < 85)
     forest = soft(lowland & (fbm(n, 9, 5, SEED + 50) > 0.56), 2.5)
+    # The forest mask for the scene builder (miniature trees grow where it is painted).
+    Image.fromarray((np.clip(forest, 0, 1) * 255).astype(np.uint8)).resize((256, 256), Image.BILINEAR).save(
+        os.path.join(maps, "forest.png"))
     rgb, a = composite(z, a, (34, 58, 30), forest * 0.62)
     hub_mask = np.zeros((n, n), bool)
     for k, _, _ in hubs_early(cent, area, n):

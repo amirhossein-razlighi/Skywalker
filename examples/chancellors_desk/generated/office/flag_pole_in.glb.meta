@@ -1,0 +1,14 @@
+{
+  "guid": "1721ca0f84ee5b1cafc268618765d499",
+  "type": "mesh",
+  "tags": [],
+  "description": "",
+  "source": {},
+  "import": {
+    "normalize": false,
+    "zUp": false,
+    "vertexColors": false,
+    "material": "generated/office/flag_pole_in_brass.mat.json",
+    "prefab": "generated/office/flag_pole_in.prefab.json"
+  }
+}

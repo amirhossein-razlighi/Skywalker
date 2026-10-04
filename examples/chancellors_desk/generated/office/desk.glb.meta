@@ -1,0 +1,14 @@
+{
+  "guid": "d8d46141fed3ddd81e22a813b3e758cd",
+  "type": "mesh",
+  "tags": [],
+  "description": "",
+  "source": {},
+  "import": {
+    "normalize": false,
+    "zUp": false,
+    "vertexColors": false,
+    "material": "generated/office/desk_walnut.mat.json",
+    "prefab": "generated/office/desk.prefab.json"
+  }
+}

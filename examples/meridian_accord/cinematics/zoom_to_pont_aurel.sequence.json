@@ -1,0 +1,86 @@
+{
+  "format": "skywalker.sequence",
+  "version": 1,
+  "name": "zoom_to_pont_aurel",
+  "duration": 8,
+  "tracks": [
+    {
+      "type": "shot",
+      "camera": "Cam zoom_to_pont_aurel",
+      "keys": [
+        {
+          "t": 0,
+          "shot": "path",
+          "duration": 8,
+          "target": [
+            -518,
+            30,
+            20
+          ],
+          "points": [
+            [
+              -160,
+              2050,
+              1500
+            ],
+            [
+              -330,
+              980,
+              820
+            ],
+            [
+              -470,
+              420,
+              360
+            ],
+            [
+              -495,
+              330,
+              300
+            ]
+          ],
+          "fov": 38
+        }
+      ]
+    },
+    {
+      "type": "camera",
+      "keys": [
+        {
+          "t": 0,
+          "camera": "Cam zoom_to_pont_aurel"
+        }
+      ]
+    },
+    {
+      "type": "event",
+      "keys": [
+        {
+          "t": 0,
+          "event": "hud_show",
+          "target": "Campaign"
+        },
+        {
+          "t": 0.005,
+          "event": "freeze",
+          "target": "Campaign"
+        },
+        {
+          "t": 0.01,
+          "event": "stage_1",
+          "target": "Campaign"
+        },
+        {
+          "t": 4.6,
+          "event": "labels_near",
+          "target": "Campaign"
+        },
+        {
+          "t": 6.4,
+          "event": "tip_show",
+          "target": "Campaign"
+        }
+      ]
+    }
+  ]
+}

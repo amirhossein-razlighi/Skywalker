@@ -1,0 +1,14 @@
+{
+  "guid": "aa4b743c7e56140e7b4ade729cb720ff",
+  "type": "mesh",
+  "tags": [],
+  "description": "",
+  "source": {},
+  "import": {
+    "normalize": false,
+    "zUp": false,
+    "vertexColors": false,
+    "material": "generated/office/pen_lacquer.mat.json",
+    "prefab": "generated/office/pen.prefab.json"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "guid": "2e8763ee4ef44a78241594e2c6986449",
+  "type": "mesh",
+  "tags": [],
+  "description": "",
+  "source": {},
+  "import": {
+    "normalize": false,
+    "zUp": false,
+    "vertexColors": false,
+    "material": "generated/minis/city_a_stone_302824.mat.json",
+    "prefab": "generated/minis/city_a.prefab.json"
+  }
+}

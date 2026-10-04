@@ -1,0 +1,13 @@
+{
+  "guid": "92e3375785c266ccea8cc2e6fa4bf329",
+  "type": "mesh",
+  "tags": [],
+  "description": "",
+  "source": {},
+  "import": {
+    "normalize": false,
+    "zUp": false,
+    "vertexColors": false,
+    "material": "generated/minis/supply_s0.mat.json"
+  }
+}

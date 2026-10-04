@@ -53,6 +53,10 @@ Each frame renders one or more sub-samples:
   Perlin-Worley noise. It drifts with `windDirection`, is lit with Beer–powder,
   multi-scattering and a dual-lobe phase, and appears in reflections. `cloudMode: flat` is
   the cheap painted layer.
+- **Clouds below the camera:** when the camera is above or inside the layer (a strategy map,
+  a flight), the clouds are composited over the ground seen through them, not only over the
+  sky. For map-scale scenes use a low layer and small features, e.g. `cloudHeight: 330`,
+  `cloudThickness: 150`, `cloudScale: 0.1`.
 - **Far sea:** the sea blends into the horizon, so the simulated grid never shows its edge.
 
 ### Terrain and foliage

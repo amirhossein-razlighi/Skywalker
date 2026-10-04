@@ -1,0 +1,44 @@
+title: Start
+---
+<<declare $approval = 52>>
+<<declare $stability = 61>>
+<<declare $treasury = 124>>
+<<declare $army = 40>>
+Dornach: Chancellor. The Assembly passed it. Two hundred and twelve to one hundred and ninety-eight. #portrait:dornach
+Dornach: The Bridges Decree is on your desk. The Ledger already has the vote on its front page. #portrait:dornach
+<<show_paper>>
+-> Fourteen votes. That is not a mandate, Ilse.
+    Dornach: It is the only mandate this republic has ever had. #portrait:dornach
+-> Who is waiting outside?
+    Dornach: General Vass. And Ardanne from the Treasury. They arrived together, which worries me. #portrait:dornach
+<<hide_paper>>
+<<jump Treasury>>
+===
+title: Treasury
+---
+Ardanne: Nine hundred million crowns, Chancellor. The Bond will not sell at four percent. Not this winter. #portrait:ardanne
+-> Then we sell it at six.
+    <<set $treasury -= 18>>
+    <<set $approval += 3>>
+    Ardanne: Then we will be paying for these bridges until my grandchildren retire. #portrait:ardanne
+-> Cut the contracts in the eastern provinces.
+    <<set $treasury += 22>>
+    <<set $stability -= 9>>
+    Ardanne: The east will remember who drew the line through their villages. #portrait:ardanne
+<<jump General>>
+===
+title: General
+---
+Vass: The Engineer Corps built those bridges, and the Corps blew them up. We will not rebuild them under clerks. #portrait:vass
+-> The Corps answers to the Republic now, General.
+    <<set $army -= 15>>
+    <<set $approval += 4>>
+    Vass: Then the Republic had better learn to pour concrete. #portrait:vass
+-> Command of the works stays with you. On paper it is civil.
+    <<set $army += 20>>
+    <<set $stability += 4>>
+    <<set $approval -= 6>>
+    Vass: A sensible arrangement. The men will be pleased. #portrait:vass
+Dornach: The decree, Chancellor. They are waiting for the ink. #portrait:dornach
+<<show_decree>>
+===

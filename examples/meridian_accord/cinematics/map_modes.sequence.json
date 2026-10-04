@@ -1,0 +1,140 @@
+{
+  "format": "skywalker.sequence",
+  "version": 1,
+  "name": "map_modes",
+  "duration": 7,
+  "tracks": [
+    {
+      "type": "shot",
+      "camera": "Cam map_modes",
+      "keys": [
+        {
+          "t": 0,
+          "shot": "path",
+          "duration": 7,
+          "target": [
+            -120,
+            0,
+            -80
+          ],
+          "points": [
+            [
+              -60,
+              1500,
+              1050
+            ],
+            [
+              -110,
+              1450,
+              1000
+            ],
+            [
+              -160,
+              1400,
+              950
+            ]
+          ],
+          "fov": 40
+        }
+      ]
+    },
+    {
+      "type": "camera",
+      "keys": [
+        {
+          "t": 0,
+          "camera": "Cam map_modes"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "entity": "Cursor",
+      "property": "ui.visible",
+      "keys": [
+        {
+          "t": 0,
+          "value": true,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "entity": "Cursor",
+      "property": "ui.position",
+      "keys": [
+        {
+          "t": 0,
+          "value": [
+            1380,
+            620
+          ],
+          "ease": "smooth"
+        },
+        {
+          "t": 2,
+          "value": [
+            1728,
+            754
+          ],
+          "ease": "smooth"
+        },
+        {
+          "t": 2.6,
+          "value": [
+            1730,
+            756
+          ],
+          "ease": "smooth"
+        },
+        {
+          "t": 4.2,
+          "value": [
+            1797,
+            754
+          ],
+          "ease": "smooth"
+        },
+        {
+          "t": 6.8,
+          "value": [
+            1800,
+            756
+          ],
+          "ease": "smooth"
+        }
+      ]
+    },
+    {
+      "type": "event",
+      "keys": [
+        {
+          "t": 0,
+          "event": "hud_show",
+          "target": "Campaign"
+        },
+        {
+          "t": 0.005,
+          "event": "hold_front",
+          "target": "Campaign"
+        },
+        {
+          "t": 0.01,
+          "event": "stage_2",
+          "target": "Campaign"
+        },
+        {
+          "t": 2.4,
+          "event": "mode_terrain",
+          "target": "Campaign"
+        },
+        {
+          "t": 4.6,
+          "event": "mode_supply",
+          "target": "Campaign"
+        }
+      ]
+    }
+  ]
+}

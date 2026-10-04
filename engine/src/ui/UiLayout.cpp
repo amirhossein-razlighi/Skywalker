@@ -145,7 +145,8 @@ struct Builder {
     }
 
     /// Size of the element's own content (text, image, switch) without children, padding included.
-    Vec2 ownContent(const Node& n, float width) const {
+    /// `forced`: the width is imposed (a stretched fit-to-content child), so its text wraps to it.
+    Vec2 ownContent(const Node& n, float width, bool forced = false) const {
         Vec4 pad = contentPadding(n);
         float padW = pad.y + pad.w, padH = pad.x + pad.z;
         const std::string& w = n.el.widget;
@@ -154,7 +155,7 @@ struct Builder {
         if (!txt.empty() && w != "slider" && w != "progress" && w != "scroll" && w != "spacer" && w != "image") {
             float extra = 0;
             if (w == "toggle") extra = switchWidth(n) + 10.f;
-            bool wrap = width > 0.f && !fitW(n);
+            bool wrap = width > 0.f && (!fitW(n) || forced);
             float maxW = wrap ? std::max(1.f, width - padW - extra) : 0.f;
             text::TextLayout t = sys.layoutText(txt, n.style, 1.f, maxW, wrap);
             c = {t.width + extra, t.height};
@@ -202,7 +203,7 @@ struct Builder {
         if (fitW(n) && !force) width = -1.f;
         else if (width <= 0.f) width = size.x;
         Vec4 pad = contentPadding(n);
-        Vec2 content = ownContent(n, width);
+        Vec2 content = ownContent(n, width, force);
         std::vector<int> kids = flowChildren(n);
         const std::string flow = flowOf(n);
         float innerW = width > 0.f ? std::max(0.f, width - pad.y - pad.w) : -1.f;
@@ -341,11 +342,17 @@ struct Builder {
             float leftover = mainSize - used - gaps;
             if (scroll) leftover = 0;
             float offset = 0, between = n.el.gap;
-            if (flexTotal > 0.f && leftover > 0.f) {
+            if (flexTotal > 0.f && leftover != 0.f) {
+                // Flexible children share the leftover space; when the content is too wide or tall (e.g. a
+                // fit-to-content text in a dialogue box), they also give up space, never below zero, so
+                // the stack stays inside its parent and their text wraps instead of overflowing.
                 for (size_t j = 0; j < kids.size(); ++j) {
-                    float share = leftover * out.nodes[static_cast<size_t>(kids[j])].el.flex / flexTotal;
-                    (row ? sizes[j].x : sizes[j].y) += share;
-                    // A flexed column child that fits its height may need its text re-wrapped: width is unchanged.
+                    const Node& kn = out.nodes[static_cast<size_t>(kids[j])];
+                    if (kn.el.flex <= 0.f) continue;
+                    float& mainLen = row ? sizes[j].x : sizes[j].y;
+                    mainLen = std::max(0.f, mainLen + leftover * kn.el.flex / flexTotal);
+                    // A row child's width changed: re-measure its height at the new width (text re-wraps).
+                    if (row && n.el.align != "stretch" && fitH(kn)) sizes[j].y = pref(kids[j], mainLen, true).y;
                 }
                 leftover = 0;
             }

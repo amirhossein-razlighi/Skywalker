@@ -1,0 +1,13 @@
+{
+  "guid": "d114ed99a5f534245bfafbdc2466f3b5",
+  "type": "mesh",
+  "tags": [],
+  "description": "",
+  "source": {},
+  "import": {
+    "normalize": false,
+    "zUp": false,
+    "vertexColors": false,
+    "material": "generated/office/flag_cloth_in.mat.json"
+  }
+}

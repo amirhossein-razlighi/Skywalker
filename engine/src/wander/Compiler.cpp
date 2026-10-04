@@ -937,6 +937,11 @@ private:
     // --- statements ------------------------------------------------------------------
     void block(const Block& b) {
         pushBlock();
+        // Scratch registers of the enclosing statement's header (a loop bound such as `counts[k]`, an
+        // if condition) are dead once the body starts. Release them, so locals declared in the body
+        // take the next local slot: otherwise a local could sit above localsEnd() and the next
+        // statement's temporaries would overwrite it.
+        freeTemps();
         bool terminated = false;
         for (const auto& s : b) {
             if (terminated) {

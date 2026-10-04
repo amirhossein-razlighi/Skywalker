@@ -1,0 +1,14 @@
+{
+  "guid": "49fc31eb4094fd9e26171a0831e9626f",
+  "type": "mesh",
+  "tags": [],
+  "description": "",
+  "source": {},
+  "import": {
+    "normalize": false,
+    "zUp": false,
+    "vertexColors": false,
+    "material": "generated/minis/flag_pole_pole_wood_110806.mat.json",
+    "prefab": "generated/minis/flag_pole.prefab.json"
+  }
+}
