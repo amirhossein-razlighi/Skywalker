@@ -617,3 +617,27 @@ fragment float4 crossfadeFragment(FullscreenOut in [[stage_in]], texture2d<float
                                   constant ScreenFadeUniforms& u [[buffer(0)]]) {
     return float4(previous.sample(presentSampler, uvOf(in)).rgb, u.color.a);
 }
+
+// ---------------------------------------------------------------------------
+// 2D physics debug lines (Frame2D::debugLines): world-space segments over the finished world, under the UI.
+// ---------------------------------------------------------------------------
+
+struct DebugLineVertexIn {
+    float4 position;  // world xyz, w unused
+    float4 color;     // linear rgb, a = opacity
+};
+
+struct DebugLineOut {
+    float4 position [[position]];
+    float4 color;
+};
+
+vertex DebugLineOut debugLineVertex(uint vid [[vertex_id]], const device DebugLineVertexIn* verts [[buffer(0)]],
+                                    constant float4x4& viewProj [[buffer(1)]]) {
+    DebugLineOut o;
+    o.position = viewProj * float4(verts[vid].position.xyz, 1.0);
+    o.color = verts[vid].color;
+    return o;
+}
+
+fragment float4 debugLineFragment(DebugLineOut in [[stage_in]]) { return in.color; }

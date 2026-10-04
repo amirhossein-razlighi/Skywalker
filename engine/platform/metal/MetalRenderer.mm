@@ -793,6 +793,7 @@ public:
                            {gbufA_, gbufB_, giOut_, ssrOut_, aoBlurred_, depthResolved_, hdr_, velocity_}, &pu, sizeof(pu), false,
                            @"Debug view");
             }
+            encodeDebugLines2D(cmd, frame);  // [2D physics] physics2d_world.debugDraw, over the world
             if (r2d_) r2d_->encodeUI(cmd, frame, resolve_, depthResolved_);  // UI at output resolution
             encodeScreenTransition(cmd, frame);  // [scene transitions] over the whole picture, UI included
             encodeOverlays(cmd, frame, base);  // editor gizmos stay visible
@@ -932,7 +933,7 @@ private:
             "motionTileMaxFragment", "motionNeighborMaxFragment", "fxExposureFragment",
             "shadowClearVertex", "shadowAtlasDebugFragment", "probeSkyFragment", "probeFilterKernel", "probeDebugFragment",
             "meshFragmentProbes", "ssgiProbesFragment", "lightingResolveProbesFragment", "screenFadeFragment",
-            "crossfadeFragment"};
+            "crossfadeFragment", "debugLineVertex", "debugLineFragment"};
         return kRequired;
     }
 
@@ -1083,7 +1084,9 @@ private:
         // Scene transitions over the final image, UI included (game/SceneFlow.h): fade toward a color, crossfade.
         id<MTLRenderPipelineState> screenFade = resolveProbes ? make("fullscreenVertex", "screenFadeFragment", kColorFormat, 1, Blend::Alpha, false, &e) : nil;
         id<MTLRenderPipelineState> crossfade = screenFade ? make("fullscreenVertex", "crossfadeFragment", kColorFormat, 1, Blend::Alpha, false, &e) : nil;
-        if (!crossfade) volume = nil;
+        // [2D physics] debug lines over the final image, under the UI.
+        id<MTLRenderPipelineState> debugLines = crossfade ? make("debugLineVertex", "debugLineFragment", kColorFormat, 1, Blend::Alpha, false, &e) : nil;
+        if (!debugLines) volume = nil;
         if (volume) {
             for (const char* k : {"fluidAdvect", "fluidCorrect", "fluidCombust", "fluidCurl", "fluidForces", "fluidDivergence",
                                   "fluidJacobi", "fluidProject"}) {
@@ -1117,6 +1120,7 @@ private:
         overlayPipeline_ = overlay;
         screenFadePipeline_ = screenFade;
         crossfadePipeline_ = crossfade;
+        debugLinePipeline_ = debugLines;
         bloomPrefilterPipeline_ = prefilter;
         bloomDownPipeline_ = down;
         bloomUpPipeline_ = up;
@@ -3198,6 +3202,39 @@ private:
         [enc endEncoding];
     }
 
+    // [2D physics] Frame2D::debugLines as one line list: world-space ends through the frame's (unjittered)
+    // view-projection, alpha-blended into the final image, no depth test. Bounded: at most kMaxDebugLines.
+    static constexpr size_t kMaxDebugLines = 32768;
+    void encodeDebugLines2D(id<MTLCommandBuffer> cmd, const FrameData& frame) {
+        const auto& lines = frame.render2d.debugLines;
+        if (lines.empty() || !debugLinePipeline_) return;
+        const size_t n = std::min(lines.size(), kMaxDebugLines);
+        std::vector<simd_float4> verts;
+        verts.reserve(n * 4);
+        for (size_t i = 0; i < n; ++i) {
+            const DebugLine2D& l = lines[i];
+            const simd_float4 c = lin(Vec4{l.color.x, l.color.y, l.color.z, std::clamp(l.color.w, 0.f, 1.f)});
+            verts.push_back(simd_make_float4(l.a.x, l.a.y, l.a.z, 1.f));
+            verts.push_back(c);
+            verts.push_back(simd_make_float4(l.b.x, l.b.y, l.b.z, 1.f));
+            verts.push_back(c);
+        }
+        const Alloc buf = transient(verts.data(), verts.size() * sizeof(simd_float4));
+        const simd_float4x4 vp = toSimd(frame.viewProjection());
+        MTLRenderPassDescriptor* rp = [MTLRenderPassDescriptor renderPassDescriptor];
+        rp.colorAttachments[0].texture = resolve_;
+        rp.colorAttachments[0].loadAction = MTLLoadActionLoad;
+        rp.colorAttachments[0].storeAction = MTLStoreActionStore;
+        profileRenderPass(rp, "2D debug lines", "post");
+        id<MTLRenderCommandEncoder> enc = [cmd renderCommandEncoderWithDescriptor:rp];
+        enc.label = @"2D debug lines";
+        [enc setRenderPipelineState:debugLinePipeline_];
+        [enc setVertexBuffer:buf.buffer offset:buf.offset atIndex:0];
+        [enc setVertexBytes:&vp length:sizeof(vp) atIndex:1];
+        [enc drawPrimitives:MTLPrimitiveTypeLine vertexStart:0 vertexCount:n * 2];
+        [enc endEncoding];
+    }
+
     // [scene transitions] FrameData::fade from the scene flow. A crossfade starts from the last frame shown
     // (resolve_ is what present() and readback() hand out): it is copied once when crossfade first goes
     // above 0 and released when it is back to 0. A fade blends toward the color. Both are one fullscreen
@@ -3484,6 +3521,7 @@ private:
     id<MTLTexture> resolve_, msaaColor_, msaaDepth_, shadowMap_, white_;
     // [scene transitions] fade and crossfade over the final image; the frame a crossfade starts from
     id<MTLRenderPipelineState> screenFadePipeline_, crossfadePipeline_;
+    id<MTLRenderPipelineState> debugLinePipeline_;  // [2D physics] debug lines
     id<MTLTexture> crossfadeFrom_, crossfadeSource_;
     bool crossfading_ = false;
     bool msaaMemoryless_ = true;  // [characters] false once dense hair needed spillable MSAA targets
