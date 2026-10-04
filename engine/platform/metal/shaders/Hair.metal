@@ -394,6 +394,7 @@ static uint hairSampleMask(float coverage, float2 pixel, float strandRand, float
 struct HairVOut {
     float4 position [[position]];
     float3 worldPos;
+    float3 prevWorldPos;  // the strand point in the previous frame (velocity buffer)
     float3 tangent;
     float coverage;
     float t;
@@ -405,6 +406,7 @@ struct HairOut {
     float4 color [[color(0)]];
     float4 gbufA [[color(1)]];
     float4 gbufB [[color(2)]];
+    float2 velocity [[color(3)]];  // object motion (see objectMotion in Common.metal)
     uint mask [[sample_mask]];
 };
 
@@ -436,14 +438,19 @@ static float3 hairExpand(constant HairParams& H, device const float4* pos, devic
     return p + B * side * wDraw * 0.5;
 }
 
+// `prevPos` holds the previous frame's interpolated strands (the same buffer when the hair did
+// not move), so moving hair reaches the velocity buffer.
 vertex HairVOut hairVertex(uint vid [[vertex_id]], uint iid [[instance_id]], constant FrameUniforms& f [[buffer(2)]],
                            constant HairParams& H [[buffer(3)]], device const float4* pos [[buffer(4)]],
-                           device const HairChild* children [[buffer(5)]]) {
+                           device const HairChild* children [[buffer(5)]], device const float4* prevPos [[buffer(6)]]) {
     HairVOut o;
     float3 T;
     float cov, t, rnd;
     bool ortho = f.cameraForward.w > 0.5;
     float3 world = hairExpand(H, pos, children, iid, vid, f.cameraPos.xyz, f.cameraForward.xyz, ortho, H.view.x, T, cov, t, rnd);
+    float3 pT;
+    float pCov, pt, pRnd;
+    o.prevWorldPos = hairExpand(H, prevPos, children, iid, vid, f.cameraPos.xyz, f.cameraForward.xyz, ortho, H.view.x, pT, pCov, pt, pRnd);
     o.position = f.viewProj * float4(world, 1.0);
     o.worldPos = world;
     o.tangent = T;
@@ -470,6 +477,7 @@ fragment HairOut hairFragment(HairVOut in [[stage_in]], constant HairParams& H [
     o.color = float4(c, 1.0);
     o.gbufA = float4(albedo, 1.0);
     o.gbufB = float4(octEncode(N), H.rootColor.w, kGbufHair);
+    o.velocity = objectMotion(f, in.worldPos, in.prevWorldPos);
     o.mask = mask;
     return o;
 }
@@ -532,6 +540,7 @@ fragment HairOut hairCardFragment(HairCardOut in [[stage_in]], constant HairPara
     o.color = float4(c, 1.0);
     o.gbufA = float4(albedo, 1.0);
     o.gbufB = float4(octEncode(N), H.rootColor.w, kGbufHair);
+    o.velocity = float2(0.0);  // distant cards: camera motion only
     o.mask = mask;
     return o;
 }

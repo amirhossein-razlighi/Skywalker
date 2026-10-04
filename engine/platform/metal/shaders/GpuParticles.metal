@@ -843,6 +843,8 @@ vertex MeshOut gpuMeshParticleVertex(uint vid [[vertex_id]], uint iid [[instance
     o.fade = 0.0;
     o.position = f.viewProj * float4(world, 1.0);
     o.worldPos = world;
+    // Velocity buffer: where the particle was a frame ago (its spin is ignored).
+    o.prevWorldPos = world - p.velLife.xyz * clamp(f.cameraPos.w - f.cluster2.z, 0.0, 0.1);
     o.normal = R * float3(v.normal);
     if (P.extra.w > 0.5) {
         // Thin translucent meshes (leaves, petals): the side facing away from the sun is lit by

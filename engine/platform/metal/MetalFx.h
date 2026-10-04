@@ -40,6 +40,7 @@ struct FxFormats {
     MTLPixelFormat depth = MTLPixelFormatDepth32Float;
     NSUInteger samples = 4;           // main pass MSAA
     NSUInteger shadowTileTexels = 2048;  // one cascade tile of the sun shadow atlas
+    MTLPixelFormat velocity = MTLPixelFormatRG16Float;  // main pass color(3): object motion
 };
 
 /// Scene resources and per-pass constants the effects read.

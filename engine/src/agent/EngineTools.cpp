@@ -638,10 +638,12 @@ void addViewTools(Engine& engine, ToolRegistry& reg) {
                      {"samples", integer("Supersampling: jittered sub-frames accumulated (default 4; 1 = fastest preview, "
                                          "16-32 = final-quality stills with noise-free GI and reflections)")},
                      {"clay", boolean("Render every surface as matte white clay (judge form and light; film 'sketch to fill' beats)")},
-                     {"debug_view", enumeration({"final", "albedo", "normals", "material", "gi", "reflections", "ao", "depth", "lighting", "sketch", "impostors"},
+                     {"debug_view", enumeration({"final", "albedo", "normals", "material", "gi", "reflections", "ao", "depth", "lighting", "sketch", "impostors", "motion"},
                                                 "Buffer visualization for diagnosing looks: material = roughness (red) / metallic (green), "
                                                 "gi = bounce light, lighting = before screen-space GI/reflections, impostors = the final image "
-                                                "with foliage meshes tinted green and distant impostors magenta")},
+                                                "with foliage meshes tinted green and distant impostors magenta, motion = the velocity buffer "
+                                                "(hue = direction, brightness = speed, full at 16 px/frame) that TAA, MetalFX and motion blur use; "
+                                                "capture twice (samples 1) while something moves to see it")},
                      {"quality", enumeration({"full", "balanced", "fast"}, "Viewport quality tier (default full; fast/balanced preview what the editor shows while editing)")},
                      {"include_image", boolean("Return the image (default true); false = only the entity list")},
                      {"save_path", string("Also write the PNG to this project-relative path")}}),
@@ -670,9 +672,9 @@ void addViewTools(Engine& engine, ToolRegistry& reg) {
                  o.editorOverlays = a.get("overlays").asBool(true);
                  o.samples = static_cast<int>(std::clamp<int64_t>(a.get("samples").asInt(4), 1, 64));
                  {
-                     static const char* kViews[] = {"final", "albedo", "normals", "material", "gi", "reflections", "ao", "depth", "lighting", "sketch", "impostors"};
+                     static const char* kViews[] = {"final", "albedo", "normals", "material", "gi", "reflections", "ao", "depth", "lighting", "sketch", "impostors", "motion"};
                      std::string dv = a.get("debug_view").asString();
-                     for (int i = 0; i < 11; ++i) if (dv == kViews[i]) o.debugView = i;
+                     for (int i = 0; i < 12; ++i) if (dv == kViews[i]) o.debugView = i;
                      o.clay = a.get("clay").asBool(false);
                      std::string q = a.get("quality").asString();
                      o.quality = q == "fast" ? 2 : q == "balanced" ? 1 : 0;

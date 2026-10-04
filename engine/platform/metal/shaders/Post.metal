@@ -173,23 +173,27 @@ static float3 sampleCatmullRom(texture2d<float> tex, float2 uv, float2 texel) {
     return max(r / wsum, 0.0);
 }
 
-// Camera motion vectors (uv units, current -> previous) for MetalFX temporal upscaling.
+// The velocity buffer (uv units, current -> previous, unjittered): camera reprojection of the
+// depth buffer plus the object motion the main pass wrote (moving and skinned meshes, foliage
+// wind, hair, mesh particles; 0 = static). Sky pixels reproject through the far plane (camera
+// rotation only). Read by TAA, MetalFX, motion blur and debug_view "motion".
 fragment float2 motionVectorFragment(FullscreenOut in [[stage_in]], constant FrameUniforms& f [[buffer(0)]],
-                                     depth2d<float> depthTex [[texture(0)]]) {
+                                     depth2d<float> depthTex [[texture(0)]], texture2d<float> objectMotionTex [[texture(1)]]) {
     float2 uv = uvOf(in);
     float d = depthTex.sample(pointClamp, uv);
+    float2 obj = objectMotionTex.sample(pointClamp, uv).xy;
     float3 p = reconstructWorld(f, uv, min(d, 0.999999));
     float4 pc = f.prevViewProj * float4(p, 1.0);
-    if (pc.w <= 0.0) return float2(0.0);
+    if (pc.w <= 0.0) return obj;
     float2 puv = float2(pc.x / pc.w * 0.5 + 0.5, 0.5 - pc.y / pc.w * 0.5) + f.temporal.xy * float2(0.5, -0.5);
-    return puv - uv;
+    return puv - uv + obj;
 }
 
 fragment float4 temporalFragment(FullscreenOut in [[stage_in]], constant FrameUniforms& f [[buffer(0)]],
                                  constant TemporalUniforms& t [[buffer(1)]], texture2d<float> lit [[texture(0)]],
                                  texture2d<float> vol [[texture(1)]], texture2d<float> history [[texture(2)]],
                                  depth2d<float> depthTex [[texture(3)]], texture2d<float> reactive [[texture(4)]],
-                                 texture2d<float> cloudTex [[texture(5)]]) {
+                                 texture2d<float> cloudTex [[texture(5)]], texture2d<float> velocity [[texture(6)]]) {
     float2 uv = uvOf(in);
     float3 cur = sceneAt(lit, vol, t, uv, f, cloudTex, depthTex);
     int mode = int(t.params.x + 0.5);
@@ -219,12 +223,10 @@ fragment float4 temporalFragment(FullscreenOut in [[stage_in]], constant FrameUn
             }
         }
     }
-    float3 p = reconstructWorld(f, nearestUV, nearest);
-    float4 pc = f.prevViewProj * float4(p, 1.0);
-    float2 puv = float2(pc.x / pc.w * 0.5 + 0.5, 0.5 - pc.y / pc.w * 0.5) + (uv - nearestUV);
-    // The history is (on average) unjittered: undo this frame's sub-pixel offset. Sky pixels
-    // reproject through the far plane, i.e. by camera rotation only.
-    puv += f.temporal.xy * float2(0.5, -0.5);
+    // Dilated velocity: the motion of the nearest surface in the 3x3 neighborhood, so the edges of
+    // moving objects reproject with the object rather than the background behind them. The
+    // velocity buffer is unjittered and includes object motion (moving, skinned, swaying).
+    float2 puv = uv + velocity.sample(pointClamp, nearestUV).xy;
     if (any(puv < 0.0) || any(puv > 1.0)) return float4(cur, 1.0);
     float3 h = toYCoCg(sampleCatmullRom(history, puv, t.texel.xy));
     // Variance clipping (Salvi): clip the history toward the neighborhood mean.
@@ -280,26 +282,116 @@ fragment float exposureFragment(FullscreenOut in [[stage_in]], constant float4& 
     return exp2(mix(log2(cur), log2(target), 1.0 - exp(-p.x)));
 }
 
-fragment float4 motionBlurFragment(FullscreenOut in [[stage_in]], constant FrameUniforms& f [[buffer(0)]],
-                                   constant LensUniforms& l [[buffer(1)]], texture2d<float> src [[texture(0)]],
-                                   depth2d<float> depthTex [[texture(1)]]) {
-    float2 uv = uvOf(in);
+// Motion blur (McGuire et al. 2012, "A reconstruction filter for plausible motion blur"): the
+// velocity buffer (camera + object motion) is reduced to the largest vector per tile (TileMax),
+// then per 3x3 tile neighborhood (NeighborMax); each pixel gathers along its neighborhood's
+// dominant motion, weighting samples by depth order and by whether their own motion covers
+// this pixel. Moving objects blur over a sharp background and vice versa.
+struct MotionBlurUniforms {
+    float4 params;  // x = shutter (velocity scale), y = tile size (velocity texels), z = max blur (output px), w = sample count
+    float4 size;    // xy = velocity texture size (px), zw = output size (px)
+};
+
+// Shutter-scaled motion in output pixels, clamped to the maximum blur length.
+static float2 blurPx(float2 vUV, constant MotionBlurUniforms& u) {
+    float2 v = vUV * u.params.x * u.size.zw;
+    float len = length(v);
+    return len > u.params.z ? v * (u.params.z / len) : v;
+}
+
+fragment float2 motionTileMaxFragment(FullscreenOut in [[stage_in]], constant MotionBlurUniforms& u [[buffer(0)]],
+                                      texture2d<float> velocity [[texture(0)]]) {
+    // This tile covers output pixels [tile * K, tile * K + K): params.y = K in velocity texels
+    // (the velocity buffer is at the internal resolution). Bounded loop: at most 64x64 texels.
+    const float kf = max(u.params.y, 1.0);
+    const int k = clamp(int(ceil(kf)), 1, 64);
+    const uint2 size = uint2(max(u.size.xy, float2(1.0)));
+    const uint2 origin = uint2(floor(floor(in.position.xy) * kf));
+    float2 best = float2(0.0);
+    float bestLen = -1.0;
+    for (int y = 0; y < k; ++y) {
+        for (int x = 0; x < k; ++x) {
+            uint2 p = min(origin + uint2(x, y), size - 1);
+            float2 v = velocity.read(p).xy;
+            float l = length_squared(v * u.size.zw);
+            if (l > bestLen) {
+                bestLen = l;
+                best = v;
+            }
+        }
+    }
+    return best;
+}
+
+fragment float2 motionNeighborMaxFragment(FullscreenOut in [[stage_in]], constant MotionBlurUniforms& u [[buffer(0)]],
+                                          texture2d<float> tiles [[texture(0)]]) {
+    const int2 size = int2(tiles.get_width(), tiles.get_height());
+    const int2 c = int2(in.position.xy);
+    float2 best = float2(0.0);
+    float bestLen = -1.0;
+    for (int y = -1; y <= 1; ++y) {
+        for (int x = -1; x <= 1; ++x) {
+            float2 v = tiles.read(uint2(clamp(c + int2(x, y), int2(0), size - 1))).xy;
+            float l = length_squared(v * u.size.zw);
+            if (l > bestLen) {
+                bestLen = l;
+                best = v;
+            }
+        }
+    }
+    return best;
+}
+
+static float viewDepthAt(constant FrameUniforms& f, depth2d<float> depthTex, float2 uv) {
     float d = depthTex.sample(pointClamp, uv);
     float3 p = reconstructWorld(f, uv, min(d, 0.999999));
-    float4 pc = f.prevViewProj * float4(p, 1.0);
-    float2 puv = float2(pc.x / pc.w * 0.5 + 0.5, 0.5 - pc.y / pc.w * 0.5);
-    float2 vel = (uv - puv) * l.motion.x;
-    float len = length(vel);
-    if (len < l.texel.x * 0.5 || pc.w <= 0.0) return src.sample(pointClamp, uv);
-    vel *= min(1.0, 0.06 / len);  // cap the streak
+    return max(dot(p - f.cameraPos.xyz, f.cameraForward.xyz), 1e-3);
+}
+
+fragment float4 motionBlurFragment(FullscreenOut in [[stage_in]], constant FrameUniforms& f [[buffer(0)]],
+                                   constant MotionBlurUniforms& u [[buffer(1)]], texture2d<float> src [[texture(0)]],
+                                   depth2d<float> depthTex [[texture(1)]], texture2d<float> velocity [[texture(2)]],
+                                   texture2d<float> neighborMax [[texture(3)]]) {
+    float2 uv = uvOf(in);
+    float3 cX = src.sample(pointClamp, uv).rgb;
+    float2 vN = blurPx(neighborMax.sample(pointClamp, uv).xy, u);
+    float lenN = length(vN);
+    if (lenN < 0.5) return float4(cX, 1.0);  // nothing nearby moves
+    float2 vX = blurPx(velocity.sample(pointClamp, uv).xy, u);
+    float lenX = max(length(vX), 0.5);
+    float zX = viewDepthAt(f, depthTex, uv);
+    float wsum = 1.0 / lenX;
+    float3 sum = cX * wsum;
+    const int n = clamp(int(u.params.w + 0.5), 4, 32);
     float jitter = interleavedGradientNoise(in.position.xy) - 0.5;
-    float3 sum = 0.0;
-    const int N = 12;
-    for (int i = 0; i < N; ++i) {
-        float t = (float(i) + 0.5 + jitter) / float(N) - 0.5;
-        sum += src.sample(linearClamp, uv + vel * t).rgb;
+    float2 invSize = 1.0 / u.size.zw;
+    for (int i = 0; i < n; ++i) {
+        float t = mix(-1.0, 1.0, (float(i) + 0.5 + jitter) / float(n));  // along the dominant motion
+        float2 offPx = vN * (t * 0.5);
+        float dist = length(offPx);
+        if (dist < 0.25) continue;
+        float2 uvY = uv + offPx * invSize;
+        float zY = viewDepthAt(f, depthTex, uvY);
+        float lenY = max(length(blurPx(velocity.sample(pointClamp, uvY).xy, u)), 0.5);
+        float soft = 0.02 * min(zX, zY) + 0.02;
+        float fg = saturate(1.0 - (zY - zX) / soft);  // Y in front of X
+        float bg = saturate(1.0 - (zX - zY) / soft);  // Y behind X
+        float coneY = saturate(1.0 - dist / lenY), coneX = saturate(1.0 - dist / lenX);
+        float cylY = 1.0 - smoothstep(0.95 * lenY, 1.05 * lenY, dist), cylX = 1.0 - smoothstep(0.95 * lenX, 1.05 * lenX, dist);
+        float w = fg * coneY + bg * coneX + cylY * cylX * 2.0;
+        sum += src.sample(linearClamp, uvY).rgb * w;
+        wsum += w;
     }
-    return float4(sum / float(N), 1.0);
+    return float4(sum / max(wsum, 1e-5), 1.0);
+}
+
+// MetalFX exposure input: the exposure the composite pass applies (manual x auto), so the
+// upscaler's internal tonemapping matches the final image.
+fragment float fxExposureFragment(FullscreenOut in [[stage_in]], constant float4& p [[buffer(0)]],
+                                  texture2d<float> exposureTex [[texture(0)]]) {
+    float e = p.x;
+    if (p.y > 0.5) e *= exposureTex.read(uint2(0, 0)).r;
+    return isfinite(e) ? clamp(e, 1e-4, 1e4) : 1.0;
 }
 
 // Signed circle of confusion in half-resolution pixels (negative = in front of focus).
@@ -442,12 +534,13 @@ fragment float4 compositeFragment(FullscreenOut in [[stage_in]], texture2d<float
 }
 
 // Buffer visualization (agents and artists debugging lighting): 1 albedo, 2 normals,
-// 3 roughness/metallic, 4 GI, 5 reflections, 6 ambient occlusion, 7 depth, 8 direct+sky lighting.
+// 3 roughness/metallic, 4 GI, 5 reflections, 6 ambient occlusion, 7 depth, 8 direct+sky lighting,
+// 9 sketch, 11 motion (velocity buffer).
 fragment float4 debugViewFragment(FullscreenOut in [[stage_in]], constant PostUniforms& p [[buffer(0)]],
                                   texture2d<float> gbufA [[texture(0)]], texture2d<float> gbufB [[texture(1)]],
                                   texture2d<float> gi [[texture(2)]], texture2d<float> ssr [[texture(3)]],
                                   texture2d<float> ao [[texture(4)]], depth2d<float> depthTex [[texture(5)]],
-                                  texture2d<float> hdr [[texture(6)]]) {
+                                  texture2d<float> hdr [[texture(6)]], texture2d<float> velocity [[texture(7)]]) {
     float2 uv = uvOf(in);
     int mode = int(p.params.x + 0.5);
     float4 b = gbufB.sample(pointClamp, uv);
@@ -484,6 +577,16 @@ fragment float4 debugViewFragment(FullscreenOut in [[stage_in]], constant PostUn
         float3 paper = float3(0.965, 0.955, 0.93) - paperGrain;
         float3 ink = float3(0.16, 0.17, 0.2);
         c = mix(paper, ink, saturate(edge * 0.95 + (d0 < 1.0 ? hatch : 0.0)));
+    }
+    else if (mode == 11) {
+        // Motion: hue = direction, brightness = speed (full at 16 px per frame), over a dimmed
+        // grayscale of the scene so agents can tell what moves.
+        float2 v = velocity.sample(pointClamp, uv).xy * p.texel.zw;  // pixels per frame
+        float len = length(v);
+        float h = atan2(v.y, v.x) / 6.2831853 + 0.5;
+        float3 hue = saturate(abs(fract(h + float3(0.0, 2.0 / 3.0, 1.0 / 3.0)) * 6.0 - 3.0) - 1.0);
+        float lum = dot(tonemapACES(hdr.sample(linearClamp, uv).rgb), float3(0.2126, 0.7152, 0.0722));
+        c = mix(float3(lum * 0.25), hue, saturate(len / 16.0));
     }
     else c = tonemapACES(hdr.sample(linearClamp, uv).rgb);
     return float4(c, 1.0);

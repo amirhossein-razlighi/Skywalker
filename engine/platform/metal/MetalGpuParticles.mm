@@ -120,6 +120,7 @@ bool MetalGpuParticles::build(id<MTLLibrary> lib, const FxFormats& fmt) {
     md.colorAttachments[0].pixelFormat = fmt.hdr;
     md.colorAttachments[1].pixelFormat = fmt.gbufA;
     md.colorAttachments[2].pixelFormat = fmt.gbufB;
+    md.colorAttachments[3].pixelFormat = fmt.velocity;
     md.depthAttachmentPixelFormat = fmt.depth;
     meshPipeline_ = md.vertexFunction && md.fragmentFunction ? [device_ newRenderPipelineStateWithDescriptor:md error:&err] : nil;
     MTLRenderPipelineDescriptor* sd = [MTLRenderPipelineDescriptor new];

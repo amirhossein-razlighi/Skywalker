@@ -281,7 +281,8 @@ struct FrameData {
     bool resetHistory = false;
     /// Buffer visualization instead of the final image: 0 off, 1 albedo, 2 normals,
     /// 3 roughness/metallic, 4 GI, 5 reflections, 6 AO, 7 depth, 8 lighting before GI, 9 sketch,
-    /// 10 impostors (the final image with foliage meshes tinted green and impostors magenta).
+    /// 10 impostors (the final image with foliage meshes tinted green and impostors magenta),
+    /// 11 motion (the velocity buffer: hue = direction, brightness = speed).
     int debugView = 0;
     /// Viewport quality: 0 full (play, captures), 1 balanced, 2 fast (editing a heavy world).
     /// Lower tiers pick coarser LODs and cheaper shadows; the engine also trims the environment.

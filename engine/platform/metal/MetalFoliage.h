@@ -47,6 +47,7 @@ struct FoliageFormats {
     MTLPixelFormat gbufB = MTLPixelFormatRGBA16Float;
     MTLPixelFormat depth = MTLPixelFormatDepth32Float;
     NSUInteger samples = 4;
+    MTLPixelFormat velocity = MTLPixelFormatRG16Float;  // main pass color(3): object motion
 };
 
 /// Per-frame camera inputs of the cull pass.

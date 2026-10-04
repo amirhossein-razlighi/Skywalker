@@ -29,7 +29,10 @@ struct FxDrawUniforms {
     simd_float4 maps;
     simd_float4 outlineColor;
     simd_float4 material4;  // alpha cutoff
+    simd_float4x4 prevModel;  // velocity buffer (appended)
+    simd_float4 motion;
 };
+static_assert(sizeof(FxDrawUniforms) == 336);
 
 /// Mirror of GpuStep in GpuParticles.metal.
 struct GpuStepUniforms {
@@ -153,6 +156,8 @@ private:
         uint64_t hash = 0;
         uint32_t P = 0, G = 0, N = 0;
         id<MTLBuffer> rest, pos, prev, children, offsets, render;
+        id<MTLBuffer> renderPrev;  // last frame's interpolated strands (velocity buffer)
+        bool motion = false;       // renderPrev holds last frame's strands and they moved
         id<MTLTexture> domDepth, domOpaque, domDensity;
         double lastTime = -1;
         Mat4 lastModel;
