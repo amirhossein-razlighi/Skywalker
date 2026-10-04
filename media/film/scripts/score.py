@@ -7,7 +7,7 @@ Reads the film's musical grid from src/timeline.json (100 BPM, one bar = 72 fram
 section change, riser and impact lands exactly where the edit cuts. Writes a 48 kHz stereo WAV, then
 normalises it with ffmpeg's two-pass loudnorm to -14 LUFS integrated, -1.5 dBTP.
 
-Instruments: wavetable supersaw pads, an FM bell motif, a plucked arpeggio through a ping-pong delay,
+Instruments: wavetable supersaw pads, a bowed-string swell for the cold open, an FM bell for the finale chord, a plucked arpeggio through a ping-pong delay,
 sub bass, synthesized kick / clap / hats, noise risers, reverse swells and impacts, all into a
 convolution reverb, with sidechain-style ducking from the kick.
 """
@@ -200,8 +200,8 @@ for bar in range(N_BARS):
     en = env_adsr(n, att, 0.6, 0.85, 1.6, sustain_n=int(hold * SR))
     sig *= en[:, None] / (len(chord) * 5)
     level = 0.55 + 0.35 * e
-    if s == "open" and bar < 2:
-        level *= 0.5 + 0.25 * bar
+    if s == "open" and bar < 8:
+        level *= 0.55 + 0.05 * bar  # the strings carry the cold open; the pad sits underneath
     add(pad, sig, t_of_bar(bar), level)
 
 # tame the supersaw fizz: a warm low-pass on the pad bus
@@ -222,11 +222,46 @@ def bell_note(m, dur=2.6, bright=1.0):
     return y
 
 
-for bar in range(0, 8, 2):
-    for beat, m in MOTIF:
-        if bar == 0 and beat < 2:
-            continue
-        add(bell, bell_note(m), t_of_bar(bar, beat), 0.16)
+# ---------------------------------------------------------------- cold open: string swell
+# Over the sketch -> clay -> final reveal the melody is played as slow, legato bowed lines
+# (no struck notes): detuned saw ensembles with soft attacks, gentle vibrato and a warm
+# low-pass, an airy shimmer that grows while the lines draw, and a low drone from bar 4.
+strings = np.zeros((N, 2))
+OPEN_LINE = [(0.0, 78, 4.0), (2.0, 76, 3.0), (3.0, 74, 3.5), (5.0, 73, 2.0), (6.0, 76, 2.2)]  # (bar, midi, bars)
+
+
+def bowed(m, dur, bright=14, vib=0.0045):
+    n = int((dur + 1.8) * SR)
+    t = np.arange(n) / SR
+    f = mtof(m)
+    sig = np.zeros((n, 2))
+    for v, det in enumerate((-9, -3, 4, 10)):
+        ph = np.cumsum(f * 2 ** (det / 1200) * (1 + vib * np.sin(2 * np.pi * (4.6 + 0.3 * v) * t + v)) / SR)
+        w = TABLES[bright][((ph + rng.random()) % 1.0 * TABLE).astype(np.int32)]
+        pan = 0.5 + 0.3 * (v - 1.5) / 1.5
+        sig[:, 0] += w * (1 - pan)
+        sig[:, 1] += w * pan
+    env = env_adsr(n, 1.4, 0.8, 0.8, 1.8, sustain_n=int(dur * SR))
+    return sig * env[:, None] / 4
+
+
+for bar0, m, bars in OPEN_LINE:
+    add(strings, bowed(m, bars * BAR), t_of_bar(0, bar0 * 4), 0.26)
+    add(strings, bowed(m - 12, bars * BAR, bright=6), t_of_bar(0, bar0 * 4), 0.12)  # cellos an octave below
+strings = fft_filter(strings, lo=90, hi=3800, slope=0.8)
+
+# airy shimmer: band-passed noise breathing in with the line drawing
+n_air = int(t_of_bar(8) * SR)
+air = fft_filter(rng.standard_normal((n_air, 2)), lo=4000, hi=11000)
+air *= (np.linspace(0, 1, n_air) ** 1.5 * (0.6 + 0.4 * np.sin(np.arange(n_air) / SR * 2 * np.pi * 0.21)))[:, None]
+add(fx, air, 0.0, 0.012)
+
+# low drone from bar 4 into the logo hit
+n_dr = int((t_of_bar(8) - t_of_bar(4) + 1.5) * SR)
+td = np.arange(n_dr) / SR
+drone = np.sin(2 * np.pi * mtof(38) * td) + 0.3 * np.sin(2 * np.pi * mtof(50) * td)
+drone *= env_adsr(n_dr, 3.0, 0.5, 1.0, 1.5, sustain_n=n_dr - int(1.5 * SR))
+add(strings, np.stack([drone, drone], 1), t_of_bar(4), 0.022)
 for bar in (TOOLS, TOOLS + 2, TOOLS + 4, TOOLS + 6):
     for beat, m in MOTIF[::2]:
         add(bell, bell_note(m + 12, 2.0, 0.6), t_of_bar(bar, beat), 0.07)
@@ -508,12 +543,13 @@ def convolve(x, ir, block=1 << 16):
     return out[: len(x)]
 
 
-send = pad * 0.55 + bell * 1.0 + arp * 0.6 + drums * 0.08 + fx * 0.5
+send = pad * 0.55 + bell * 1.0 + strings * 0.8 + arp * 0.6 + drums * 0.08 + fx * 0.5
 wet = convolve(send, reverb_ir())
 
 mix = (
     pad * duck * 0.9
     + bell * 0.9
+    + strings * 0.85
     + arp * duck * 0.8
     + bass * duck * 0.95
     + drums * 0.9
