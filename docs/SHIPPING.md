@@ -83,6 +83,7 @@ typo never silently ships the wrong thing.
 | `exclude` | none | Files to leave out even when referenced. The build warns about each referenced file you excluded. |
 | `render` | none | `{"layers": {"1": "world", "2": "hero"}}` names the 20 render layers ([RENDERING](RENDERING.md#render-layers)); tools and Wander `layer_mask()` accept the names. |
 | `mounts` | none | `{"kit": "../_kit"}`: shared folders outside the project, addressed as `kit/...` ([ASSETS](ASSETS.md#shared-kits-mounts-in-gamejson)). Names are letters, digits, `_` and `-`. |
+| `localization` | source `en` | `{"source": "en", "locale": "fr", "useSystemLocale": true, "maxLengthRatio": 1.3}`: the game's language and whether a shipped game follows the player's system locale ([LOCALIZATION](LOCALIZATION.md)). |
 
 Command-line flags of the player and `skywalker build` override the file.
 
