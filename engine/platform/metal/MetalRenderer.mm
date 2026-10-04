@@ -492,7 +492,8 @@ public:
 
     Status render(const FrameData& frame) override {
         @autoreleasepool {
-            const bool accumulateFrame = std::clamp(frame.samples, 1, 256) > 1;
+            // Offline (movie) sub-frames are accumulated by the caller: always the still path.
+            const bool accumulateFrame = std::clamp(frame.samples, 1, 256) > 1 || frame.offline.enabled;
             const float renderScale = accumulateFrame ? 1.f : std::clamp(frame.environment.renderScale, 0.33f, 1.f);
             ensureTargets(frame.width, frame.height, renderScale);
             // Upscaling: interactive editor tiers use the GPU-only MetalFX spatial scaler after our
@@ -519,8 +520,9 @@ public:
                 motionValid_ = false;
             }
             const int samples = std::clamp(frame.samples, 1, 256);
-            const bool accumulate = samples > 1;
+            const bool accumulate = accumulateFrame;
             const bool jittered = accumulate || env.taa;
+            const uint64_t jitterBase = frame.offline.enabled ? static_cast<uint64_t>(std::max(frame.offline.sampleOffset, 0)) : 0;
             const float w = static_cast<float>(hdr_.width), h = static_cast<float>(hdr_.height);  // internal resolution
 
             // Bound the frames in flight so the transient ring is never overwritten in use.
@@ -547,7 +549,7 @@ public:
             if (r2d_) r2d_->encodeOccluders(cmd, frame);  // 2D shadow casters
             for (int i = 0; i < samples; ++i) {
                 // Sub-pixel jitter (Halton 2,3): TAA spreads it over frames, stills over sub-samples.
-                Vec2 j = jittered ? halton23(accumulate ? static_cast<uint64_t>(i) : frameIndex_) : Vec2{0, 0};
+                Vec2 j = jittered ? halton23(accumulate ? jitterBase + static_cast<uint64_t>(i) : frameIndex_) : Vec2{0, 0};
                 Vec2 jn{j.x * 2.f / w, j.y * 2.f / h};
                 Mat4 jvp = Mat4::translate({jn.x, jn.y, 0.f}) * vp;
                 FrameUniforms fu = base;
@@ -2724,8 +2726,12 @@ private:
             id<MTLBlitCommandEncoder> blit = [cmd blitCommandEncoder];
             [blit generateMipmapsForTexture:lum_];
             [blit endEncoding];
-            float dt = 1.f / 60.f;
-            simd_float4 ep = simd_make_float4(accumulated || !exposureValid_ ? -1.f : dt * env.adaptationSpeed * 3.f,
+            // Stills converge instantly; real time and offline movie frames adapt over time (offline:
+            // by the movie's frame time, re-metering at cuts) so exposure never pumps frame to frame.
+            const bool offline = frame.offline.enabled;
+            float dt = offline ? std::max(frame.offline.exposureDt, 0.f) : 1.f / 60.f;
+            const bool converge = !exposureValid_ || (offline ? frame.resetHistory : accumulated);
+            simd_float4 ep = simd_make_float4(converge ? -1.f : dt * env.adaptationSpeed * 3.f,
                                               0.f, -10.f, 10.f);
             id<MTLTexture> dst = exposure_[exposureCurrent_ ^ 1];
             fullscreen(cmd, exposurePipeline_, dst, {lum_, exposure_[exposureCurrent_]}, &ep, sizeof(ep), false, @"Exposure adapt");

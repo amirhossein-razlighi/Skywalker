@@ -1,6 +1,6 @@
 ---
 name: skywalker-animation
-description: Animate characters and direct cinematics in Skywalker - import rigged glTF, animator state machines and blend trees, driving them from Wander, bone attachments (weapons, hats), look-at and two-bone IK, and sequences with keyed properties, camera shots and cuts, storyboard scrubs and frame renders. Use for walking/idle/jump characters, held props, hand-on-handle reaches, cutscenes and trailers.
+description: Animate characters and direct cinematics in Skywalker - import rigged glTF, animator state machines and blend trees, driving them from Wander, bone attachments (weapons, hats), look-at and two-bone IK, and sequences with keyed properties, camera shots and cuts, storyboard scrubs, and final movie renders to MP4/ProRes/PNG with motion blur (movie_render). Use for walking/idle/jump characters, held props, hand-on-handle reaches, cutscenes, trailers and films.
 ---
 
 # Animation and sequences
@@ -71,11 +71,12 @@ bone_ik {character:"Knight", bone:"RightFoot", position:[0.2,0.3,-0.4], pole:[0,
 
 1. `sequence_create {path:"cinematics/arrival.sequence.json", duration:10, entity:"Director"}`: the asset plus an entity with a `sequencer` (plays on simulation start unless `play_on_start:false`).
 2. **Camera moves**: `sequence_camera_shot` (creates missing cameras and adds the cut). Shots: `orbit` (`radius`, `height`, `from`/`to` degrees, 0 = +Z of target), `dolly` (`distance` [far,near], `angle`), `crane` (`height` [low,high]),
-   `track`, `pan`, `static`, `path` (`points`). All take `target` (entity name or point), `offset`, `fov` (number or [from,to]), `roll`, `ease`, `start`, `duration`.
+   `track`, `pan`, `static`, `path` (`points`), `flyover` (straight aerial pass over the target from the `angle` side: `distance` = half the pass, `height`). All take `target` (entity name or point), `offset`, `fov` (number or [from,to]), `roll`, `ease`, `start`, `duration`.
 3. **Everything else**: `sequence_key` adds many keys at once: property keys (`transform.position`, `light.intensity`, `camera.fov`, `mesh.color`, `particles.rate`, `environment.sunElevation` with no entity), `camera_cuts`, `events`
    (Wander events, optional `target`) and `animations` (`play`, `fade`, `params`).
 4. **Storyboard**: `sequence_scrub {times:[...]}` renders up to 8 frames through the sequence's own camera without playing, then restores the scene.
 5. Adjust and scrub again; finally `sequence_play` (starts the simulation when editing) and check with `step` plus `viewport_capture {view:"scene"}`.
+6. **Render the movie**: `movie_render` (below).
 
 ```text
 sequence_create {path:"cinematics/arrival.sequence.json", duration:10, entity:"Director"}
@@ -93,6 +94,27 @@ sequence_play {sequence:"Director", action:"play", from:0}
 - `sequence_scrub` works only while editing. `persist:true` leaves the editor showing that time; `save_dir` must exist (`frame_0000.png`, ...). In Wander: `play_sequence(e, start?)`.
 - Sequencer `mesh.color` keys show only on entities with inline surfaces, not ones using a `mesh.material` asset.
 
+## Workflow C: render a movie (the Movie Render Queue)
+
+`movie_render` renders offline and deterministically from the scene state (restored afterwards): a sequence (its whole length, or `start`/`end`), an inline
+`camera` move, or the scene camera for `duration` seconds. Engine doc: `skywalker://docs/MOVIE_RENDER`.
+
+```text
+movie_render {sequence:"Director", output:"renders/arrival.mp4", resolution:"1080p", fps:24, samples:8, shutter:0.5}
+movie_render {sequence:"Director", outputs:["renders/arrival_master.mov", {path:"renders/arrival_web.mp4", codec:"hevc"}], samples:16, shutter:0.5, simulate:true}
+movie_render {camera:{keys:[{t:0, eye:[-3,2.7,-27], target:[2,2,-22]}, {t:4, eye:[-11,9,-9], target:[20,4,38]}]}, simulate:true, output:"renders/reveal/frame_####.png"}
+movie_render {camera:{shots:[{shot:"flyover", target:"Village", duration:6, distance:40, height:15}, {shot:"orbit", target:"Well", duration:4, radius:8}]}, clay:true, output:"renders/clay.mov"}
+movie_render {output:"renders/reveal/frame_####.png", resume:true, camera:{keys:[{t:0, eye:[-3,2.7,-27], target:[2,2,-22]}, {t:4, eye:[-11,9,-9], target:[20,4,38]}]}, simulate:true}
+movie_render {action:"status"}
+```
+
+- Outputs by extension: `.mp4` = H.264 (`codec:"hevc"` = 10-bit HEVC), `.mov` = ProRes 422 HQ, a folder or `name_####.png` = PNG sequence. Several outputs come from one render.
+- `simulate:true` runs the game (scripts, physics, water bobbing boats); the default runs only sequences, animators and particles.
+- Motion blur: `shutter` 0..1 of the frame (0.5 = 180 degrees; default = the camera's `motionBlur`), sub-frames at exact fractional times; `samples` is the per-frame budget (8 previews, 16-32 finals).
+- Same move in three looks for "sketch to clay to final" transitions: render it with `debug_view:"sketch"`, `clay:true` and normally; the frames line up exactly.
+- Long renders: `background:true` returns at once (the editor shows a progress bar; poll with `action:"status"`); `action:"cancel"` stops after the current sub-frame and keeps what was written; `resume:true` continues a PNG sequence.
+- Preview a range cheaply first (`quality:"fast"`, `samples:1`, `resolution:"720p"`), then render the final.
+
 ## Wander builtins
 
 `set_param(e, name, value)`, `trigger(e, name)`, `play_animation(e, name, fade?, loop?)`, `anim_state(e)`, `play_sequence(e, from?)`; fields are also properties: `self.animator.speed = 0.5`, `self.animator.lookAt = "Player"`.
@@ -102,7 +124,7 @@ sequence_play {sequence:"Director", action:"play", from:0}
 1. `animation_preview` with 4-8 `times` across the clip: check the pose reads (feet on the ground, arms not through the body), loops are seamless (first and last frame match).
 2. `animation_list {entity}` while playing shows the current state, parameters and recent events; `sim_trace` on `transform.position` confirms speed matches the clip's `rootSpeed`.
 3. Capture mid-run at fixed ticks (`sim_control step`, then `viewport_capture`) from two angles. Judge motion from several frames, never one.
-4. For cutscenes, scrub a storyboard, check every cut lands on the subject and the last frame is clean, then render frames with `fps` + `save_dir` if the human wants a video.
+4. For cutscenes, scrub a storyboard, check every cut lands on the subject and the last frame is clean, then `movie_render` the video (check a few frames of the PNG sequence or the summary's timings).
 
 ## Pitfalls
 

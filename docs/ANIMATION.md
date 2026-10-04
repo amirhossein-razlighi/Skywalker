@@ -145,6 +145,8 @@ after the state machine and look-at, every tick while playing and in editor prev
 
 ## Sequences (`*.sequence.json`)
 
+Render a sequence to a video or image sequence with `movie_render` ([MOVIE_RENDER](MOVIE_RENDER.md)).
+
 ```json
 {
   "format": "skywalker.sequence", "version": 1, "name": "Intro", "duration": 12,
@@ -203,7 +205,7 @@ saved.
 | `bone_ik` | Make a hand or foot reach an object or point (two-bone IK effector) |
 | `sequence_create` | New sequence asset + an entity that plays it |
 | `sequence_key` | Add/replace many keys at once: properties, camera cuts, events, animation keys |
-| `sequence_camera_shot` | Add an orbit/dolly/crane/track/pan/static/path shot (creates the camera, adds the cut) |
+| `sequence_camera_shot` | Add an orbit/dolly/crane/track/pan/static/path/flyover shot (creates the camera, adds the cut) |
 | `sequence_get` | Tracks, length, values and live camera at a time |
 | `sequence_scrub` | Storyboard captures through the sequence's camera, frame rendering to disk (`fps`, `save_dir`), editor preview |
 | `sequence_play` | Play / stop (starts the simulation when editing) |

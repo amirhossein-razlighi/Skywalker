@@ -62,6 +62,10 @@ struct SkywalkerApp: App {
                 Button("Pause") { engine.call("sim_control", ["action": "pause"]) }.keyboardShortcut("p", modifiers: [.command, .shift])
                 Button("Stop") { engine.call("sim_control", ["action": "stop"]) }.keyboardShortcut(".")
                 Divider()
+                Button("Render Movie…") { engine.movieRequest = MovieRequest() }
+                    .keyboardShortcut("m", modifiers: [.command, .option])
+                    .disabled(engine.movie?.finished == false)
+                Divider()
                 Button("Frame All") { engine.call("camera_set", ["frame": "all"]) }.keyboardShortcut("0")
             }
         }

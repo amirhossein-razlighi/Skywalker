@@ -22,7 +22,7 @@ const char* toString(TrackType t) {
 }
 
 const std::vector<std::string>& shotKinds() {
-    static const std::vector<std::string> kinds{"orbit", "dolly", "crane", "track", "pan", "static", "path"};
+    static const std::vector<std::string> kinds{"orbit", "dolly", "crane", "track", "pan", "static", "path", "flyover"};
     return kinds;
 }
 
@@ -457,6 +457,14 @@ std::optional<ShotPose> evaluateShot(const Track& track, float t, const PointLoo
             out.rotation = {pitch, lerpf(y0, y1, s), d.get("roll").asFloat(0.f)};
             lookAt.reset();
         }
+    } else if (kind == "flyover") {
+        // A straight aerial pass over the target: from `distance` m on the `angle` side to as far past it,
+        // keeping it framed (the classic establishing flyover).
+        float dist = d.get("distance").isNumber() ? d.get("distance").asFloat() : 30.f;
+        auto [h0, h1] = range(d.get("height"), 12.f, 12.f);
+        Vec3 dir = dirOf(d.get("angle").asFloat(0.f));
+        out.position = aim + dir * lerpf(dist, -dist, s) + Vec3{0, lerpf(h0, h1, s), 0};
+        lookAt = aim;
     } else if (kind == "static") {
         out.position = jvec(d.get("position"), aim + Vec3{0, 1.6f, 6.f});
     } else if (kind == "path") {

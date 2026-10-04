@@ -19,6 +19,7 @@
 #include "skywalker/agent/SocketServer.h"
 #include "skywalker/core/Log.h"
 #include "skywalker/core/Strings.h"
+#include "skywalker/engine/Movie.h"
 #include "skywalker/native/NativeModules.h"
 #include "skywalker/assets/Prefab.h"
 #include "skywalker/render/Gltf.h"
@@ -192,6 +193,7 @@ Engine::Engine(EngineConfig config)
 }
 
 Engine::~Engine() {
+    movie_.reset();  // a running movie render restores the scene and closes its files first
     {
         // Refuse new jobs and release any thread waiting on a queued one, *then* join the
         // server threads; otherwise a connection thread could wait on a job never pumped.
@@ -369,6 +371,14 @@ void Engine::step(int ticks) {
 }
 
 void Engine::update(double seconds) {
+    if (movie_) {  // a movie render owns the simulation: one sub-frame per update, agents still served
+        pump();
+        if (movie_ && !movie_->advance()) {
+            lastMovie_ = movie_->status();
+            movie_.reset();
+        }
+        return;
+    }
     // Hot reload: rescan the project for changed assets every couple of seconds while editing.
     assetScanTimer_ += seconds;
     if (assetScanTimer_ >= 2.0 && playState_ == PlayState::Editing && !drag_.entity && !gizmoDrag_) {
@@ -403,7 +413,10 @@ void Engine::update(double seconds) {
     if (ticks) step(ticks);
 }
 
-double Engine::effectsTime() const { return playState_ == PlayState::Editing ? previewTime_ : runtime_->time(); }
+double Engine::effectsTime() const {
+    if (effectsTimeOverride_) return *effectsTimeOverride_;  // movie sub-frames
+    return playState_ == PlayState::Editing ? previewTime_ : runtime_->time();
+}
 
 fx::Ocean& Engine::oceanFor(EntityId e, const Water& w) {
     fx::Ocean& ocean = oceans_[e];
@@ -626,7 +639,7 @@ FrameData Engine::frame(const CaptureOptions& opts) {
     std::erase_if(oceans_, [&](const auto& kv) { return std::find(waterIds.begin(), waterIds.end(), kv.first) == waterIds.end(); });
     // Terrain and foliage (resolved texture paths included). Captures generate all foliage
     // in range; the live viewport streams a few chunks per frame.
-    world_->gather(*scene_, view, f, opts.samples <= 1);
+    world_->gather(*scene_, view, f, opts.samples <= 1 && !opts.offline.enabled);
     {
         std::vector<std::string> meshes;
         for (const auto& b : f.instances) {
@@ -701,10 +714,16 @@ Result<Capture> Engine::capture(const CaptureOptions& opts) {
     GpuJobLock gpuLock;
     Capture c;
     c.frame = frame(opts);
+    c.frame.resetHistory = c.frame.resetHistory || opts.resetHistory;
+    if (opts.offline.enabled) {
+        c.frame.offline = opts.offline;
+        c.frame.camera.motionBlur = 0.f;
+    }
     if (Status s = renderer_->render(c.frame); !s) return s.error();
     auto img = renderer_->readback();
     if (!img) return img.error();
     c.image = std::move(img.value());
+    if (!opts.listVisible) return c;
     c.visible = visibleEntities(*scene_, c.frame);
     world2d_->refineVisible(c.frame, c.visible, *scene_);  // real boxes for sprites, tiles, text, UI
     if (opts.annotate) annotate(c.image, c.visible);
@@ -712,6 +731,7 @@ Result<Capture> Engine::capture(const CaptureOptions& opts) {
 }
 
 Status Engine::renderToSurface(void* surface, int width, int height) {
+    if (movie_) return renderer_->present(surface);  // show the movie frames as they render
     auto start = std::chrono::steady_clock::now();
     CaptureOptions opts;
     opts.width = width;

@@ -49,6 +49,11 @@ public:
     void gather(const Scene& scene, const ViewCamera& camera, std::vector<ParticleInstance>& out,
                 std::vector<LightItem>& lights) const;
 
+    /// Movie sub-frames (docs/MOVIE_RENDER.md): gather() places particles `seconds` away from their
+    /// simulated state along their velocity (negative = earlier), so motion blur samples between
+    /// fixed ticks see them move smoothly. 0 (default) = the simulated positions.
+    void setRenderTimeOffset(float seconds) { renderTimeOffset_ = seconds; }
+
     size_t liveCount(EntityId emitter) const;
     size_t totalLive() const;
     size_t emitterCount() const { return states_.size(); }
@@ -79,6 +84,7 @@ private:
     void spawn(State& s, const ParticleEmitter& em, const Mat4& world, int count);
     std::unordered_map<EntityId, State> states_;
     float time_ = 0;
+    float renderTimeOffset_ = 0;
     // GPU emitters
     std::unordered_map<EntityId, uint64_t> gpuBursts_;
     struct CachedSurface {

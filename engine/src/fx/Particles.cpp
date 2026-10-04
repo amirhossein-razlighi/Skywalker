@@ -306,6 +306,7 @@ void ParticleSystem::gather(const Scene& scene, const ViewCamera& camera, std::v
             if (out.size() - first >= kMaxRendered) break;
             Vec3 pos = em->worldSpace ? p.pos : world.transformPoint(p.pos);
             Vec3 vel = em->worldSpace ? p.vel : world.transformDir(p.vel);
+            pos += vel * renderTimeOffset_;
             float t = std::clamp(p.age / p.life, 0.f, 1.f);
             float size = p.size0 + (p.size1 - p.size0) * t;
             if (dot(pos - eye, fwd) < -size * 2.f) continue;  // behind the camera

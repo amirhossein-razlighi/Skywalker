@@ -6,6 +6,7 @@
 // jobs which run in `pump()` on the main thread (called from `update()`). This keeps
 // the core lock-free and deterministic while still allowing many concurrent agents.
 
+#include <atomic>
 #include <cstdint>
 #include <deque>
 #include <functional>
@@ -46,6 +47,10 @@ class World2D;
 class NativeModules;
 namespace studio {
 class Studio;
+}
+namespace movie {
+struct Options;
+class Job;
 }
 
 /// Registers the engine's Wander builtins (effects, water, and every subsystem's) in the
@@ -91,6 +96,11 @@ struct CaptureOptions {
     int debugView = 0;  // see FrameData::debugView
     bool clay = false;  // every surface matte white clay (look-dev of form and light; "sketch to fill" films)
     int quality = 0;    // FrameData::quality: 0 full, 1 balanced, 2 fast
+    // Movie sub-frames (docs/MOVIE_RENDER.md): FrameData::offline; a real shutter is accumulated by the
+    // caller, so the post-process motion blur is off. resetHistory marks a cut.
+    FrameData::Offline offline;
+    bool resetHistory = false;
+    bool listVisible = true;  // compute Capture::visible (skipped by movie frames)
 };
 
 /// How the live editor viewport trades quality for responsiveness while editing. Play mode
@@ -272,6 +282,19 @@ public:
     physics::PhysicsSystem& physics() { return *physics_; }
     nav::NavSystem& navigation() { return *nav_; }
 
+    // --- Movie render queue (docs/MOVIE_RENDER.md) ------------------------------------------
+    /// Renders a movie to completion on this thread; `progress` (and "movie_progress" events) report each frame.
+    Result<Json> renderMovie(const movie::Options& options, const std::function<void(const Json&)>& progress = {});
+    /// Starts a movie render that update() advances one sub-frame at a time (the editor stays live).
+    Status startMovie(const movie::Options& options);
+    /// Thread-safe: the running movie render stops after the current sub-frame (its outputs stay valid).
+    void cancelMovie() { movieCancel_ = true; }
+    bool movieRendering() const { return movie_ != nullptr; }
+    /// The running (or last) movie render: progress, or its summary.
+    Json movieStatus() const;
+    /// Effects clock override for movie sub-frames (water, sky, GPU effects); nullopt = the normal clock.
+    void setEffectsTimeOverride(std::optional<double> seconds) { effectsTimeOverride_ = seconds; }
+
     // --- Events (activity feed) -----------------------------------------------------
     void emitEvent(Json event);
     std::vector<Json> drainEvents();
@@ -384,6 +407,11 @@ private:
     std::unique_ptr<SocketServer> server_;
     std::unique_ptr<World2D> world2d_;
     std::unique_ptr<studio::Studio> studio_;
+    // Movie render queue (Movie.cpp)
+    std::unique_ptr<movie::Job> movie_;
+    Json lastMovie_;
+    std::atomic<bool> movieCancel_{false};
+    std::optional<double> effectsTimeOverride_;
 };
 
 void registerEngineTools(Engine& engine);

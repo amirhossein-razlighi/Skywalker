@@ -132,6 +132,10 @@ set(SKY_ENGINE_SOURCES
     src/game/GameFiles.cpp
     src/game/Packager.cpp
     src/agent/GameTools.cpp
+    # Movie render queue: offline cinematic rendering to PNG sequences and video (docs/MOVIE_RENDER.md)
+    src/render/MovieWriter.cpp
+    src/engine/Movie.cpp
+    src/agent/MovieTools.cpp
 )
 
 # DCC bridge: the Python helper library and the Blender add-on are embedded so the engine can
@@ -286,6 +290,18 @@ if(SKY_HAS_METAL)
         "-framework Foundation" "-framework Metal" "-framework MetalKit" "-framework MetalFX" "-framework QuartzCore")
 else()
     target_compile_definitions(skywalker_engine PUBLIC $<$<COMPILE_LANGUAGE:C,CXX,OBJCXX>:SKY_HAS_METAL=0>)
+endif()
+
+# Movie render queue: native video encoding with AVFoundation (H.264, HEVC Main10, ProRes). Without it
+# (other platforms, or -DSKY_WITH_AVFOUNDATION=OFF) movies render to PNG sequences only.
+option(SKY_WITH_AVFOUNDATION "Encode movies natively with AVFoundation (Apple platforms)" ${APPLE})
+if(APPLE AND SKY_WITH_AVFOUNDATION)
+    target_sources(skywalker_engine PRIVATE platform/metal/MovieWriter.mm)
+    target_compile_definitions(skywalker_engine PRIVATE SKY_HAS_AVFOUNDATION=1)
+    target_link_libraries(skywalker_engine PUBLIC
+        "-framework AVFoundation" "-framework CoreMedia" "-framework CoreVideo" "-framework VideoToolbox")
+else()
+    target_compile_definitions(skywalker_engine PRIVATE SKY_HAS_AVFOUNDATION=0)
 endif()
 
 # Stable C API (used by the Swift editor and future language bindings).

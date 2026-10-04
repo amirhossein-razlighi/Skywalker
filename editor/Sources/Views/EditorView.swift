@@ -54,6 +54,9 @@ struct EditorView: View {
         .background(Theme.window)
         .foregroundStyle(Theme.text)
         .toolbar { toolbar }
+        .sheet(item: Binding(get: { engine.movieRequest }, set: { engine.movieRequest = $0 })) { request in
+            MovieRenderSheet(request: request).environment(engine)
+        }
         .navigationTitle(engine.sceneName)
         .navigationSubtitle(engine.playState == "editing" ? "Skywalker" : engine.playState.capitalized)
         .onChange(of: crew.workingCount) { old, new in
@@ -282,6 +285,8 @@ struct ViewportPanel: View {
                     .background(Theme.panel.opacity(0.88), in: RoundedRectangle(cornerRadius: 6))
                     .overlay(RoundedRectangle(cornerRadius: 6).stroke(Theme.border))
                     .environment(\.colorScheme, .dark)
+                    Spacer()
+                    MovieProgressHUD()
                     Spacer()
                     if showStats { StatsOverlay() }
                 }

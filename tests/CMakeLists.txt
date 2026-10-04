@@ -49,6 +49,7 @@ set(SKY_TEST_SOURCES
     test_sequencer.cpp
     test_integrations.cpp
     test_game.cpp
+    test_movie.cpp
 )
 
 add_executable(skywalker_tests ${SKY_TEST_SOURCES})
