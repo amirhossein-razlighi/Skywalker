@@ -100,3 +100,6 @@ examples/neon_requiem/lookdev/
 examples/ashen_peaks/dcc/
 # Gloamwater art is painted by media/demo/games/gloamwater_art.py (regenerated on build)
 examples/gloamwater/art/
+examples/ashen_peaks/agents/
+examples/ashen_peaks/studio/
+examples/*/.skywalker/cache/

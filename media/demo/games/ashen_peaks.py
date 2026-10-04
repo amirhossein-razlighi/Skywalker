@@ -35,10 +35,12 @@ PAD = (-335.0, -190.0, 88.0)         # monastery terrace center x, z and height
 RIVER = [(40, 985), (15, 880), (-45, 700), (-20, 520), (20, 360), (-15, 200), (-70, 70), (-110, -60),
          (-150, -185), (-120, -300), (-70, -430), (-40, -600), (15, -780), (-5, -975)]
 # Pilgrim stairs from the river up to the gate: (x, z, height) control points; landings in between.
-STAIRS = [(-176.0, -22.0, 14.2), (-205.0, -47.0, 30.0), (-236.0, -76.0, 47.0), (-262.0, -104.0, 63.0), (-284.0, -127.0, 77.0),
-          (-300.0, -145.0, PAD[2])]
+STAIRS = [(-176.0, -22.0, 14.2), (-210.7, -41.4, 30.0), (-230.3, -81.6, 47.0), (-267.7, -98.4, 63.0), (-279.7, -131.2, 77.0),
+          (-300.0, -145.0, PAD[2])]  # a gentle zigzag of flights with landings at every turn
 TERRACE = [(-335.0, -190.0, 46.0), (-314.0, -160.0, 26.0), (-358.0, -148.0, 26.0), (-352.0, -200.0, 32.0),
            (-306.0, -214.0, 22.0), (-322.0, -176.0, 34.0)]  # flattened discs (x, z, radius) forming the terrace
+STILL_WATER = {"size": 2000, "windSpeed": 0.6, "waveScale": 0.06, "choppiness": 0.2, "patchSize": 30, "depth": 6,
+               "deepColor": "#06161a", "shallowColor": "#3d6a5c", "clarity": 2.6, "foam": 0.0, "roughness": 0.008}
 AXIS = 45.0                          # the monastery faces north-east, down its stairs
 # Buildings: (asset, name, x, z, yaw). Positions on the terrace (height PAD[2]).
 BUILDINGS = [("gate", "Crane Gate", -307.0, -152.0, AXIS), ("hall", "Hall of the Kindled Crane", -350.0, -196.0, AXIS),
@@ -96,7 +98,7 @@ def sculpt_valley(cir):
     strokes += [dict(x=x, z=z, radius=r, strength=1, mode="flatten", target=py, falloff=0.02) for x, z, r in TERRACE]
     # The lake: a basin against the foot of the cliff.
     lx, lz, lr = LAKE
-    strokes += [dict(x=lx, z=lz, radius=lr * 1.45, strength=1, mode="flatten", target=WATER_Y + 0.8, falloff=0.6),
+    strokes += [dict(x=lx, z=lz, radius=lr * 1.12, strength=1, mode="flatten", target=WATER_Y + 0.8, falloff=0.45),
                 dict(x=lx, z=lz, radius=lr, strength=1, mode="flatten", target=WATER_Y - 7, falloff=0.75),
                 dict(x=lx - 30, z=lz + 40, radius=lr * 0.6, strength=1, mode="flatten", target=WATER_Y - 4, falloff=0.8),
                 dict(x=lx + 20, z=lz - 50, radius=lr * 0.55, strength=1, mode="flatten", target=WATER_Y - 3, falloff=0.8)]
@@ -110,10 +112,11 @@ def sculpt_valley(cir):
         strokes.append(dict(x=x, z=z, radius=17 * w, strength=0.5, mode="flatten", target=WATER_Y + 0.9, falloff=0.9))
         strokes.append(dict(x=x, z=z, radius=9.5 * w, strength=1, mode="flatten", target=WATER_Y - 1.8, falloff=0.7))
     cir.call("terrain_sculpt", entity="Valley", strokes=strokes)
-    # The pilgrim stairs ride a ramp of packed earth.
+    # The pilgrim stairs ride a ramp of packed earth. Brushes run downhill so each one leaves the
+    # ground at or below the stair profile (the stone flights are deep and hide the difference).
     strokes = []
-    for x, z, y in stair_path(1.5):
-        strokes.append(dict(x=x, z=z, radius=8, strength=1, mode="flatten", target=y - 0.28, falloff=0.75))
+    for x, z, y in reversed(stair_path(1.5)):
+        strokes.append(dict(x=x, z=z, radius=9, strength=1, mode="flatten", target=y - 0.3, falloff=0.6))
     cir.call("terrain_sculpt", entity="Valley", strokes=strokes)
     # Break up the brush shapes a little (cliff and spur faces only, not the floor).
     strokes = [dict(x=px + 60 + r.uniform(-15, 15), z=pz + r.uniform(-60, 60), radius=r.uniform(14, 26), strength=r.uniform(1.5, 3),
@@ -132,8 +135,8 @@ def terrain_layers(pix):
     bank = ph.texture(pix, "brown_mud_leaves_01", tiling=1.0, triplanar=False)
     return [
         {"name": "forest floor", "material": forest, "tiling": 3.5, "color": "#a9b98f"},
-        {"name": "meadow", "material": meadow, "tiling": 3.0, "color": "#b4cc8a", "heightMax": 175, "slopeMax": 21, "noise": 0.75, "sharpness": 0.35},
-        {"name": "mossy scree", "material": mossy, "tiling": 7, "color": "#b9c29a", "slopeMin": 24, "slopeMax": 40, "noise": 0.6, "sharpness": 0.4},
+        {"name": "meadow", "material": meadow, "tiling": 3.0, "color": "#a4c47e", "heightMax": 175, "slopeMax": 21, "noise": 0.75, "sharpness": 0.35},
+        {"name": "mossy scree", "material": mossy, "tiling": 18, "color": "#93b07c", "slopeMin": 24, "slopeMax": 40, "noise": 0.6, "sharpness": 0.4},
         {"name": "cliff", "material": cliff, "tiling": 9, "color": "#b4bcc0", "slopeMin": 37, "noise": 0.5, "sharpness": 0.55, "triplanar": True},
         {"name": "snow", "material": snow, "tiling": 6, "heightMin": 300, "slopeMax": 42, "noise": 0.8, "sharpness": 0.6},
         {"name": "river bed", "material": bed, "tiling": 3, "heightMax": WATER_Y + 0.4, "sharpness": 0.7},
@@ -159,19 +162,19 @@ def build(studio):
     cir.call("terrain_paint", entity="Valley", layer="meadow",
              strokes=[dict(x=x, z=z, radius=12, strength=1.0, falloff=0.6) for x, z, _ in stair_path(3.0)])
     cir.call("terrain_paint", entity="Valley", layer="path",
-             strokes=[dict(x=x, z=z, radius=6.5, strength=1.0, falloff=0.6) for x, z, _ in stair_path(2.0)] +
+             strokes=[dict(x=x, z=z, radius=4.2, strength=1.0, falloff=0.5) for x, z, _ in stair_path(2.0)] +
              [dict(x=x, z=z, radius=r + 3, strength=1.0, falloff=0.3) for x, z, r in TERRACE])
     # The far ranges: a second, coarse terrain under the valley that fills every horizon.
     far_layers = [
-        {"name": "forest", "material": layers[0]["material"], "tiling": 30, "color": "#5d7048"},
-        {"name": "scree", "material": layers[2]["material"], "tiling": 40, "slopeMin": 26, "noise": 0.5},
+        {"name": "forest", "material": layers[1]["material"], "tiling": 30, "color": "#4a6634"},
+        {"name": "scree", "material": layers[2]["material"], "tiling": 40, "color": "#6f8a5c", "slopeMin": 30, "noise": 0.5},
         {"name": "cliff", "material": layers[3]["material"], "tiling": 60, "slopeMin": 36, "triplanar": True},
-        {"name": "snow", "material": layers[4]["material"], "tiling": 40, "heightMin": 650, "slopeMax": 46, "noise": 0.7},
+        {"name": "snow", "material": layers[4]["material"], "tiling": 40, "heightMin": 560, "slopeMax": 46, "noise": 0.7},
     ]
     cir.call("terrain_create", name="Far Ranges", preset="alpine", size=16000, resolution=1025, seed=29, layers=far_layers,
-             position=[0, -40, 0], generator={"maxHeight": 1500, "featureSize": 2600})
+             position=[0, -40, 0], generator={"maxHeight": 950, "featureSize": 2600})
     cir.call("terrain_sculpt", entity="Far Ranges", strokes=[
-        dict(x=0, z=0, radius=1750, strength=1, mode="flatten", target=-40, falloff=0.6),
+        dict(x=0, z=0, radius=2700, strength=1, mode="flatten", target=-40, falloff=0.55),
         dict(x=0, z=0, radius=800, strength=1, mode="flatten", target=-80, falloff=0.2)])
     cir.call("terrain_layers", entity="Far Ranges", layers=far_layers)
     cir.call("entity_update", entity="Far Ranges", components={"terrain": {"macroVariation": 0.7}})
@@ -179,16 +182,24 @@ def build(studio):
 
     # --- Water: one still surface for the river and the lake ------------------------------------
     pix.call("fx_create", effect="lake", name="Kagami Lake", position=[0, WATER_Y, 0],
-             overrides={"size": 2000, "windSpeed": 1.2, "waveScale": 0.22, "choppiness": 0.4, "patchSize": 40, "depth": 6,
-                        "deepColor": "#06161a", "shallowColor": "#3d6a5c", "clarity": 2.6, "foam": 0.05, "roughness": 0.02})
+             overrides=STILL_WATER)
 
     # --- The monastery ---------------------------------------------------------------------------------
-    build_monastery(studio)
+    meshes, M = build_monastery(studio)
 
     # --- Foliage ------------------------------------------------------------------------------------
     grow(cir, pix)
 
-    # --- Aurora: misty sunrise ------------------------------------------------------------------------
+    # --- Stratus: life; Nimbus: the film's shots ---------------------------------------------------------
+    life(studio, meshes, M)
+    nim.e("Player Camera", pos=tuple(META["view"]["eye"]), camera={"fov": 50, "primary": True, "farPlane": 40000, "nearPlane": 0.15})
+    nim.flush("Game camera")
+    nim.call("entity_update", entity="Player Camera", components={"transform": {"rotation": [-12, -125, 0]}})
+    sequences(nim)
+
+    # --- Aurora: two moods, two scenes ---------------------------------------------------------------------
+    aur.call("environment_update", **MOODS["sunset"])
+    nim.call("scene_save", path="scenes/sunset.sky.json")
     aur.call("environment_update", **MOODS["sunrise"])
     nim.call("scene_save", path="scenes/main.sky.json")
 
@@ -256,7 +267,8 @@ def monastery_materials(pix):
             ("gold", dict(color="#d8a64a", metallic=1.0, roughness=0.28)),
             ("banner", dict(texture="textures/banner_crane.png", color="#ffffff", roughness=0.9, subsurface=0.45, doubleSided=True)),
             ("plaque", dict(texture="textures/plaque_crane.png", color="#ffffff", roughness=0.45, clearcoat=0.4)),
-            ("cloth", dict(color="#ffffff", roughness=0.9, subsurface=0.5, doubleSided=True))):
+            ("cloth", dict(color="#ffffff", roughness=0.9, subsurface=0.5, doubleSided=True)),
+            ("feather", dict(color="#ffffff", roughness=0.8, subsurface=0.3, doubleSided=True))):
         path = f"materials/{name}.mat.json"
         pix.material(path, **fields)
         M[name] = path
@@ -287,7 +299,7 @@ def model_monastery(pix):
     return meshes
 
 
-PART_MAT = {"stone": "stone", "lacquer": "lacquer", "timber": "timber", "panel": "panel", "plaster": "plaster", "paper": "paper",
+PART_MAT = {"feather": "feather", "stone": "stone", "lacquer": "lacquer", "timber": "timber", "panel": "panel", "plaster": "plaster", "paper": "paper",
             "jade": "jade", "roof": "roof", "ridge": "ridge", "bronze": "bronze", "gold": "gold", "plaque": "plaque",
             "redpaper": "redpaper", "banner": "banner", "cloth": "cloth", "ember": "ember"}
 GRANITE = {"lantern", "stairs", "bridge"}  # monolithic stone: no masonry pattern
@@ -416,7 +428,235 @@ def build_monastery(studio):
     pix.flush("Braziers and banners")
     for k, (x, y, z) in enumerate(fires):
         aur.call("fx_create", effect="torch", name=f"Gate Fire {k + 1}", position=[x, y, z])
-    return lamps
+    return meshes, M
+
+
+# --- Life: cranes, petals, mist, flickering lanterns, banners in the wind ----------------------------
+FLICKER = """behavior Flicker
+  var base = 0
+  on start
+    base = self.light.intensity
+  end
+  on tick
+    let n = sin(time * 7.3 + self.id) * 0.5 + sin(time * 12.9 + self.id * 1.7) * 0.3 + sin(time * 23.0 + self.id * 0.3) * 0.2
+    self.light.intensity = base * (1 + n * 0.14)
+  end
+end"""
+
+SWAY = """behavior Sway
+  var yaw = 0
+  on start
+    yaw = self.rotation.y
+  end
+  on tick
+    self.rotation = (sin(time * 1.3 + self.id) * 4, yaw, cos(time * 1.1 + self.id * 0.7) * 4)
+  end
+end"""
+
+FLUTTER = """on tick
+  self.rotation = (sin(time * 2.3 + self.id) * 2, sin(time * 1.7 + self.id * 0.9) * 9 + sin(time * 4.1 + self.id) * 3, 0)
+end"""
+
+GLIDE = """behavior Glide
+  on tick
+    let a = time * self.speed + self.phase
+    self.position = (self.cx + cos(a) * self.r, self.h + sin(a * 2.3) * 2.5, self.cz + sin(a) * self.r)
+    self.rotation = (sin(a * 2.3) * 6, 0 - a * 57.3, 0 - 14)
+  end
+end"""
+
+FLAP = """on tick
+  self.rotation = (0, self.side, sin(time * self.beat + self.phase) * 34 + 6)
+end"""
+
+
+def life(studio, meshes, M):
+    pix, aur, stra = (studio.agent(n) for n in ("Pixel", "Aurora", "Stratus"))
+    r = rnd(4321)
+    # Red-crowned cranes wheeling around the pagoda and over the lake.
+    flights = [(-362, -146, 46, PAD[2] + 34), (-362, -146, 64, PAD[2] + 46), (-180, -170, 90, 60), (-200, -120, 120, 75)]
+    k = 0
+    for cx, cz, rad, h in flights:
+        for _ in range(3 if rad < 80 else 2):
+            name = f"Crane {k + 1}"
+            speed = (6.5 + r.uniform(-1, 1)) / rad  # ~6.5 m/s
+            stra.e(name, pos=(cx + rad, h, cz), tags=["crane"],
+                   vars={"cx": cx, "cz": cz, "r": rad + r.uniform(-6, 6), "h": h + r.uniform(-4, 4), "speed": speed,
+                         "phase": k * 0.55 + r.uniform(0, 0.3)})
+            stra.e(f"{name} body", meshes["cranebody"]["feather"], parent=name, material=M["feather"])
+            for side, yaw in (("R", 0), ("L", 180)):
+                stra.e(f"{name} wing {side}", meshes["cranewing"]["feather"], parent=name, pos=(0.0, 0.04, 0.1),
+                       rot=(0, yaw, 0), material=M["feather"],
+                       vars={"side": yaw, "beat": 3.4 + r.uniform(-0.3, 0.3), "phase": r.uniform(0, 6.28)})
+            k += 1
+    stra.flush("Cranes")
+    for i in range(k):
+        stra.behave(f"Crane {i + 1}", "Glide", "Wheel slowly on the thermals above the monastery, banking into the turn.", GLIDE)
+        for side in ("R", "L"):
+            stra.behave(f"Crane {i + 1} wing {side}", "Flap", "Slow, deep wingbeats.", FLAP)
+    stra.flush("Crane flight")
+
+    # Lanterns flicker, paper lanterns sway, banners flutter.
+    for e in stra.call("scene_query", tag="lantern")["matches"]:
+        stra.behave(e["name"], "Flicker", "Candle flame: a soft, irregular flicker.", FLICKER)
+    for e in stra.call("scene_query", tag="sway")["matches"]:
+        stra.behave(e["name"], "Sway", "Hanging lanterns sway a little in the breeze.", SWAY)
+    for e in stra.call("scene_query", tag="banner")["matches"]:
+        if e.get("parent", 0) == 0:
+            stra.behave(f"{e['name']} banner", "Flutter", "The banner swings and ripples in the wind.", FLUTTER)
+    stra.flush("Flicker, sway, flutter")
+
+    # Mist over the lake and the river meadows, blossom petals drifting across the courtyard.
+    lx, lz, _ = LAKE
+    for k, (x, z, size) in enumerate(((lx, lz, 150), (lx + 40, lz + 120, 110), (-60, 120, 120), (-20, 380, 120))):
+        aur.call("fx_create", effect="mist", name=f"Valley Mist {k + 1}", position=[x, WATER_Y + 1.2, z],
+                 overrides={"shapeSize": [size, 2, size], "rate": 5, "lifetime": 26, "sizeStart": 16, "sizeEnd": 30,
+                            "colorStart": "#c9d3dc30", "colorEnd": "#c9d3dc00", "maxParticles": 140, "prewarm": True})
+    # Low cloud banks clinging to the valley walls and the spurs that close the valley.
+    for k, (x, y, z) in enumerate(((-720, 300, -420), (-650, 280, 260), (700, 300, -150), (640, 290, 520), (-250, 330, 1050),
+                                   (300, 320, -1060), (-820, 340, -950))):
+        aur.call("fx_create", effect="mist", name=f"Cloud Bank {k + 1}", position=[x, y, z],
+                 overrides={"shapeSize": [380, 50, 260], "rate": 1.2, "lifetime": 90, "sizeStart": 70, "sizeEnd": 150,
+                            "colorStart": "#e8ecf048", "colorEnd": "#e8ecf000", "maxParticles": 70, "speed": 0.4, "prewarm": True,
+                            "wind": 0.3})
+    gx, gz = BUILDINGS[0][2], BUILDINGS[0][3]
+    hx, hz = BUILDINGS[1][2], BUILDINGS[1][3]
+    aur.call("fx_create", effect="snow", name="Blossom Petals", position=[(gx + hx) / 2, PAD[2] + 14, (gz + hz) / 2],
+             overrides={"rate": 45, "lifetime": 16, "shapeSize": [60, 0, 60], "sizeStart": 0.07, "sizeEnd": 0.06, "speed": 0.4,
+                        "gravity": 0.12, "turbulence": 1.4, "turbulenceScale": 3, "colorStart": "#e6b3d8f0",
+                        "colorEnd": "#d9a0cfe0", "floorHeight": PAD[2], "maxParticles": 900, "wind": 1.0, "prewarm": True})
+    sx, sz, sy = STAIRS[2]
+    aur.call("fx_create", effect="snow", name="Stair Petals", position=[sx, sy + 10, sz],
+             overrides={"rate": 30, "lifetime": 14, "shapeSize": [50, 0, 70], "sizeStart": 0.07, "sizeEnd": 0.06, "speed": 0.4,
+                        "gravity": 0.12, "turbulence": 1.4, "turbulenceScale": 3, "colorStart": "#e6b3d8f0",
+                        "colorEnd": "#d9a0cfe0", "floorHeight": STAIRS[0][2], "maxParticles": 700, "wind": 1.0, "prewarm": True})
+
+
+# --- Hero shots ----------------------------------------------------------------------------------------
+# Each: a camera path (Catmull-Rom; a point is [x, y, z] absolute, [x, dy, z, "g"] above the ground or
+# [x, dy, z, "w"] above the water), a fixed look-at target, lens, mood and length.
+def on_stairs(flight, t, dy=1.7, side=0.0):
+    """A point on the pilgrim stairs: `flight` (0..4), `t` along it (0..1), `dy` above the steps, `side` meters right."""
+    (x0, z0, y0), (x1, z1, y1) = STAIRS[flight], STAIRS[flight + 1]
+    run = math.dist((x0, z0), (x1, z1))
+    d = run * t
+    y = y0 if d < LANDING else y0 + (y1 - y0) * (d - LANDING) / (run - LANDING)
+    ux, uz = (x1 - x0) / run, (z1 - z0) / run
+    return [round(x0 + ux * d - uz * side, 3), round(y + dy, 3), round(z0 + uz * d + ux * side, 3)]
+
+
+SHOTS = [
+    dict(name="establishing", mood="sunrise", seconds=8, fov=34,
+         path=[[-150, 168, 20], [-178, 156, -8], [-202, 146, -34]], target=[-340, 98, -184]),
+    dict(name="mirror_lake", mood="sunrise", seconds=7, fov=42,
+         path=[[-158, 1.5, -222, "g"], [-152, 1.4, -212, "g"], [-146, 1.35, -202, "g"]], target=[-110, 32, 40]),
+    dict(name="meadow", mood="sunrise", seconds=6, fov=44, aperture=4.0,
+         path=[[-36, 0.9, 132, "g"], [-44, 1.0, 114, "g"], [-52, 1.15, 96, "g"]], target=[-300, 95, -150]),
+    dict(name="pilgrim_stairs", mood="sunset", seconds=7, fov=50,
+         path=[on_stairs(3, 0.02, 1.6, 0.6), on_stairs(3, 0.12, 1.7, 0.4), on_stairs(3, 0.22, 1.8, 0.2)],
+         target=[-303, 96, -150]),
+    dict(name="crane_gate", mood="sunset", seconds=6, fov=48,
+         path=[[-292.0, 1.6, -136.0, "g"], [-293.5, 3.5, -137.5, "g"], [-295.0, 6.0, -139.0, "g"]], target=[-309, 96, -154]),
+    dict(name="courtyard", mood="sunset", seconds=7, fov=50, aperture=5.6,
+         path=[[-315.0, 1.7, -160.0, "g"], [-320.5, 1.7, -165.5, "g"], [-326.0, 1.75, -171.0, "g"]], target=[-350, 96, -196]),
+    dict(name="ember_pagoda", mood="sunset", seconds=7, fov=46, orbit=dict(center=(-362, -146), radius=30, height=1.8,
+                                                                           start=18, end=62, aim=15)),
+    dict(name="storm_vista", mood="sunset", seconds=8, fov=54,
+         path=[[-314.0, 99.0, -131.0], [-311.0, 100.0, -127.0], [-308.0, 101.0, -123.0]], target=[0, 45, 500]),
+]
+SEQ_ENV = ("sunElevation", "sunAzimuth", "sunIntensity", "sunColor", "ambient", "clouds", "cloudHeight", "cloudThickness",
+           "cloudDensity", "fogColor", "fogDensity", "fogHeight", "godRays", "haze", "exposureCompensation", "look", "lookStrength",
+           "saturation", "contrast", "bloomIntensity", "vignette", "shadowSoftness", "windSpeed", "temperature")
+
+
+def _resolve_shot(b, shot):
+    if "orbit" in shot:
+        o = shot["orbit"]
+        cx, cz = o["center"]
+        cy = PAD[2]
+        pts = []
+        for k in range(5):
+            a = math.radians(o["start"] + (o["end"] - o["start"]) * k / 4)
+            pts.append([round(cx + math.sin(a) * o["radius"], 3), round(cy + o["height"], 3), round(cz + math.cos(a) * o["radius"], 3)])
+        return pts, [cx, round(cy + o["aim"], 3), cz]
+    pts = []
+    for p in shot["path"]:
+        if len(p) == 4:
+            if p[3] == "w":
+                base = WATER_Y
+            else:
+                base = b.call("terrain_query", entity="Valley", points=[[p[0], p[2]]])["points"][0]["height"]
+                base = max(base, WATER_Y)
+            pts.append([p[0], round(base + p[1], 3), p[2]])
+        else:
+            pts.append(list(p))
+    return pts, list(shot["target"])
+
+
+def sequences(nim):
+    """One cinematic sequence per hero shot: the mood (environment keys at t=0) and a path camera."""
+    out = {}
+    for shot in SHOTS:
+        pts, target = _resolve_shot(nim, shot)
+        out[shot["name"]] = dict(path=pts, target=target, fov=shot["fov"], seconds=shot["seconds"], mood=shot["mood"],
+                                 aperture=shot.get("aperture", 0))
+        path = f"sequences/{shot['name']}.sequence.json"
+        env = MOODS[shot["mood"]]
+        tracks = [{"type": "property", "property": f"environment.{k}", "keys": [{"t": 0, "value": env[k], "ease": "step"}]}
+                  for k in SEQ_ENV if k in env]
+        nim.call("sequence_create", path=path, name=f"Ashen Peaks — {shot['name']}", duration=shot["seconds"], tracks=tracks,
+                 entity=f"Sequence {shot['name']}", play_on_start=False, overwrite=True)
+        cam = f"Cam {shot['name']}"
+        nim.call("sequence_camera_shot", sequence=path, camera=cam, shot="path", start=0, duration=shot["seconds"], points=pts,
+                 target=target, fov=shot["fov"], ease="smooth")
+        nim.call("entity_update", entity=cam, components={"camera": {"farPlane": 40000, "nearPlane": 0.15,
+                                                                     "aperture": shot.get("aperture", 0), "primary": False}})
+    with open(os.path.join(PROJECT, "shot_heights.json"), "w") as f:
+        json.dump({"shots": out}, f, indent=1)
+
+
+def _catmull(pts, s):
+    s = min(max(s, 0.0), 1.0)
+    if len(pts) == 1:
+        return list(pts[0])
+    x = s * (len(pts) - 1)
+    i = min(int(x), len(pts) - 2)
+    u = x - i
+    p0, p1, p2, p3 = pts[max(i - 1, 0)], pts[i], pts[i + 1], pts[min(i + 2, len(pts) - 1)]
+    return [0.5 * (2 * b + (c - a) * u + (2 * a - 5 * b + 4 * c - d) * u * u + (3 * b - a - 3 * c + d) * u ** 3)
+            for a, b, c, d in zip(p0, p1, p2, p3)]
+
+
+def _shot_data():
+    with open(os.path.join(PROJECT, "shot_heights.json")) as f:
+        return json.load(f)["shots"]
+
+
+def shot_camera(shot, s):
+    """Camera (eye, target, fov) of a resolved shot at normalized time s (smooth ease, like the sequence)."""
+    e = s * s * (3 - 2 * s)
+    return dict(eye=[round(v, 4) for v in _catmull(shot["path"], e)], target=shot["target"], fov=shot["fov"])
+
+
+def shots():
+    data = _shot_data()
+    out = []
+    for shot in SHOTS:
+        d = data[shot["name"]]
+        env = MOODS[d["mood"]]
+
+        def cam(i, n, d=d):
+            c = shot_camera(d, i / max(n - 1, 1))
+            if d.get("aperture"):
+                c["aperture"] = d["aperture"]
+            return c
+
+        def before(sky, i, n, env=env):
+            if i == 0 or i == n // 2:
+                sky.call("environment_update", **env)
+
+        out.append(dict(name=shot["name"], frames=int(d["seconds"] * 30), cam=cam, before=before, warmup=120))
+    return out
 
 
 def grow(cir, pix):
@@ -446,9 +686,9 @@ def grow(cir, pix):
 
     FOREST, MEADOW, SCREE, CLIFF, BANK = 0, 1, 2, 3, 7
     cir.call("foliage_add", entity="Valley", name="Forest", seed=4, layers=[
-        L(fir, density=0.011, scaleMin=1.6, scaleMax=3.0, slopeMax=36, heightMin=WATER_Y + 1.5, heightMax=260, terrainLayer=FOREST,
+        L(fir, density=0.011, scaleMin=1.6, scaleMax=3.0, slopeMax=36, heightMin=WATER_Y + 1.5, heightMax=390, terrainLayer=FOREST,
           alignToNormal=0.05, clumping=0.85, cullDistance=2000, wind=0.3, randomTilt=2, subsurface=0.4),
-        L(fir_s, density=0.012, scaleMin=1.0, scaleMax=2.2, slopeMax=36, heightMin=WATER_Y + 1.5, heightMax=280, terrainLayer=FOREST,
+        L(fir_s, density=0.012, scaleMin=1.0, scaleMax=2.2, slopeMax=36, heightMin=WATER_Y + 1.5, heightMax=400, terrainLayer=FOREST,
           clumping=0.8, cullDistance=700, wind=0.45, seed=3, subsurface=0.4),
         L(broad, density=0.0012, scaleMin=0.9, scaleMax=1.4, slopeMax=22, heightMin=WATER_Y + 1.5, heightMax=120, terrainLayer=FOREST,
           clumping=0.6, cullDistance=1500, wind=0.35, seed=8, subsurface=0.5),
@@ -457,7 +697,9 @@ def grow(cir, pix):
         *[L(sh, density=0.014 if i < 2 else 0.004, scaleMin=0.7, scaleMax=1.5, slopeMax=34, heightMin=WATER_Y + 0.8, heightMax=220,
             clumping=0.8, terrainLayer=FOREST if i < 2 else MEADOW, cullDistance=220, wind=0.6, seed=10 + i, subsurface=0.5)
           for i, sh in enumerate(shrubs)],
-        L(fir, density=0.006, scaleMin=1.4, scaleMax=2.6, slopeMax=40, heightMin=40, heightMax=300, terrainLayer=SCREE,
+        L(fir_s, density=0.012, scaleMin=1.2, scaleMax=2.4, slopeMax=40, heightMin=30, heightMax=400, terrainLayer=SCREE,
+          clumping=0.85, cullDistance=1200, wind=0.4, seed=74, subsurface=0.4),
+        L(fir, density=0.02, scaleMin=1.4, scaleMax=2.6, slopeMax=40, heightMin=30, heightMax=400, terrainLayer=SCREE,
           alignToNormal=0.05, clumping=0.9, cullDistance=2000, wind=0.3, randomTilt=3, seed=71, subsurface=0.4),
         L(fern, density=0.35, scaleMin=0.6, scaleMax=1.4, slopeMax=38, heightMax=220, terrainLayer=FOREST, clumping=0.8,
           cullDistance=80, wind=0.7, castShadows=False, subsurface=0.5),
@@ -505,28 +747,45 @@ def grow(cir, pix):
     ])
 
 
+# Two moods: a misty sunrise (mist pooled in the valley, soft side light) and a storm-lit sunset
+# (heavy cloud banks, a low burning sun under them, warm lanterns against cool shade).
 MOODS = {
     "sunrise": dict(
-        skyMode="atmosphere", sunElevation=7, sunAzimuth=180, sunIntensity=3.2, sunColor="#ffdcb0", clouds=0.42,
-        cloudHeight=380, cloudThickness=900, cloudScale=1.6, cloudDensity=0.8, cloudSpeed=5,
-        fogDensity=0.0014, fogHeight=0.055, fogColor="#b8c4d2", haze=0.0015, godRays=1.0,
-        ambient=0.45, autoExposure=True, exposureCompensation=0.1, tonemap="agx", look="golden_hour", lookStrength=0.25,
-        saturation=1.08, contrast=1.06, bloomIntensity=0.35, vignette=0.22, grain=0.05, showGrid=False, windSpeed=3,
+        skyMode="atmosphere", sunElevation=11, sunAzimuth=180, sunIntensity=3.4, sunColor="#ffe4c4", clouds=0.42,
+        cloudHeight=1600, cloudThickness=1200, cloudScale=1.6, cloudDensity=0.8, cloudSpeed=5,
+        fogDensity=0.004, fogHeight=0.05, fogColor="#a9b7c6", haze=0.0005, godRays=1.0,
+        ambient=0.5, autoExposure=True, exposureCompensation=0.1, tonemap="agx", look="golden_hour", lookStrength=0.2,
+        saturation=1.08, contrast=1.06, bloomIntensity=0.35, vignette=0.22, grain=0.04, showGrid=False, windSpeed=3,
         windDirection=200, gi=1, ssr=1, ao=1.0, shadowDistance=900, shadowSoftness=1.1, temperature=0.0),
     "sunset": dict(
-        skyMode="atmosphere", sunElevation=4, sunAzimuth=255, sunIntensity=4.2, sunColor="#ff9a58", clouds=0.68,
-        cloudHeight=520, cloudThickness=1600, cloudScale=1.9, cloudDensity=1.5, cloudSpeed=12,
-        fogDensity=0.0016, fogHeight=0.02, fogColor="#8d7f86", haze=0.0018, godRays=1.4,
-        ambient=0.32, autoExposure=True, exposureCompensation=-0.1, tonemap="agx", look="teal_orange", lookStrength=0.45,
-        saturation=1.12, contrast=1.14, bloomIntensity=0.45, vignette=0.3, grain=0.06, showGrid=False, windSpeed=7,
-        windDirection=230, gi=1, ssr=1, ao=1.0, shadowDistance=900, shadowSoftness=1.0, temperature=0.12),
+        skyMode="atmosphere", sunElevation=4.5, sunAzimuth=20, sunIntensity=4.0, sunColor="#ff9c5c", clouds=0.74,
+        cloudHeight=1800, cloudThickness=2200, cloudScale=1.9, cloudDensity=1.5, cloudSpeed=12,
+        fogDensity=0.0018, fogHeight=0.04, fogColor="#7d7a8c", haze=0.0004, godRays=0.9,
+        ambient=0.34, autoExposure=True, exposureCompensation=-0.1, tonemap="agx", look="teal_orange", lookStrength=0.4,
+        saturation=1.1, contrast=1.14, bloomIntensity=0.45, vignette=0.3, grain=0.05, showGrid=False, windSpeed=7,
+        windDirection=230, gi=1, ssr=1, ao=1.0, shadowDistance=900, shadowSoftness=1.0, temperature=0.1),
 }
+
+
+def reshoot(studio):
+    """Re-derive the hero-shot sequences and the two mood scenes from the saved world (fast iteration)."""
+    nim, aur = studio.agent("Nimbus"), studio.agent("Aurora")
+    nim.call("scene_load", path="scenes/main.sky.json")
+    nim.call("entity_update", entity="Kagami Lake", components={"water": STILL_WATER})
+    sequences(nim)
+    aur.call("environment_update", **MOODS["sunset"])
+    nim.call("scene_save", path="scenes/sunset.sky.json")
+    aur.call("environment_update", **MOODS["sunrise"])
+    nim.call("scene_save", path="scenes/main.sky.json")
 
 
 if __name__ == "__main__":
     os.makedirs(PROJECT, exist_ok=True)
     st = Studio(PROJECT)
     try:
-        build(st)
+        reshoot(st) if "--shots" in sys.argv else build(st)
     finally:
         st.close()
+    meta = {k: v for k, v in META.items() if k != "view"}
+    with open(os.path.join(PROJECT, "game.json"), "w") as f:
+        json.dump(meta, f, indent=2)

@@ -1,0 +1,315 @@
+{
+  "format": "skywalker.sequence",
+  "version": 1,
+  "name": "Ashen Peaks — storm_vista",
+  "duration": 8,
+  "tracks": [
+    {
+      "type": "property",
+      "property": "environment.sunElevation",
+      "keys": [
+        {
+          "t": 0,
+          "value": 4.5,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.sunAzimuth",
+      "keys": [
+        {
+          "t": 0,
+          "value": 20,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.sunIntensity",
+      "keys": [
+        {
+          "t": 0,
+          "value": 4,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.sunColor",
+      "keys": [
+        {
+          "t": 0,
+          "value": "#ff9c5c",
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.ambient",
+      "keys": [
+        {
+          "t": 0,
+          "value": 0.34,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.clouds",
+      "keys": [
+        {
+          "t": 0,
+          "value": 0.74,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.cloudHeight",
+      "keys": [
+        {
+          "t": 0,
+          "value": 1800,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.cloudThickness",
+      "keys": [
+        {
+          "t": 0,
+          "value": 2200,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.cloudDensity",
+      "keys": [
+        {
+          "t": 0,
+          "value": 1.5,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.fogColor",
+      "keys": [
+        {
+          "t": 0,
+          "value": "#7d7a8c",
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.fogDensity",
+      "keys": [
+        {
+          "t": 0,
+          "value": 0.0018,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.fogHeight",
+      "keys": [
+        {
+          "t": 0,
+          "value": 0.04,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.godRays",
+      "keys": [
+        {
+          "t": 0,
+          "value": 0.9,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.haze",
+      "keys": [
+        {
+          "t": 0,
+          "value": 4e-04,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.exposureCompensation",
+      "keys": [
+        {
+          "t": 0,
+          "value": -0.1,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.look",
+      "keys": [
+        {
+          "t": 0,
+          "value": "teal_orange",
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.lookStrength",
+      "keys": [
+        {
+          "t": 0,
+          "value": 0.4,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.saturation",
+      "keys": [
+        {
+          "t": 0,
+          "value": 1.1,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.contrast",
+      "keys": [
+        {
+          "t": 0,
+          "value": 1.14,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.bloomIntensity",
+      "keys": [
+        {
+          "t": 0,
+          "value": 0.45,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.vignette",
+      "keys": [
+        {
+          "t": 0,
+          "value": 0.3,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.shadowSoftness",
+      "keys": [
+        {
+          "t": 0,
+          "value": 1,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.windSpeed",
+      "keys": [
+        {
+          "t": 0,
+          "value": 7,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "property",
+      "property": "environment.temperature",
+      "keys": [
+        {
+          "t": 0,
+          "value": 0.1,
+          "ease": "step"
+        }
+      ]
+    },
+    {
+      "type": "shot",
+      "camera": "Cam storm_vista",
+      "keys": [
+        {
+          "t": 0,
+          "shot": "path",
+          "duration": 8,
+          "target": [
+            0,
+            45,
+            500
+          ],
+          "points": [
+            [
+              -314,
+              99,
+              -131
+            ],
+            [
+              -311,
+              100,
+              -127
+            ],
+            [
+              -308,
+              101,
+              -123
+            ]
+          ],
+          "fov": 54
+        }
+      ]
+    },
+    {
+      "type": "camera",
+      "keys": [
+        {
+          "t": 0,
+          "camera": "Cam storm_vista"
+        }
+      ]
+    }
+  ]
+}
