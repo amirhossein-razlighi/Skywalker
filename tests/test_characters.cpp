@@ -5,6 +5,7 @@
 
 #include <cmath>
 
+#include "skywalker/anim/CharacterIk.h"
 #include "skywalker/anim/Controller.h"
 #include "skywalker/anim/HumanoidMap.h"
 #include "skywalker/anim/Retarget.h"
@@ -353,4 +354,144 @@ TEST_CASE("root motion: yaw is extracted from turning clips, the body keeps faci
     CHECK(yaw == 0.f);
     plain.evaluate(p);
     CHECK(degrees(p[0].r.angle()) == doctest::Approx(45.f).epsilon(0.02));
+}
+
+// ---------------------------------------------------------------------------------------------
+// Foot and hand IK
+// ---------------------------------------------------------------------------------------------
+
+namespace {
+
+GroundProbe ground(float y, Vec3 normal = {0, 1, 0}, float x = 0.f, float z = 0.f) {
+    GroundProbe g;
+    g.hit = true;
+    g.point = {x, y, z};
+    g.normal = normalize(normal);
+    return g;
+}
+
+std::array<FootInput, 2> standing(float leftGround, float rightGround) {
+    std::array<FootInput, 2> in;
+    for (int i = 0; i < 2; ++i) {
+        float x = i ? -0.1f : 0.1f;
+        in[static_cast<size_t>(i)].ankle = {x, 0.08f, 0};
+        in[static_cast<size_t>(i)].toe = {x, 0.02f, 0.12f};
+        in[static_cast<size_t>(i)].heel = ground(i ? rightGround : leftGround, {0, 1, 0}, x);
+        in[static_cast<size_t>(i)].toeProbe = ground(i ? rightGround : leftGround, {0, 1, 0}, x, 0.12f);
+    }
+    return in;
+}
+
+}  // namespace
+
+TEST_CASE("foot IK: ground offsets, pelvis drop, slopes, reach and toe clearance") {
+    FootIkSettings s;
+    s.footHeight = 0.08f;
+    s.toeHeight = 0.02f;
+    SUBCASE("raised ground lifts both feet, the pelvis stays") {
+        FootIkState st;
+        FootIkResult r = solveFeet(s, standing(0.2f, 0.2f), {0, 0, 0}, {0, 1, 0}, 0.f, st);
+        CHECK(r.ankle[0].y == doctest::Approx(0.28f));
+        CHECK(r.ankle[1].y == doctest::Approx(0.28f));
+        CHECK(r.pelvisOffset == doctest::Approx(0.f));
+        CHECK(r.weight[0] == doctest::Approx(1.f));
+    }
+    SUBCASE("a lower foot drops the pelvis by its offset") {
+        FootIkState st;
+        FootIkResult r = solveFeet(s, standing(-0.15f, 0.f), {0, 0, 0}, {0, 1, 0}, 0.f, st);
+        CHECK(r.ankle[0].y == doctest::Approx(0.08f - 0.15f));
+        CHECK(r.ankle[1].y == doctest::Approx(0.08f));
+        CHECK(r.pelvisOffset == doctest::Approx(-0.15f));
+    }
+    SUBCASE("feet tilt onto the slope, clamped at maxSlope") {
+        FootIkState st;
+        auto in = standing(0.f, 0.f);
+        Vec3 n20 = Quat::axisAngle({1, 0, 0}, radians(20.f)).rotate({0, 1, 0});
+        Vec3 n60 = Quat::axisAngle({1, 0, 0}, radians(60.f)).rotate({0, 1, 0});
+        in[0].heel.normal = n20;
+        in[1].heel.normal = n60;
+        FootIkResult r = solveFeet(s, in, {0, 0, 0}, {0, 1, 0}, 0.f, st);
+        CHECK(degrees(r.tilt[0].angle()) == doctest::Approx(20.f).epsilon(0.01));
+        CHECK(degrees(r.tilt[1].angle()) == doctest::Approx(40.f).epsilon(0.01));
+    }
+    SUBCASE("ground out of reach fades the IK out (jumps, ledges)") {
+        FootIkState st;
+        FootIkResult r = solveFeet(s, standing(-1.f, -1.f), {0, 0, 0}, {0, 1, 0}, 0.f, st);
+        CHECK(r.weight[0] == doctest::Approx(0.f));
+        CHECK(r.pelvisOffset == doctest::Approx(0.f));
+    }
+    SUBCASE("the toe never sinks into a higher stair step") {
+        FootIkState st;
+        auto in = standing(0.f, 0.f);
+        in[0].toeProbe = ground(0.18f, {0, 1, 0}, 0.1f, 0.12f);
+        FootIkResult r = solveFeet(s, in, {0, 0, 0}, {0, 1, 0}, 0.f, st);
+        // The toe (0.02 above the sole) must end at least toeHeight above the 0.18 m step.
+        CHECK(r.ankle[0].y == doctest::Approx(0.08f + 0.18f).epsilon(0.001));
+        CHECK(r.ankle[1].y == doctest::Approx(0.08f));
+    }
+}
+
+TEST_CASE("foot IK: planted feet lock while sliding slowly and re-plant with a step") {
+    FootIkSettings s;
+    s.footHeight = 0.08f;
+    s.lockSpeed = 0.35f;
+    s.lockDistance = 0.22f;
+    FootIkState st;
+    const float dt = 1.f / 60.f;
+    float x = 0.f;
+    FootIkResult r;
+    auto step = [&] {
+        auto in = standing(0.f, 0.f);
+        in[0].ankle.x = 0.1f + x;  // the animation slides the left foot slowly (0.1 m/s)
+        in[0].toe.x = 0.1f + x;
+        r = solveFeet(s, in, {0, 0, 0}, {0, 1, 0}, dt, st);
+        x += 0.1f * dt;
+    };
+    for (int i = 0; i < 60; ++i) step();
+    CHECK(st.feet[0].contact);
+    CHECK(st.feet[0].locked);
+    CHECK(r.ankle[0].x < 0.11f);  // stays where it planted while the animation slid 0.1 m
+    for (int i = 0; i < 120; ++i) step();  // 0.3 m away: a re-plant happened
+    CHECK(st.feet[0].locked);
+    CHECK(r.ankle[0].x > 0.25f);
+    CHECK(r.ankle[0].x < 0.1f + x + 1e-3f);
+    // Fast motion (a swing foot) never locks.
+    FootIkState fast;
+    for (int i = 0; i < 30; ++i) {
+        auto in = standing(0.f, 0.f);
+        in[1].ankle.x = -0.1f + 1.2f * dt * static_cast<float>(i);
+        solveFeet(s, in, {0, 0, 0}, {0, 1, 0}, dt, fast);
+    }
+    CHECK_FALSE(fast.feet[1].locked);
+}
+
+TEST_CASE("foot and hand IK on a skeleton: pelvis, ankles on target, hands reach, bones keep lengths") {
+    Skeleton sk = mixamoTPose();
+    HumanoidMap map = detectHumanoid(sk);
+    REQUIRE(map.complete());
+    float ankleH = 0.f, toeH = 0.f;
+    restFootHeights(sk, map, ankleH, toeH);
+    CHECK(ankleH > 0.05f);
+    Pose pose = restPose(sk);
+    std::vector<Mat4> g;
+    computeGlobals(sk, pose, g);
+    const int lf = map[HumanBone::LeftFoot], rf = map[HumanBone::RightFoot];
+    Vec3 la = pos(g, lf), ra = pos(g, rf);
+    FootIkResult r;
+    r.ankle = {la + Vec3{0, -0.05f, 0.1f}, ra + Vec3{0, 0.05f, 0}};
+    r.tilt = {Quat::axisAngle({1, 0, 0}, radians(-10.f)), Quat{}};
+    r.weight = {1.f, 1.f};
+    r.pelvisOffset = -0.1f;
+    float shin0 = distance(pos(g, map[HumanBone::LeftLowerLeg]), la);
+    applyFeet(sk, map, r, Mat4{}, pose, g);
+    CHECK(pos(g, map[HumanBone::Hips]).y == doctest::Approx(0.9f));
+    CHECK(distance(pos(g, lf), r.ankle[0]) < 1e-3f);
+    CHECK(distance(pos(g, rf), r.ankle[1]) < 1e-3f);
+    CHECK(distance(pos(g, map[HumanBone::LeftLowerLeg]), pos(g, lf)) == doctest::Approx(shin0).epsilon(1e-4));
+    CHECK(pos(g, map[HumanBone::LeftLowerLeg]).z > la.z + 0.01f);  // a straight leg bends its knee forward
+    // A grip point in front of the chest (e.g. on a staff held by the other hand) within the arm's reach.
+    Mat4 grip = Mat4::translate(pos(g, map[HumanBone::LeftUpperArm]) + Vec3{-0.1f, -0.25f, 0.3f});
+    REQUIRE(applyHand(sk, map, true, grip, Mat4{}, 1.f, false, pose, g));
+    CHECK(distance(pos(g, map[HumanBone::LeftHand]), grip.translation()) < 1e-3f);
+    CHECK_FALSE(applyHand(sk, HumanoidMap{}, true, grip, Mat4{}, 1.f, false, pose, g));
 }

@@ -168,6 +168,9 @@ set(SKY_ENGINE_SOURCES
     # Character tech: humanoid maps, pose-space retargeting, foot / hand IK, skinned grooms (docs/CHARACTERS.md)
     src/anim/HumanoidMap.cpp
     src/anim/Retarget.cpp
+    src/anim/CharacterIk.cpp
+    src/ecs/CharacterComponents.cpp
+    src/engine/CharacterHooks.cpp
 )
 
 # DCC bridge: the Python helper library and the Blender add-on are embedded so the engine can

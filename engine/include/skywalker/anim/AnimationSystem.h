@@ -20,6 +20,7 @@
 #include <vector>
 
 #include "skywalker/anim/Animation.h"
+#include "skywalker/anim/CharacterIk.h"
 #include "skywalker/anim/Controller.h"
 #include "skywalker/anim/Sequence.h"
 #include "skywalker/render/Renderer.h"
@@ -40,6 +41,9 @@ public:
         /// Root motion hook (e.g. a physics character controller). Return true when the
         /// delta (world space, meters) was consumed; otherwise the Transform moves.
         std::function<bool(EntityId entity, Vec3 worldDelta)> rootMotion;
+        /// Foot IK ground probe: the nearest surface along a ray (world), ignoring `character` and
+        /// everything below it. Empty = no foot planting.
+        std::function<GroundProbe(Vec3 origin, Vec3 direction, float maxDistance, EntityId character)> ground;
     };
     Hooks hooks;
     /// Process modes (scene/Process.h): which sequencers and animators run this tick and how fast
@@ -112,6 +116,15 @@ public:
     Status setPreview(EntityId animatorEntity, const std::string& stateOrClip, float seconds);
     void clearPreview(EntityId animatorEntity);
 
+    // --- Character tech (CharacterIk.cpp) ---------------------------------------------------
+    /// Turns the character (in place) to face `yawDegrees` (world yaw, 0 = -Z) at characterIk.turnSpeed;
+    /// controllers with a float `turn` / bool `turning` parameter get the angle left (turn clips).
+    Status turnInPlace(EntityId e, float yawDegrees);
+    /// Humanoid map, foot / hand IK status of the last solve, turn target.
+    Result<Json> characterStatus(EntityId e);
+    /// Bone segments (parent joint -> joint) of the current pose in world space (debug views).
+    std::vector<std::pair<Vec3, Vec3>> skeletonLines(EntityId e);
+
     Status playSequence(EntityId e, float from = 0.f);
     Status stopSequence(EntityId e);
     Json sequenceState(EntityId e);
@@ -136,6 +149,10 @@ private:
     void finishPose(Instance& inst, EntityId e, const Animator& a);
     void applyLookAt(Instance& inst, EntityId e, const Animator& a);
     void applyRootYaw(const Instance& inst, EntityId e, float yaw);
+    const HumanoidMap* humanoidOf(Instance& inst);
+    Mat4 freshWorld(EntityId target, EntityId character, Instance& inst);
+    void applyCharacterIk(Instance& inst, EntityId e);
+    void updateTurn(Instance& inst, EntityId e, float dt);
     void applyIk(Instance& inst, EntityId e);
     const std::vector<EntityId>* ikEffectors(EntityId animatorEntity);
     Mat4 modelToWorld(const Instance& inst, EntityId animatorEntity) const;

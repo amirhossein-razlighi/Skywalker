@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 
+#include "AnimationSystemInternal.h"
 #include "skywalker/anim/Retarget.h"
 
 #include "skywalker/core/Log.h"
@@ -89,62 +90,6 @@ std::vector<int> lookChain(const Skeleton& sk) {
 }
 
 }  // namespace
-
-struct AnimationSystem::Instance {
-    std::string signature;
-    std::shared_ptr<const Library> lib;
-    std::shared_ptr<const ControllerDef> ctl;
-    AnimatorRuntime rt;
-    std::string error;
-    int rootMode = -1;  // pinned root (rootMotion or inPlace) * 2 + root yaw; -1 = not configured yet
-
-    // The first rigged mesh under the animator: where the skeleton sits in the world.
-    uint64_t bindRevision = ~0ull, bindGeneration = 0;
-    EntityId meshEntity = kNoEntity;
-    std::string meshKey, libraryFromMesh;
-    Mat4 transform;  // the mesh's glTF -> mesh space transform
-
-    Pose pose;
-    std::vector<Mat4> globals;
-    std::vector<Mat4> prevGlobals;  // the pose of the tick before (render interpolation)
-    uint64_t version = 0;
-    bool posed = false;
-    std::string editKey;
-    uint64_t paramsVersion = 0;
-    float editClock = 0.f;
-
-    struct SkinEntry {
-        const MeshData* mesh = nullptr;
-        std::vector<int> map;
-        uint64_t version = ~0ull;
-        SkinPose pose;
-        std::shared_ptr<MeshData> posed;
-        uint64_t posedVersion = ~0ull;
-        SkinPose blended;  // between the previous tick's pose and the last one (render interpolation)
-        uint64_t blendedVersion = ~0ull;
-        float blendedAlpha = -1.f;
-    };
-    std::unordered_map<std::string, SkinEntry> skins;
-
-    std::vector<int> lookChain;
-    std::vector<Mat4> restGlobals;     // skeleton rest pose (look-at reference)
-    float lookBlend = 0.f;
-    std::optional<Vec3> lookTarget;    // last aim point (world): lets the turn fade out when lookAt clears
-    Vec3 lastRootMotion{0, 0, 0};
-    float lastRootYaw = 0.f;  // radians, last tick
-    std::vector<std::string> recentEvents;
-    std::optional<std::pair<std::string, float>> preview;     // tool preview: (state or clip, seconds)
-    std::optional<std::pair<std::string, float>> seqPreview;  // sequencer animation track, this frame only
-};
-
-struct AnimationSystem::SeqInstance {
-    std::string signature;
-    std::shared_ptr<const SequenceDef> def;
-    std::string error;
-    bool started = false;
-    bool playing = false;
-    float time = 0.f;
-};
 
 AnimationSystem::AnimationSystem(Scene& scene) : scene_(scene) {}
 AnimationSystem::~AnimationSystem() = default;
@@ -411,6 +356,9 @@ void AnimationSystem::initRuntime(Instance& inst, const Animator& a) {
     inst.restGlobals.clear();
     inst.lookTarget.reset();
     inst.rootMode = -1;
+    inst.humanoid.reset();
+    inst.feet = FootIkState{};
+    inst.ikStatus = Json();
     ++inst.version;
 
     std::shared_ptr<const ControllerDef> ctl;
@@ -610,6 +558,7 @@ void AnimationSystem::applyIk(Instance& inst, EntityId e) {
 void AnimationSystem::finishPose(Instance& inst, EntityId e, const Animator& a) {
     inst.rt.evaluate(inst.pose);
     applyLookAt(inst, e, a);
+    applyCharacterIk(inst, e);  // feet, pelvis and hand targets (characterIk component)
     applyIk(inst, e);
     computeGlobals(inst.lib->skeleton, inst.pose, inst.globals);
     inst.posed = true;
@@ -732,11 +681,15 @@ void AnimationSystem::tick(float baseDt) {
             }
             const float dt = baseDt * (process ? process->scale(e) : 1.f);
             if (inst->posed) inst->prevGlobals = inst->globals;
+            updateTurn(*inst, e, dt);  // turn_in_place: rotate toward the target, feed `turn` / `turning`
             std::vector<AnimatorRuntime::Event> events;
             Vec3 delta{0, 0, 0};
             float yaw = 0.f;
             inst->rt.update(dt * a->speed, &events, a->rootMotion ? &delta : nullptr, a->rootMotion && a->rootYaw ? &yaw : nullptr);
             for (const auto& ev : events) {
+                // Foot contact markers (characterIk.contact = events).
+                if (ev.name == "foot_l_down" || ev.name == "foot_l_up") inst->feet.feet[0].eventContact = ev.name == "foot_l_down";
+                if (ev.name == "foot_r_down" || ev.name == "foot_r_up") inst->feet.feet[1].eventContact = ev.name == "foot_r_down";
                 if (hooks.emit) hooks.emit("anim:" + ev.name, e);
                 inst->recentEvents.push_back(ev.name);
                 if (inst->recentEvents.size() > kRecentEvents) inst->recentEvents.erase(inst->recentEvents.begin());
@@ -759,7 +712,9 @@ void AnimationSystem::tick(float baseDt) {
             const bool looking = !a->lookAt.empty() && scene_.resolve(a->lookAt, e) != kNoEntity;
             float goal = looking ? std::clamp(a->lookAtWeight, 0.f, 1.f) : 0.f;  // turns fade in and out
             inst->lookBlend += (goal - inst->lookBlend) * std::min(1.f, dt * kLookRate);
+            inst->tickDt = dt;  // foot IK smoothing and contact locking advance with the simulation
             finishPose(*inst, e, *a);
+            inst->tickDt = 0.f;
         }
     }
     // 3. Bone attachments

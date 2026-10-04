@@ -208,7 +208,14 @@ bool solveTwoBoneIk(const Skeleton& sk, Pose& pose, std::vector<Mat4>& globals, 
     if (end < 0 || static_cast<size_t>(end) >= sk.bones.size() || weight <= 0.f) return false;
     const int mid = sk.bones[static_cast<size_t>(end)].parent;
     const int root = mid >= 0 ? sk.bones[static_cast<size_t>(mid)].parent : -1;
-    if (root < 0 || globals.size() != sk.bones.size() || pose.size() != sk.bones.size()) return false;
+    return solveTwoBoneChain(sk, pose, globals, root, mid, end, t, pole, weight);
+}
+
+bool solveTwoBoneChain(const Skeleton& sk, Pose& pose, std::vector<Mat4>& globals, int root, int mid, int end, Vec3 t, Vec3 pole,
+                       float weight) {
+    const int n = static_cast<int>(sk.bones.size());
+    if (weight <= 0.f || root < 0 || mid < 0 || end < 0 || root >= n || mid >= n || end >= n) return false;
+    if (globals.size() != sk.bones.size() || pose.size() != sk.bones.size()) return false;
     const Vec3 a = globals[static_cast<size_t>(root)].translation();
     const Vec3 b = globals[static_cast<size_t>(mid)].translation();
     const Vec3 c = globals[static_cast<size_t>(end)].translation();

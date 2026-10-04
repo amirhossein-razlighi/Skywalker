@@ -98,6 +98,9 @@ void computeGlobals(const Skeleton& skeleton, const Pose& pose, std::vector<Mat4
 /// `globals` must match `pose` and is updated. Returns false if the chain is degenerate.
 bool solveTwoBoneIk(const Skeleton& skeleton, Pose& pose, std::vector<Mat4>& globals, int end, Vec3 target, Vec3 pole,
                     float weight);
+/// The same for an explicit chain (root -> mid -> end may have twist / helper bones in between).
+bool solveTwoBoneChain(const Skeleton& skeleton, Pose& pose, std::vector<Mat4>& globals, int root, int mid, int end, Vec3 target,
+                       Vec3 pole, float weight);
 
 /// Average horizontal speed of the root bone over a clip (model units per second, `up` is
 /// the model's up axis). Locomotion clips report how fast they move: blend thresholds.
