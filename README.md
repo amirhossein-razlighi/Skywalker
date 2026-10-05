@@ -11,6 +11,15 @@
 
 ---
 
+<p align="center">
+  <a href="https://github.com/amirhossein-razlighi/Skywalker/releases/tag/launch-trailer">
+    <img src="assets/trailer/trailer-poster.jpg" alt="Watch the Skywalker launch trailer (4:02)" width="860">
+  </a>
+</p>
+
+<p align="center"><a href="https://github.com/amirhossein-razlighi/Skywalker/releases/download/launch-trailer/skywalker-launch-trailer-1080p.mp4"><b>Watch the launch trailer</b></a> (4:02, 1080p). Every shot was rendered by the engine.</p>
+
+
 Skywalker is a C++20 game engine with a native macOS editor, designed so that AI agents
 (Claude, GPT, DeepSeek, local and self-hosted models) can **see** the scene, **act** on it
 precisely, **test** what they built, and **collaborate** with you — through the very same

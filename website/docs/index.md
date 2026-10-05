@@ -22,6 +22,16 @@ hide:
   </div>
 </div>
 
+## Launch trailer
+
+<video controls preload="none" playsinline poster="assets/trailer/trailer-poster.jpg" style="width:100%;border-radius:12px">
+  <source src="https://github.com/amirhossein-razlighi/Skywalker/releases/download/launch-trailer/skywalker-launch-trailer-720p.mp4" type="video/mp4">
+</video>
+
+Four minutes from the first prompt to a shipped game: the agent studio, Wander, the tool wall, guardrails, live edits,
+self-testing agents, the renderer and nine worlds built with the engine. Every shot was rendered in-engine.
+[Download the 1080p version](https://github.com/amirhossein-razlighi/Skywalker/releases/download/launch-trailer/skywalker-launch-trailer-1080p.mp4).
+
 ## Why Skywalker
 
 <div class="grid cards" markdown>
@@ -30,7 +40,7 @@ hide:
 
     ---
 
-    168 typed, schema-validated tools cover scenes, worlds, rendering, physics, animation, audio, UI, assets, the
+    More than 230 typed, schema-validated tools cover scenes, worlds, rendering, physics, animation, audio, UI, assets, the
     studio, movies and shipping. The editor, its crew and external agents share them, so humans and agents never have
     different powers. Errors come with *did you mean …?* hints.
 
