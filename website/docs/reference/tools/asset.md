@@ -543,7 +543,7 @@ Create a reusable material asset (*.mat.json): color, metallic, roughness, emiss
 | `fuzz` | number |  | cloth: extra rim of loose fibers | 0 .. 2 |
 | `hairShift` | number |  | hair_card: primary highlight shift along the strand | -1 .. 1 |
 | `hairSpecular` | number |  | hair_card: highlight strength | 0 .. 4 |
-| `hairDirection` | string |  | hair_card: strand direction in the card's UVs (root to tip) | `v` `-v` `u` `-u` |
+| `hairDirection` | string |  | hair_card: strand direction in the card's UVs (root to tip); auto = found per pixel from the strand pattern of the texture (atlases whose cards run either way) | `auto` `v` `-v` `u` `-u` |
 | `alphaMode` | string |  | hair_card: dither = stochastic transparency that resolves to soft strands under TAA and stills; coverage = alpha to coverage (MSAA) | `dither` `coverage` |
 | `clearcoatRoughness` | number |  | Roughness of the clearcoat layer (0.02 mirror lacquer .. 0.3 satin; default 0.06) | 0 .. 1 |
 | `flakes` | number |  | Metallic flakes in the base layer (car paint sparkle): share of the base reflection, 0 = none, 0.3-0.6 = metallic paint | 0 .. 1 |
@@ -632,7 +632,7 @@ Change fields of an existing material; every entity using it updates instantly.
 | `fuzz` | number |  | cloth: extra rim of loose fibers | 0 .. 2 |
 | `hairShift` | number |  | hair_card: primary highlight shift along the strand | -1 .. 1 |
 | `hairSpecular` | number |  | hair_card: highlight strength | 0 .. 4 |
-| `hairDirection` | string |  | hair_card: strand direction in the card's UVs (root to tip) | `v` `-v` `u` `-u` |
+| `hairDirection` | string |  | hair_card: strand direction in the card's UVs (root to tip); auto = found per pixel from the strand pattern of the texture (atlases whose cards run either way) | `auto` `v` `-v` `u` `-u` |
 | `alphaMode` | string |  | hair_card: dither = stochastic transparency that resolves to soft strands under TAA and stills; coverage = alpha to coverage (MSAA) | `dither` `coverage` |
 | `clearcoatRoughness` | number |  | Roughness of the clearcoat layer (0.02 mirror lacquer .. 0.3 satin; default 0.06) | 0 .. 1 |
 | `flakes` | number |  | Metallic flakes in the base layer (car paint sparkle): share of the base reflection, 0 = none, 0.3-0.6 = metallic paint | 0 .. 1 |

@@ -337,7 +337,7 @@ static MainOut meshShade(MeshOut in, bool frontFacing, constant DrawUniforms& d,
         if (shadingModel == kShadeSkin) s.N = skinMicroNormal(s.N, in.worldPos, texUV, d);
         if (shadingModel == kShadeEye) eyeSurface(s, Ngeo, in.worldPos, texUV, V, d, albedoTex, f.extra.w);
         if (shadingModel == kShadeHairCard) {
-            ci.hairT = hairCardTangent(s.N, in.worldPos, texUV, d);
+            ci.hairT = hairCardTangent(s.N, in.worldPos, texUV, d, albedoTex, d.maps.x > 0.5);
             if (d.character[1].x < 0.5) {  // dithered: stochastic coverage that TAA / accumulation resolves
                 if (s.alpha < ditherNoise(in.position.xy, f.temporal)) discard_fragment();
                 s.alpha = 1.0;

@@ -145,6 +145,9 @@ static float3 clothLight(SurfaceData s, constant DrawUniforms& d, float3 V, floa
 
 static float3 hairCardLight(SurfaceData s, CharacterInputs ci, constant DrawUniforms& d, float3 V, float3 L, float3 radiance, float shadow,
                             float specScale) {
+    // Kajiya-Kay with Marschner's two visible lobes: R (white, a Fresnel-weighted reflection off the cuticle, ~5% at
+    // normal incidence) shifted toward the root, and TRT (tinted by the fiber color twice) shifted toward the tip.
+    // Earlier versions left out the Fresnel factor: R was ~20x too bright and burned the cards into a white band.
     float3 N = s.N, T = ci.hairT;
     float shift = d.character[0].x;
     float3 T1 = normalize(T + N * shift), T2 = normalize(T + N * (shift - 0.15));
@@ -153,11 +156,13 @@ static float3 hairCardLight(SurfaceData s, CharacterInputs ci, constant DrawUnif
     float th1 = dot(T1, H), th2 = dot(T2, H);
     float spec1 = pow(sqrt(saturate(1.0 - th1 * th1)), e1) * (e1 + 2.0) / (8.0 * M_PI_F);
     float spec2 = pow(sqrt(saturate(1.0 - th2 * th2)), e2) * (e2 + 2.0) / (8.0 * M_PI_F);
+    float cosL = sqrt(saturate(1.0 - dot(T, L) * dot(T, L)));             // light's angle to the fiber's normal plane
+    float fresnel = 0.046 + 0.954 * pow(1.0 - saturate(dot(V, H)), 5.0);  // cuticle, eta ~1.55
     float facing = smoothstep(-0.15, 0.25, dot(N, L));
-    float3 spec = (float3(spec1) + s.albedo * spec2 * 1.6) * d.character[0].y * facing * specScale;
+    float3 spec = (float3(spec1 * fresnel) + s.albedo * s.albedo * spec2 * 0.5) * cosL * d.character[0].y * facing * specScale;
     float3 diffuse = s.albedo / M_PI_F * saturate(mix(0.3, 1.0, dot(N, L) * 0.5 + 0.5));
     float3 through = s.albedo * pow(saturate(dot(V, -L)), 4.0) * 0.35;  // backlit hair glows
-    return (diffuse + spec * 0.25 + through) * radiance * shadow * M_PI_F;
+    return (diffuse + spec + through) * radiance * shadow * M_PI_F;
 }
 
 static float3 characterLight(SurfaceData s, CharacterInputs ci, constant DrawUniforms& d, float3 V, float3 L, float3 radiance, float shadow,
@@ -210,11 +215,46 @@ static void eyeSurface(thread SurfaceData& s, float3 Ngeo, float3 worldPos, floa
     s.roughness = clamp(d.character[1].x, 0.02, 1.0);
 }
 
-// Hair cards: the strand direction along the card's UV axis (world space).
-static float3 hairCardTangent(float3 N, float3 worldPos, float2 uv, constant DrawUniforms& d) {
+// Hair cards: the strand direction along the card's UV axis (world space). With hairDirection "auto"
+// (character[0].z = 2) it is read from the texture: strands vary fast across and slowly along their length,
+// so the UV axis with the lower gradient energy of the strand mask (alpha, then luminance) over a small
+// neighbourhood is the strand axis; the two cotangent axes are blended by those energies, which also
+// follows diagonal strands and avoids a hard switch between neighbouring pixels.
+static float hairStrandMask(texture2d<float> tex, float2 uv, float lod) {
+    float4 c = tex.sample(materialSampler, uv, level(lod));
+    return c.a * 0.7 + dot(c.rgb, float3(0.3, 0.59, 0.11)) * 0.3;
+}
+
+static float2 hairStrandAxisWeights(texture2d<float> tex, float2 uv) {
+    const float lod = 1.0;
+    float2 texel = 1.0 / float2(max(tex.get_width(), 1u), max(tex.get_height(), 1u)) * exp2(lod);
+    float eu = 0.0, ev = 0.0;
+    for (int j = -1; j <= 1; ++j) {
+        for (int i = -1; i <= 1; ++i) {
+            float2 p = uv + float2(i, j) * texel * 3.0;
+            float gu = hairStrandMask(tex, p + float2(texel.x, 0.0), lod) - hairStrandMask(tex, p - float2(texel.x, 0.0), lod);
+            float gv = hairStrandMask(tex, p + float2(0.0, texel.y), lod) - hairStrandMask(tex, p - float2(0.0, texel.y), lod);
+            eu += gu * gu;
+            ev += gv * gv;
+        }
+    }
+    // weight of the u axis grows where the mask changes along v (strands run along u)
+    float sum = eu + ev;
+    return sum > 1e-6 ? float2(ev, eu) / sum : float2(0.0, 1.0);
+}
+
+static float3 hairCardTangent(float3 N, float3 worldPos, float2 uv, constant DrawUniforms& d, texture2d<float> albedoTex, bool hasTex) {
     float3 T, B;
     charCotangentFrame(N, worldPos, uv, T, B);
-    float3 dir = (d.character[0].z > 0.5 ? B : T) * d.character[0].w;
+    float3 dir;
+    if (d.character[0].z > 1.5) {
+        float2 w = hasTex ? hairStrandAxisWeights(albedoTex, uv) : float2(0.0, 1.0);
+        // sharpen the blend toward the dominant axis; keep the v sign convention (root to tip = +v)
+        w = w * w;
+        dir = normalize(T) * w.x + normalize(B) * w.y;
+    } else {
+        dir = (d.character[0].z > 0.5 ? B : T) * d.character[0].w;
+    }
     dir -= N * dot(dir, N);
     return length(dir) > 1e-6 ? normalize(dir) : float3(0.0, 1.0, 0.0);
 }

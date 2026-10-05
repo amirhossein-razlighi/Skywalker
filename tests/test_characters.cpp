@@ -14,6 +14,8 @@
 #include "skywalker/engine/Engine.h"
 #include "skywalker/fx/Groom.h"
 #include "skywalker/fx/GroomBinding.h"
+#include "skywalker/assets/Material.h"
+#include "skywalker/render/Image.h"
 #include "skywalker/scene/Scene.h"
 
 using namespace sky;
@@ -838,4 +840,93 @@ TEST_CASE("character tools: retarget, inspect, IK setup, retargetFrom and Wander
     // Turning in place reaches the target yaw at turnSpeed (220 deg/s: 90 degrees in under half a second).
     CHECK(e.scene().get<Transform>(e.scene().find("Hero"))->rotation.y == doctest::Approx(90.f).epsilon(0.02));
     e.stop();
+}
+
+TEST_CASE("hair_card: auto strand direction by default, explicit directions packed") {
+    MaterialAsset m;
+    m.shading = "hair_card";
+    CHECK(m.hairDirection == "auto");
+    Surface s = toSurface(m);
+    CHECK(s.model[0].z == doctest::Approx(2.f));  // auto: the shader reads the strand pattern
+    m.hairDirection = "-u";
+    s = toSurface(m);
+    CHECK(s.model[0].z == doctest::Approx(0.f));
+    CHECK(s.model[0].w == doctest::Approx(-1.f));
+    m.hairDirection = "v";
+    s = toSurface(m);
+    CHECK(s.model[0].z == doctest::Approx(1.f));
+}
+
+TEST_CASE("hair_card: hair cards keep their color under a highlight (Metal, skipped without a GPU)") {
+    EngineConfig cfg;
+    cfg.renderer = RendererBackend::Auto;
+    cfg.projectDir = (std::filesystem::temp_directory_path() / ("skywalker-haircard-" + AssetDatabase::newGuid().substr(0, 8))).string();
+    std::filesystem::create_directories(cfg.projectDir);
+    Engine e(cfg);
+    if (e.renderer().info().backend != "metal") return;
+    (void)e.newScene("Hair", false);
+    // A dark-brown strand texture: strands run along v (alpha and value vary across u), like most card atlases
+    // laid out sideways; the other card is the same texture turned 90 degrees in UV.
+    for (int turned = 0; turned < 2; ++turned) {
+        Image img(256, 256);
+        for (int y = 0; y < 256; ++y) {
+            for (int x = 0; x < 256; ++x) {
+                float t = static_cast<float>(turned ? y : x);
+                float strand = 0.5f + 0.5f * std::sin(t * 0.9f) * std::sin(t * 0.23f + 1.f);
+                uint8_t* p = img.at(x, y);
+                p[0] = static_cast<uint8_t>(60 * (0.6f + 0.4f * strand));
+                p[1] = static_cast<uint8_t>(40 * (0.6f + 0.4f * strand));
+                p[2] = static_cast<uint8_t>(26 * (0.6f + 0.4f * strand));
+                p[3] = 255;
+            }
+        }
+        REQUIRE(writePng(img, cfg.projectDir + "/strands" + std::to_string(turned) + ".png"));
+    }
+    auto tool = [&](const char* name, const std::string& args) {
+        ToolResult r = e.callTool(name, Json::parse(args).value(), "agent:test");
+        INFO(name, " -> ", (r.content.empty() ? "" : r.content.front().text));
+        REQUIRE(!r.isError);
+    };
+    tool("material_create", R"({"path":"pbr.mat.json","color":"#ffffff","roughness":0.45,"texture":"strands0.png"})");
+    tool("material_create", R"({"path":"card0.mat.json","preset":"hair_card","color":"#ffffff","roughness":0.45,"texture":"strands0.png","alphaMode":"coverage","alphaCutoff":0})");
+    tool("material_create", R"({"path":"card1.mat.json","preset":"hair_card","color":"#ffffff","roughness":0.45,"texture":"strands1.png","alphaMode":"coverage","alphaCutoff":0})");
+    // three cards side by side facing the camera, the sun behind the camera so the half vector meets the cards
+    tool("entity_create", R"({"name":"Pbr","position":[-1.1,1,0],"rotation":[90,0,0],"components":{"mesh":{"mesh":"plane","material":"pbr.mat.json"}}})");
+    tool("entity_create", R"({"name":"Card0","position":[0,1,0],"rotation":[90,0,0],"components":{"mesh":{"mesh":"plane","material":"card0.mat.json"}}})");
+    tool("entity_create", R"({"name":"Card1","position":[1.1,1,0],"rotation":[90,0,0],"components":{"mesh":{"mesh":"plane","material":"card1.mat.json"}}})");
+    tool("environment_update", R"({"skyMode":"gradient","sunElevation":25,"sunAzimuth":0,"autoExposure":false,"exposure":1,"bloomIntensity":0})");
+    CaptureOptions o;
+    o.width = 240;
+    o.height = 80;
+    o.samples = 4;
+    o.hasCustomView = true;
+    o.customView.eye = {0, 1.0f, 2.2f};
+    o.customView.target = {0, 1.0f, 0};
+    o.customView.fovDeg = 40;
+    auto cap = e.capture(o);
+    REQUIRE(cap);
+    auto patch = [&](int cx) {
+        double sum = 0, peak = 0;
+        int n = 0;
+        for (int y = 30; y < 50; ++y) {
+            for (int x = cx - 10; x < cx + 10; ++x) {
+                const uint8_t* p = cap->image.at(x, y);
+                double l = 0.2126 * p[0] + 0.7152 * p[1] + 0.0722 * p[2];
+                sum += l;
+                peak = std::max(peak, l);
+                ++n;
+            }
+        }
+        return std::pair<double, double>{sum / n, peak};
+    };
+    auto pbr = patch(65), card0 = patch(120), card1 = patch(175);
+    INFO("pbr ", pbr.first, "/", pbr.second, " card0 ", card0.first, "/", card0.second, " card1 ", card1.first, "/", card1.second);
+    CHECK(pbr.first > 2.0);
+    // dark hair stays dark hair: no white band (the R lobe used to be ~20x too bright)
+    CHECK(card0.second < 200.0);
+    CHECK(card1.second < 200.0);
+    CHECK(card0.first < pbr.first * 3.0 + 10.0);
+    CHECK(card1.first < pbr.first * 3.0 + 10.0);
+    // the auto direction treats both layouts alike
+    CHECK(std::fabs(card0.first - card1.first) < 0.35 * std::max(card0.first, card1.first) + 4.0);
 }

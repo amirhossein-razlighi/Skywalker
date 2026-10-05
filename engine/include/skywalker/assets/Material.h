@@ -60,7 +60,7 @@ struct MaterialAsset {
     // hair_card
     float hairShift = 0.08f;         // primary highlight shift along the strand (cuticle tilt)
     float hairSpecular = 0.8f;       // highlight strength
-    std::string hairDirection = "v"; // strand direction in UV: v, -v, u, -u
+    std::string hairDirection = "auto";  // strand direction in UV: auto (from the texture's strand pattern), v, -v, u, -u
     std::string alphaMode = "dither";  // hair cards: dither (stochastic, resolves under TAA) | coverage (alpha to coverage)
     // Car paint: the clearcoat's own roughness, and metallic flakes in the base layer (docs/RENDERING.md "Car paint").
     float clearcoatRoughness = 0.06f;

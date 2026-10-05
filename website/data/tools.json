@@ -2769,12 +2769,13 @@
      "hairDirection": {
       "type": "string",
       "enum": [
+       "auto",
        "v",
        "-v",
        "u",
        "-u"
       ],
-      "description": "hair_card: strand direction in the card's UVs (root to tip)"
+      "description": "hair_card: strand direction in the card's UVs (root to tip); auto = found per pixel from the strand pattern of the texture (atlases whose cards run either way)"
      },
      "alphaMode": {
       "type": "string",
@@ -3109,12 +3110,13 @@
      "hairDirection": {
       "type": "string",
       "enum": [
+       "auto",
        "v",
        "-v",
        "u",
        "-u"
       ],
-      "description": "hair_card: strand direction in the card's UVs (root to tip)"
+      "description": "hair_card: strand direction in the card's UVs (root to tip); auto = found per pixel from the strand pattern of the texture (atlases whose cards run either way)"
      },
      "alphaMode": {
       "type": "string",
