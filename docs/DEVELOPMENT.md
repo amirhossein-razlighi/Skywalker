@@ -45,7 +45,7 @@ File › Open Project… (⌘O) switches projects; the editor reopens the last o
 ## Linux
 
 The `headless` preset builds the engine, the CLI and the test suite on Linux with GCC 13 or Clang 18 and runs every
-test on the CPU renderer; CI (`headless-linux`) builds it and runs `ctest --preset headless` on Ubuntu 24.04. Metal,
+test on the CPU renderer (not run in CI). Metal,
 the editor and AVFoundation video encoding are macOS-only: the tests that need them report a message and pass.
 
 ```bash

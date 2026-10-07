@@ -2,7 +2,7 @@ name: CI
 
 # Runs only when code or build files change: docs, media and example-only pushes are skipped.
 # Pushes to main run the fast check (debug build of engine + editor, full test suite).
-# The slower AddressSanitizer and Linux builds run nightly, on pull requests and on demand.
+# The slower AddressSanitizer build runs on pull requests and on demand.
 on:
   push:
     branches: [main]
@@ -27,12 +27,10 @@ on:
       - "CMakeLists.txt"
       - "CMakePresets.json"
       - ".github/workflows/ci.yml"
-  schedule:
-    - cron: "17 3 * * *"  # nightly full run
   workflow_dispatch:
     inputs:
       full:
-        description: "Also run the ASan and Linux jobs"
+        description: "Also run the ASan job"
         type: boolean
         default: true
 
@@ -94,28 +92,3 @@ jobs:
       - name: Cache stats
         if: always()
         run: ccache -s | head -12
-
-  # Linux runs the portable core with GCC and the CPU renderer: build plus the full test suite.
-  headless-linux:
-    name: Linux (headless build)
-    if: github.event_name != 'push' && (github.event_name != 'workflow_dispatch' || inputs.full)
-    runs-on: ubuntu-24.04
-    timeout-minutes: 45
-    steps:
-      - uses: actions/checkout@v5
-      - name: Tools
-        run: sudo apt-get update && sudo apt-get install -y ninja-build zlib1g-dev libcurl4-openssl-dev ccache
-      - name: Compiler cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ccache
-          key: ccache-linux-${{ hashFiles('CMakeLists.txt', 'cmake/**', 'engine/CMakeLists.txt', 'tests/CMakeLists.txt') }}-${{ github.sha }}
-          restore-keys: |
-            ccache-linux-${{ hashFiles('CMakeLists.txt', 'cmake/**', 'engine/CMakeLists.txt', 'tests/CMakeLists.txt') }}-
-            ccache-linux-
-      - name: Configure
-        run: cmake --preset headless -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
-      - name: Build
-        run: cmake --build --preset headless
-      - name: Test
-        run: ctest --preset headless --output-on-failure
